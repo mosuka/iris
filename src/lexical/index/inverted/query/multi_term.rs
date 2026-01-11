@@ -3,6 +3,8 @@
 //! This module provides traits and utilities for queries that match multiple terms,
 //! similar to Lucene's MultiTermQuery.
 
+use serde::{Deserialize, Serialize};
+
 use crate::error::Result;
 use crate::lexical::index::inverted::core::terms::TermsEnum;
 use crate::lexical::index::inverted::query::Query;
@@ -117,7 +119,7 @@ pub trait MultiTermQuery: Query {
 /// - **BooleanRewrite**: Convert to BooleanQuery with all matching terms
 ///
 /// The choice of strategy affects both performance and scoring behavior.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum RewriteMethod {
     /// Collect the top N terms by score, then create a BooleanQuery.
     /// This is the default and most performant for scoring queries.

@@ -9,6 +9,7 @@ use crate::lexical::index::inverted::core::automaton::{AutomatonTermsEnum, Leven
 use crate::lexical::index::inverted::core::terms::{TermDictionaryAccess, TermsEnum as _};
 use crate::lexical::index::inverted::query::Query;
 use crate::lexical::index::inverted::query::matcher::Matcher;
+use crate::lexical::index::inverted::query::multi_term::{MultiTermQuery, RewriteMethod};
 use crate::lexical::index::inverted::query::scorer::Scorer;
 use crate::lexical::index::inverted::reader::InvertedIndexReader;
 use crate::lexical::reader::LexicalIndexReader;
@@ -32,6 +33,8 @@ pub struct FuzzyQuery {
     max_expansions: usize,
     /// Boost factor for the query
     boost: f32,
+    /// Rewrite method for multi-term expansion
+    rewrite_method: RewriteMethod,
 }
 
 impl FuzzyQuery {
@@ -45,6 +48,7 @@ impl FuzzyQuery {
             transpositions: true,
             max_expansions: 50, // Same default as Lucene
             boost: 1.0,
+            rewrite_method: RewriteMethod::default(),
         }
     }
 
@@ -108,6 +112,17 @@ impl FuzzyQuery {
     /// Get the maximum number of terms to expand to.
     pub fn get_max_expansions(&self) -> usize {
         self.max_expansions
+    }
+
+    /// Set the rewrite method.
+    pub fn with_rewrite_method(mut self, rewrite_method: RewriteMethod) -> Self {
+        self.rewrite_method = rewrite_method;
+        self
+    }
+
+    /// Get the rewrite method.
+    pub fn rewrite_method(&self) -> RewriteMethod {
+        self.rewrite_method
     }
 
     /// Find matching terms using efficient term dictionary enumeration.
@@ -213,6 +228,27 @@ impl FuzzyQuery {
         };
 
         Ok((base_frequency as f32 * rarity_factor) as u32)
+    }
+}
+
+impl MultiTermQuery for FuzzyQuery {
+    fn field(&self) -> &str {
+        &self.field
+    }
+
+    fn enumerate_terms(&self, reader: &dyn LexicalIndexReader) -> Result<Vec<(String, u64, f32)>> {
+        let matches = self.find_matches(reader)?;
+
+        // Convert to MultiTermQuery format
+        let results = matches
+            .into_iter()
+            .map(|m| {
+                // Apply boost based on similarity
+                (m.term, m.doc_frequency as u64, m.similarity_score)
+            })
+            .collect();
+
+        Ok(results)
     }
 }
 
