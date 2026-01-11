@@ -6,9 +6,12 @@ use std::sync::Arc;
 use regex::Regex;
 
 use crate::error::Result;
+use crate::lexical::index::inverted::core::terms::{TermDictionaryAccess, TermsEnum};
 use crate::lexical::index::inverted::query::Query;
 use crate::lexical::index::inverted::query::matcher::{EmptyMatcher, Matcher};
+use crate::lexical::index::inverted::query::multi_term::{MultiTermQuery, RewriteMethod};
 use crate::lexical::index::inverted::query::scorer::Scorer;
+use crate::lexical::index::inverted::reader::InvertedIndexReader;
 use crate::lexical::reader::LexicalIndexReader;
 
 /// A query that matches documents containing terms that match a wildcard pattern.
@@ -26,7 +29,10 @@ pub struct WildcardQuery {
     /// The compiled regex for matching.
     regex: Arc<Regex>,
     /// The boost factor for this query.
+    /// The boost factor for this query.
     boost: f32,
+    /// Rewrite method for multi-term expansion
+    rewrite_method: RewriteMethod,
 }
 
 impl WildcardQuery {
@@ -41,12 +47,19 @@ impl WildcardQuery {
             pattern,
             regex: Arc::new(regex),
             boost: 1.0,
+            rewrite_method: RewriteMethod::default(),
         })
     }
 
     /// Set the boost factor for this query.
     pub fn with_boost(mut self, boost: f32) -> Self {
         self.boost = boost;
+        self
+    }
+
+    /// Set the rewrite method.
+    pub fn with_rewrite_method(mut self, rewrite_method: RewriteMethod) -> Self {
+        self.rewrite_method = rewrite_method;
         self
     }
 
@@ -58,6 +71,11 @@ impl WildcardQuery {
     /// Get the wildcard pattern.
     pub fn pattern(&self) -> &str {
         &self.pattern
+    }
+
+    /// Get the rewrite method.
+    pub fn rewrite_method(&self) -> RewriteMethod {
+        self.rewrite_method
     }
 
     /// Compile a wildcard pattern into a regex.
@@ -122,131 +140,130 @@ impl WildcardQuery {
     pub fn matches(&self, term: &str) -> bool {
         self.regex.is_match(term)
     }
+}
 
-    /// Calculate pattern complexity for scoring.
-    fn calculate_pattern_complexity(&self) -> f32 {
-        let mut complexity = 1.0;
-        let pattern_chars: Vec<char> = self.pattern.chars().collect();
+impl MultiTermQuery for WildcardQuery {
+    fn field(&self) -> &str {
+        &self.field
+    }
 
-        // Base complexity factors
-        let asterisk_count = pattern_chars.iter().filter(|&&c| c == '*').count();
-        let question_count = pattern_chars.iter().filter(|&&c| c == '?').count();
-        let literal_count = pattern_chars.len() - asterisk_count - question_count;
+    fn enumerate_terms(&self, reader: &dyn LexicalIndexReader) -> Result<Vec<(String, u64, f32)>> {
+        let mut results = Vec::new();
 
-        // Leading wildcard increases complexity (slower)
-        if pattern_chars.first() == Some(&'*') {
-            complexity *= 0.7; // Leading wildcards are less precise
+        if let Some(inverted_reader) = reader.as_any().downcast_ref::<InvertedIndexReader>() {
+            if let Some(terms) = inverted_reader.terms(&self.field)? {
+                let mut iterator = terms.iterator()?;
+
+                // Naive implementation: iterate over all terms and check match
+                // Optimization TODO: Use AutomatonTermsEnum if we can convert regex to Level-based automaton
+                // or if we can extract a common prefix to seek to.
+
+                // Try to extract prefix for optimization
+                let prefix: String = self
+                    .pattern
+                    .chars()
+                    .take_while(|&c| c != '*' && c != '?' && c != '[')
+                    .collect();
+
+                if !prefix.is_empty() {
+                    iterator.seek(&prefix)?;
+                    // Check logic similar to PrefixQuery
+                    if let Some(term_stats) = iterator.current() {
+                        if term_stats.term.starts_with(&prefix) && self.matches(&term_stats.term) {
+                            results.push((term_stats.term.clone(), term_stats.doc_freq, 1.0));
+                        }
+                    }
+
+                    while let Some(term_stats) = iterator.next()? {
+                        if !term_stats.term.starts_with(&prefix) {
+                            break;
+                        }
+                        if self.matches(&term_stats.term) {
+                            results.push((term_stats.term.clone(), term_stats.doc_freq, 1.0));
+                        }
+                        // Check limits
+                        if let Some(limit) = self.rewrite_method.max_expansions() {
+                            if results.len() >= limit {
+                                break;
+                            }
+                        }
+                    }
+                } else {
+                    // No prefix, must scan all terms
+                    while let Some(term_stats) = iterator.next()? {
+                        if self.matches(&term_stats.term) {
+                            results.push((term_stats.term.clone(), term_stats.doc_freq, 1.0));
+                        }
+                        // Check limits
+                        if let Some(limit) = self.rewrite_method.max_expansions() {
+                            if results.len() >= limit {
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
         }
 
-        // Trailing wildcard is more efficient
-        if pattern_chars.last() == Some(&'*') && pattern_chars.first() != Some(&'*') {
-            complexity *= 1.2; // Prefix matching is efficient
-        }
-
-        // More literals make patterns more selective
-        complexity *= 1.0 + (literal_count as f32 * 0.1);
-
-        // Multiple wildcards increase complexity
-        complexity *= 1.0 - ((asterisk_count + question_count) as f32 * 0.05);
-
-        // Exact patterns (no wildcards) are most precise
-        if asterisk_count == 0 && question_count == 0 {
-            complexity *= 1.5;
-        }
-
-        complexity.clamp(0.1, 2.0)
+        Ok(results)
     }
 }
 
 impl Query for WildcardQuery {
     fn matcher(&self, reader: &dyn LexicalIndexReader) -> Result<Box<dyn Matcher>> {
-        // Schema-less: no field validation needed
-        // All fields are treated as text fields for wildcard matching
-        let mut matching_doc_ids = Vec::new();
+        let matching_terms = self.enumerate_terms(reader)?;
 
-        // Iterate through all documents and find matches
-        for doc_id in 0..reader.doc_count() {
-            if let Ok(Some(doc)) = reader.document(doc_id)
-                && let Some(field_value) = doc.get_field(&self.field)
-                && let Some(text) = field_value.value.as_text()
-            {
-                // Schema-less: token-based matching for all text fields
-                let tokens: Vec<&str> = text.split_whitespace().collect();
-                let matches = tokens.iter().any(|token| self.regex.is_match(token));
-
-                if matches {
-                    matching_doc_ids.push(doc_id);
-                }
-            }
+        if matching_terms.is_empty() {
+            return Ok(Box::new(EmptyMatcher::new()));
         }
 
-        if matching_doc_ids.is_empty() {
-            Ok(Box::new(EmptyMatcher::new()))
-        } else {
-            Ok(Box::new(
-                crate::lexical::index::inverted::query::matcher::PreComputedMatcher::new(
-                    matching_doc_ids,
-                ),
-            ))
+        // Construct BooleanQuery
+        use crate::lexical::index::inverted::query::boolean::{BooleanClause, BooleanQuery, Occur};
+        use crate::lexical::index::inverted::query::term::TermQuery;
+
+        let mut boolean_query = BooleanQuery::new();
+        boolean_query.set_boost(self.boost);
+
+        for (term, _, _) in matching_terms {
+            let term_query = TermQuery::new(self.field.clone(), term);
+            boolean_query.add_clause(BooleanClause::new(
+                Box::new(term_query),
+                Occur::Should, // OR
+            ));
         }
+
+        boolean_query.matcher(reader)
     }
 
     fn scorer(&self, reader: &dyn LexicalIndexReader) -> Result<Box<dyn Scorer>> {
-        // Calculate actual matching statistics for better scoring
-        let total_docs = reader.doc_count();
-        let mut actual_doc_freq = 0u64;
-        let mut total_term_freq = 0u64;
-        let mut field_lengths = Vec::new();
+        // Delegate to BooleanQuery scorer
+        let matching_terms = self.enumerate_terms(reader)?;
 
-        // Schema-less: treat all fields as text fields for wildcard matching
-        // Count actual matches and collect field statistics
-        for doc_id in 0..total_docs {
-            if let Ok(Some(doc)) = reader.document(doc_id)
-                && let Some(field_value) = doc.get_field(&self.field)
-                && let Some(text) = field_value.value.as_text()
-            {
-                // Token-based matching with count
-                let tokens: Vec<&str> = text.split_whitespace().collect();
-                let match_count = tokens
-                    .iter()
-                    .filter(|token| self.regex.is_match(token))
-                    .count();
-                let matches = match_count > 0;
-                let field_len = tokens.len();
-
-                if matches {
-                    actual_doc_freq += 1;
-                    total_term_freq += match_count as u64;
-                }
-                field_lengths.push(field_len);
-            }
+        if matching_terms.is_empty() {
+            // Return dummy scorer
+            use crate::lexical::index::inverted::query::scorer::BM25Scorer;
+            return Ok(Box::new(BM25Scorer::new(
+                0,
+                0,
+                reader.doc_count(),
+                0.0,
+                reader.doc_count(),
+                0.0,
+            )));
         }
 
-        // Calculate average field length
-        let avg_field_length = if field_lengths.is_empty() {
-            10.0
-        } else {
-            field_lengths.iter().sum::<usize>() as f64 / field_lengths.len() as f64
-        };
+        use crate::lexical::index::inverted::query::boolean::{BooleanClause, BooleanQuery, Occur};
+        use crate::lexical::index::inverted::query::term::TermQuery;
 
-        // Create dynamic scorer based on pattern characteristics
-        let pattern_complexity = self.calculate_pattern_complexity();
-        let selectivity_boost = if actual_doc_freq > 0 {
-            // More selective patterns get higher base scores
-            (total_docs as f32 / actual_doc_freq as f32).ln().max(0.1)
-        } else {
-            0.1
-        };
+        let mut boolean_query = BooleanQuery::new();
+        boolean_query.set_boost(self.boost);
 
-        Ok(Box::new(WildcardScorer::new(
-            actual_doc_freq.max(1),
-            total_term_freq.max(1),
-            total_docs,
-            avg_field_length,
-            pattern_complexity,
-            selectivity_boost,
-            self.boost,
-        )))
+        for (term, _, _) in matching_terms {
+            let term_query = TermQuery::new(self.field.clone(), term);
+            boolean_query.add_clause(BooleanClause::new(Box::new(term_query), Occur::Should));
+        }
+
+        boolean_query.scorer(reader)
     }
 
     fn boost(&self) -> f32 {
@@ -258,11 +275,10 @@ impl Query for WildcardQuery {
     }
 
     fn description(&self) -> String {
-        if self.boost == 1.0 {
-            format!("{}:{}", self.field, self.pattern)
-        } else {
-            format!("{}:{}^{}", self.field, self.pattern, self.boost)
-        }
+        format!(
+            "WildcardQuery(field: {}, pattern: {})",
+            self.field, self.pattern
+        )
     }
 
     fn clone_box(&self) -> Box<dyn Query> {
@@ -273,125 +289,13 @@ impl Query for WildcardQuery {
         Ok(self.pattern.is_empty())
     }
 
-    fn cost(&self, _reader: &dyn LexicalIndexReader) -> Result<u64> {
-        Ok(1000) // Wildcards are expensive
+    fn cost(&self, reader: &dyn LexicalIndexReader) -> Result<u64> {
+        // Wildcard queries can be expensive
+        Ok(reader.doc_count() as u64)
     }
 
     fn as_any(&self) -> &dyn std::any::Any {
         self
-    }
-}
-
-/// Specialized scorer for wildcard queries.
-#[derive(Debug, Clone)]
-pub struct WildcardScorer {
-    /// Document frequency of matches.
-    doc_freq: u64,
-    /// Total term frequency across all documents.
-    total_term_freq: u64,
-    /// Total number of documents in the index.
-    total_docs: u64,
-    /// Average field length.
-    avg_field_length: f64,
-    /// Pattern complexity factor.
-    complexity: f32,
-    /// Pattern selectivity boost.
-    selectivity: f32,
-    /// Boost factor.
-    boost: f32,
-}
-
-impl WildcardScorer {
-    /// Create a new wildcard scorer.
-    pub fn new(
-        doc_freq: u64,
-        total_term_freq: u64,
-        total_docs: u64,
-        avg_field_length: f64,
-        complexity: f32,
-        selectivity: f32,
-        boost: f32,
-    ) -> Self {
-        WildcardScorer {
-            doc_freq,
-            total_term_freq,
-            total_docs,
-            avg_field_length,
-            complexity,
-            selectivity,
-            boost,
-        }
-    }
-
-    /// Calculate IDF component with wildcard adjustments.
-    fn calculate_idf(&self) -> f32 {
-        if self.doc_freq == 0 || self.total_docs == 0 {
-            return 0.1;
-        }
-
-        let n = self.total_docs as f32;
-        let df = self.doc_freq as f32;
-
-        // Standard IDF with wildcard selectivity adjustment
-        let base_idf = ((n - df + 0.5) / (df + 0.5)).ln().max(0.1);
-
-        // Apply selectivity boost for more discriminating patterns
-        base_idf * self.selectivity
-    }
-
-    /// Calculate TF component with pattern complexity.
-    fn calculate_tf(&self, term_freq: f32) -> f32 {
-        if term_freq == 0.0 {
-            return 0.0;
-        }
-
-        // BM25 TF calculation with complexity adjustment
-        let k1 = 1.2;
-        let b = 0.75;
-        let field_length = self.avg_field_length as f32;
-        let norm_factor = 1.0 - b + b * (field_length / self.avg_field_length as f32);
-
-        let tf_component = (term_freq * (k1 + 1.0)) / (term_freq + k1 * norm_factor);
-
-        // Apply complexity factor - more complex patterns get slight boost
-        tf_component * self.complexity
-    }
-}
-
-impl crate::lexical::index::inverted::query::scorer::Scorer for WildcardScorer {
-    fn score(&self, _doc_id: u64, term_freq: f32, _field_length: Option<f32>) -> f32 {
-        if self.doc_freq == 0 || self.total_docs == 0 {
-            return 0.0;
-        }
-
-        let idf = self.calculate_idf();
-        let tf = self.calculate_tf(term_freq);
-
-        // Final score with document frequency variation
-        let doc_factor = 1.0 + (self.total_term_freq as f32 / self.doc_freq.max(1) as f32) * 0.1;
-
-        self.boost * idf * tf * doc_factor
-    }
-
-    fn boost(&self) -> f32 {
-        self.boost
-    }
-
-    fn set_boost(&mut self, boost: f32) {
-        self.boost = boost;
-    }
-
-    fn max_score(&self) -> f32 {
-        let max_idf = self.calculate_idf();
-        let max_tf = self.calculate_tf(10.0); // Assume max term frequency
-        let max_doc_factor =
-            1.0 + (self.total_term_freq as f32 / self.doc_freq.max(1) as f32) * 0.1;
-
-        self.boost * max_idf * max_tf * max_doc_factor
-    }
-
-    fn name(&self) -> &'static str {
-        "WildcardScorer"
     }
 }
 
