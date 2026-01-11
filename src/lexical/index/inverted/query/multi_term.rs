@@ -47,6 +47,9 @@ pub trait MultiTermQuery: Query {
     /// Get the field name this query searches in.
     fn field(&self) -> &str;
 
+    /// Get the rewrite method.
+    fn rewrite_method(&self) -> RewriteMethod;
+
     /// Enumerate terms from the index that match this query's criteria.
     ///
     /// This method should:
@@ -105,6 +108,139 @@ pub trait MultiTermQuery: Query {
         // should be used instead. Implementations should override this for better performance.
         Ok(None)
     }
+
+    /// Rewrite the query into a simpler form (e.g., BooleanQuery).
+    fn rewrite(&self, reader: &dyn LexicalIndexReader) -> Result<Box<dyn Query>> {
+        let rewrite_method = self.rewrite_method();
+
+        // Try to get TermsEnum
+        let terms_enum_opt = self.get_terms_enum(reader)?;
+
+        let matching_terms = if let Some(mut terms_enum) = terms_enum_opt {
+            match rewrite_method {
+                RewriteMethod::TopTermsScoring { max_expansions }
+                | RewriteMethod::TopTermsBlended { max_expansions } => {
+                    // Use priority queue to collect top terms
+                    collect_top_terms(&mut *terms_enum, max_expansions)?
+                }
+                _ => {
+                    // Collect all terms
+                    let mut terms = Vec::new();
+                    while let Some(term_stats) = terms_enum.next()? {
+                        terms.push((term_stats.term.clone(), term_stats.doc_freq, 1.0));
+                    }
+                    terms
+                }
+            }
+        } else {
+            // Fallback to legacy enumerate_terms
+            self.enumerate_terms(reader)?
+        };
+
+        if matching_terms.is_empty() {
+            // We return a BooleanQuery which will produce EmptyMatcher if empty.
+            use crate::lexical::index::inverted::query::boolean::BooleanQuery;
+            return Ok(Box::new(BooleanQuery::new()));
+        }
+
+        use crate::lexical::index::inverted::query::boolean::{BooleanClause, BooleanQuery, Occur};
+        use crate::lexical::index::inverted::query::term::TermQuery;
+
+        let mut boolean_query = BooleanQuery::new();
+        boolean_query.set_boost(self.boost());
+
+        match rewrite_method {
+            RewriteMethod::TopTermsScoring { .. } => {
+                for (term, _, _) in matching_terms {
+                    let term_query = TermQuery::new(MultiTermQuery::field(self).to_string(), term);
+                    boolean_query
+                        .add_clause(BooleanClause::new(Box::new(term_query), Occur::Should));
+                }
+            }
+            RewriteMethod::TopTermsBlended { .. } => {
+                // TODO: Implement proper blended scoring (adjusting IDF across terms)
+                // For now, treat same as TopTermsScoring but typically boosts might vary
+                for (term, _, _) in matching_terms {
+                    let term_query = TermQuery::new(MultiTermQuery::field(self).to_string(), term);
+                    boolean_query
+                        .add_clause(BooleanClause::new(Box::new(term_query), Occur::Should));
+                }
+            }
+            RewriteMethod::ConstantScore => {
+                for (term, _, _) in matching_terms {
+                    let term_query = TermQuery::new(MultiTermQuery::field(self).to_string(), term);
+                    boolean_query
+                        .add_clause(BooleanClause::new(Box::new(term_query), Occur::Should));
+                }
+            }
+            RewriteMethod::BooleanQuery => {
+                for (term, _, _) in matching_terms {
+                    let term_query = TermQuery::new(MultiTermQuery::field(self).to_string(), term);
+                    boolean_query
+                        .add_clause(BooleanClause::new(Box::new(term_query), Occur::Should));
+                }
+            }
+        }
+
+        Ok(Box::new(boolean_query))
+    }
+}
+
+// Helper struct for priority queue
+#[derive(PartialEq)]
+struct ScoredTerm {
+    term: String,
+    doc_freq: u64,
+    boost: f32,
+}
+
+impl Eq for ScoredTerm {}
+
+impl PartialOrd for ScoredTerm {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for ScoredTerm {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        // Reverse doc_freq comparison: Lower DF > Higher DF
+        other
+            .doc_freq
+            .cmp(&self.doc_freq)
+            .then_with(|| self.term.cmp(&other.term)) // Tie-break by term
+    }
+}
+
+fn collect_top_terms(
+    terms_enum: &mut dyn TermsEnum,
+    max_expansions: usize,
+) -> Result<Vec<(String, u64, f32)>> {
+    use std::cmp::Reverse;
+    use std::collections::BinaryHeap;
+
+    let mut heap = BinaryHeap::with_capacity(max_expansions + 1);
+
+    while let Some(term_stats) = terms_enum.next()? {
+        let scored_term = ScoredTerm {
+            term: term_stats.term.clone(),
+            doc_freq: term_stats.doc_freq,
+            boost: 1.0,
+        };
+
+        heap.push(Reverse(scored_term));
+
+        if heap.len() > max_expansions {
+            heap.pop(); // Remove the smallest item (Lowest Score)
+        }
+    }
+
+    let mut results = Vec::with_capacity(heap.len());
+    while let Some(Reverse(scored_term)) = heap.pop() {
+        results.push((scored_term.term, scored_term.doc_freq, scored_term.boost));
+    }
+
+    Ok(results)
 }
 
 /// Rewrite strategies for multi-term queries.
@@ -177,10 +313,3 @@ impl RewriteMethod {
         )
     }
 }
-
-// TODO: Implement MultiTermQuery for FuzzyQuery
-// TODO: Implement PrefixQuery
-// TODO: Implement WildcardQuery (already exists, needs to implement this trait)
-// TODO: Implement RegexpQuery
-// TODO: Add rewrite() method to Query trait
-// TODO: Implement AutomatonTermsEnum for efficient term filtering

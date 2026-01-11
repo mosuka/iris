@@ -8,7 +8,7 @@ use regex::Regex;
 use crate::error::Result;
 use crate::lexical::index::inverted::core::terms::{TermDictionaryAccess, TermsEnum};
 use crate::lexical::index::inverted::query::Query;
-use crate::lexical::index::inverted::query::matcher::{EmptyMatcher, Matcher};
+use crate::lexical::index::inverted::query::matcher::Matcher;
 use crate::lexical::index::inverted::query::multi_term::{MultiTermQuery, RewriteMethod};
 use crate::lexical::index::inverted::query::scorer::Scorer;
 use crate::lexical::index::inverted::reader::InvertedIndexReader;
@@ -147,9 +147,14 @@ impl MultiTermQuery for WildcardQuery {
         &self.field
     }
 
-    fn enumerate_terms(&self, reader: &dyn LexicalIndexReader) -> Result<Vec<(String, u64, f32)>> {
-        let mut results = Vec::new();
+    fn rewrite_method(&self) -> RewriteMethod {
+        self.rewrite_method
+    }
 
+    fn get_terms_enum(
+        &self,
+        reader: &dyn LexicalIndexReader,
+    ) -> Result<Option<Box<dyn TermsEnum>>> {
         if let Some(inverted_reader) = reader.as_any().downcast_ref::<InvertedIndexReader>() {
             if let Some(terms) = inverted_reader.terms(&self.field)? {
                 let regex_pattern = Self::compile_pattern(&self.pattern)?;
@@ -158,81 +163,52 @@ impl MultiTermQuery for WildcardQuery {
                         &regex_pattern,
                     )?;
 
-                let mut terms_enum =
+                let terms_enum =
                     crate::lexical::index::inverted::core::automaton::AutomatonTermsEnum::new(
                         terms.iterator()?,
                         regex_automaton,
                     );
 
-                if let Some(max) = self.rewrite_method.max_expansions() {
-                    terms_enum = terms_enum.with_max_matches(max);
-                }
-
-                while let Some(term_stats) = terms_enum.next()? {
-                    results.push((term_stats.term.clone(), term_stats.doc_freq, 1.0));
-                }
+                return Ok(Some(Box::new(terms_enum)));
             }
         }
+        Ok(None)
+    }
 
-        Ok(results)
+    fn enumerate_terms(&self, reader: &dyn LexicalIndexReader) -> Result<Vec<(String, u64, f32)>> {
+        // Now mostly a fallback, or could reuse rewrite logic if we exposed it differently.
+        // But the trait default implementation of rewrite() calls get_terms_enum().
+        // So enumerate_terms is only called if get_terms_enum returns None,
+        // OR if needed directly.
+        // Let's keep existing implementation for compatibility or use get_terms_enum manually.
+        if let Some(mut terms_enum) = self.get_terms_enum(reader)? {
+            let mut results = Vec::new();
+            let max = self.rewrite_method.max_expansions();
+
+            // Simple scan limited by max_expansions (arbitrary selection if not scoring)
+            while let Some(term_stats) = terms_enum.next()? {
+                results.push((term_stats.term.clone(), term_stats.doc_freq, 1.0));
+                if let Some(m) = max {
+                    if results.len() >= m {
+                        break;
+                    }
+                }
+            }
+            return Ok(results);
+        }
+        Ok(Vec::new())
     }
 }
 
 impl Query for WildcardQuery {
     fn matcher(&self, reader: &dyn LexicalIndexReader) -> Result<Box<dyn Matcher>> {
-        let matching_terms = self.enumerate_terms(reader)?;
-
-        if matching_terms.is_empty() {
-            return Ok(Box::new(EmptyMatcher::new()));
-        }
-
-        // Construct BooleanQuery
-        use crate::lexical::index::inverted::query::boolean::{BooleanClause, BooleanQuery, Occur};
-        use crate::lexical::index::inverted::query::term::TermQuery;
-
-        let mut boolean_query = BooleanQuery::new();
-        boolean_query.set_boost(self.boost);
-
-        for (term, _, _) in matching_terms {
-            let term_query = TermQuery::new(self.field.clone(), term);
-            boolean_query.add_clause(BooleanClause::new(
-                Box::new(term_query),
-                Occur::Should, // OR
-            ));
-        }
-
-        boolean_query.matcher(reader)
+        let rewritten = self.rewrite(reader)?;
+        rewritten.matcher(reader)
     }
 
     fn scorer(&self, reader: &dyn LexicalIndexReader) -> Result<Box<dyn Scorer>> {
-        // Delegate to BooleanQuery scorer
-        let matching_terms = self.enumerate_terms(reader)?;
-
-        if matching_terms.is_empty() {
-            // Return dummy scorer
-            use crate::lexical::index::inverted::query::scorer::BM25Scorer;
-            return Ok(Box::new(BM25Scorer::new(
-                0,
-                0,
-                reader.doc_count(),
-                0.0,
-                reader.doc_count(),
-                0.0,
-            )));
-        }
-
-        use crate::lexical::index::inverted::query::boolean::{BooleanClause, BooleanQuery, Occur};
-        use crate::lexical::index::inverted::query::term::TermQuery;
-
-        let mut boolean_query = BooleanQuery::new();
-        boolean_query.set_boost(self.boost);
-
-        for (term, _, _) in matching_terms {
-            let term_query = TermQuery::new(self.field.clone(), term);
-            boolean_query.add_clause(BooleanClause::new(Box::new(term_query), Occur::Should));
-        }
-
-        boolean_query.scorer(reader)
+        let rewritten = self.rewrite(reader)?;
+        rewritten.scorer(reader)
     }
 
     fn boost(&self) -> f32 {
