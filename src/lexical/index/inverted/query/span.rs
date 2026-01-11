@@ -4,6 +4,7 @@
 //! within documents, enabling complex proximity and phrase searches.
 
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 use crate::error::Result;
 use crate::lexical::index::inverted::query::Query;
@@ -101,10 +102,22 @@ impl SpanTermQuery {
 }
 
 impl SpanQuery for SpanTermQuery {
-    fn get_spans(&self, _doc_id: u32, _reader: &dyn LexicalIndexReader) -> Result<Vec<Span>> {
-        // In a real implementation, this would fetch term positions from the index
-        // For now, we'll return a placeholder
-        Ok(vec![Span::new(0, 1, self.term.clone())])
+    fn get_spans(&self, doc_id: u32, reader: &dyn LexicalIndexReader) -> Result<Vec<Span>> {
+        let mut spans = Vec::new();
+
+        if let Some(mut iter) = reader.postings(&self.field, &self.term)? {
+            // Skip to the target document
+            if iter.skip_to(doc_id as u64)? && iter.doc_id() == doc_id as u64 {
+                // Determine positions if available
+                let positions = iter.positions()?;
+                for pos in positions {
+                    // Span for a single term has length 1
+                    spans.push(Span::new(pos as u32, pos as u32 + 1, self.term.clone()));
+                }
+            }
+        }
+
+        Ok(spans)
     }
 
     fn field_name(&self) -> &str {
@@ -463,19 +476,178 @@ impl SpanQueryWrapper {
     }
 }
 
-impl Query for SpanQueryWrapper {
-    fn matcher(&self, _reader: &dyn LexicalIndexReader) -> Result<Box<dyn Matcher>> {
-        // In a real implementation, this would create a SpanMatcher
-        Err(crate::error::SarissaError::query(
-            "SpanQueryWrapper matcher not implemented",
-        ))
+impl SpanMatcher {
+    pub fn new(span_query: Box<dyn SpanQuery>, reader: &dyn LexicalIndexReader) -> Result<Self> {
+        let mut matches = Vec::new();
+        let doc_count = reader.doc_count();
+
+        // Naive scan of all documents
+        for doc_id in 0..doc_count {
+            // In a real optimized system we wouldn't do this.
+            let spans = span_query.get_spans(doc_id as u32, reader)?;
+            if !spans.is_empty() {
+                matches.push(doc_id);
+            }
+        }
+
+        Ok(SpanMatcher {
+            matches,
+            current_index: 0,
+            current_doc_id: u64::MAX,
+        })
+    }
+}
+
+/// A matcher that finds documents containing spans.
+#[derive(Debug)]
+pub struct SpanMatcher {
+    /// Matching document IDs.
+    matches: Vec<u64>,
+    /// Current position in the matches.
+    current_index: usize,
+    /// Current document ID.
+    current_doc_id: u64,
+}
+
+impl Matcher for SpanMatcher {
+    fn doc_id(&self) -> u64 {
+        if self.current_index >= self.matches.len() {
+            u64::MAX
+        } else {
+            self.current_doc_id
+        }
     }
 
-    fn scorer(&self, _reader: &dyn LexicalIndexReader) -> Result<Box<dyn Scorer>> {
-        // In a real implementation, this would create a SpanScorer
-        Err(crate::error::SarissaError::query(
-            "SpanQueryWrapper scorer not implemented",
-        ))
+    fn next(&mut self) -> Result<bool> {
+        if self.current_index >= self.matches.len() {
+            return Ok(false);
+        }
+
+        // If this is the first call (current_doc_id is MAX and index 0), pick the first one.
+        // But logic below handles it:
+        // Actually, typical iterator pattern:
+        // if initialized but not started?
+        // Let's assume standard behavior: `next()` advances.
+        // Initially we might be at -1?
+        // Let's use `current_doc_id` to track state.
+
+        if self.current_doc_id == u64::MAX && self.current_index == 0 && !self.matches.is_empty() {
+            // First match
+            self.current_doc_id = self.matches[0];
+            return Ok(true);
+        }
+
+        self.current_index += 1;
+        if self.current_index >= self.matches.len() {
+            self.current_doc_id = u64::MAX;
+            Ok(false)
+        } else {
+            self.current_doc_id = self.matches[self.current_index];
+            Ok(true)
+        }
+    }
+
+    fn skip_to(&mut self, target: u64) -> Result<bool> {
+        while self.current_index < self.matches.len() && self.matches[self.current_index] < target {
+            self.current_index += 1;
+        }
+
+        if self.current_index >= self.matches.len() {
+            self.current_doc_id = u64::MAX;
+            Ok(false)
+        } else {
+            self.current_doc_id = self.matches[self.current_index];
+            Ok(true)
+        }
+    }
+
+    fn is_exhausted(&self) -> bool {
+        self.current_index >= self.matches.len()
+    }
+
+    fn cost(&self) -> u64 {
+        self.matches.len() as u64
+    }
+}
+
+/// A scorer for span queries.
+#[derive(Debug)]
+pub struct SpanScorer {
+    span_query: Box<dyn SpanQuery>,
+    // We cannot store reader here either!
+    // Query::scorer returns Box<dyn Scorer>.
+    // Scorer::score(doc_id, ...) does NOT take reader.
+    // So SpanScorer CANNOT call `get_spans(doc_id, reader)`.
+    // This implies `SpanScorer` must ALSO pre-calculate scores or have access to pre-calculated data?
+    // PhraseScorer calculates `phrase_doc_freq` map upfront!
+    // So `SpanScorer` must behave similarly: Pre-calculate everything in `new`.
+    scores: HashMap<u64, f32>,
+    boost: f32,
+}
+
+impl SpanScorer {
+    pub fn new(
+        span_query: Box<dyn SpanQuery>,
+        reader: &dyn LexicalIndexReader,
+        boost: f32,
+    ) -> Result<Self> {
+        let mut scores = HashMap::new();
+        let doc_count = reader.doc_count();
+
+        // Naive pre-calculation
+        // Note: For large indexes this is terrible.
+        // But for SpanTermQuery it's equivalent to fully materializing the query.
+        for doc_id in 0..doc_count {
+            let spans = span_query.get_spans(doc_id as u32, reader)?;
+            if !spans.is_empty() {
+                // Score = boost * count (simplified)
+                // Or basic TF/IDF? We lack global stats easily here unless we query reader.
+                // Let's use count * boost for now.
+                let score = (spans.len() as f32) * boost;
+                scores.insert(doc_id, score);
+            }
+        }
+
+        Ok(SpanScorer {
+            span_query,
+            scores,
+            boost,
+        })
+    }
+}
+
+impl Scorer for SpanScorer {
+    fn score(&self, doc_id: u64, _term_freq: f32, _field_length: Option<f32>) -> f32 {
+        *self.scores.get(&doc_id).unwrap_or(&0.0)
+    }
+
+    fn boost(&self) -> f32 {
+        self.boost
+    }
+
+    fn set_boost(&mut self, boost: f32) {
+        self.boost = boost;
+    }
+
+    fn max_score(&self) -> f32 {
+        // Approximate
+        self.boost * 100.0
+    }
+
+    fn name(&self) -> &'static str {
+        "SpanScorer"
+    }
+}
+
+impl Query for SpanQueryWrapper {
+    fn matcher(&self, reader: &dyn LexicalIndexReader) -> Result<Box<dyn Matcher>> {
+        let matches = SpanMatcher::new(self.span_query.clone_box(), reader)?;
+        Ok(Box::new(matches))
+    }
+
+    fn scorer(&self, reader: &dyn LexicalIndexReader) -> Result<Box<dyn Scorer>> {
+        let scorer = SpanScorer::new(self.span_query.clone_box(), reader, self.boost)?;
+        Ok(Box::new(scorer))
     }
 
     fn boost(&self) -> f32 {
