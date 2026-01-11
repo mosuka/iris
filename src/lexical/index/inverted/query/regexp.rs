@@ -70,18 +70,6 @@ impl RegexpQuery {
     pub fn pattern(&self) -> &str {
         &self.pattern
     }
-
-    /// Get the compiled regex.
-    /// Recompiles if missing (e.g. after deserialization).
-    fn get_regex(&self) -> Result<Arc<Regex>> {
-        if let Some(regex) = &self.regex {
-            Ok(regex.clone())
-        } else {
-            let regex = Regex::new(&self.pattern)
-                .map_err(|e| SarissaError::analysis(format!("Invalid regexp pattern: {e}")))?;
-            Ok(Arc::new(regex))
-        }
-    }
 }
 
 impl MultiTermQuery for RegexpQuery {
