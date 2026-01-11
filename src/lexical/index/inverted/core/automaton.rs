@@ -11,10 +11,23 @@ use crate::util::levenshtein::{damerau_levenshtein_distance, levenshtein_distanc
 /// This is a simplified implementation that checks if a candidate string
 /// is within the specified edit distance from the pattern.
 ///
-/// TODO: Implement a proper finite automaton using the Levenshtein automaton algorithm.
-/// For now, this uses direct distance calculation, which is less efficient but simpler.
+use regex::Regex;
+
+/// A trait for finite automata used in term filtering.
+pub trait Automaton: Send + Sync {
+    /// Check if a candidate string matches the automaton.
+    fn matches(&self, candidate: &str) -> bool;
+
+    /// Get the initial seek term for this automaton.
+    ///
+    /// This is useful for seeking to the starting position in a term dictionary.
+    fn initial_seek_term(&self) -> Option<String>;
+}
+
+/// A simple Levenshtein automaton for fuzzy string matching.
 ///
-/// See Lucene's LevenshteinAutomata.java for the full implementation.
+/// This is a simplified implementation that checks if a candidate string
+/// is within the specified edit distance from the pattern.
 #[derive(Debug, Clone)]
 pub struct LevenshteinAutomaton {
     /// The pattern string to match against
@@ -29,13 +42,6 @@ pub struct LevenshteinAutomaton {
 
 impl LevenshteinAutomaton {
     /// Create a new Levenshtein automaton.
-    ///
-    /// # Arguments
-    ///
-    /// * `pattern` - The string to match against
-    /// * `max_edits` - Maximum edit distance (0, 1, or 2)
-    /// * `prefix_length` - Required exact prefix length
-    /// * `transpositions` - Whether transpositions count as single edits
     pub fn new(
         pattern: impl Into<String>,
         max_edits: u32,
@@ -48,38 +54,6 @@ impl LevenshteinAutomaton {
             prefix_length,
             transpositions,
         }
-    }
-
-    /// Check if a candidate string matches the automaton.
-    ///
-    /// Returns true if the candidate is within max_edits edit distance from the pattern
-    /// and satisfies the prefix requirement.
-    pub fn matches(&self, candidate: &str) -> bool {
-        // Check prefix requirement
-        if self.prefix_length > 0 {
-            let pattern_prefix = self
-                .pattern
-                .chars()
-                .take(self.prefix_length)
-                .collect::<String>();
-            let candidate_prefix = candidate
-                .chars()
-                .take(self.prefix_length)
-                .collect::<String>();
-
-            if pattern_prefix != candidate_prefix {
-                return false;
-            }
-        }
-
-        // Calculate edit distance
-        let distance = if self.transpositions {
-            damerau_levenshtein_distance(&self.pattern, candidate) as u32
-        } else {
-            levenshtein_distance(&self.pattern, candidate) as u32
-        };
-
-        distance <= self.max_edits
     }
 
     /// Get the pattern string.
@@ -101,12 +75,29 @@ impl LevenshteinAutomaton {
     pub fn uses_transpositions(&self) -> bool {
         self.transpositions
     }
+}
 
-    /// Get the initial seek term for this automaton.
-    ///
-    /// This is useful for seeking to the starting position in a term dictionary.
-    /// For a fuzzy query, we can start from the prefix (if any).
-    pub fn initial_seek_term(&self) -> Option<String> {
+impl Automaton for LevenshteinAutomaton {
+    fn matches(&self, candidate: &str) -> bool {
+        // Check prefix requirement
+        if self.prefix_length > 0 {
+            let pattern_prefix: String = self.pattern.chars().take(self.prefix_length).collect();
+            if !candidate.starts_with(&pattern_prefix) {
+                return false;
+            }
+        }
+
+        // Calculate edit distance
+        let distance = if self.transpositions {
+            damerau_levenshtein_distance(&self.pattern, candidate) as u32
+        } else {
+            levenshtein_distance(&self.pattern, candidate) as u32
+        };
+
+        distance <= self.max_edits
+    }
+
+    fn initial_seek_term(&self) -> Option<String> {
         if self.prefix_length > 0 {
             Some(self.pattern.chars().take(self.prefix_length).collect())
         } else {
@@ -115,23 +106,101 @@ impl LevenshteinAutomaton {
     }
 }
 
+/// An automaton backed by a regular expression.
+#[derive(Debug, Clone)]
+pub struct RegexAutomaton {
+    regex: Regex,
+    #[allow(dead_code)]
+    pattern: String,
+    initial_seek_term: Option<String>,
+}
+
+impl RegexAutomaton {
+    /// Create a new regex automaton.
+    pub fn new(pattern: &str) -> Result<Self> {
+        let regex = Regex::new(pattern).map_err(|e| {
+            crate::error::SarissaError::analysis(format!("Invalid regexp pattern: {e}"))
+        })?;
+
+        // Extract prefix optimization
+        let initial_seek_term = Self::extract_prefix(pattern);
+
+        Ok(RegexAutomaton {
+            regex,
+            pattern: pattern.to_string(),
+            initial_seek_term,
+        })
+    }
+
+    /// Create from existing compiled regex.
+    pub fn from_regex(regex: Regex, pattern: String) -> Self {
+        let initial_seek_term = Self::extract_prefix(&pattern);
+        RegexAutomaton {
+            regex,
+            pattern,
+            initial_seek_term,
+        }
+    }
+
+    fn extract_prefix(pattern: &str) -> Option<String> {
+        let mut chars = pattern.chars();
+        if chars.next() != Some('^') {
+            return None;
+        }
+
+        let mut prefix = String::new();
+        let mut escaped = false;
+
+        for c in chars {
+            if escaped {
+                prefix.push(c);
+                escaped = false;
+            } else {
+                match c {
+                    '\\' => escaped = true,
+                    '.' | '+' | '*' | '?' | '(' | ')' | '|' | '[' | ']' | '{' | '}' | '^' | '$' => {
+                        break;
+                    }
+                    _ => prefix.push(c),
+                }
+            }
+        }
+
+        if prefix.is_empty() {
+            None
+        } else {
+            Some(prefix)
+        }
+    }
+}
+
+impl Automaton for RegexAutomaton {
+    fn matches(&self, candidate: &str) -> bool {
+        self.regex.is_match(candidate)
+    }
+
+    fn initial_seek_term(&self) -> Option<String> {
+        self.initial_seek_term.clone()
+    }
+}
+
 /// A terms enum that filters terms using an automaton.
 ///
 /// This wraps another TermsEnum and only yields terms that match the automaton.
-pub struct AutomatonTermsEnum<T: TermsEnum> {
+pub struct AutomatonTermsEnum<T: TermsEnum, A: Automaton> {
     /// The underlying terms enum
     inner: T,
     /// The automaton to filter with
-    automaton: LevenshteinAutomaton,
+    automaton: A,
     /// Maximum number of matching terms to return
     max_matches: Option<usize>,
     /// Number of matches found so far
     matches_found: usize,
 }
 
-impl<T: TermsEnum> AutomatonTermsEnum<T> {
+impl<T: TermsEnum, A: Automaton> AutomatonTermsEnum<T, A> {
     /// Create a new automaton terms enum.
-    pub fn new(inner: T, automaton: LevenshteinAutomaton) -> Self {
+    pub fn new(inner: T, automaton: A) -> Self {
         AutomatonTermsEnum {
             inner,
             automaton,
@@ -147,12 +216,12 @@ impl<T: TermsEnum> AutomatonTermsEnum<T> {
     }
 
     /// Get the automaton.
-    pub fn automaton(&self) -> &LevenshteinAutomaton {
+    pub fn automaton(&self) -> &A {
         &self.automaton
     }
 }
 
-impl<T: TermsEnum> TermsEnum for AutomatonTermsEnum<T> {
+impl<T: TermsEnum, A: Automaton> TermsEnum for AutomatonTermsEnum<T, A> {
     fn next(&mut self) -> Result<Option<TermStats>> {
         // Check if we've reached the max matches limit
         if let Some(max) = self.max_matches
@@ -165,7 +234,10 @@ impl<T: TermsEnum> TermsEnum for AutomatonTermsEnum<T> {
         if self.matches_found == 0
             && let Some(seek_term) = self.automaton.initial_seek_term()
         {
-            self.inner.seek(&seek_term)?;
+            let _ = self.inner.seek(&seek_term)?;
+            // Note: We ignore the bool result of seek because we need to check matches anyway.
+            // If seek returns false (exact match not found), it still positions at the insertion point,
+            // which is correct for iterating forward.
         }
 
         // Find the next matching term
@@ -176,7 +248,7 @@ impl<T: TermsEnum> TermsEnum for AutomatonTermsEnum<T> {
             }
 
             // Optimization: if we've moved past possible matches, stop early
-            // This works if the term dictionary is sorted
+            // This works if the term dictionary is sorted and we have a prefix constraint
             if let Some(prefix) = self.automaton.initial_seek_term()
                 && !term_stats.term.starts_with(&prefix)
             {

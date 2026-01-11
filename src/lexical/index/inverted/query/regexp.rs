@@ -7,6 +7,7 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 
 use crate::error::{Result, SarissaError};
+use crate::lexical::index::inverted::core::automaton::{AutomatonTermsEnum, RegexAutomaton};
 use crate::lexical::index::inverted::core::terms::{TermDictionaryAccess, TermsEnum};
 use crate::lexical::index::inverted::query::Query;
 use crate::lexical::index::inverted::query::matcher::{EmptyMatcher, Matcher};
@@ -70,11 +71,6 @@ impl RegexpQuery {
         &self.pattern
     }
 
-    /// Get the rewrite method.
-    pub fn rewrite_method(&self) -> RewriteMethod {
-        self.rewrite_method
-    }
-
     /// Get the compiled regex.
     /// Recompiles if missing (e.g. after deserialization).
     fn get_regex(&self) -> Result<Arc<Regex>> {
@@ -86,40 +82,6 @@ impl RegexpQuery {
             Ok(Arc::new(regex))
         }
     }
-
-    /// Attempt to extract a constant prefix from the regex pattern.
-    /// This is a simple heuristic to optimize term dictionary constraints.
-    fn extract_prefix(&self) -> Option<String> {
-        let mut chars = self.pattern.chars();
-        if chars.next() != Some('^') {
-            return None;
-        }
-
-        let mut prefix = String::new();
-        let mut escaped = false;
-
-        for c in chars {
-            if escaped {
-                prefix.push(c);
-                escaped = false;
-            } else {
-                match c {
-                    '\\' => escaped = true,
-                    '.' | '+' | '*' | '?' | '(' | ')' | '|' | '[' | ']' | '{' | '}' | '^' | '$' => {
-                        // Special char, stop prefix extraction
-                        break;
-                    }
-                    _ => prefix.push(c),
-                }
-            }
-        }
-
-        if prefix.is_empty() {
-            None
-        } else {
-            Some(prefix)
-        }
-    }
 }
 
 impl MultiTermQuery for RegexpQuery {
@@ -129,48 +91,26 @@ impl MultiTermQuery for RegexpQuery {
 
     fn enumerate_terms(&self, reader: &dyn LexicalIndexReader) -> Result<Vec<(String, u64, f32)>> {
         let mut results = Vec::new();
-        let regex = self.get_regex()?;
 
         if let Some(inverted_reader) = reader.as_any().downcast_ref::<InvertedIndexReader>() {
             if let Some(terms) = inverted_reader.terms(&self.field)? {
-                let mut iterator = terms.iterator()?;
-
-                // Try to extract prefix for optimization
-                if let Some(prefix) = self.extract_prefix() {
-                    iterator.seek(&prefix)?;
-                    // Check current term after seek
-                    if let Some(term_stats) = iterator.current() {
-                        if term_stats.term.starts_with(&prefix) && regex.is_match(&term_stats.term)
-                        {
-                            results.push((term_stats.term.clone(), term_stats.doc_freq, 1.0));
-                        }
-                    }
-
-                    while let Some(term_stats) = iterator.next()? {
-                        if !term_stats.term.starts_with(&prefix) {
-                            break;
-                        }
-                        if regex.is_match(&term_stats.term) {
-                            results.push((term_stats.term.clone(), term_stats.doc_freq, 1.0));
-                        }
-                        if let Some(limit) = self.rewrite_method.max_expansions() {
-                            if results.len() >= limit {
-                                break;
-                            }
-                        }
-                    }
+                // Use RegexAutomaton and AutomatonTermsEnum
+                // Re-use our existing regex logic via RegexAutomaton
+                // Note: We need to handle the case where self.regex is Some or None
+                let regex_automaton = if let Some(regex) = &self.regex {
+                    RegexAutomaton::from_regex(regex.as_ref().clone(), self.pattern.clone())
                 } else {
-                    // No prefix, scan all terms
-                    while let Some(term_stats) = iterator.next()? {
-                        if regex.is_match(&term_stats.term) {
-                            results.push((term_stats.term.clone(), term_stats.doc_freq, 1.0));
-                        }
-                        if let Some(limit) = self.rewrite_method.max_expansions() {
-                            if results.len() >= limit {
-                                break;
-                            }
-                        }
-                    }
+                    RegexAutomaton::new(&self.pattern)?
+                };
+
+                let mut terms_enum = AutomatonTermsEnum::new(terms.iterator()?, regex_automaton);
+
+                if let Some(max) = self.rewrite_method.max_expansions() {
+                    terms_enum = terms_enum.with_max_matches(max);
+                }
+
+                while let Some(term_stats) = terms_enum.next()? {
+                    results.push((term_stats.term.clone(), term_stats.doc_freq, 1.0));
                 }
             }
         }
@@ -277,16 +217,19 @@ mod tests {
 
     #[test]
     fn test_prefix_extraction() {
-        let query = RegexpQuery::new("f", "^abc.*").unwrap();
-        assert_eq!(query.extract_prefix().as_deref(), Some("abc"));
+        use crate::lexical::index::inverted::core::automaton::{Automaton, RegexAutomaton};
 
-        let query = RegexpQuery::new("f", "abc.*").unwrap();
-        assert_eq!(query.extract_prefix(), None); // No anchor
+        // Test via RegexAutomaton
+        let automaton = RegexAutomaton::new("^abc.*").unwrap();
+        assert_eq!(automaton.initial_seek_term().as_deref(), Some("abc"));
 
-        let query = RegexpQuery::new("f", "^abc\\.def").unwrap();
-        assert_eq!(query.extract_prefix().as_deref(), Some("abc.def"));
+        let automaton = RegexAutomaton::new("abc.*").unwrap();
+        assert_eq!(automaton.initial_seek_term(), None); // No anchor
 
-        let query = RegexpQuery::new("f", "^a(b|c)").unwrap();
-        assert_eq!(query.extract_prefix().as_deref(), Some("a"));
+        let automaton = RegexAutomaton::new("^abc\\.def").unwrap();
+        assert_eq!(automaton.initial_seek_term().as_deref(), Some("abc.def"));
+
+        let automaton = RegexAutomaton::new("^a(b|c)").unwrap();
+        assert_eq!(automaton.initial_seek_term().as_deref(), Some("a"));
     }
 }

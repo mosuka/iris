@@ -40,7 +40,10 @@ impl WildcardQuery {
     pub fn new<S: Into<String>>(field: S, pattern: S) -> Result<Self> {
         let field = field.into();
         let pattern = pattern.into();
-        let regex = Self::compile_pattern(&pattern)?;
+        let regex_pattern = Self::compile_pattern(&pattern)?;
+        let regex = Regex::new(&regex_pattern).map_err(|e| {
+            crate::error::SarissaError::analysis(format!("Invalid wildcard pattern: {e}"))
+        })?;
 
         Ok(WildcardQuery {
             field,
@@ -78,8 +81,8 @@ impl WildcardQuery {
         self.rewrite_method
     }
 
-    /// Compile a wildcard pattern into a regex.
-    fn compile_pattern(pattern: &str) -> Result<Regex> {
+    /// Compile a wildcard pattern into a regex string.
+    fn compile_pattern(pattern: &str) -> Result<String> {
         let mut regex_pattern = String::new();
         regex_pattern.push('^'); // Match from the beginning
 
@@ -130,10 +133,7 @@ impl WildcardQuery {
         }
 
         regex_pattern.push('$'); // Match to the end
-
-        Regex::new(&regex_pattern).map_err(|e| {
-            crate::error::SarissaError::analysis(format!("Invalid wildcard pattern: {e}"))
-        })
+        Ok(regex_pattern)
     }
 
     /// Check if a term matches the wildcard pattern.
@@ -152,55 +152,24 @@ impl MultiTermQuery for WildcardQuery {
 
         if let Some(inverted_reader) = reader.as_any().downcast_ref::<InvertedIndexReader>() {
             if let Some(terms) = inverted_reader.terms(&self.field)? {
-                let mut iterator = terms.iterator()?;
+                let regex_pattern = Self::compile_pattern(&self.pattern)?;
+                let regex_automaton =
+                    crate::lexical::index::inverted::core::automaton::RegexAutomaton::new(
+                        &regex_pattern,
+                    )?;
 
-                // Naive implementation: iterate over all terms and check match
-                // Optimization TODO: Use AutomatonTermsEnum if we can convert regex to Level-based automaton
-                // or if we can extract a common prefix to seek to.
+                let mut terms_enum =
+                    crate::lexical::index::inverted::core::automaton::AutomatonTermsEnum::new(
+                        terms.iterator()?,
+                        regex_automaton,
+                    );
 
-                // Try to extract prefix for optimization
-                let prefix: String = self
-                    .pattern
-                    .chars()
-                    .take_while(|&c| c != '*' && c != '?' && c != '[')
-                    .collect();
+                if let Some(max) = self.rewrite_method.max_expansions() {
+                    terms_enum = terms_enum.with_max_matches(max);
+                }
 
-                if !prefix.is_empty() {
-                    iterator.seek(&prefix)?;
-                    // Check logic similar to PrefixQuery
-                    if let Some(term_stats) = iterator.current() {
-                        if term_stats.term.starts_with(&prefix) && self.matches(&term_stats.term) {
-                            results.push((term_stats.term.clone(), term_stats.doc_freq, 1.0));
-                        }
-                    }
-
-                    while let Some(term_stats) = iterator.next()? {
-                        if !term_stats.term.starts_with(&prefix) {
-                            break;
-                        }
-                        if self.matches(&term_stats.term) {
-                            results.push((term_stats.term.clone(), term_stats.doc_freq, 1.0));
-                        }
-                        // Check limits
-                        if let Some(limit) = self.rewrite_method.max_expansions() {
-                            if results.len() >= limit {
-                                break;
-                            }
-                        }
-                    }
-                } else {
-                    // No prefix, must scan all terms
-                    while let Some(term_stats) = iterator.next()? {
-                        if self.matches(&term_stats.term) {
-                            results.push((term_stats.term.clone(), term_stats.doc_freq, 1.0));
-                        }
-                        // Check limits
-                        if let Some(limit) = self.rewrite_method.max_expansions() {
-                            if results.len() >= limit {
-                                break;
-                            }
-                        }
-                    }
+                while let Some(term_stats) = terms_enum.next()? {
+                    results.push((term_stats.term.clone(), term_stats.doc_freq, 1.0));
                 }
             }
         }
