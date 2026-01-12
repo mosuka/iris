@@ -336,10 +336,6 @@ impl SegmentManager {
             .sum()
     }
 
-    pub fn total_deleted(&self) -> u64 {
-        0 // TODO: Track deleted count in ManagedSegmentInfo
-    }
-
     /// Generate a new segment ID.
     pub fn generate_segment_id(&self) -> String {
         let mut next_id = self.next_segment_id.write().unwrap();
