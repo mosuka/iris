@@ -3,6 +3,7 @@
 //! This module provides efficient document deletion using bitmap-based
 //! logical deletion and periodic compaction for space reclamation.
 
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, RwLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -50,25 +51,25 @@ impl Default for DeletionConfig {
 }
 
 /// A bitmap-based deletion tracker for a segment.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct DeletionBitmap {
     /// Segment ID this bitmap belongs to.
     pub segment_id: String,
 
     /// Bitmap of deleted documents (bit set = deleted).
-    pub deleted_docs: BitVec,
+    pub deleted_docs: RwLock<BitVec>,
 
     /// Total number of documents in the segment.
-    pub total_docs: u64,
+    pub total_docs: AtomicU64,
 
     /// Number of deleted documents.
-    pub deleted_count: u64,
+    pub deleted_count: AtomicU64,
 
     /// Timestamp of last modification.
-    pub last_modified: u64,
+    pub last_modified: AtomicU64,
 
     /// Version number for consistency.
-    pub version: u64,
+    pub version: AtomicU64,
 }
 
 impl DeletionBitmap {
@@ -76,60 +77,86 @@ impl DeletionBitmap {
     pub fn new(segment_id: String, total_docs: u64) -> Self {
         DeletionBitmap {
             segment_id,
-            deleted_docs: BitVec::from_elem(total_docs as usize, false),
-            total_docs,
-            deleted_count: 0,
-            last_modified: SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_secs(),
-            version: 1,
+            deleted_docs: RwLock::new(BitVec::from_elem(total_docs as usize, false)),
+            total_docs: AtomicU64::new(total_docs),
+            deleted_count: AtomicU64::new(0),
+            last_modified: AtomicU64::new(
+                SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs(),
+            ),
+            version: AtomicU64::new(1),
         }
     }
 
     /// Mark a document as deleted.
-    pub fn delete_document(&mut self, doc_id: u64) -> Result<bool> {
-        if doc_id >= self.total_docs {
+    pub fn delete_document(&self, doc_id: u64) -> Result<bool> {
+        let current_total = self.total_docs.load(Ordering::SeqCst);
+        if doc_id >= current_total {
             return Err(SarissaError::index(format!(
-                "Document ID {doc_id} out of range for segment {}",
-                self.segment_id
+                "Document ID {doc_id} out of range for segment {} (max {})",
+                self.segment_id, current_total
             )));
         }
 
-        let was_already_deleted = self.deleted_docs.get(doc_id as usize).unwrap_or(false);
+        let mut docs = self.deleted_docs.write().unwrap();
+        let was_already_deleted = docs.get(doc_id as usize).unwrap_or(false);
         if !was_already_deleted {
-            self.deleted_docs.set(doc_id as usize, true);
-            self.deleted_count += 1;
-            self.last_modified = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_secs();
-            self.version += 1;
+            docs.set(doc_id as usize, true);
+            self.deleted_count.fetch_add(1, Ordering::SeqCst);
+            self.last_modified.store(
+                SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs(),
+                Ordering::SeqCst,
+            );
+            self.version.fetch_add(1, Ordering::SeqCst);
         }
 
         Ok(!was_already_deleted)
     }
 
+    /// Resize the bitmap to accommodate more documents.
+    pub fn resize(&self, new_size: u64) {
+        if new_size <= self.total_docs.load(Ordering::SeqCst) {
+            return;
+        }
+
+        let mut docs = self.deleted_docs.write().unwrap();
+        let current_size = docs.len();
+        if (new_size as usize) > current_size {
+            docs.grow((new_size as usize) - current_size, false);
+            self.total_docs.store(new_size, Ordering::SeqCst);
+        }
+    }
+
     /// Check if a document is deleted.
     pub fn is_deleted(&self, doc_id: u64) -> bool {
-        if doc_id >= self.total_docs {
+        if doc_id >= self.total_docs.load(Ordering::SeqCst) {
             return false;
         }
-        self.deleted_docs.get(doc_id as usize).unwrap_or(false)
+        self.deleted_docs
+            .read()
+            .unwrap()
+            .get(doc_id as usize)
+            .unwrap_or(false)
     }
 
     /// Get deletion ratio (0.0 to 1.0).
     pub fn deletion_ratio(&self) -> f64 {
-        if self.total_docs == 0 {
+        if self.total_docs.load(Ordering::SeqCst) == 0 {
             0.0
         } else {
-            self.deleted_count as f64 / self.total_docs as f64
+            self.deleted_count.load(Ordering::SeqCst) as f64
+                / self.total_docs.load(Ordering::SeqCst) as f64
         }
     }
 
     /// Get number of live (non-deleted) documents.
     pub fn live_count(&self) -> u64 {
-        self.total_docs - self.deleted_count
+        self.total_docs.load(Ordering::SeqCst) - self.deleted_count.load(Ordering::SeqCst)
     }
 
     /// Check if compaction is needed.
@@ -140,7 +167,8 @@ impl DeletionBitmap {
     /// Get all deleted document IDs.
     pub fn get_deleted_docs(&self) -> Vec<u64> {
         let mut deleted = Vec::new();
-        for (i, bit) in self.deleted_docs.iter().enumerate() {
+        let docs = self.deleted_docs.read().unwrap();
+        for (i, bit) in docs.iter().enumerate() {
             if bit {
                 deleted.push(i as u64);
             }
@@ -151,7 +179,7 @@ impl DeletionBitmap {
     /// Get memory usage of this bitmap in bytes.
     pub fn memory_usage(&self) -> usize {
         std::mem::size_of::<Self>() +
-        self.deleted_docs.capacity() / 8 + // bits to bytes
+        self.deleted_docs.read().unwrap().capacity() / 8 + // bits to bytes
         self.segment_id.capacity()
     }
 
@@ -163,13 +191,13 @@ impl DeletionBitmap {
 
         // Write metadata
         writer.write_string(&self.segment_id)?;
-        writer.write_u64(self.total_docs)?;
-        writer.write_u64(self.deleted_count)?;
-        writer.write_u64(self.last_modified)?;
-        writer.write_u64(self.version)?;
+        writer.write_u64(self.total_docs.load(Ordering::SeqCst))?;
+        writer.write_u64(self.deleted_count.load(Ordering::SeqCst))?;
+        writer.write_u64(self.last_modified.load(Ordering::SeqCst))?;
+        writer.write_u64(self.version.load(Ordering::SeqCst))?;
 
         // Write bitmap data
-        let bitmap_bytes = self.deleted_docs.to_bytes();
+        let bitmap_bytes = self.deleted_docs.read().unwrap().to_bytes();
         writer.write_varint(bitmap_bytes.len() as u64)?;
         writer.write_bytes(&bitmap_bytes)?;
 
@@ -201,15 +229,15 @@ impl DeletionBitmap {
         // Read bitmap data
         let _bitmap_size = reader.read_varint()? as usize;
         let bitmap_bytes = reader.read_bytes()?;
-        let deleted_docs = BitVec::from_bytes(&bitmap_bytes);
+        let deleted_docs = RwLock::new(BitVec::from_bytes(&bitmap_bytes));
 
         Ok(DeletionBitmap {
             segment_id,
             deleted_docs,
-            total_docs,
-            deleted_count,
-            last_modified,
-            version: bitmap_version,
+            total_docs: AtomicU64::new(total_docs),
+            deleted_count: AtomicU64::new(deleted_count),
+            last_modified: AtomicU64::new(last_modified),
+            version: AtomicU64::new(bitmap_version),
         })
     }
 }
@@ -408,7 +436,7 @@ pub struct DeletionManager {
     storage: Arc<dyn Storage>,
 
     /// Deletion bitmaps per segment.
-    bitmaps: RwLock<AHashMap<String, DeletionBitmap>>,
+    bitmaps: RwLock<AHashMap<String, Arc<DeletionBitmap>>>,
 
     /// Deletion log for recovery.
     deletion_log: Option<DeletionLog>,
@@ -461,9 +489,20 @@ impl DeletionManager {
         Ok(manager)
     }
 
+    /// Get deletion bitmap for a segment.
+    pub fn get_bitmap(&self, segment_id: &str) -> Option<Arc<DeletionBitmap>> {
+        self.bitmaps.read().unwrap().get(segment_id).cloned()
+    }
+
     /// Initialize deletion tracking for a segment.
     pub fn initialize_segment(&self, segment_id: &str, total_docs: u64) -> Result<()> {
-        let bitmap = DeletionBitmap::new(segment_id.to_string(), total_docs);
+        let bitmaps = self.bitmaps.read().unwrap();
+        if bitmaps.contains_key(segment_id) {
+            return Ok(());
+        }
+        drop(bitmaps);
+
+        let bitmap = Arc::new(DeletionBitmap::new(segment_id.to_string(), total_docs));
 
         {
             let mut bitmaps = self.bitmaps.write().unwrap();
@@ -477,12 +516,22 @@ impl DeletionManager {
         Ok(())
     }
 
+    /// Resize a segment's bitmap.
+    pub fn resize_segment(&self, segment_id: &str, new_size: u64) -> Result<()> {
+        let bitmaps = self.bitmaps.read().unwrap();
+        if let Some(bitmap) = bitmaps.get(segment_id) {
+            bitmap.resize(new_size);
+            self.save_bitmap(segment_id)?;
+        }
+        Ok(())
+    }
+
     /// Mark a document as deleted.
     pub fn delete_document(&self, segment_id: &str, doc_id: u64, reason: &str) -> Result<bool> {
         let was_deleted = {
-            let mut bitmaps = self.bitmaps.write().unwrap();
+            let bitmaps = self.bitmaps.read().unwrap();
 
-            if let Some(bitmap) = bitmaps.get_mut(segment_id) {
+            if let Some(bitmap) = bitmaps.get(segment_id) {
                 bitmap.delete_document(doc_id)?
             } else {
                 return Err(SarissaError::index(format!(
@@ -510,12 +559,12 @@ impl DeletionManager {
     pub fn delete_documents(&self, segment_id: &str, doc_ids: &[u64], reason: &str) -> Result<u64> {
         let mut deleted_count = 0;
 
-        // Process in batches to avoid holding write lock too long
+        // Process in batches (read lock is sufficient with atomic bitmap)
         for chunk in doc_ids.chunks(self.config.deletion_batch_size) {
             {
-                let mut bitmaps = self.bitmaps.write().unwrap();
+                let bitmaps = self.bitmaps.read().unwrap();
 
-                if let Some(bitmap) = bitmaps.get_mut(segment_id) {
+                if let Some(bitmap) = bitmaps.get(segment_id) {
                     for &doc_id in chunk {
                         if bitmap.delete_document(doc_id)? {
                             deleted_count += 1;
@@ -631,7 +680,7 @@ impl DeletionManager {
 
                 if let Ok(bitmap) = DeletionBitmap::read_from_storage(&mut reader) {
                     let mut bitmaps = self.bitmaps.write().unwrap();
-                    bitmaps.insert(bitmap.segment_id.clone(), bitmap);
+                    bitmaps.insert(bitmap.segment_id.clone(), Arc::new(bitmap));
                 }
             }
         }
@@ -647,8 +696,14 @@ impl DeletionManager {
         let mut stats = self.stats.write().unwrap();
 
         stats.segments_tracked = bitmaps.len();
-        stats.total_docs = bitmaps.values().map(|b| b.total_docs).sum();
-        stats.total_deleted = bitmaps.values().map(|b| b.deleted_count).sum();
+        stats.total_docs = bitmaps
+            .values()
+            .map(|b| b.total_docs.load(Ordering::SeqCst))
+            .sum();
+        stats.total_deleted = bitmaps
+            .values()
+            .map(|b| b.deleted_count.load(Ordering::SeqCst))
+            .sum();
 
         if stats.total_docs > 0 {
             stats.overall_deletion_ratio = stats.total_deleted as f64 / stats.total_docs as f64;
@@ -690,8 +745,14 @@ impl DeletionManager {
         let mut global_state = self.global_state.write().unwrap();
 
         // Calculate totals
-        global_state.total_documents = bitmaps.values().map(|b| b.total_docs).sum();
-        global_state.total_deleted = bitmaps.values().map(|b| b.deleted_count).sum();
+        global_state.total_documents = bitmaps
+            .values()
+            .map(|b| b.total_docs.load(Ordering::SeqCst))
+            .sum();
+        global_state.total_deleted = bitmaps
+            .values()
+            .map(|b| b.deleted_count.load(Ordering::SeqCst))
+            .sum();
 
         // Calculate global deletion ratio
         if global_state.total_documents > 0 {
@@ -714,7 +775,7 @@ impl DeletionManager {
             .map(|b| {
                 if b.needs_compaction(self.config.compaction_threshold) {
                     // Rough estimate: deleted_ratio * segment_size
-                    (b.deletion_ratio() * b.total_docs as f64 * 100.0) as u64 // 100 bytes per doc estimate
+                    (b.deletion_ratio() * b.total_docs.load(Ordering::SeqCst) as f64 * 100.0) as u64 // 100 bytes per doc estimate
                 } else {
                     0
                 }
@@ -785,12 +846,12 @@ impl DeletionManager {
             .values()
             .map(|bitmap| SegmentDeletionReport {
                 segment_id: bitmap.segment_id.clone(),
-                total_docs: bitmap.total_docs,
-                deleted_docs: bitmap.deleted_count,
+                total_docs: bitmap.total_docs.load(Ordering::SeqCst),
+                deleted_docs: bitmap.deleted_count.load(Ordering::SeqCst),
                 deletion_ratio: bitmap.deletion_ratio(),
                 needs_compaction: bitmap.needs_compaction(self.config.compaction_threshold),
                 memory_usage: bitmap.memory_usage(),
-                last_modified: bitmap.last_modified,
+                last_modified: bitmap.last_modified.load(Ordering::SeqCst),
             })
             .collect();
 
@@ -954,15 +1015,15 @@ mod tests {
         let bitmap = DeletionBitmap::new("seg001".to_string(), 1000);
 
         assert_eq!(bitmap.segment_id, "seg001");
-        assert_eq!(bitmap.total_docs, 1000);
-        assert_eq!(bitmap.deleted_count, 0);
+        assert_eq!(bitmap.total_docs.load(Ordering::SeqCst), 1000);
+        assert_eq!(bitmap.deleted_count.load(Ordering::SeqCst), 0);
         assert_eq!(bitmap.deletion_ratio(), 0.0);
         assert_eq!(bitmap.live_count(), 1000);
     }
 
     #[test]
     fn test_deletion_bitmap_operations() {
-        let mut bitmap = DeletionBitmap::new("seg001".to_string(), 100);
+        let bitmap = DeletionBitmap::new("seg001".to_string(), 100);
 
         // Delete some documents
         assert!(bitmap.delete_document(5).unwrap());
@@ -976,18 +1037,18 @@ mod tests {
         assert!(!bitmap.is_deleted(20));
 
         // Check counts
-        assert_eq!(bitmap.deleted_count, 3);
+        assert_eq!(bitmap.deleted_count.load(Ordering::SeqCst), 3);
         assert_eq!(bitmap.live_count(), 97);
         assert_eq!(bitmap.deletion_ratio(), 0.03);
 
         // Try to delete same document again
         assert!(!bitmap.delete_document(5).unwrap());
-        assert_eq!(bitmap.deleted_count, 3);
+        assert_eq!(bitmap.deleted_count.load(Ordering::SeqCst), 3);
     }
 
     #[test]
     fn test_deletion_bitmap_out_of_range() {
-        let mut bitmap = DeletionBitmap::new("seg001".to_string(), 100);
+        let bitmap = DeletionBitmap::new("seg001".to_string(), 100);
 
         let result = bitmap.delete_document(150);
         assert!(result.is_err());

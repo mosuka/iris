@@ -119,6 +119,18 @@ pub trait VectorIndexWriter: Send + Sync + std::fmt::Debug {
     /// This removes the document from the index buffer if it hasn't been finalized.
     fn delete_document(&mut self, doc_id: u64) -> Result<()>;
 
+    /// Delete documents matching a metadata field value.
+    ///
+    /// This removes matching documents from the index buffer regarding the filtering criteria.
+    /// Returns the number of documents removed.
+    fn delete_documents(&mut self, field: &str, value: &str) -> Result<usize> {
+        let _ = field;
+        let _ = value;
+        Err(crate::error::SarissaError::InvalidOperation(
+            "delete_documents not implemented for this writer".to_string(),
+        ))
+    }
+
     /// Commit pending changes to the index.
     ///
     /// This method finalizes the index and writes it to storage.

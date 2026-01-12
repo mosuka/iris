@@ -785,14 +785,6 @@ impl IvfIndexWriter {
         Vector::new(data)
     }
     // optimize method moved to VectorIndexWriter trait implementation
-
-    pub fn delete_documents(&mut self, field: &str, value: &str) -> Result<u64> {
-        // Simplified implementation - returns 0
-        // TODO: Implement proper deletion with metadata storage
-        let _field = field;
-        let _value = value;
-        Ok(0)
-    }
 }
 
 impl VectorIndexWriter for IvfIndexWriter {
@@ -978,8 +970,31 @@ impl VectorIndexWriter for IvfIndexWriter {
     }
 
     fn delete_document(&mut self, doc_id: u64) -> Result<()> {
+        if self.is_finalized {
+            return Err(SarissaError::InvalidOperation(
+                "Cannot delete documents from finalized index".to_string(),
+            ));
+        }
         self.vectors.retain(|(id, _, _)| *id != doc_id);
         Ok(())
+    }
+
+    fn delete_documents(&mut self, field: &str, value: &str) -> Result<usize> {
+        if self.is_finalized {
+            return Err(SarissaError::InvalidOperation(
+                "Cannot delete documents from finalized index".to_string(),
+            ));
+        }
+
+        let initial_len = self.vectors.len();
+        self.vectors.retain(|(_, _, vector)| {
+            vector
+                .get_metadata(field)
+                .map(|v| v != value)
+                .unwrap_or(true)
+        });
+
+        Ok(initial_len - self.vectors.len())
     }
 
     fn rollback(&mut self) -> Result<()> {

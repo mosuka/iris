@@ -4,6 +4,7 @@ use std::collections::hash_map::Entry;
 use std::sync::Arc;
 
 use crate::error::{Result, SarissaError};
+use crate::maintenance::deletion::DeletionBitmap;
 use crate::storage::Storage;
 use crate::vector::core::document::{METADATA_WEIGHT, StoredVector};
 use crate::vector::core::vector::Vector;
@@ -45,6 +46,9 @@ pub struct SegmentedVectorField {
 
     /// Active segment for current writes.
     pub active_segment: Arc<RwLock<Option<(String, HnswIndexWriter)>>>,
+
+    /// Global deletion bitmap.
+    pub deletion_bitmap: Option<Arc<DeletionBitmap>>,
 }
 
 impl SegmentedVectorField {
@@ -53,6 +57,7 @@ impl SegmentedVectorField {
         config: VectorFieldConfig,
         segment_manager: Arc<SegmentManager>,
         storage: Arc<dyn Storage>,
+        deletion_bitmap: Option<Arc<DeletionBitmap>>,
     ) -> Result<Self> {
         let name_str = name.into();
 
@@ -62,6 +67,7 @@ impl SegmentedVectorField {
             segment_manager,
             storage,
             active_segment: Arc::new(RwLock::new(None)),
+            deletion_bitmap,
         };
 
         Ok(field)
@@ -325,11 +331,17 @@ impl SegmentedVectorField {
 
         for info in segments {
             // Load reader for segment
-            let reader = HnswIndexReader::load(
+            let mut reader = HnswIndexReader::load(
                 self.storage.as_ref(),
                 &info.segment_id,
                 self.config.distance,
             )?;
+
+            // Inject deletion bitmap if available
+            if let Some(bitmap) = &self.deletion_bitmap {
+                reader.set_deletion_bitmap(bitmap.clone());
+            }
+
             let searcher = HnswSearcher::new(Arc::new(reader))?;
 
             let mut params = VectorIndexSearchParams::default();

@@ -13,6 +13,7 @@ use crate::vector::reader::{ValidationReport, VectorIndexMetadata, VectorStats};
 use crate::vector::reader::{VectorIndexReader, VectorIterator};
 use std::sync::Mutex;
 
+use crate::maintenance::deletion::DeletionBitmap;
 /// Storage for vectors (in-memory or on-demand).
 use crate::vector::index::storage::VectorStorage;
 
@@ -26,6 +27,7 @@ pub struct HnswIndexReader {
     m: usize,
     ef_construction: usize,
     pub graph: Option<Arc<HnswGraph>>,
+    deletion_bitmap: Option<Arc<DeletionBitmap>>,
 }
 
 impl HnswIndexReader {
@@ -242,7 +244,20 @@ impl HnswIndexReader {
             m,
             ef_construction,
             graph,
+            deletion_bitmap: None,
         })
+    }
+
+    pub fn set_deletion_bitmap(&mut self, bitmap: Arc<DeletionBitmap>) {
+        self.deletion_bitmap = Some(bitmap);
+    }
+
+    fn is_deleted(&self, doc_id: u64) -> bool {
+        if let Some(bitmap) = &self.deletion_bitmap {
+            bitmap.is_deleted(doc_id)
+        } else {
+            false
+        }
     }
 
     /// Get HNSW parameters.
@@ -257,6 +272,9 @@ impl VectorIndexReader for HnswIndexReader {
     }
 
     fn get_vector(&self, doc_id: u64, field_name: &str) -> Result<Option<Vector>> {
+        if self.is_deleted(doc_id) {
+            return Ok(None);
+        }
         self.vectors
             .get(&(doc_id, field_name.to_string()), self.dimension)
     }
@@ -264,7 +282,7 @@ impl VectorIndexReader for HnswIndexReader {
     fn get_vectors_for_doc(&self, doc_id: u64) -> Result<Vec<(String, Vector)>> {
         let mut result = Vec::new();
         for (id, field) in &self.vector_ids {
-            if *id == doc_id {
+            if *id == doc_id && !self.is_deleted(*id) {
                 if let Some(vec) = self.vectors.get(&(*id, field.clone()), self.dimension)? {
                     result.push((field.clone(), vec));
                 }
@@ -276,7 +294,11 @@ impl VectorIndexReader for HnswIndexReader {
     fn get_vectors(&self, doc_ids: &[(u64, String)]) -> Result<Vec<Option<Vector>>> {
         let mut result = Vec::with_capacity(doc_ids.len());
         for (id, field) in doc_ids {
-            result.push(self.vectors.get(&(*id, field.clone()), self.dimension)?);
+            if self.is_deleted(*id) {
+                result.push(None);
+            } else {
+                result.push(self.vectors.get(&(*id, field.clone()), self.dimension)?);
+            }
         }
         Ok(result)
     }
@@ -332,7 +354,7 @@ impl VectorIndexReader for HnswIndexReader {
     ) -> Result<Vec<(u64, String, Vector)>> {
         let mut result = Vec::new();
         for (id, field) in &self.vector_ids {
-            if *id >= start_doc_id && *id < end_doc_id {
+            if *id >= start_doc_id && *id < end_doc_id && !self.is_deleted(*id) {
                 if let Some(vec) = self.vectors.get(&(*id, field.clone()), self.dimension)? {
                     result.push((*id, field.clone(), vec));
                 }
@@ -344,7 +366,7 @@ impl VectorIndexReader for HnswIndexReader {
     fn get_vectors_by_field(&self, field_name: &str) -> Result<Vec<(u64, Vector)>> {
         let mut result = Vec::new();
         for (id, field) in &self.vector_ids {
-            if field == field_name {
+            if field == field_name && !self.is_deleted(*id) {
                 if let Some(vec) = self.vectors.get(&(*id, field.clone()), self.dimension)? {
                     result.push((*id, vec));
                 }
@@ -365,6 +387,7 @@ impl VectorIndexReader for HnswIndexReader {
             keys: self.vector_ids.clone(),
             current: 0,
             dimension: self.dimension,
+            deletion_bitmap: self.deletion_bitmap.clone(),
         }))
     }
 
@@ -457,12 +480,22 @@ struct HnswVectorIterator {
     keys: Vec<(u64, String)>,
     current: usize,
     dimension: usize,
+    deletion_bitmap: Option<Arc<DeletionBitmap>>,
 }
 
 impl VectorIterator for HnswVectorIterator {
     fn next(&mut self) -> Result<Option<(u64, String, Vector)>> {
         if self.current < self.keys.len() {
             let (doc_id, field) = &self.keys[self.current];
+
+            // Check deletion
+            if let Some(bitmap) = &self.deletion_bitmap {
+                if bitmap.is_deleted(*doc_id) {
+                    self.current += 1;
+                    return self.next(); // Recursively skip deleted
+                }
+            }
+
             if let Some(vec) = self
                 .storage
                 .get(&(*doc_id, field.clone()), self.dimension)?

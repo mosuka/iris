@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::error::Result;
+use crate::maintenance::deletion::DeletionBitmap;
 use crate::vector::core::distance::DistanceMetric;
 use crate::vector::core::vector::Vector;
 
@@ -128,6 +129,7 @@ pub struct SimpleVectorReader {
     vector_ids: Vec<(u64, String)>,
     dimension: usize,
     distance_metric: DistanceMetric,
+    deletion_bitmap: Option<Arc<DeletionBitmap>>,
 }
 
 impl SimpleVectorReader {
@@ -151,7 +153,20 @@ impl SimpleVectorReader {
             vector_ids,
             dimension,
             distance_metric,
+            deletion_bitmap: None,
         })
+    }
+
+    pub fn set_deletion_bitmap(&mut self, bitmap: Arc<DeletionBitmap>) {
+        self.deletion_bitmap = Some(bitmap);
+    }
+
+    fn is_deleted(&self, doc_id: u64) -> bool {
+        if let Some(bitmap) = &self.deletion_bitmap {
+            bitmap.is_deleted(doc_id)
+        } else {
+            false
+        }
     }
 }
 
@@ -161,6 +176,9 @@ impl VectorIndexReader for SimpleVectorReader {
     }
 
     fn get_vector(&self, doc_id: u64, field_name: &str) -> Result<Option<Vector>> {
+        if self.is_deleted(doc_id) {
+            return Ok(None);
+        }
         Ok(self.vectors.get(&(doc_id, field_name.to_string())).cloned())
     }
 
@@ -337,15 +355,34 @@ impl VectorIndexReaderFactory {
     pub fn create_reader(
         index_type: &str,
         index_data: &[u8],
+        deletion_bitmap: Option<Arc<DeletionBitmap>>,
     ) -> Result<Arc<dyn VectorIndexReader>> {
         use crate::vector::index::flat::reader::FlatVectorIndexReader;
         use crate::vector::index::hnsw::reader::HnswIndexReader;
         use crate::vector::index::ivf::reader::IvfIndexReader;
 
         match index_type.to_lowercase().as_str() {
-            "flat" => Ok(Arc::new(FlatVectorIndexReader::from_bytes(index_data)?)),
-            "hnsw" => Ok(Arc::new(HnswIndexReader::from_bytes(index_data)?)),
-            "ivf" => Ok(Arc::new(IvfIndexReader::from_bytes(index_data)?)),
+            "flat" => {
+                let mut reader = FlatVectorIndexReader::from_bytes(index_data)?;
+                if let Some(bitmap) = deletion_bitmap {
+                    reader.set_deletion_bitmap(bitmap);
+                }
+                Ok(Arc::new(reader))
+            }
+            "hnsw" => {
+                let mut reader = HnswIndexReader::from_bytes(index_data)?;
+                if let Some(bitmap) = deletion_bitmap {
+                    reader.set_deletion_bitmap(bitmap);
+                }
+                Ok(Arc::new(reader))
+            }
+            "ivf" => {
+                let mut reader = IvfIndexReader::from_bytes(index_data)?;
+                if let Some(bitmap) = deletion_bitmap {
+                    reader.set_deletion_bitmap(bitmap);
+                }
+                Ok(Arc::new(reader))
+            }
             _ => Err(crate::error::SarissaError::InvalidOperation(format!(
                 "Unknown index type: {index_type}"
             ))),

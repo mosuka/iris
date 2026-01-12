@@ -417,6 +417,24 @@ impl VectorIndexWriter for FlatIndexWriter {
         Ok(())
     }
 
+    fn delete_documents(&mut self, field: &str, value: &str) -> Result<usize> {
+        if self.is_finalized {
+            return Err(SarissaError::InvalidOperation(
+                "Cannot delete documents from finalized index".to_string(),
+            ));
+        }
+
+        let initial_len = self.vectors.len();
+        self.vectors.retain(|(_, _, vector)| {
+            vector
+                .get_metadata(field)
+                .map(|v| v != value)
+                .unwrap_or(true)
+        });
+
+        Ok(initial_len - self.vectors.len())
+    }
+
     fn rollback(&mut self) -> Result<()> {
         // Clear pending vectors and reset state
         self.vectors.clear();

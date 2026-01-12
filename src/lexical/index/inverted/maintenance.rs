@@ -7,6 +7,6 @@
 //! - Transaction support
 
 pub mod background_tasks;
-pub mod deletion;
+// pub mod deletion; // Moved to separate crate-level module
 pub mod optimization;
 pub mod transaction;
