@@ -259,17 +259,17 @@ impl SpanNearQuery {
             return true;
         }
 
-        let mut sorted_spans = spans.to_vec();
-        sorted_spans.sort_by_key(|s| s.start);
-
         // Check order requirement
         if self.in_order {
-            for (i, span) in sorted_spans.iter().enumerate().take(spans.len()) {
-                if span.term != self.clauses[i].field_name() {
+            for i in 0..spans.len() - 1 {
+                if spans[i].start > spans[i + 1].start {
                     return false;
                 }
             }
         }
+
+        let mut sorted_spans = spans.to_vec();
+        sorted_spans.sort_by_key(|s| s.start);
 
         // Check slop requirement
         let total_span = Span::new(
@@ -490,10 +490,16 @@ impl SpanMatcher {
             }
         }
 
+        let current_doc_id = if matches.is_empty() {
+            u64::MAX
+        } else {
+            matches[0]
+        };
+
         Ok(SpanMatcher {
             matches,
             current_index: 0,
-            current_doc_id: u64::MAX,
+            current_doc_id,
         })
     }
 }
@@ -519,24 +525,6 @@ impl Matcher for SpanMatcher {
     }
 
     fn next(&mut self) -> Result<bool> {
-        if self.current_index >= self.matches.len() {
-            return Ok(false);
-        }
-
-        // If this is the first call (current_doc_id is MAX and index 0), pick the first one.
-        // But logic below handles it:
-        // Actually, typical iterator pattern:
-        // if initialized but not started?
-        // Let's assume standard behavior: `next()` advances.
-        // Initially we might be at -1?
-        // Let's use `current_doc_id` to track state.
-
-        if self.current_doc_id == u64::MAX && self.current_index == 0 && !self.matches.is_empty() {
-            // First match
-            self.current_doc_id = self.matches[0];
-            return Ok(true);
-        }
-
         self.current_index += 1;
         if self.current_index >= self.matches.len() {
             self.current_doc_id = u64::MAX;
@@ -573,6 +561,7 @@ impl Matcher for SpanMatcher {
 /// A scorer for span queries.
 #[derive(Debug)]
 pub struct SpanScorer {
+    #[allow(dead_code)]
     span_query: Box<dyn SpanQuery>,
     // We cannot store reader here either!
     // Query::scorer returns Box<dyn Scorer>.
