@@ -145,3 +145,112 @@ fn test_vacuum_reduces_file_size() {
         );
     }
 }
+
+#[test]
+fn test_vacuum_reduces_file_size_hnsw() {
+    let dir = Builder::new().prefix("test_vacuum_hnsw").tempdir().unwrap();
+    let path = dir.path().to_path_buf();
+
+    // 1. Create VectorEngine using HNSW
+    let field_config = VectorFieldConfig {
+        dimension: 128,
+        distance: DistanceMetric::Cosine,
+        index: VectorIndexKind::Hnsw,
+        metadata: HashMap::new(),
+        base_weight: 1.0,
+    };
+
+    let config = VectorIndexConfig {
+        fields: HashMap::from([("vectors".to_string(), field_config)]),
+        default_fields: vec!["vectors".to_string()],
+        metadata: HashMap::new(),
+        default_distance: DistanceMetric::Cosine,
+        default_dimension: None,
+        default_index_kind: VectorIndexKind::Hnsw,
+        default_base_weight: 1.0,
+        implicit_schema: false,
+        embedder: Arc::new(sarissa::embedding::precomputed::PrecomputedEmbedder::new()),
+        deletion_config: sarissa::maintenance::deletion::DeletionConfig::default(),
+    };
+
+    let file_config = FileStorageConfig::new(path.to_str().unwrap());
+    let storage_config = StorageConfig::File(file_config);
+    let storage = StorageFactory::create(storage_config).unwrap();
+
+    let engine = VectorEngine::new(storage, config).unwrap();
+
+    let dim = 128;
+    // Use enough vectors to force multiple segments if possible,
+    // or just rely on flush causing a segment.
+    let num_vectors = 200;
+
+    // 2. Insert vectors
+    println!("Inserting {} vectors...", num_vectors);
+    for i in 0..num_vectors {
+        let mut doc_vector = DocumentVector::new();
+        doc_vector.set_field("vectors", StoredVector::new(Arc::from(vec![0.1f32; dim])));
+        engine.upsert_vectors(i, doc_vector).unwrap();
+    }
+
+    println!("Flushing vectors to disk...");
+    engine.flush_vectors().unwrap();
+    engine.commit().unwrap();
+    println!("committed.");
+
+    // Path check might be different for SegmentedVectorField structure
+    // It creates segments inside "vector_fields/vectors/" directory.
+    let index_dir = path.join("vector_fields").join("vectors");
+
+    // Calculate total size of segments
+    let get_size = |dir: &std::path::Path| -> u64 {
+        let mut size = 0;
+        if let Ok(entries) = std::fs::read_dir(dir) {
+            for entry in entries {
+                if let Ok(entry) = entry {
+                    if let Ok(metadata) = entry.metadata() {
+                        if metadata.is_file() {
+                            size += metadata.len();
+                        }
+                    }
+                }
+            }
+        }
+        size
+    };
+
+    let size_before = get_size(&index_dir);
+    println!("Size before deletion: {} bytes", size_before);
+
+    // 3. Delete 100 vectors (even IDs)
+    println!("Deleting {} vectors...", num_vectors / 2);
+    for i in 0..num_vectors {
+        if i % 2 == 0 {
+            engine.delete_vectors(i).unwrap();
+        }
+    }
+    engine.commit().unwrap(); // Persist deletions (bitmaps)
+
+    let size_intermediate = get_size(&index_dir);
+    println!(
+        "Size after delete (before optimize): {} bytes",
+        size_intermediate
+    );
+
+    // 4. Run Vacuum (Merge)
+    println!("Running optimize (Vacuum)...");
+    engine.optimize().unwrap();
+
+    let size_after = get_size(&index_dir);
+    println!("Size after optimize: {} bytes", size_after);
+
+    // If compaction works, size should decrease significantly.
+    // If not, it might stay same or increase (due to new merged segment + old ones if not cleaned).
+    // Note: SegmentManager usually deletes old segments after merge.
+
+    assert!(
+        size_after < size_before,
+        "Size should decrease after vacuum. Before: {}, After: {}",
+        size_before,
+        size_after
+    );
+}

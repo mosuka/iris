@@ -11,6 +11,7 @@ use crate::vector::core::vector::Vector;
 
 use super::manager::ManagedSegmentInfo;
 
+use crate::maintenance::deletion::DeletionBitmap;
 use crate::vector::index::config::HnswIndexConfig;
 use crate::vector::index::hnsw::reader::HnswIndexReader;
 use crate::vector::index::hnsw::writer::HnswIndexWriter;
@@ -109,6 +110,7 @@ pub struct MergeEngine {
     storage: Arc<dyn Storage>,
     index_config: HnswIndexConfig,
     writer_config: VectorIndexWriterConfig,
+    deletion_bitmap: Option<Arc<DeletionBitmap>>,
 }
 
 impl MergeEngine {
@@ -124,7 +126,13 @@ impl MergeEngine {
             storage,
             index_config,
             writer_config,
+            deletion_bitmap: None,
         }
+    }
+
+    /// Set deletion bitmap for filtering deleted vectors during merge.
+    pub fn set_deletion_bitmap(&mut self, bitmap: Arc<DeletionBitmap>) {
+        self.deletion_bitmap = Some(bitmap);
     }
 
     /// Merge multiple segments into a single segment.
@@ -145,6 +153,7 @@ impl MergeEngine {
         let segments_merged = segments.len() as u32;
         #[allow(unused_assignments)]
         let mut vectors_merged = 0;
+        let mut deletions_removed = 0;
         #[allow(unused_assignments)]
         let mut total_size = segments.iter().map(|s| s.size_bytes).sum::<u64>();
 
@@ -162,7 +171,12 @@ impl MergeEngine {
 
             let mut iterator = reader.vector_iterator()?;
             while let Some((doc_id, field, vector)) = iterator.next()? {
-                // TODO: Check for deletions here if we had a deletion bitmap passed in.
+                if let Some(bitmap) = &self.deletion_bitmap {
+                    if bitmap.is_deleted(doc_id) {
+                        deletions_removed += 1;
+                        continue;
+                    }
+                }
                 all_vectors.push((doc_id, field, vector));
             }
         }
@@ -197,7 +211,7 @@ impl MergeEngine {
         let stats = MergeStats {
             segments_merged,
             vectors_merged,
-            deletions_removed: 0,
+            deletions_removed,
             merge_time_ms,
             merged_size_bytes: total_size,
         };

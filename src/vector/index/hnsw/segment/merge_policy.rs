@@ -93,6 +93,31 @@ impl MergePolicy for SimpleMergePolicy {
     }
 }
 
+/// Policy that forces validation/merging of all segments.
+#[derive(Debug, Default)]
+pub struct ForceMergePolicy;
+
+impl ForceMergePolicy {
+    /// Create a new force merge policy.
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl MergePolicy for ForceMergePolicy {
+    fn candidates(
+        &self,
+        segments: &[ManagedSegmentInfo],
+        _config: &SegmentManagerConfig,
+    ) -> Option<Vec<String>> {
+        if segments.is_empty() {
+            return None;
+        }
+        // Force merge all segments
+        Some(segments.iter().map(|s| s.segment_id.clone()).collect())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
