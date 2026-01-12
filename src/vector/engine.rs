@@ -134,13 +134,13 @@ impl VectorEngine {
             next_doc_id: AtomicU64::new(0),
             closed: AtomicU64::new(0),
         };
-        engine.load_persisted_state()?;
-
         // Ensure global deletion bitmap is initialized
         engine.deletion_manager.initialize_segment(
             "global",
             engine.next_doc_id.load(Ordering::SeqCst) + 1000, // Reserve some space
         )?;
+
+        engine.load_persisted_state()?;
 
         // Register embedder instances from the config (after fields are instantiated)
         engine.register_embedder_from_config(config_embedder)?;

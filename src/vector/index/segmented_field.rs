@@ -115,14 +115,22 @@ impl SegmentedVectorField {
         Ok(())
     }
 
-    /// Trigger a background merge of segments if needed.
+    /// Trigger a background merge of segments using various policies.
     pub fn perform_merge(&self) -> Result<()> {
         let policy = crate::vector::index::hnsw::segment::merge_policy::SimpleMergePolicy::new();
-        if let Some(candidate) = self.segment_manager.check_merge(&policy) {
+        self.perform_merge_with_policy(&policy)
+    }
+
+    /// Trigger a merge with a specific policy.
+    pub fn perform_merge_with_policy(
+        &self,
+        policy: &dyn crate::vector::index::hnsw::segment::merge_policy::MergePolicy,
+    ) -> Result<()> {
+        if let Some(candidate) = self.segment_manager.check_merge(policy) {
             // Get HNSW parameters from metadata if available
             let hnsw_config_meta = HnswMetadataConfig::from_metadata(&self.config.metadata);
 
-            let engine = MergeEngine::new(
+            let mut engine = MergeEngine::new(
                 MergeConfig::default(),
                 self.storage.clone(),
                 HnswIndexConfig {
@@ -135,6 +143,10 @@ impl SegmentedVectorField {
                     ..Default::default()
                 },
             );
+
+            if let Some(bitmap) = &self.deletion_bitmap {
+                engine.set_deletion_bitmap(bitmap.clone());
+            }
 
             let new_segment_id = self.segment_manager.generate_segment_id();
             let result =
@@ -244,7 +256,8 @@ impl VectorFieldWriter for SegmentedVectorField {
     }
 
     fn optimize(&self) -> Result<()> {
-        self.perform_merge()
+        let policy = crate::vector::index::hnsw::segment::merge_policy::ForceMergePolicy::new();
+        self.perform_merge_with_policy(&policy)
     }
 }
 

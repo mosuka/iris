@@ -238,8 +238,10 @@ impl SegmentManager {
 
     /// Delete physical files associated with a segment.
     pub fn delete_segment_files(&self, segment_id: &str) -> Result<()> {
-        // HNSW index writer uses segment_id as the main file name
-        self.storage.delete_file(segment_id)?;
+        // HNSW index writer uses segment_id.hnsw as the file name
+        let file_name = format!("{}.hnsw", segment_id);
+        // Best effort deletion - ignore if file doesn't exist
+        let _ = self.storage.delete_file(&file_name);
         Ok(())
     }
 
