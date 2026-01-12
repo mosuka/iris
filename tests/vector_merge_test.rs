@@ -29,8 +29,13 @@ fn test_segmented_field_manual_merge() -> Result<(), Box<dyn std::error::Error>>
         base_weight: 1.0, // Default weight
     };
 
-    let field =
-        SegmentedVectorField::create("test_field", field_config, manager.clone(), storage.clone())?;
+    let field = SegmentedVectorField::create(
+        "test_field",
+        field_config,
+        manager.clone(),
+        storage.clone(),
+        None,
+    )?;
 
     // 3. Add vectors and flush to create segments
     // Segment 1

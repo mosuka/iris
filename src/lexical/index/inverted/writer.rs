@@ -17,11 +17,11 @@ use crate::lexical::core::analyzed::{AnalyzedDocument, AnalyzedTerm};
 use crate::lexical::core::document::Document;
 use crate::lexical::core::field::FieldValue;
 use crate::lexical::index::inverted::core::posting::{Posting, TermPostingIndex};
-use crate::lexical::index::inverted::maintenance::deletion::{DeletionConfig, DeletionManager};
 use crate::lexical::index::inverted::segment::SegmentInfo;
 use crate::lexical::index::structures::dictionary::{TermDictionaryBuilder, TermInfo};
 use crate::lexical::index::structures::doc_values::DocValuesWriter;
 use crate::lexical::writer::LexicalIndexWriter;
+use crate::maintenance::deletion::{DeletionConfig, DeletionManager};
 use crate::storage::Storage;
 use crate::storage::structured::StructWriter;
 

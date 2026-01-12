@@ -40,6 +40,7 @@ use serde::{Deserialize, Serialize};
 use crate::embedding::embedder::Embedder;
 use crate::embedding::precomputed::PrecomputedEmbedder;
 use crate::error::{Result, SarissaError};
+use crate::maintenance::deletion::DeletionConfig;
 use crate::vector::DistanceMetric;
 
 /// Configuration for a single vector collection.
@@ -106,6 +107,9 @@ pub struct VectorIndexConfig {
     /// Use `PerFieldEmbedder` for field-specific embedders.
     /// Use `PrecomputedEmbedder` when using pre-computed vectors.
     pub embedder: Arc<dyn Embedder>,
+
+    /// Deletion maintenance configuration.
+    pub deletion_config: DeletionConfig,
 }
 
 impl std::fmt::Debug for VectorIndexConfig {
@@ -120,6 +124,7 @@ impl std::fmt::Debug for VectorIndexConfig {
             .field("default_base_weight", &self.default_base_weight)
             .field("implicit_schema", &self.implicit_schema)
             .field("embedder", &format_args!("{:?}", self.embedder))
+            .field("deletion_config", &self.deletion_config)
             .finish()
     }
 }
@@ -207,6 +212,7 @@ pub struct VectorIndexConfigBuilder {
     default_index_kind: VectorIndexKind,
     default_base_weight: f32,
     implicit_schema: bool,
+    deletion_config: Option<DeletionConfig>,
 }
 
 impl VectorIndexConfigBuilder {
@@ -222,6 +228,7 @@ impl VectorIndexConfigBuilder {
             default_index_kind: VectorIndexKind::Flat,
             default_base_weight: VectorFieldConfig::default_weight(),
             implicit_schema: false,
+            deletion_config: None,
         }
     }
 
@@ -343,6 +350,12 @@ impl VectorIndexConfigBuilder {
         self
     }
 
+    /// Set deletion configuration.
+    pub fn deletion_config(mut self, config: DeletionConfig) -> Self {
+        self.deletion_config = Some(config);
+        self
+    }
+
     /// Build the configuration.
     ///
     /// If no embedder is set, defaults to `PrecomputedEmbedder` for pre-computed vectors.
@@ -361,6 +374,7 @@ impl VectorIndexConfigBuilder {
             default_base_weight: self.default_base_weight,
             implicit_schema: self.implicit_schema,
             embedder,
+            deletion_config: self.deletion_config.unwrap_or_default(),
         };
         config.validate()?;
         Ok(config)
@@ -390,6 +404,7 @@ impl Serialize for VectorIndexConfig {
         state.serialize_field("default_index_kind", &self.default_index_kind)?;
         state.serialize_field("default_base_weight", &self.default_base_weight)?;
         state.serialize_field("implicit_schema", &self.implicit_schema)?;
+        state.serialize_field("deletion_config", &self.deletion_config)?;
         state.end()
     }
 }
@@ -416,6 +431,8 @@ impl<'de> Deserialize<'de> for VectorIndexConfig {
             default_base_weight: f32,
             #[serde(default)]
             implicit_schema: bool,
+            #[serde(default)]
+            deletion_config: DeletionConfig,
         }
 
         let helper = VectorIndexConfigHelper::deserialize(deserializer)?;
@@ -428,6 +445,7 @@ impl<'de> Deserialize<'de> for VectorIndexConfig {
             default_index_kind: helper.default_index_kind,
             default_base_weight: helper.default_base_weight,
             implicit_schema: helper.implicit_schema,
+            deletion_config: helper.deletion_config,
             // Default to PrecomputedEmbedder; can be replaced programmatically
             embedder: Arc::new(PrecomputedEmbedder::new()),
         })

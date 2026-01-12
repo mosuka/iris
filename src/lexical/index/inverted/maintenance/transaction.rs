@@ -12,11 +12,9 @@ use uuid::Uuid;
 
 use crate::error::{Result, SarissaError};
 use crate::lexical::core::document::Document;
-use crate::lexical::index::inverted::maintenance::deletion::{
-    DeletionManager, GlobalDeletionState,
-};
 use crate::lexical::index::inverted::segment::manager::SegmentManager;
 use crate::lexical::index::inverted::segment::merge_engine::MergeEngine;
+use crate::maintenance::deletion::{DeletionManager, GlobalDeletionState};
 use crate::storage::Storage;
 
 /// Transaction isolation levels.

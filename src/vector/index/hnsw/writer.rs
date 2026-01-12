@@ -1374,8 +1374,35 @@ impl VectorIndexWriter for HnswIndexWriter {
         }
 
         // Logical deletion from buffer
+        let initial_len = self.vectors.len();
         self.vectors.retain(|(id, _, _)| *id != doc_id);
+
+        if self.vectors.len() < initial_len {
+            self.rebuild_doc_id_map();
+        }
         Ok(())
+    }
+
+    fn delete_documents(&mut self, field: &str, value: &str) -> Result<usize> {
+        if self.is_finalized {
+            return Err(SarissaError::InvalidOperation(
+                "Cannot delete documents from finalized index".to_string(),
+            ));
+        }
+
+        let initial_len = self.vectors.len();
+        self.vectors.retain(|(_, _, vector)| {
+            vector
+                .get_metadata(field)
+                .map(|v| v != value)
+                .unwrap_or(true)
+        });
+
+        let removed = initial_len - self.vectors.len();
+        if removed > 0 {
+            self.rebuild_doc_id_map();
+        }
+        Ok(removed)
     }
 
     fn rollback(&mut self) -> Result<()> {

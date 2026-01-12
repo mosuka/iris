@@ -37,6 +37,7 @@ mod tests {
             default_base_weight: 1.0,
             implicit_schema: false,
             embedder: Arc::new(sarissa::embedding::precomputed::PrecomputedEmbedder::new()),
+            deletion_config: sarissa::maintenance::deletion::DeletionConfig::default(),
         };
 
         let storage =

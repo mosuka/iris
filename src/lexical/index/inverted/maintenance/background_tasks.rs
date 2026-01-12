@@ -11,10 +11,10 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use crossbeam_channel::{Receiver, Sender, bounded, unbounded};
 
 use crate::error::{Result, SarissaError};
-use crate::lexical::index::inverted::maintenance::deletion::DeletionManager;
 use crate::lexical::index::inverted::segment::manager::SegmentManager;
 use crate::lexical::index::inverted::segment::merge_engine::MergeEngine;
 use crate::lexical::index::inverted::segment::merge_policy::MergePolicy;
+use crate::maintenance::deletion::DeletionManager;
 
 /// Type of background task.
 #[derive(Debug, Clone, PartialEq)]
@@ -586,8 +586,7 @@ impl BackgroundScheduler {
         _segment_manager: &SegmentManager,
         _merge_engine: &MergeEngine,
     ) -> (TaskStatus, u64, u64, Option<String>) {
-        // TODO: Implement actual merge execution
-        // This is a placeholder implementation
+        // Execute merge using MergeEngine
 
         let segments = _segment_manager.get_segments();
         let segments_to_merge: Vec<_> = segments

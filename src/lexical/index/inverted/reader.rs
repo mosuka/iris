@@ -19,13 +19,13 @@ use crate::lexical::index::inverted::core::posting::{Posting, PostingList};
 use crate::lexical::index::inverted::core::terms::{
     InvertedIndexTerms, TermDictionaryAccess, Terms,
 };
-use crate::lexical::index::inverted::maintenance::deletion::DeletionBitmap;
 use crate::lexical::index::inverted::segment::SegmentInfo;
 use crate::lexical::index::structures::dictionary::HybridTermDictionary;
 use crate::lexical::index::structures::dictionary::TermInfo;
 use crate::lexical::index::structures::doc_values::DocValuesReader;
 use crate::lexical::reader::FieldStats;
 use crate::lexical::reader::PostingIterator;
+use crate::maintenance::deletion::DeletionBitmap;
 use crate::storage::Storage;
 use crate::storage::structured::StructReader;
 
@@ -540,7 +540,7 @@ impl SegmentReader {
     }
 
     /// Check whether a global doc_id is marked as deleted in this segment.
-    fn is_deleted(&self, global_doc_id: u64) -> Result<bool> {
+    pub fn is_deleted(&self, global_doc_id: u64) -> Result<bool> {
         if !self.info.has_deletions {
             return Ok(false);
         }
@@ -1073,8 +1073,17 @@ impl crate::lexical::reader::LexicalIndexReader for InvertedIndexReader {
         self.total_doc_count
     }
 
-    fn is_deleted(&self, _doc_id: u64) -> bool {
-        // TODO: Implement deletion support
+    fn is_deleted(&self, doc_id: u64) -> bool {
+        // Find the segment containing this document
+        for segment_reader in &self.segment_readers {
+            let reader = segment_reader.read().unwrap();
+            let segment_start = reader.info.doc_offset;
+            let segment_end = segment_start + reader.info.doc_count;
+
+            if doc_id >= segment_start && doc_id < segment_end {
+                return reader.is_deleted(doc_id).unwrap_or(false);
+            }
+        }
         false
     }
 

@@ -66,6 +66,7 @@ async fn test_vector_segment_integration() {
         embedder: Arc::new(MockTextEmbedder { dimension: 4 }),
         default_fields: vec!["vector_field".to_string()],
         metadata: std::collections::HashMap::new(),
+        deletion_config: sarissa::maintenance::deletion::DeletionConfig::default(),
     };
 
     // We construct engine manually to inject storage

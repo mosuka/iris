@@ -284,7 +284,7 @@ impl MergeEngine {
             if segment.segment_info.has_deletions {
                 let bitmap_file = format!("{}.delmap", segment.segment_info.segment_id);
                 if let Ok(input) = self.storage.open_input(&bitmap_file) {
-                    use crate::lexical::index::inverted::maintenance::deletion::DeletionBitmap;
+                    use crate::maintenance::deletion::DeletionBitmap;
                     use crate::storage::structured::StructReader;
 
                     if let Ok(mut reader) = StructReader::new(input) {

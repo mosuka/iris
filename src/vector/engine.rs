@@ -37,6 +37,7 @@ use parking_lot::{Mutex, RwLock};
 use crate::embedding::embedder::{EmbedInput, Embedder};
 use crate::embedding::per_field::PerFieldEmbedder;
 use crate::error::{Result, SarissaError};
+use crate::maintenance::deletion::DeletionManager;
 use crate::storage::Storage;
 use crate::storage::prefixed::PrefixedStorage;
 use crate::vector::core::document::{
@@ -87,6 +88,8 @@ pub struct VectorEngine {
     embedder_registry: Arc<VectorEmbedderRegistry>,
     embedder_executor: Mutex<Option<Arc<EmbedderExecutor>>>,
     wal: Arc<WalManager>,
+    /// Manager for logical deletions.
+    deletion_manager: Arc<DeletionManager>,
     storage: Arc<dyn Storage>,
     documents: Arc<RwLock<HashMap<u64, DocumentVector>>>,
     snapshot_wal_seq: AtomicU64,
@@ -112,6 +115,9 @@ impl VectorEngine {
 
         // Store the embedder from config before moving config into Arc
         let config_embedder = config.embedder.clone();
+        let deletion_config = config.deletion_config.clone();
+
+        let deletion_manager = Arc::new(DeletionManager::new(deletion_config, storage.clone())?);
 
         let mut engine = Self {
             config: Arc::new(config),
@@ -121,6 +127,7 @@ impl VectorEngine {
             embedder_registry,
             embedder_executor: Mutex::new(None),
             wal: Arc::new(WalManager::new(storage.clone(), "vector_engine.wal")?),
+            deletion_manager,
             storage,
             documents: Arc::new(RwLock::new(HashMap::new())),
             snapshot_wal_seq: AtomicU64::new(0),
@@ -128,6 +135,12 @@ impl VectorEngine {
             closed: AtomicU64::new(0),
         };
         engine.load_persisted_state()?;
+
+        // Ensure global deletion bitmap is initialized
+        engine.deletion_manager.initialize_segment(
+            "global",
+            engine.next_doc_id.load(Ordering::SeqCst) + 1000, // Reserve some space
+        )?;
 
         // Register embedder instances from the config (after fields are instantiated)
         engine.register_embedder_from_config(config_embedder)?;
@@ -410,6 +423,7 @@ impl VectorEngine {
                     config,
                     segment_manager,
                     storage,
+                    self.deletion_manager.get_bitmap("global"),
                 )?))
             }
             _ => {
@@ -550,6 +564,9 @@ impl VectorEngine {
         config: &VectorFieldConfig,
     ) -> Result<Arc<dyn VectorFieldReader>> {
         let storage = self.field_storage(field_name);
+
+        let global_bitmap = self.deletion_manager.get_bitmap("global");
+
         Ok(match config.index {
             VectorIndexKind::Flat => {
                 let flat_config = crate::vector::index::config::FlatIndexConfig {
@@ -558,27 +575,33 @@ impl VectorEngine {
                     loading_mode: crate::vector::index::config::IndexLoadingMode::default(),
                     ..Default::default()
                 };
-                let reader = Arc::new(FlatVectorIndexReader::load(
+                let mut reader = FlatVectorIndexReader::load(
                     &*storage,
                     FIELD_INDEX_BASENAME,
                     flat_config.distance_metric,
-                )?);
+                )?;
+                if let Some(bitmap) = &global_bitmap {
+                    reader.set_deletion_bitmap(bitmap.clone());
+                }
+                let reader = Arc::new(reader);
                 Arc::new(FlatFieldReader::new(field_name.to_string(), reader))
             }
             VectorIndexKind::Hnsw => {
-                let reader = Arc::new(HnswIndexReader::load(
-                    &*storage,
-                    FIELD_INDEX_BASENAME,
-                    config.distance,
-                )?);
+                let mut reader =
+                    HnswIndexReader::load(&*storage, FIELD_INDEX_BASENAME, config.distance)?;
+                if let Some(bitmap) = &global_bitmap {
+                    reader.set_deletion_bitmap(bitmap.clone());
+                }
+                let reader = Arc::new(reader);
                 Arc::new(HnswFieldReader::new(field_name.to_string(), reader))
             }
             VectorIndexKind::Ivf => {
-                let reader = Arc::new(IvfIndexReader::load(
-                    &*storage,
-                    FIELD_INDEX_BASENAME,
-                    config.distance,
-                )?);
+                let mut reader =
+                    IvfIndexReader::load(&*storage, FIELD_INDEX_BASENAME, config.distance)?;
+                if let Some(bitmap) = &global_bitmap {
+                    reader.set_deletion_bitmap(bitmap.clone());
+                }
+                let reader = Arc::new(reader);
                 Arc::new(IvfFieldReader::with_n_probe(
                     field_name.to_string(),
                     reader,
@@ -656,6 +679,11 @@ impl VectorEngine {
                 .writer()
                 .delete_document(doc_id, field_entry.version)?;
         }
+
+        // Logical deletion in bitmap
+        self.deletion_manager
+            .delete_document("global", doc_id, "delete_request")?;
+
         Ok(())
     }
 
@@ -1503,6 +1531,7 @@ impl crate::vector::search::searcher::VectorSearcher for VectorEngineSearcher {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::maintenance::deletion::DeletionConfig;
     use crate::storage::memory::{MemoryStorage, MemoryStorageConfig};
     use crate::vector::DistanceMetric;
     use crate::vector::core::document::StoredVector;
@@ -1530,6 +1559,7 @@ mod tests {
             default_base_weight: 1.0,
             implicit_schema: false,
             embedder: Arc::new(PrecomputedEmbedder::new()),
+            deletion_config: DeletionConfig::default(),
         }
     }
 

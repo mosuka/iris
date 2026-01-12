@@ -7,13 +7,13 @@ use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::error::{Result, SarissaError};
-use crate::lexical::index::inverted::maintenance::deletion::DeletionManager;
 use crate::lexical::index::inverted::segment::manager::{
     ManagedSegmentInfo, MergeStrategy, SegmentManager,
 };
 use crate::lexical::index::inverted::segment::merge_engine::{
     MergeConfig, MergeEngine, MergeResult,
 };
+use crate::maintenance::deletion::DeletionManager;
 use crate::storage::Storage;
 
 /// Optimization strategy types.
@@ -533,8 +533,8 @@ pub enum RecommendationPriority {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::lexical::index::inverted::maintenance::deletion::DeletionConfig;
     use crate::lexical::index::inverted::segment::manager::SegmentManagerConfig;
+    use crate::maintenance::deletion::DeletionConfig;
 
     use crate::storage::memory::MemoryStorage;
     use crate::storage::memory::MemoryStorageConfig;

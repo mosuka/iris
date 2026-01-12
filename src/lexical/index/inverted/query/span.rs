@@ -490,16 +490,10 @@ impl SpanMatcher {
             }
         }
 
-        let current_doc_id = if matches.is_empty() {
-            u64::MAX
-        } else {
-            matches[0]
-        };
-
         Ok(SpanMatcher {
             matches,
-            current_index: 0,
-            current_doc_id,
+            current_index: usize::MAX,
+            current_doc_id: u64::MAX,
         })
     }
 }
@@ -525,7 +519,12 @@ impl Matcher for SpanMatcher {
     }
 
     fn next(&mut self) -> Result<bool> {
-        self.current_index += 1;
+        if self.current_index == usize::MAX {
+            self.current_index = 0;
+        } else {
+            self.current_index += 1;
+        }
+
         if self.current_index >= self.matches.len() {
             self.current_doc_id = u64::MAX;
             Ok(false)
@@ -536,6 +535,10 @@ impl Matcher for SpanMatcher {
     }
 
     fn skip_to(&mut self, target: u64) -> Result<bool> {
+        if self.current_index == usize::MAX {
+            self.current_index = 0;
+        }
+
         while self.current_index < self.matches.len() && self.matches[self.current_index] < target {
             self.current_index += 1;
         }
