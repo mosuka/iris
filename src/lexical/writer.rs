@@ -75,4 +75,9 @@ pub trait LexicalIndexWriter: Send + Sync + std::fmt::Debug {
 
     /// Get the next available document ID.
     fn next_doc_id(&self) -> u64;
+
+    /// Find the internal document ID for a given term (field:value).
+    ///
+    /// This allows NRT (Near Real-Time) lookups for ID management.
+    fn find_doc_id_by_term(&self, field: &str, term: &str) -> Result<Option<u64>>;
 }

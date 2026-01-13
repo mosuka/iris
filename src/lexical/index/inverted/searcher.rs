@@ -31,6 +31,8 @@ use crate::lexical::search::searcher::{
 pub struct InvertedIndexSearcher {
     /// The index reader to search against.
     reader: Arc<dyn LexicalIndexReader>,
+    /// Default fields to search if none specified in query.
+    default_fields: Vec<String>,
 }
 
 impl InvertedIndexSearcher {
@@ -38,12 +40,22 @@ impl InvertedIndexSearcher {
     pub fn new(reader: Box<dyn LexicalIndexReader>) -> Self {
         InvertedIndexSearcher {
             reader: Arc::from(reader),
+            default_fields: Vec::new(),
         }
     }
 
     /// Create a new searcher with an `Arc<dyn LexicalIndexReader>`.
     pub fn from_arc(reader: Arc<dyn LexicalIndexReader>) -> Self {
-        InvertedIndexSearcher { reader }
+        InvertedIndexSearcher {
+            reader,
+            default_fields: Vec::new(),
+        }
+    }
+
+    /// Set default fields for search.
+    pub fn with_default_fields(mut self, fields: Vec<String>) -> Self {
+        self.default_fields = fields;
+        self
     }
 
     /// Get the index reader.
@@ -299,7 +311,10 @@ impl InvertedIndexSearcher {
                 };
 
                 // Parse DSL string into Query object
-                let parser = QueryParser::new(analyzer.clone());
+                let mut parser = QueryParser::new(analyzer.clone());
+                if !self.default_fields.is_empty() {
+                    parser = parser.with_default_fields(self.default_fields.clone());
+                }
                 parser.parse(dsl_string)?
             }
             LexicalSearchQuery::Obj(q) => q.clone_box(),

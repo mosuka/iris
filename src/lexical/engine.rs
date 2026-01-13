@@ -215,6 +215,38 @@ impl LexicalEngine {
         guard.as_mut().unwrap().delete_document(doc_id)
     }
 
+    /// Find the internal document ID for a given term (field:value).
+    ///
+    /// This searches both the uncommitted in-memory buffer (via Writer) and
+    /// the committed index (via Searcher).
+    pub fn find_doc_id_by_term(&self, field: &str, term: &str) -> Result<Option<u64>> {
+        // 1. Check writer (NRT - Uncommitted)
+        {
+            let guard = self.writer_cache.lock();
+            if let Some(writer) = guard.as_ref() {
+                if let Some(doc_id) = writer.find_doc_id_by_term(field, term)? {
+                    return Ok(Some(doc_id));
+                }
+            }
+        }
+
+        // 2. Check reader (Committed)
+        use crate::lexical::index::inverted::query::Query;
+        use crate::lexical::index::inverted::query::term::TermQuery;
+
+        let query = Box::new(TermQuery::new(field, term)) as Box<dyn Query>;
+        let request = LexicalSearchRequest::new(query)
+            .max_docs(1)
+            .load_documents(false);
+
+        let results = self.search(request)?;
+        if let Some(hit) = results.hits.first() {
+            Ok(Some(hit.doc_id))
+        } else {
+            Ok(None)
+        }
+    }
+
     /// Commit any pending changes to the index.
     ///
     /// This method flushes all pending write operations to storage and makes them

@@ -8,6 +8,7 @@ use std::sync::Arc;
 
 use crate::error::Result;
 use crate::hybrid::search::searcher::{HybridSearchRequest, HybridSearchResults};
+
 use crate::storage::Storage;
 use crate::vector::core::document::{DocumentPayload, DocumentVector};
 
@@ -18,37 +19,6 @@ struct HybridEngineManifest {
     next_doc_id: u64,
 }
 
-/// High-level hybrid search engine combining lexical and vector search.
-///
-/// This engine wraps both `LexicalEngine` and `VectorEngine` to provide
-/// unified hybrid search functionality. It follows the same pattern as the
-/// individual engines but coordinates searches across both indexes.
-///
-/// # Examples
-///
-/// ```no_run
-/// use sarissa::hybrid::engine::HybridEngine;
-/// use sarissa::hybrid::search::searcher::HybridSearchRequest;
-/// use sarissa::lexical::engine::LexicalEngine;
-/// use sarissa::vector::engine::VectorEngine;
-/// use sarissa::storage::{Storage, StorageConfig, StorageFactory};
-/// use sarissa::storage::memory::MemoryStorageConfig;
-/// use std::sync::Arc;
-///
-/// # async fn example(lexical_engine: LexicalEngine, vector_engine: VectorEngine) -> sarissa::error::Result<()> {
-/// // Create storage
-/// let storage_config = StorageConfig::Memory(MemoryStorageConfig::default());
-/// let storage = StorageFactory::create(storage_config)?;
-///
-/// // Create hybrid engine
-/// let engine = HybridEngine::new(storage, lexical_engine, vector_engine)?;
-///
-/// // Text-only search
-/// let request = HybridSearchRequest::new().with_text("rust programming");
-/// let results = engine.search(request).await?;
-/// # Ok(())
-/// # }
-/// ```
 pub struct HybridEngine {
     /// Storage for hybrid engine metadata (manifest).
     storage: Arc<dyn Storage>,
@@ -132,6 +102,75 @@ impl HybridEngine {
         let doc_id = self.next_doc_id;
         self.upsert_document(doc_id, doc).await?;
         Ok(doc_id)
+    }
+
+    /// Add or update a hybrid document using an external ID.
+    ///
+    /// # Arguments
+    ///
+    /// * `external_id` - The stable external identifier
+    /// * `doc` - The hybrid document to add
+    ///
+    /// # Returns
+    ///
+    /// The assigned internal document ID
+    pub async fn index_document(
+        &mut self,
+        external_id: &str,
+        mut doc: crate::hybrid::core::document::HybridDocument,
+    ) -> Result<u64> {
+        // 1. Lookup existing ID via Lexical Engine (_id field)
+        if let Some(old_id) = self
+            .lexical_engine
+            .find_doc_id_by_term("_id", external_id)?
+        {
+            // Delete old document from both engines
+            let _ = self.lexical_engine.delete_document(old_id);
+            let _ = self.vector_engine.delete_vectors(old_id);
+        }
+
+        // 2. Inject _id field into lexical document
+        if doc.lexical_doc.is_none() {
+            doc.lexical_doc = Some(crate::lexical::core::document::Document::new());
+        }
+        if let Some(lex_doc) = &mut doc.lexical_doc {
+            use crate::lexical::core::field::{Field, FieldOption, FieldValue, TextOption};
+            lex_doc.add_field(
+                "_id",
+                Field::new(
+                    FieldValue::Text(external_id.to_string()),
+                    FieldOption::Text(TextOption::default()),
+                ),
+            );
+        }
+
+        // 3. Upsert with new ID
+        let doc_id = self.next_doc_id;
+        self.upsert_document(doc_id, doc).await?;
+
+        Ok(doc_id)
+    }
+
+    /// Delete a document by its external ID.
+    ///
+    /// # Arguments
+    ///
+    /// * `external_id` - The external identifier to delete
+    ///
+    /// # Returns
+    ///
+    /// `true` if the document was found and deleted, `false` otherwise
+    pub fn delete_document_by_id(&mut self, external_id: &str) -> Result<bool> {
+        if let Some(internal_id) = self
+            .lexical_engine
+            .find_doc_id_by_term("_id", external_id)?
+        {
+            self.lexical_engine.delete_document(internal_id)?;
+            self.vector_engine.delete_vectors(internal_id)?;
+            Ok(true)
+        } else {
+            Ok(false)
+        }
     }
 
     /// Upsert a hybrid document with a specific document ID.

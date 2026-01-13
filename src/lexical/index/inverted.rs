@@ -342,7 +342,9 @@ impl LexicalIndex for InvertedIndex {
     fn searcher(&self) -> Result<Box<dyn LexicalSearcher>> {
         self.check_closed()?;
         let reader = self.reader()?;
-        Ok(Box::new(InvertedIndexSearcher::from_arc(reader)))
+        let searcher = InvertedIndexSearcher::from_arc(reader)
+            .with_default_fields(self.config.default_fields.clone());
+        Ok(Box::new(searcher))
     }
 
     fn default_fields(&self) -> Result<Vec<String>> {

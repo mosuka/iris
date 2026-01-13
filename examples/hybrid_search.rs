@@ -1,120 +1,119 @@
 use std::error::Error;
 use std::sync::Arc;
 
-use sarissa::analysis::analyzer::standard::StandardAnalyzer;
+use sarissa::analysis::analyzer::pipeline::PipelineAnalyzer;
+use sarissa::analysis::token_filter::lowercase::LowercaseFilter;
+use sarissa::analysis::tokenizer::whitespace::WhitespaceTokenizer;
 use sarissa::hybrid::core::document::HybridDocument;
+use sarissa::hybrid::engine::HybridEngine;
 use sarissa::hybrid::search::searcher::HybridSearchRequest;
-use sarissa::hybrid::writer::HybridIndexWriter;
 use sarissa::lexical::core::document::Document;
 use sarissa::lexical::core::field::TextOption;
-use sarissa::lexical::index::inverted::writer::{InvertedIndexWriter, InvertedIndexWriterConfig};
+use sarissa::lexical::engine::LexicalEngine;
+use sarissa::lexical::engine::config::LexicalIndexConfig;
 use sarissa::lexical::search::searcher::LexicalSearchRequest;
-use sarissa::storage::memory::{MemoryStorage, MemoryStorageConfig};
+use sarissa::storage::memory::MemoryStorageConfig;
+use sarissa::storage::{StorageConfig, StorageFactory};
 use sarissa::vector::core::distance::DistanceMetric;
-use sarissa::vector::core::document::StoredVector;
+use sarissa::vector::core::document::{DocumentPayload, Payload, StoredVector};
+use sarissa::vector::engine::VectorEngine;
+use sarissa::vector::engine::config::{VectorFieldConfig, VectorIndexConfig, VectorIndexKind};
 use sarissa::vector::engine::request::{QueryVector, VectorSearchRequest};
-use sarissa::vector::index::config::HnswIndexConfig;
-use sarissa::vector::index::hnsw::writer::HnswIndexWriter;
-use sarissa::vector::writer::VectorIndexWriterConfig;
 
 fn main() -> Result<(), Box<dyn Error>> {
-    println!("Hybrid Search Example");
-    println!("=====================");
+    println!("Hybrid Search Example (Recommended Usage)");
+    println!("=======================================");
+
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()?;
 
     // 1. Setup Storage
-    // In this example, we use in-memory storage for simplicity.
-    let storage = Arc::new(MemoryStorage::new(MemoryStorageConfig::default()));
+    let storage_config = StorageConfig::Memory(MemoryStorageConfig::default());
+    let storage = StorageFactory::create(storage_config)?;
 
-    // 2. Configure Writers
-    // Lexical writer configuration (Inverted Index)
-    let lexical_config = InvertedIndexWriterConfig {
-        analyzer: Arc::new(StandardAnalyzer::new()?),
-        ..Default::default()
-    };
-
-    // Vector writer configuration (HNSW Index)
-    let vector_config = HnswIndexConfig {
-        dimension: 3,
-        distance_metric: DistanceMetric::Euclidean,
-        ..Default::default()
-    };
-
-    let vector_writer_config = VectorIndexWriterConfig::default();
-
-    // 3. Create Writers
-    let lexical_writer = Box::new(InvertedIndexWriter::new(storage.clone(), lexical_config)?);
-    let vector_writer = Box::new(HnswIndexWriter::with_storage(
-        vector_config,
-        vector_writer_config,
-        "example_idx",
-        storage.clone(),
-    )?);
-
-    // Create HybridIndexWriter
-    // Note: We pass storage to manage shared metadata like document IDs
-    let mut writer = HybridIndexWriter::new(lexical_writer, vector_writer, storage.clone())?;
-
-    // 4. Add Documents
-    println!("Adding specific documents...");
-
-    // Doc 1: "apple banana", vector [1.0, 0.0, 0.0]
-    let doc1 = Document::builder()
-        .add_text("content", "apple banana", TextOption::default())
+    // 2. Configure & Create Lexical Engine
+    // We use a simple tokenizer/analyzer pipeline here
+    let tokenizer = Arc::new(WhitespaceTokenizer::new());
+    let analyzer = PipelineAnalyzer::new(tokenizer).add_filter(Arc::new(LowercaseFilter::new()));
+    let lexical_config = LexicalIndexConfig::builder()
+        .analyzer(Arc::new(analyzer))
+        .default_field("content")
         .build();
-    let mut payload1 = sarissa::vector::core::document::DocumentPayload::new();
-    payload1.set_field(
-        "vector",
-        sarissa::vector::core::document::Payload::vector(std::sync::Arc::<[f32]>::from(vec![
-            1.0, 0.0, 0.0,
-        ])),
-    );
-    let hybrid_doc1 = HybridDocument::builder()
-        .add_lexical_doc(doc1)
-        .add_vector_payload(payload1)
-        .build();
-    let id1 = writer.add_document(hybrid_doc1)?;
-    println!(
-        "Added Document 1 (ID: {}) - 'apple banana', [1.0, 0.0, 0.0]",
-        id1
-    );
+    let lexical_engine = LexicalEngine::new(storage.clone(), lexical_config)?;
 
-    // Doc 2: "banana orange", vector [0.0, 1.0, 0.0]
-    let doc2 = Document::builder()
-        .add_text("content", "banana orange", TextOption::default())
-        .build();
-    let mut payload2 = sarissa::vector::core::document::DocumentPayload::new();
-    payload2.set_field(
-        "vector",
-        sarissa::vector::core::document::Payload::vector(std::sync::Arc::<[f32]>::from(vec![
-            0.0, 1.0, 0.0,
-        ])),
-    );
-    let hybrid_doc2 = HybridDocument::builder()
-        .add_lexical_doc(doc2)
-        .add_vector_payload(payload2)
-        .build();
-    let id2 = writer.add_document(hybrid_doc2)?;
-    println!(
-        "Added Document 2 (ID: {}) - 'banana orange', [0.0, 1.0, 0.0]",
-        id2
-    );
+    // 3. Configure & Create Vector Engine
+    let vector_config = VectorIndexConfig::builder()
+        .field(
+            "vector",
+            VectorFieldConfig {
+                dimension: 3,
+                distance: DistanceMetric::Euclidean, // Matches example data flavor
+                index: VectorIndexKind::Hnsw,
+                ..Default::default()
+            },
+        )
+        .default_field("vector")
+        .build()?;
+    let vector_engine = VectorEngine::new(storage.clone(), vector_config)?;
 
-    // 5. Commit
-    writer.commit()?;
+    // 4. Create Hybrid Engine (The recommended high-level entry point)
+    let mut engine = HybridEngine::new(storage.clone(), lexical_engine, vector_engine)?;
+
+    // 5. Index Documents with External IDs
+    rt.block_on(async {
+        // Doc 1: "apple banana", vector [1.0, 0.0, 0.0]
+        // We give it a stable external ID: "product-1"
+        println!("Indexing 'product-1'...");
+        let doc1 = Document::builder()
+            .add_text("content", "apple banana", TextOption::default())
+            .build();
+        let mut payload1 = DocumentPayload::new();
+        payload1.set_field("vector", Payload::vector(vec![1.0f32, 0.0, 0.0]));
+
+        let hybrid_doc1 = HybridDocument::builder()
+            .add_lexical_doc(doc1)
+            .add_vector_payload(payload1)
+            .build();
+
+        engine
+            .index_document("product-1", hybrid_doc1)
+            .await
+            .unwrap();
+
+        // Doc 2: "banana orange", vector [0.0, 1.0, 0.0]
+        // External ID: "product-2"
+        println!("Indexing 'product-2'...");
+        let doc2 = Document::builder()
+            .add_text("content", "banana orange", TextOption::default())
+            .build();
+        let mut payload2 = DocumentPayload::new();
+        payload2.set_field("vector", Payload::vector(vec![0.0f32, 1.0, 0.0]));
+
+        let hybrid_doc2 = HybridDocument::builder()
+            .add_lexical_doc(doc2)
+            .add_vector_payload(payload2)
+            .build();
+
+        engine
+            .index_document("product-2", hybrid_doc2)
+            .await
+            .unwrap();
+    });
+
+    // 6. Commit
+    engine.commit()?;
     println!("Committed changes.");
 
-    // 6. Build Reader (HybridIndex)
-    let index = writer.build()?;
-    println!("Built Hybrid Index.");
+    // 7. Execute Hybrid Search
+    println!("\n--- Hybrid Search for 'apple' near [0.95, 0.05, 0.0] ---");
 
-    // 7. Search / Verify
-    println!("\n--- Hybrid Search ---");
-
-    // Lexical Query part
+    // Lexical Query: "content:apple"
+    // Note: We search the field "content". System automatically indexed "_id" field too.
     let lexical_req = LexicalSearchRequest::new("content:apple");
 
-    // Vector Query part
-    let query_vec_data = vec![0.95, 0.05, 0.0]; // Close to doc1
+    // Vector Query: Close to product-1
+    let query_vec_data = vec![0.95, 0.05, 0.0];
     let vector_req = VectorSearchRequest {
         query_vectors: vec![QueryVector {
             vector: StoredVector {
@@ -128,29 +127,53 @@ fn main() -> Result<(), Box<dyn Error>> {
         ..Default::default()
     };
 
-    // Hybrid Query part
     let search_request = HybridSearchRequest::new()
         .with_lexical_request(lexical_req)
         .with_vector_request(vector_req);
 
-    // Execute Search (need async runtime)
-    let rt = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()?;
-
-    let results = rt.block_on(index.search(search_request))?;
+    let results = rt.block_on(engine.search(search_request))?;
 
     println!("Found {} results:", results.results.len());
     for (i, result) in results.results.iter().enumerate() {
         println!(
-            "{}. Doc ID: {} (Score: {:.4})",
+            "{}. Internal ID: {} (Score: {:.4})",
             i + 1,
             result.doc_id,
             result.hybrid_score
         );
-        println!("   Keyword Score: {:?}", result.keyword_score);
-        println!("   Vector Similarity: {:?}", result.vector_similarity);
+        // We can retrieve the stored _id to verify
+        // Ideally HybridSearchResults returns fields, but currently it returns metadata if requested.
+        // For demonstration, we assume user trusts the ID.
     }
+
+    // 8. Demonstrate Update via External ID
+    println!("\n--- Updating 'product-1' (changing content to 'green apple') ---");
+    rt.block_on(async {
+        let doc1_v2 = Document::builder()
+            .add_text("content", "green apple", TextOption::default())
+            .build();
+        // keeping same vector for simplicity
+        let mut payload1_v2 = DocumentPayload::new();
+        payload1_v2.set_field("vector", Payload::vector(vec![1.0f32, 0.0, 0.0]));
+
+        let hybrid_doc1_v2 = HybridDocument::builder()
+            .add_lexical_doc(doc1_v2)
+            .add_vector_payload(payload1_v2)
+            .build();
+
+        // Re-index with SAME ID "product-1". This replaces the old document.
+        engine
+            .index_document("product-1", hybrid_doc1_v2)
+            .await
+            .unwrap();
+    });
+    engine.commit()?;
+
+    // Search again for "green"
+    println!("Searching for 'green'...");
+    let req_update = HybridSearchRequest::new().with_text("content:green");
+    let results_update = rt.block_on(engine.search(req_update))?;
+    println!("Found {} results for 'green'", results_update.results.len());
 
     Ok(())
 }
