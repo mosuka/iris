@@ -8,8 +8,8 @@ use sarissa::analysis::analyzer::analyzer::Analyzer;
 use sarissa::analysis::analyzer::keyword::KeywordAnalyzer;
 use sarissa::analysis::analyzer::per_field::PerFieldAnalyzer;
 use sarissa::analysis::analyzer::standard::StandardAnalyzer;
-use sarissa::document::document::Document;
-use sarissa::document::field::{IntegerOption, TextOption};
+use sarissa::lexical::core::document::Document;
+use sarissa::lexical::core::field::{IntegerOption, TextOption};
 use sarissa::error::Result;
 use sarissa::lexical::engine::LexicalEngine;
 use sarissa::lexical::engine::config::LexicalIndexConfig;
@@ -151,7 +151,7 @@ fn main() -> Result<()> {
                 println!("      Category: {category}");
             }
             if let Some(field) = doc.get_field("year")
-                && let sarissa::document::field::FieldValue::Integer(year) = &field.value
+                && let sarissa::lexical::core::field::FieldValue::Integer(year) = &field.value
             {
                 println!("      Year: {year}");
             }

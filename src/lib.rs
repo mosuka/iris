@@ -12,7 +12,7 @@
 //! - BM25 scoring
 
 pub mod analysis;
-pub mod document;
+
 pub mod embedding;
 pub mod error;
 pub mod hybrid;
@@ -23,8 +23,6 @@ pub mod spelling;
 pub mod storage;
 pub mod util;
 pub mod vector;
-
-pub mod prelude {}
 
 // Version information
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

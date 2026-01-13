@@ -257,8 +257,8 @@ impl InvertedIndexWriter {
     /// # Example
     ///
     /// ```rust,no_run
-    /// use sarissa::document::document::Document;
-    /// use sarissa::document::parser::DocumentParser;
+    /// use sarissa::lexical::core::document::Document;
+    /// use sarissa::lexical::core::parser::DocumentParser;
     /// use sarissa::analysis::analyzer::per_field::PerFieldAnalyzer;
     /// use sarissa::analysis::analyzer::standard::StandardAnalyzer;
     /// use sarissa::lexical::index::inverted::writer::{InvertedIndexWriter, InvertedIndexWriterConfig};
@@ -274,7 +274,7 @@ impl InvertedIndexWriter {
     /// };
     /// let mut writer = InvertedIndexWriter::new(storage, config).unwrap();
     ///
-    /// use sarissa::document::field::TextOption;
+    /// use sarissa::lexical::core::field::TextOption;
     /// let doc = Document::builder()
     ///     .add_text("title", "Rust Programming", TextOption::default())
     ///     .build();

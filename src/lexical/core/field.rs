@@ -28,7 +28,7 @@
 //! The `FieldValue` enum provides conversion methods for extracting typed values:
 //!
 //! ```
-//! use sarissa::document::field::FieldValue;
+//! use sarissa::lexical::core::field::FieldValue;
 //!
 //! let text_value = FieldValue::Text("hello".to_string());
 //! assert_eq!(text_value.as_text(), Some("hello"));
@@ -45,7 +45,7 @@
 //! String values can be interpreted as different types:
 //!
 //! ```
-//! use sarissa::document::field::FieldValue;
+//! use sarissa::lexical::core::field::FieldValue;
 //!
 //! // Boolean inference from text
 //! let text = FieldValue::Text("true".to_string());
@@ -116,7 +116,7 @@ impl<D: rkyv::rancor::Fallible + ?Sized>
 /// # Examples
 ///
 /// ```
-/// use sarissa::document::field::{Field, FieldValue, FieldOption, TextOption};
+/// use sarissa::lexical::core::field::{Field, FieldValue, FieldOption, TextOption};
 ///
 /// // Create a text field with custom options
 /// let field = Field {
@@ -191,7 +191,7 @@ pub enum NumericType {
 /// Creating field values:
 ///
 /// ```
-/// use sarissa::document::field::FieldValue;
+/// use sarissa::lexical::core::field::FieldValue;
 ///
 /// let text = FieldValue::Text("Rust Programming".to_string());
 /// let number = FieldValue::Integer(2024);
@@ -203,7 +203,7 @@ pub enum NumericType {
 /// Extracting typed values:
 ///
 /// ```
-/// use sarissa::document::field::FieldValue;
+/// use sarissa::lexical::core::field::FieldValue;
 ///
 /// let value = FieldValue::Integer(100);
 /// assert_eq!(value.as_numeric(), Some("100".to_string()));
@@ -460,7 +460,7 @@ impl Default for IvfOption {
 /// # Examples
 ///
 /// ```
-/// use sarissa::document::field::{VectorOption, VectorIndexType};
+/// use sarissa::lexical::core::field::{VectorOption, VectorIndexType};
 /// use sarissa::vector::DistanceMetric;
 ///
 /// // Simple flat index
@@ -543,7 +543,7 @@ impl VectorOption {
     /// # Examples
     ///
     /// ```
-    /// use sarissa::document::field::VectorOption;
+    /// use sarissa::lexical::core::field::VectorOption;
     ///
     /// let opt = VectorOption::flat(384);
     /// ```
@@ -567,7 +567,7 @@ impl VectorOption {
     /// # Examples
     ///
     /// ```
-    /// use sarissa::document::field::VectorOption;
+    /// use sarissa::lexical::core::field::VectorOption;
     ///
     /// let opt = VectorOption::hnsw(768);
     /// ```
@@ -591,7 +591,7 @@ impl VectorOption {
     /// # Examples
     ///
     /// ```
-    /// use sarissa::document::field::VectorOption;
+    /// use sarissa::lexical::core::field::VectorOption;
     ///
     /// let opt = VectorOption::ivf(1536);
     /// ```
@@ -737,7 +737,7 @@ pub struct GeoOption {
 /// # Examples
 ///
 /// ```
-/// use sarissa::document::field::{FieldOption, TextOption, VectorOption};
+/// use sarissa::lexical::core::field::{FieldOption, TextOption, VectorOption};
 ///
 /// // Text field with custom options
 /// let text_opt = FieldOption::Text(TextOption {
