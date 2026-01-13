@@ -41,7 +41,7 @@ use parking_lot::{Mutex, RwLock};
 /// # Usage Example
 ///
 /// ```rust,no_run
-/// use sarissa::document::document::Document;
+/// use sarissa::lexical::core::document::Document;
 /// use sarissa::lexical::engine::LexicalEngine;
 /// use sarissa::lexical::engine::config::LexicalIndexConfig;
 /// use sarissa::lexical::search::searcher::LexicalSearchRequest;
@@ -54,7 +54,7 @@ use parking_lot::{Mutex, RwLock};
 /// let engine = LexicalEngine::new(storage, config).unwrap();
 ///
 /// // Add documents
-/// use sarissa::document::field::TextOption;
+/// use sarissa::lexical::core::field::TextOption;
 /// let doc = Document::builder()
 ///     .add_text("title", "Rust Programming", TextOption::default())
 ///     .build();
@@ -151,7 +151,7 @@ impl LexicalEngine {
     /// # Example
     ///
     /// ```rust,no_run
-    /// use sarissa::document::document::Document;
+    /// use sarissa::lexical::core::document::Document;
     /// # use sarissa::lexical::engine::LexicalEngine;
     /// # use sarissa::lexical::engine::config::LexicalIndexConfig;
     /// # use sarissa::storage::{StorageConfig, StorageFactory};
@@ -161,7 +161,7 @@ impl LexicalEngine {
     /// # let storage = StorageFactory::create(storage_config).unwrap();
     /// # let engine = LexicalEngine::new(storage, LexicalIndexConfig::default()).unwrap();
     ///
-    /// use sarissa::document::field::TextOption;
+    /// use sarissa::lexical::core::field::TextOption;
     /// let doc = Document::builder()
     ///     .add_text("title", "Hello World", TextOption::default())
     ///     .add_text("body", "This is a test", TextOption::default())
@@ -266,7 +266,7 @@ impl LexicalEngine {
     /// # Example
     ///
     /// ```rust,no_run
-    /// use sarissa::document::document::Document;
+    /// use sarissa::lexical::core::document::Document;
     /// # use sarissa::lexical::engine::LexicalEngine;
     /// # use sarissa::lexical::engine::config::LexicalIndexConfig;
     /// # use sarissa::storage::{StorageConfig, StorageFactory};
@@ -277,7 +277,7 @@ impl LexicalEngine {
     /// # let engine = LexicalEngine::new(storage, LexicalIndexConfig::default()).unwrap();
     ///
     /// // Add multiple documents
-    /// use sarissa::document::field::TextOption;
+    /// use sarissa::lexical::core::field::TextOption;
     /// for i in 0..10 {
     ///     let doc = Document::builder()
     ///         .add_text("id", &i.to_string(), TextOption::default())
@@ -316,7 +316,7 @@ impl LexicalEngine {
     /// # Example
     ///
     /// ```rust,no_run
-    /// use sarissa::document::document::Document;
+    /// use sarissa::lexical::core::document::Document;
     /// # use sarissa::lexical::engine::LexicalEngine;
     /// # use sarissa::lexical::engine::config::LexicalIndexConfig;
     /// # use sarissa::storage::{StorageConfig, StorageFactory};
@@ -327,7 +327,7 @@ impl LexicalEngine {
     /// # let mut engine = LexicalEngine::new(storage, LexicalIndexConfig::default()).unwrap();
     ///
     /// // Add and commit many documents
-    /// use sarissa::document::field::TextOption;
+    /// use sarissa::lexical::core::field::TextOption;
     /// for i in 0..1000 {
     ///     let doc = Document::builder()
     ///         .add_text("id", &i.to_string(), TextOption::default())
@@ -377,7 +377,7 @@ impl LexicalEngine {
     /// # Example with TermQuery
     ///
     /// ```rust,no_run
-    /// use sarissa::document::document::Document;
+    /// use sarissa::lexical::core::document::Document;
     /// use sarissa::lexical::search::searcher::LexicalSearchRequest;
     /// use sarissa::lexical::index::inverted::query::term::TermQuery;
     /// # use sarissa::lexical::engine::LexicalEngine;
@@ -388,7 +388,7 @@ impl LexicalEngine {
     /// # let storage_config = StorageConfig::Memory(MemoryStorageConfig::default());
     /// # let storage = StorageFactory::create(storage_config).unwrap();
     /// # let engine = LexicalEngine::new(storage, LexicalIndexConfig::default()).unwrap();
-    /// # use sarissa::document::field::TextOption;
+    /// # use sarissa::lexical::core::field::TextOption;
     /// # let doc = Document::builder().add_text("title", "hello world", TextOption::default()).build();
     /// # engine.add_document(doc).unwrap();
     /// # engine.commit().unwrap();
@@ -410,7 +410,7 @@ impl LexicalEngine {
     /// ```rust,no_run
     /// use sarissa::lexical::index::inverted::query::parser::QueryParser;
     /// use sarissa::lexical::search::searcher::LexicalSearchRequest;
-    /// # use sarissa::document::document::Document;
+    /// # use sarissa::lexical::core::document::Document;
     /// # use sarissa::lexical::engine::LexicalEngine;
     /// # use sarissa::lexical::engine::config::LexicalIndexConfig;
     /// # use sarissa::storage::{StorageConfig, StorageFactory};

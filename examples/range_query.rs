@@ -8,8 +8,8 @@ use sarissa::analysis::analyzer::analyzer::Analyzer;
 use sarissa::analysis::analyzer::keyword::KeywordAnalyzer;
 use sarissa::analysis::analyzer::per_field::PerFieldAnalyzer;
 use sarissa::analysis::analyzer::standard::StandardAnalyzer;
-use sarissa::document::document::Document;
-use sarissa::document::field::{FloatOption, IntegerOption, TextOption};
+use sarissa::lexical::core::document::Document;
+use sarissa::lexical::core::field::{FloatOption, IntegerOption, TextOption};
 use sarissa::error::Result;
 use sarissa::lexical::engine::LexicalEngine;
 use sarissa::lexical::engine::config::LexicalIndexConfig;
@@ -153,7 +153,7 @@ fn main() -> Result<()> {
                 println!("      Title: {title}");
             }
             if let Some(field) = doc.get_field("price")
-                && let sarissa::document::field::FieldValue::Float(price) = &field.value
+                && let sarissa::lexical::core::field::FieldValue::Float(price) = &field.value
             {
                 println!("      Price: ${price:.2}");
             }
@@ -181,7 +181,7 @@ fn main() -> Result<()> {
                 println!("      Title: {title}");
             }
             if let Some(field) = doc.get_field("rating")
-                && let sarissa::document::field::FieldValue::Float(rating) = &field.value
+                && let sarissa::lexical::core::field::FieldValue::Float(rating) = &field.value
             {
                 println!("      Rating: {rating:.1}");
             }
@@ -209,7 +209,7 @@ fn main() -> Result<()> {
                 println!("      Title: {title}");
             }
             if let Some(field) = doc.get_field("year")
-                && let sarissa::document::field::FieldValue::Integer(year) = &field.value
+                && let sarissa::lexical::core::field::FieldValue::Integer(year) = &field.value
             {
                 println!("      Year: {year}");
             }
@@ -237,7 +237,7 @@ fn main() -> Result<()> {
                 println!("      Title: {title}");
             }
             if let Some(field) = doc.get_field("pages")
-                && let sarissa::document::field::FieldValue::Integer(pages) = &field.value
+                && let sarissa::lexical::core::field::FieldValue::Integer(pages) = &field.value
             {
                 println!("      Pages: {pages}");
             }
@@ -265,7 +265,7 @@ fn main() -> Result<()> {
                 println!("      Title: {title}");
             }
             if let Some(field) = doc.get_field("year")
-                && let sarissa::document::field::FieldValue::Integer(year) = &field.value
+                && let sarissa::lexical::core::field::FieldValue::Integer(year) = &field.value
             {
                 println!("      Year: {year}");
             }
@@ -293,7 +293,7 @@ fn main() -> Result<()> {
                 println!("      Title: {title}");
             }
             if let Some(field) = doc.get_field("price")
-                && let sarissa::document::field::FieldValue::Float(price) = &field.value
+                && let sarissa::lexical::core::field::FieldValue::Float(price) = &field.value
             {
                 println!("      Price: ${price:.2}");
             }
@@ -321,7 +321,7 @@ fn main() -> Result<()> {
                 println!("      Title: {title}");
             }
             if let Some(field) = doc.get_field("pages")
-                && let sarissa::document::field::FieldValue::Integer(pages) = &field.value
+                && let sarissa::lexical::core::field::FieldValue::Integer(pages) = &field.value
             {
                 println!("      Pages: {pages}");
             }
