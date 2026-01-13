@@ -138,8 +138,29 @@ impl std::fmt::Debug for InvertedIndexWriter {
 impl InvertedIndexWriter {
     /// Create a new inverted index writer (schema-less mode).
     pub fn new(storage: Arc<dyn Storage>, config: InvertedIndexWriterConfig) -> Result<Self> {
+        // Recover state from existing segments
+        let mut next_doc_id = 0;
+        let mut max_segment_id = -1i32;
+
+        if let Ok(files) = storage.list_files() {
+            for file in files {
+                if file.ends_with(".meta") && file != "index.meta" {
+                    // unexpected error handling: ignore malformed files
+                    if let Ok(input) = storage.open_input(&file) {
+                        use crate::lexical::index::inverted::segment::SegmentInfo;
+                        if let Ok(meta) = serde_json::from_reader::<_, SegmentInfo>(input) {
+                            next_doc_id = next_doc_id.max(meta.doc_offset + meta.doc_count);
+                            max_segment_id = max_segment_id.max(meta.generation as i32);
+                        }
+                    }
+                }
+            }
+        }
+
+        let current_segment = (max_segment_id + 1) as u32;
+
         // Create initial DocValuesWriter (will be reset per segment)
-        let initial_segment_name = format!("{}_{:06}", config.segment_prefix, 0);
+        let initial_segment_name = format!("{}_{:06}", config.segment_prefix, current_segment);
         let doc_values_writer = DocValuesWriter::new(storage.clone(), initial_segment_name);
 
         Ok(InvertedIndexWriter {
@@ -148,8 +169,8 @@ impl InvertedIndexWriter {
             inverted_index: TermPostingIndex::new(),
             buffered_docs: Vec::new(),
             doc_values_writer,
-            next_doc_id: 0,
-            current_segment: 0,
+            next_doc_id,
+            current_segment,
             closed: false,
             stats: WriterStats {
                 docs_added: 0,
@@ -273,6 +294,35 @@ impl InvertedIndexWriter {
         self.upsert_analyzed_document(doc_id, analyzed_doc)?;
 
         Ok(doc_id)
+    }
+
+    /// Find the internal document ID for a given term (field:value).
+    ///
+    /// This searches both the in-memory buffer (uncommitted) and, in the future,
+    /// persisted segments (committed).
+    ///
+    /// Currently only searches the in-memory buffer for NRT (Near Real-Time) lookups.
+    pub fn find_doc_id_by_term(&self, field: &str, term: &str) -> Result<Option<u64>> {
+        let full_term = format!("{field}:{term}");
+
+        // 1. Check in-memory inverted index
+        if let Some(posting_list) = self.inverted_index.get_posting_list(&full_term) {
+            // Get the last document ID (most recent version if multiple exist, though upsert usually handles that)
+            // Posting list is sorted by doc_id? Usually yes for inverted index.
+            // But TermPostingIndex might just append.
+            // Let's assume the last one is the latest.
+            if let Some(last_posting) = posting_list.postings.last() {
+                return Ok(Some(last_posting.doc_id));
+            }
+        }
+
+        // 2. TODO: Check persisted segments
+        // This requires opening readers for existing segments, which is expensive if done on every write.
+        // For now, we rely on the upper layer (LexicalEngine/HybridEngine) to check committed segments via Readers,
+        // and use this method specifically for the "In-Memory / NRT" part of the check.
+        // Or we implement a BloomFilter cache for segments here.
+
+        Ok(None)
     }
 
     /// Analyze a document into terms.
@@ -1088,5 +1138,9 @@ impl LexicalIndexWriter for InvertedIndexWriter {
 
     fn next_doc_id(&self) -> u64 {
         self.next_doc_id
+    }
+
+    fn find_doc_id_by_term(&self, field: &str, term: &str) -> Result<Option<u64>> {
+        InvertedIndexWriter::find_doc_id_by_term(self, field, term)
     }
 }
