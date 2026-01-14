@@ -220,12 +220,8 @@ impl DocumentParser {
                     field_terms.insert(field_name.clone(), vec![analyzed_term]);
                     stored_fields.insert(field_name.clone(), FieldValue::Boolean(*b));
                 }
-                FieldValue::Binary(_) => {
-                    // Binary fields are not indexed, only stored
-                    stored_fields.insert(field_name.clone(), field.value.clone());
-                }
-                FieldValue::Vector(_) => {
-                    // Vector fields are not indexed in lexical engine, only stored
+                FieldValue::Blob(_, _) => {
+                    // Blob fields are not indexed in lexical engine, only stored
                     stored_fields.insert(field_name.clone(), field.value.clone());
                 }
                 FieldValue::DateTime(dt) => {

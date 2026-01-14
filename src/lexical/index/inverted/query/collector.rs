@@ -209,7 +209,7 @@ impl<'a> Collector for TopFieldCollector<'a> {
                         av.lon.partial_cmp(&bv.lon).unwrap_or(Ordering::Equal)
                     }
                 }
-                (FieldValue::Binary(av), FieldValue::Binary(bv)) => av.cmp(bv),
+                (FieldValue::Blob(_, av), FieldValue::Blob(_, bv)) => av.cmp(bv),
                 (FieldValue::Null, FieldValue::Null) => Ordering::Equal,
                 (FieldValue::Null, _) => Ordering::Greater,
                 (_, FieldValue::Null) => Ordering::Less,
@@ -233,7 +233,7 @@ impl<'a> Collector for TopFieldCollector<'a> {
                         bv.lon.partial_cmp(&av.lon).unwrap_or(Ordering::Equal)
                     }
                 }
-                (FieldValue::Binary(av), FieldValue::Binary(bv)) => bv.cmp(av),
+                (FieldValue::Blob(_, av), FieldValue::Blob(_, bv)) => bv.cmp(av),
                 (FieldValue::Null, FieldValue::Null) => Ordering::Equal,
                 (FieldValue::Null, _) => Ordering::Less,
                 (_, FieldValue::Null) => Ordering::Greater,
@@ -314,7 +314,7 @@ impl Ord for FieldScoredDoc {
                         b.lon.partial_cmp(&a.lon).unwrap_or(Ordering::Equal)
                     }
                 }
-                (FieldValue::Binary(a), FieldValue::Binary(b)) => b.cmp(a),
+                (FieldValue::Blob(_, a), FieldValue::Blob(_, b)) => b.cmp(a),
                 (FieldValue::Null, FieldValue::Null) => Ordering::Equal,
                 (FieldValue::Null, _) => Ordering::Greater,
                 (_, FieldValue::Null) => Ordering::Less,
@@ -338,7 +338,7 @@ impl Ord for FieldScoredDoc {
                         a.lon.partial_cmp(&b.lon).unwrap_or(Ordering::Equal)
                     }
                 }
-                (FieldValue::Binary(a), FieldValue::Binary(b)) => a.cmp(b),
+                (FieldValue::Blob(_, a), FieldValue::Blob(_, b)) => a.cmp(b),
                 (FieldValue::Null, FieldValue::Null) => Ordering::Equal,
                 (FieldValue::Null, _) => Ordering::Less,
                 (_, FieldValue::Null) => Ordering::Greater,

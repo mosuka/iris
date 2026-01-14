@@ -14,11 +14,7 @@
 //! # Supported Types
 //!
 //! - **Text** - String data for full-text search
-//! - **Vector** - Embedding vectors for semantic search
-//! - **Integer** - 64-bit signed integers
-//! - **Float** - 64-bit floating-point numbers
-//! - **Boolean** - true/false values
-//! - **Binary** - Raw byte data
+//! - **Blob** - Raw byte data or vectors
 //! - **DateTime** - UTC timestamps with timezone
 //! - **Geo** - Geographic coordinates (latitude/longitude)
 //! - **Null** - Explicit null values
@@ -197,7 +193,7 @@ pub enum NumericType {
 /// let number = FieldValue::Integer(2024);
 /// let price = FieldValue::Float(39.99);
 /// let active = FieldValue::Boolean(true);
-/// let data = FieldValue::Binary(vec![0x00, 0x01, 0x02]);
+/// let data = FieldValue::Blob("application/octet-stream".to_string(), vec![0x00, 0x01, 0x02]);
 /// ```
 ///
 /// Extracting typed values:
@@ -223,14 +219,12 @@ pub enum FieldValue {
     Float(f64),
     /// Boolean value
     Boolean(bool),
-    /// Binary data
-    Binary(Vec<u8>),
     /// DateTime value
     DateTime(#[rkyv(with = MicroSeconds)] chrono::DateTime<chrono::Utc>),
     /// Geographic point value
     Geo(GeoPoint),
-    /// Vector value (text to be embedded)
-    Vector(String),
+    /// Blob value (MIME type, Data)
+    Blob(String, Vec<u8>),
     /// Null value
     Null,
 }
@@ -287,9 +281,9 @@ impl FieldValue {
     }
 
     /// Get the value as binary data, if possible.
-    pub fn as_binary(&self) -> Option<&[u8]> {
+    pub fn as_blob(&self) -> Option<(&str, &[u8])> {
         match self {
-            FieldValue::Binary(data) => Some(data),
+            FieldValue::Blob(mime, data) => Some((mime, data)),
             _ => None,
         }
     }
@@ -481,7 +475,7 @@ impl Default for IvfOption {
 #[derive(
     Debug, Clone, PartialEq, Serialize, Deserialize, Archive, RkyvSerialize, RkyvDeserialize,
 )]
-pub struct VectorOption {
+pub struct VectorConfig {
     /// Vector index type (Flat, HNSW, or IVF).
     pub index_type: VectorIndexType,
 
@@ -495,11 +489,6 @@ pub struct VectorOption {
     /// Recommended for cosine similarity.
     #[serde(default = "default_true")]
     pub normalize: bool,
-
-    /// Whether to store the original field value alongside the vector.
-    /// When true, the raw text is emitted via `VectorSearchResult.metadata`.
-    #[serde(default = "default_true")]
-    pub stored: bool,
 
     /// Flat-specific configuration (used when index_type = Flat).
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -518,14 +507,13 @@ fn default_true() -> bool {
     true
 }
 
-impl Default for VectorOption {
+impl Default for VectorConfig {
     fn default() -> Self {
         Self {
             index_type: VectorIndexType::HNSW,
             dimension: 384,
             distance_metric: DistanceMetric::Cosine,
             normalize: true,
-            stored: true,
             flat: None,
             hnsw: Some(HnswOption::default()),
             ivf: None,
@@ -533,7 +521,7 @@ impl Default for VectorOption {
     }
 }
 
-impl VectorOption {
+impl VectorConfig {
     /// Create a Flat index configuration.
     ///
     /// # Arguments
@@ -591,9 +579,9 @@ impl VectorOption {
     /// # Examples
     ///
     /// ```
-    /// use sarissa::lexical::core::field::VectorOption;
+    /// use sarissa::lexical::core::field::VectorConfig;
     ///
-    /// let opt = VectorOption::ivf(1536);
+    /// let opt = VectorConfig::ivf(1536);
     /// ```
     pub fn ivf(dimension: usize) -> Self {
         Self {
@@ -603,6 +591,39 @@ impl VectorOption {
             hnsw: None,
             ivf: Some(IvfOption::default()),
             ..Default::default()
+        }
+    }
+}
+
+/// Options for Blob fields (including binary data and vectors).
+#[derive(
+    Debug, Clone, PartialEq, Serialize, Deserialize, Archive, RkyvSerialize, RkyvDeserialize,
+)]
+pub struct BlobOption {
+    /// Whether to store the blob data.
+    #[serde(default = "default_true")]
+    pub stored: bool,
+
+    /// Optional vector configuration if this blob represents a vector.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub vector: Option<VectorConfig>,
+}
+
+impl Default for BlobOption {
+    fn default() -> Self {
+        Self {
+            stored: true,
+            vector: None,
+        }
+    }
+}
+
+impl BlobOption {
+    /// Create a new BlobOption with vector configuration.
+    pub fn vector(config: VectorConfig) -> Self {
+        Self {
+            stored: true,
+            vector: Some(config),
         }
     }
 }
@@ -676,22 +697,6 @@ impl Default for BooleanOption {
     }
 }
 
-/// Options for Binary fields.
-#[derive(
-    Debug, Clone, PartialEq, Serialize, Deserialize, Archive, RkyvSerialize, RkyvDeserialize,
-)]
-pub struct BinaryOption {
-    /// Whether to store the binary data.
-    #[serde(default = "default_true")]
-    pub stored: bool,
-}
-
-impl Default for BinaryOption {
-    fn default() -> Self {
-        Self { stored: true }
-    }
-}
-
 /// Options for DateTime fields.
 #[derive(
     Debug, Clone, PartialEq, Serialize, Deserialize, Archive, RkyvSerialize, RkyvDeserialize,
@@ -737,7 +742,7 @@ pub struct GeoOption {
 /// # Examples
 ///
 /// ```
-/// use sarissa::lexical::core::field::{FieldOption, TextOption, VectorOption};
+/// use sarissa::lexical::core::field::{FieldOption, TextOption, BlobOption, VectorConfig};
 ///
 /// // Text field with custom options
 /// let text_opt = FieldOption::Text(TextOption {
@@ -746,8 +751,8 @@ pub struct GeoOption {
 ///     term_vectors: true,
 /// });
 ///
-/// // Vector field with HNSW index
-/// let vector_opt = FieldOption::Vector(VectorOption::hnsw(768));
+/// // Vector field with HNSW index via BlobOption
+/// let vector_opt = FieldOption::Blob(BlobOption::vector(VectorConfig::hnsw(768)));
 /// ```
 #[derive(
     Debug, Clone, PartialEq, Serialize, Deserialize, Archive, RkyvSerialize, RkyvDeserialize,
@@ -755,9 +760,6 @@ pub struct GeoOption {
 pub enum FieldOption {
     /// Options for text fields (lexical search).
     Text(TextOption),
-
-    /// Options for vector fields (semantic search).
-    Vector(VectorOption),
 
     /// Options for integer fields.
     Integer(IntegerOption),
@@ -768,8 +770,8 @@ pub enum FieldOption {
     /// Options for boolean fields.
     Boolean(BooleanOption),
 
-    /// Options for binary fields.
-    Binary(BinaryOption),
+    /// Options for blob fields (binary data and vectors).
+    Blob(BlobOption),
 
     /// Options for datetime fields.
     DateTime(DateTimeOption),
@@ -792,13 +794,12 @@ impl FieldOption {
     pub fn from_field_value(value: &FieldValue) -> Self {
         match value {
             FieldValue::Text(_) => FieldOption::Text(TextOption::default()),
-            FieldValue::Vector(_) => FieldOption::Vector(VectorOption::default()),
             FieldValue::Integer(_) => FieldOption::Integer(IntegerOption::default()),
             FieldValue::Float(_) => FieldOption::Float(FloatOption::default()),
             FieldValue::Boolean(_) => FieldOption::Boolean(BooleanOption::default()),
-            FieldValue::Binary(_) => FieldOption::Binary(BinaryOption::default()),
             FieldValue::DateTime(_) => FieldOption::DateTime(DateTimeOption::default()),
             FieldValue::Geo(_) => FieldOption::Geo(GeoOption::default()),
+            FieldValue::Blob(_, _) => FieldOption::Blob(BlobOption::default()), // Default to BlobOption
             FieldValue::Null => FieldOption::Text(TextOption::default()),
         }
     }

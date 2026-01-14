@@ -342,7 +342,7 @@ impl InvertedIndexWriter {
                 FieldOption::Boolean(opt) => opt.indexed,
                 FieldOption::DateTime(opt) => opt.indexed,
                 FieldOption::Geo(opt) => opt.indexed,
-                FieldOption::Binary(_) | FieldOption::Vector(_) => false,
+                FieldOption::Blob(_) => false,
             };
 
             let should_store = match &field.option {
@@ -352,8 +352,7 @@ impl InvertedIndexWriter {
                 FieldOption::Boolean(opt) => opt.stored,
                 FieldOption::DateTime(opt) => opt.stored,
                 FieldOption::Geo(opt) => opt.stored,
-                FieldOption::Binary(opt) => opt.stored,
-                FieldOption::Vector(_) => true, // Vector fields are always stored for embedding
+                FieldOption::Blob(opt) => opt.stored,
             };
 
             // Index the field if enabled
@@ -441,7 +440,7 @@ impl InvertedIndexWriter {
 
                         field_terms.insert(field_name.clone(), vec![analyzed_term]);
                     }
-                    FieldValue::Binary(_) | FieldValue::Vector(_) | FieldValue::Null => {
+                    FieldValue::Blob(_, _) | FieldValue::Null => {
                         // These types are not indexed in lexical index
                     }
                 }
@@ -656,11 +655,6 @@ impl InvertedIndexWriter {
                         stored_writer.write_u8(3)?; // Type tag for Boolean
                         stored_writer.write_u8(if *b { 1 } else { 0 })?;
                     }
-                    FieldValue::Binary(bytes) => {
-                        stored_writer.write_u8(4)?; // Type tag for Binary
-                        stored_writer.write_varint(bytes.len() as u64)?;
-                        stored_writer.write_bytes(bytes)?;
-                    }
                     FieldValue::DateTime(dt) => {
                         stored_writer.write_u8(5)?; // Type tag for DateTime
                         stored_writer.write_string(&dt.to_rfc3339())?;
@@ -670,9 +664,11 @@ impl InvertedIndexWriter {
                         stored_writer.write_f64(geo.lat)?;
                         stored_writer.write_f64(geo.lon)?;
                     }
-                    FieldValue::Vector(text) => {
-                        stored_writer.write_u8(8)?; // Type tag for Vector
-                        stored_writer.write_string(text)?;
+                    FieldValue::Blob(mime, bytes) => {
+                        stored_writer.write_u8(4)?; // Type tag for Blob
+                        stored_writer.write_string(mime)?;
+                        stored_writer.write_varint(bytes.len() as u64)?;
+                        stored_writer.write_bytes(bytes)?;
                     }
                     FieldValue::Null => {
                         stored_writer.write_u8(7)?; // Type tag for Null

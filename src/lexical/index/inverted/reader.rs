@@ -450,9 +450,10 @@ impl SegmentReader {
                             FieldValue::Boolean(b)
                         }
                         4 => {
-                            // Binary
-                            let bytes = reader.read_bytes()?;
-                            FieldValue::Binary(bytes)
+                            // Blob (MIME type + Data)
+                            let mime = reader.read_string()?;
+                            let data = reader.read_bytes()?;
+                            FieldValue::Blob(mime, data)
                         }
                         5 => {
                             // DateTime
@@ -478,9 +479,9 @@ impl SegmentReader {
                             FieldValue::Null
                         }
                         8 => {
-                            // Vector
+                            // Vector (Legacy, convert to Blob)
                             let text = reader.read_string()?;
-                            FieldValue::Vector(text)
+                            FieldValue::Blob("text/plain".to_string(), text.into_bytes())
                         }
                         _ => {
                             return Err(SarissaError::index(format!(
