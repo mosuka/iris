@@ -440,10 +440,15 @@ impl SimilaritySearchEngine {
                         FieldValue::Integer(value) => Ok(value.to_string()),
                         FieldValue::Float(value) => Ok(value.to_string()),
                         FieldValue::Boolean(value) => Ok(value.to_string()),
-                        FieldValue::Binary(_) => Ok(String::new()), // Binary data can't be converted to meaningful text
+                        FieldValue::Blob(mime, data) => {
+                            if mime == "text/plain" {
+                                Ok(String::from_utf8_lossy(data).to_string())
+                            } else {
+                                Ok(String::new())
+                            }
+                        }
                         FieldValue::DateTime(dt) => Ok(dt.to_rfc3339()),
                         FieldValue::Geo(point) => Ok(format!("{},{}", point.lat, point.lon)),
-                        FieldValue::Vector(text) => Ok(text.clone()), // Vector fields store text
                         FieldValue::Null => Ok(String::new()),
                     }
                 } else {

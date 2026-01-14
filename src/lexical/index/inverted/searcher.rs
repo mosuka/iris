@@ -1,7 +1,6 @@
 //! Searcher implementation for executing queries against an index.
 
 use crate::lexical::core::field::FieldValue;
-use crate::lexical::core::field::FieldValue::Vector;
 use std::cmp::Ordering;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -11,7 +10,7 @@ use rayon::prelude::*;
 use crate::analysis::analyzer::standard::StandardAnalyzer;
 use crate::error::{Result, SarissaError};
 use crate::lexical::core::field::FieldValue::{
-    Binary, Boolean, DateTime, Float, Geo, Integer, Null, Text,
+    Blob, Boolean, DateTime, Float, Geo, Integer, Null, Text,
 };
 use crate::lexical::index::inverted::query::Query;
 use crate::lexical::index::inverted::query::boolean::BooleanQuery;
@@ -474,12 +473,11 @@ impl InvertedIndexSearcher {
                 }
             }
             (DateTime(a_dt), DateTime(b_dt)) => a_dt.cmp(b_dt),
-            (Binary(a_bin), Binary(b_bin)) => a_bin.cmp(b_bin),
-            (Vector(a_vec), Vector(b_vec)) => a_vec.cmp(b_vec),
+            (Blob(_, a_blob), Blob(_, b_blob)) => a_blob.cmp(b_blob),
             (Null, Null) => Ordering::Equal,
 
             // For different types, use a consistent ordering based on type precedence
-            // Text < Integer < Float < Boolean < Geo < DateTime < Binary < Vector < Null
+            // Text < Integer < Float < Boolean < Geo < DateTime < Blob < Null
             (Text(_), _) => Ordering::Less,
             (_, Text(_)) => Ordering::Greater,
             (Integer(_), _) => Ordering::Less,
@@ -492,10 +490,8 @@ impl InvertedIndexSearcher {
             (_, Geo(_)) => Ordering::Greater,
             (DateTime(_), _) => Ordering::Less,
             (_, DateTime(_)) => Ordering::Greater,
-            (Binary(_), _) => Ordering::Less,
-            (_, Binary(_)) => Ordering::Greater,
-            (Vector(_), _) => Ordering::Less,
-            (_, Vector(_)) => Ordering::Greater,
+            (Blob(_, _), _) => Ordering::Less,
+            (_, Blob(_, _)) => Ordering::Greater,
         }
     }
 

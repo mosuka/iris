@@ -412,10 +412,9 @@ impl ResultProcessor {
             FieldValue::Integer(i) => i.to_string(),
             FieldValue::Float(f) => f.to_string(),
             FieldValue::Boolean(b) => b.to_string(),
-            FieldValue::Binary(_) => "[binary data]".to_string(),
+            FieldValue::Blob(mime, data) => format!("[blob: {} ({} bytes)]", mime, data.len()),
             FieldValue::DateTime(dt) => dt.to_rfc3339(),
             FieldValue::Geo(point) => format!("{},{}", point.lat, point.lon),
-            FieldValue::Vector(text) => format!("[vector: {}]", text),
             FieldValue::Null => "null".to_string(),
         }
     }

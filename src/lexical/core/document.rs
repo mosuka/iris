@@ -65,8 +65,8 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 use crate::lexical::core::field::{
-    BinaryOption, BooleanOption, DateTimeOption, Field, FieldOption, FieldValue, FloatOption,
-    GeoOption, IntegerOption, TextOption, VectorOption,
+    BlobOption, BooleanOption, DateTimeOption, Field, FieldOption, FieldValue, FloatOption,
+    GeoOption, IntegerOption, TextOption,
 };
 use crate::lexical::index::inverted::query::geo::GeoPoint;
 
@@ -583,79 +583,6 @@ impl DocumentBuilder {
         self
     }
 
-    /// Add a binary field to the document with indexing options.
-    ///
-    /// Binary fields store raw byte data. They are stored but not indexed for search.
-    /// The BinaryOption parameter controls how this field is stored.
-    ///
-    /// # Arguments
-    ///
-    /// * `name` - The field name
-    /// * `value` - The binary data as a Vec<u8>
-    /// * `option` - Indexing options (use `BinaryOption::default()` for default settings)
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use sarissa::lexical::core::document::Document;
-    /// use sarissa::lexical::core::field::{TextOption, BinaryOption};
-    ///
-    /// let doc = Document::builder()
-    ///     .add_text("filename", "image.png", TextOption::default())
-    ///     .add_binary("data", vec![0x89, 0x50, 0x4E, 0x47], BinaryOption::default())
-    ///     .build();
-    ///
-    /// assert_eq!(doc.len(), 2);
-    /// ```
-    pub fn add_binary<S: Into<String>>(
-        mut self,
-        name: S,
-        value: Vec<u8>,
-        option: BinaryOption,
-    ) -> Self {
-        self.document.add_field(
-            name,
-            Field::new(FieldValue::Binary(value), FieldOption::Binary(option)),
-        );
-        self
-    }
-
-    /// Add a numeric field to the document with indexing options (convenience method for float).
-    ///
-    /// This is an alias for `add_float()` provided for convenience.
-    /// The FloatOption parameter controls how this field is indexed (indexed, stored).
-    ///
-    /// # Arguments
-    ///
-    /// * `name` - The field name
-    /// * `value` - The numeric value
-    /// * `option` - Indexing options (use `FloatOption::default()` for default settings)
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use sarissa::lexical::core::document::Document;
-    /// use sarissa::lexical::core::field::FloatOption;
-    ///
-    /// let doc = Document::builder()
-    ///     .add_numeric("temperature", 23.5, FloatOption::default())
-    ///     .build();
-    ///
-    /// assert_eq!(doc.len(), 1);
-    /// ```
-    pub fn add_numeric<S: Into<String>>(
-        mut self,
-        name: S,
-        value: f64,
-        option: FloatOption,
-    ) -> Self {
-        self.document.add_field(
-            name,
-            Field::new(FieldValue::Float(value), FieldOption::Float(option)),
-        );
-        self
-    }
-
     /// Add a datetime field to the document with indexing options.
     ///
     /// Datetime fields store UTC timestamps.
@@ -737,42 +664,42 @@ impl DocumentBuilder {
         self
     }
 
-    /// Add a vector field to the document with indexing options.
+    /// Add a blob field to the document with indexing options.
     ///
-    /// Vector fields store text that will be converted to embeddings when indexed
-    /// by a VectorEngine. The actual embedding conversion happens during indexing,
-    /// using the embedder configured for that field.
-    /// The VectorOption parameter controls how this field is indexed (including whether
-    /// the original text should be stored via vector metadata).
+    /// Blob fields store raw byte data with a MIME type. They are either stored as binary
+    /// (BinaryOption) or processed as vector sources (VectorOption).
     ///
     /// # Arguments
     ///
     /// * `name` - The field name
-    /// * `text` - The text to be embedded
-    /// * `option` - Indexing options (use `VectorOption::default()` for default settings)
+    /// * `mime_type` - The MIME type of the content (e.g., "text/plain", "image/png")
+    /// * `data` - The raw data
+    /// * `option` - Indexing options (e.g., FieldOption::Binary(...) or FieldOption::Vector(...))
     ///
     /// # Examples
     ///
     /// ```no_run
     /// use sarissa::lexical::core::document::Document;
-    /// use sarissa::lexical::core::field::{TextOption, VectorOption};
+    /// use sarissa::lexical::core::field::{BlobOption, VectorConfig};
     ///
     /// let doc = Document::builder()
-    ///     .add_text("title", "Machine Learning Basics", TextOption::default())
-    ///     .add_vector("title_embedding", "Machine Learning Basics", VectorOption::default())
+    ///     .add_blob("image", "image/png", vec![0x89, 0x50], BlobOption::default())
+    ///     .add_blob("desc_vector", "text/plain", "description".as_bytes().to_vec(), BlobOption::vector(VectorConfig::default()))
     ///     .build();
-    ///
-    /// assert!(doc.has_field("title_embedding"));
     /// ```
-    pub fn add_vector<S: Into<String>, T: Into<String>>(
+    pub fn add_blob<S: Into<String>, M: Into<String>>(
         mut self,
         name: S,
-        text: T,
-        option: VectorOption,
+        mime_type: M,
+        data: Vec<u8>,
+        option: BlobOption,
     ) -> Self {
         self.document.add_field(
             name,
-            Field::new(FieldValue::Vector(text.into()), FieldOption::Vector(option)),
+            Field::new(
+                FieldValue::Blob(mime_type.into(), data),
+                FieldOption::Blob(option),
+            ),
         );
         self
     }

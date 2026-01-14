@@ -470,7 +470,7 @@ mod tests {
         let doc = Document::builder()
             .add_text("title", "Test Document", TextOption::default())
             .add_text("id", "doc1", TextOption::default())
-            .add_numeric("count", 42.0, FloatOption::default())
+            .add_float("count", 42.0, FloatOption::default())
             .build();
 
         writer.add_document(doc).unwrap();
