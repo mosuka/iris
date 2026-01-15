@@ -158,6 +158,7 @@ impl DocumentParser {
     pub fn parse(&self, doc: Document) -> Result<AnalyzedDocument> {
         let mut field_terms = AHashMap::new();
         let mut stored_fields = AHashMap::new();
+        let mut point_values = AHashMap::new();
 
         // Process each field in the document
         for (field_name, field) in doc.fields() {
@@ -191,6 +192,7 @@ impl DocumentParser {
 
                     field_terms.insert(field_name.clone(), vec![analyzed_term]);
                     stored_fields.insert(field_name.clone(), FieldValue::Integer(*num));
+                    point_values.insert(field_name.clone(), *num as f64);
                 }
                 FieldValue::Float(num) => {
                     // Convert float to text for indexing
@@ -205,6 +207,7 @@ impl DocumentParser {
 
                     field_terms.insert(field_name.clone(), vec![analyzed_term]);
                     stored_fields.insert(field_name.clone(), FieldValue::Float(*num));
+                    point_values.insert(field_name.clone(), *num);
                 }
                 FieldValue::Boolean(b) => {
                     // Convert boolean to text
@@ -237,6 +240,9 @@ impl DocumentParser {
 
                     field_terms.insert(field_name.clone(), vec![analyzed_term]);
                     stored_fields.insert(field_name.clone(), FieldValue::DateTime(*dt));
+                    let ts = dt.timestamp() as f64
+                        + dt.timestamp_subsec_nanos() as f64 / 1_000_000_000.0;
+                    point_values.insert(field_name.clone(), ts);
                 }
                 FieldValue::Geo(point) => {
                     // Convert geo point to string representation
@@ -269,6 +275,7 @@ impl DocumentParser {
             field_terms,
             stored_fields,
             field_lengths,
+            point_values,
         })
     }
 

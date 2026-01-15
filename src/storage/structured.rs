@@ -165,6 +165,19 @@ impl<W: StorageOutput> StructWriter<W> {
         self.writer.close()?;
         Ok(())
     }
+
+    /// Seek to a position.
+    pub fn seek(&mut self, pos: std::io::SeekFrom) -> Result<u64> {
+        let new_pos = self.writer.seek(pos)?;
+        self.position = new_pos;
+        Ok(new_pos)
+    }
+
+    /// Get current stream position from underlying writer.
+    /// This is useful when mixing raw writes with structured writes.
+    pub fn stream_position(&mut self) -> Result<u64> {
+        self.writer.stream_position().map_err(SarissaError::from)
+    }
 }
 
 /// A structured file reader for binary data.
@@ -185,6 +198,18 @@ impl<R: StorageInput> StructReader<R> {
             position: 0,
             file_size,
         })
+    }
+
+    /// Seek to a position.
+    pub fn seek(&mut self, pos: std::io::SeekFrom) -> Result<u64> {
+        let new_pos = self.reader.seek(pos)?;
+        self.position = new_pos;
+        Ok(new_pos)
+    }
+
+    /// Get current stream position from underlying reader.
+    pub fn stream_position(&mut self) -> Result<u64> {
+        self.reader.stream_position().map_err(SarissaError::from)
     }
 
     /// Read a u8 value.

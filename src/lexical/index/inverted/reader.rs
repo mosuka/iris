@@ -20,6 +20,7 @@ use crate::lexical::index::inverted::core::terms::{
     InvertedIndexTerms, TermDictionaryAccess, Terms,
 };
 use crate::lexical::index::inverted::segment::SegmentInfo;
+use crate::lexical::index::structures::bkd_tree::{BKDReader, BKDTree};
 use crate::lexical::index::structures::dictionary::HybridTermDictionary;
 use crate::lexical::index::structures::dictionary::TermInfo;
 use crate::lexical::index::structures::doc_values::DocValuesReader;
@@ -313,6 +314,9 @@ pub struct SegmentReader {
     /// Optional deletion bitmap for this segment.
     deletion_bitmap: RwLock<Option<Arc<DeletionBitmap>>>,
 
+    /// Cached BKD trees: field -> tree
+    bkd_trees: RwLock<AHashMap<String, Arc<dyn BKDTree>>>,
+
     /// Whether the segment is loaded.
     loaded: AtomicBool,
 }
@@ -329,6 +333,7 @@ impl SegmentReader {
             field_stats: RwLock::new(None),
             doc_values: RwLock::new(None),
             deletion_bitmap: RwLock::new(None),
+            bkd_trees: RwLock::new(AHashMap::new()),
             loaded: AtomicBool::new(false),
         };
 
@@ -874,6 +879,54 @@ impl SegmentReader {
 
         self.info.doc_count
     }
+
+    /// Get BKD Tree for a field, loading it if necessary.
+    pub fn get_bkd_tree(&self, field: &str) -> Result<Option<Arc<dyn BKDTree>>> {
+        // Check cache
+        if let Some(tree) = self.bkd_trees.read().unwrap().get(field) {
+            return Ok(Some(tree.clone()));
+        }
+
+        // Try to open file
+        let bkd_file = format!("{}.{}.bkd", self.info.segment_id, field);
+        if self.storage.file_exists(&bkd_file) {
+            let reader = BKDReader::open(self.storage.clone(), &bkd_file)?;
+            let tree: Arc<dyn BKDTree> = Arc::new(reader);
+
+            // Update cache
+            self.bkd_trees
+                .write()
+                .unwrap()
+                .insert(field.to_string(), tree.clone());
+
+            return Ok(Some(tree));
+        }
+
+        Ok(None)
+    }
+}
+
+#[derive(Debug)]
+struct MultiSegmentBKDTree {
+    trees: Vec<Arc<dyn BKDTree>>,
+}
+
+impl BKDTree for MultiSegmentBKDTree {
+    fn range_search(
+        &self,
+        min: Option<f64>,
+        max: Option<f64>,
+        include_min: bool,
+        include_max: bool,
+    ) -> Result<Vec<u64>> {
+        let mut results = Vec::new();
+        for tree in &self.trees {
+            let mut tree_results = tree.range_search(min, max, include_min, include_max)?;
+            results.append(&mut tree_results);
+        }
+        results.sort_unstable();
+        Ok(results)
+    }
 }
 
 /// Cache manager for efficient data access.
@@ -1284,6 +1337,24 @@ impl crate::lexical::reader::LexicalIndexReader for InvertedIndexReader {
             let seg = seg_lock.read().unwrap();
             seg.has_doc_values(field)
         })
+    }
+
+    fn get_bkd_tree(&self, field: &str) -> Result<Option<Arc<dyn BKDTree>>> {
+        self.check_closed()?;
+
+        let mut trees = Vec::new();
+        for segment_reader in &self.segment_readers {
+            let reader = segment_reader.read().unwrap();
+            if let Some(tree) = reader.get_bkd_tree(field)? {
+                trees.push(tree);
+            }
+        }
+
+        if trees.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(Arc::new(MultiSegmentBKDTree { trees })))
+        }
     }
 }
 

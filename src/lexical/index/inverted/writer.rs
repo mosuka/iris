@@ -18,6 +18,7 @@ use crate::lexical::core::document::Document;
 use crate::lexical::core::field::FieldValue;
 use crate::lexical::index::inverted::core::posting::{Posting, TermPostingIndex};
 use crate::lexical::index::inverted::segment::SegmentInfo;
+use crate::lexical::index::structures::bkd_tree::BKDWriter;
 use crate::lexical::index::structures::dictionary::{TermDictionaryBuilder, TermInfo};
 use crate::lexical::index::structures::doc_values::DocValuesWriter;
 use crate::lexical::writer::LexicalIndexWriter;
@@ -329,6 +330,7 @@ impl InvertedIndexWriter {
     fn analyze_document(&mut self, doc: Document) -> Result<AnalyzedDocument> {
         let mut field_terms = AHashMap::new();
         let mut stored_fields = AHashMap::new();
+        let mut point_values = AHashMap::new();
 
         // Process each field in the document (schema-less mode)
         for (field_name, field) in doc.fields() {
@@ -375,6 +377,7 @@ impl InvertedIndexWriter {
 
                         field_terms.insert(field_name.clone(), analyzed_terms);
                     }
+
                     FieldValue::Integer(num) => {
                         // Convert integer to text for indexing
                         let text = num.to_string();
@@ -387,6 +390,7 @@ impl InvertedIndexWriter {
                         };
 
                         field_terms.insert(field_name.clone(), vec![analyzed_term]);
+                        point_values.insert(field_name.clone(), *num as f64);
                     }
                     FieldValue::Float(num) => {
                         // Convert float to text for indexing
@@ -400,6 +404,7 @@ impl InvertedIndexWriter {
                         };
 
                         field_terms.insert(field_name.clone(), vec![analyzed_term]);
+                        point_values.insert(field_name.clone(), *num);
                     }
                     FieldValue::Boolean(boolean) => {
                         // Convert boolean to text
@@ -426,6 +431,9 @@ impl InvertedIndexWriter {
                         };
 
                         field_terms.insert(field_name.clone(), vec![analyzed_term]);
+                        let ts = dt.timestamp() as f64
+                            + dt.timestamp_subsec_nanos() as f64 / 1_000_000_000.0;
+                        point_values.insert(field_name.clone(), ts);
                     }
                     FieldValue::Geo(geo) => {
                         // Index geo field as "lat,lon" for basic text search
@@ -462,6 +470,7 @@ impl InvertedIndexWriter {
             field_terms,
             stored_fields,
             field_lengths,
+            point_values,
         })
     }
 
@@ -550,6 +559,9 @@ impl InvertedIndexWriter {
 
         // Write segment metadata
         self.write_segment_metadata(&segment_name)?;
+
+        // Write BKD trees for numeric fields
+        self.write_bkd_trees(&segment_name)?;
 
         // COMPATIBILITY: Also write documents as JSON for BasicIndexReader
         self.write_json_documents(&segment_name)?;
@@ -796,6 +808,36 @@ impl InvertedIndexWriter {
         std::io::Write::write_all(&mut output, segment_data.as_bytes())?;
         output.close()?;
 
+        Ok(())
+    }
+
+    /// Write BKD trees for numeric fields.
+    fn write_bkd_trees(&self, segment_name: &str) -> Result<()> {
+        let mut field_points: AHashMap<String, Vec<(f64, u64)>> = AHashMap::new();
+
+        for (doc_id, doc) in &self.buffered_docs {
+            for (field, value) in &doc.point_values {
+                field_points
+                    .entry(field.clone())
+                    .or_default()
+                    .push((*value, *doc_id));
+            }
+        }
+
+        for (field, mut points) in field_points {
+            // Sort points
+            points.sort_by(|a, b| {
+                a.0.partial_cmp(&b.0)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+                    .then(a.1.cmp(&b.1))
+            });
+
+            let file_name = format!("{segment_name}.{field}.bkd");
+            let output = self.storage.create_output(&file_name)?;
+            let mut writer = BKDWriter::new(output);
+            writer.write(&points)?;
+            writer.finish()?;
+        }
         Ok(())
     }
 

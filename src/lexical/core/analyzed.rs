@@ -54,6 +54,7 @@
 //!     field_terms,
 //!     stored_fields,
 //!     field_lengths,
+//!     point_values: AHashMap::new(),
 //! };
 //!
 //! assert_eq!(analyzed_doc.field_lengths["content"], 2);
@@ -88,35 +89,11 @@ pub struct AnalyzedDocument {
     pub stored_fields: AHashMap<String, FieldValue>,
     /// Field name to field length (number of tokens) mapping.
     pub field_lengths: AHashMap<String, u32>,
+    /// Field name to numeric point value (for BKD tree).
+    pub point_values: AHashMap<String, f64>,
 }
 
 /// An analyzed term with position and metadata.
-///
-/// This represents a single token after analysis, including
-/// position information for phrase queries and proximity searches.
-///
-/// # Fields
-///
-/// - `term` - The normalized term text (after tokenization/filtering)
-/// - `position` - Position in the field (0-based)
-/// - `frequency` - How many times this term appears in the document
-/// - `offset` - Character offsets in original text (start, end)
-///
-/// # Examples
-///
-/// ```
-/// use sarissa::lexical::core::analyzed::AnalyzedTerm;
-///
-/// let term = AnalyzedTerm {
-///     term: "search".to_string(),
-///     position: 5,
-///     frequency: 2,
-///     offset: (25, 31),
-/// };
-///
-/// assert_eq!(term.term, "search");
-/// assert_eq!(term.position, 5);
-/// ```
 #[derive(Debug, Clone)]
 pub struct AnalyzedTerm {
     /// The term text.
@@ -136,6 +113,7 @@ impl AnalyzedDocument {
             field_terms: AHashMap::new(),
             stored_fields: AHashMap::new(),
             field_lengths: AHashMap::new(),
+            point_values: AHashMap::new(),
         }
     }
 

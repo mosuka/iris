@@ -320,7 +320,18 @@ impl Write for MemoryOutput {
             return Err(std::io::Error::other("Output is closed"));
         }
 
-        self.buffer.extend_from_slice(buf);
+        let end_pos = (self.position as usize)
+            .checked_add(buf.len())
+            .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::Other, "File too large"))?;
+
+        if end_pos > self.buffer.len() {
+            // Resize buffer if needed, filling gaps with zeros
+            self.buffer.resize(end_pos, 0);
+        }
+
+        // Write data at current position
+        self.buffer[self.position as usize..end_pos].copy_from_slice(buf);
+
         self.position += buf.len() as u64;
         Ok(buf.len())
     }
