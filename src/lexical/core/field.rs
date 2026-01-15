@@ -454,17 +454,17 @@ impl Default for IvfOption {
 /// # Examples
 ///
 /// ```
-/// use sarissa::lexical::core::field::{VectorOption, VectorIndexType};
+/// use sarissa::lexical::core::field::{VectorConfig, VectorIndexType};
 /// use sarissa::vector::DistanceMetric;
 ///
 /// // Simple flat index
-/// let flat = VectorOption::flat(384);
+/// let flat = VectorConfig::flat(384);
 ///
 /// // HNSW with default settings
-/// let hnsw = VectorOption::hnsw(768);
+/// let hnsw = VectorConfig::hnsw(768);
 ///
 /// // Custom configuration
-/// let custom = VectorOption {
+/// let custom = VectorConfig {
 ///     index_type: VectorIndexType::HNSW,
 ///     dimension: 1536,
 ///     distance_metric: DistanceMetric::Euclidean,
@@ -531,9 +531,9 @@ impl VectorConfig {
     /// # Examples
     ///
     /// ```
-    /// use sarissa::lexical::core::field::VectorOption;
+    /// use sarissa::lexical::core::field::VectorConfig;
     ///
-    /// let opt = VectorOption::flat(384);
+    /// let opt = VectorConfig::flat(384);
     /// ```
     pub fn flat(dimension: usize) -> Self {
         Self {
@@ -555,9 +555,9 @@ impl VectorConfig {
     /// # Examples
     ///
     /// ```
-    /// use sarissa::lexical::core::field::VectorOption;
+    /// use sarissa::lexical::core::field::VectorConfig;
     ///
-    /// let opt = VectorOption::hnsw(768);
+    /// let opt = VectorConfig::hnsw(768);
     /// ```
     pub fn hnsw(dimension: usize) -> Self {
         Self {
