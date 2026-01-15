@@ -3,7 +3,8 @@
 use crate::error::Result;
 use crate::lexical::core::document::Document;
 use crate::lexical::core::field::FieldValue;
-use crate::lexical::index::structures::bkd_tree::SimpleBKDTree;
+use crate::lexical::index::structures::bkd_tree::BKDTree;
+use std::sync::Arc;
 
 /// Information about a term in the index.
 #[derive(Debug, Clone)]
@@ -95,7 +96,7 @@ pub trait LexicalIndexReader: Send + Sync + std::fmt::Debug {
     fn is_closed(&self) -> bool;
 
     /// Get BKD Tree for a numeric field, if available.
-    fn get_bkd_tree(&self, field: &str) -> Result<Option<&SimpleBKDTree>> {
+    fn get_bkd_tree(&self, field: &str) -> Result<Option<Arc<dyn BKDTree>>> {
         // Default implementation returns None (no BKD Tree support)
         let _ = field;
         Ok(None)

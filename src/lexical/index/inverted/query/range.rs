@@ -637,7 +637,12 @@ impl Query for NumericRangeQuery {
             let min_value = self.min_f64();
             let max_value = self.max_f64();
 
-            let doc_ids = bkd_tree.range_search(min_value, max_value);
+            let doc_ids = bkd_tree.range_search(
+                min_value,
+                max_value,
+                self.lower_inclusive,
+                self.upper_inclusive,
+            )?;
             return Ok(Box::new(PreComputedMatcher::new(doc_ids)));
         }
 
