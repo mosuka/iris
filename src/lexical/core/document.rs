@@ -680,11 +680,11 @@ impl DocumentBuilder {
     ///
     /// ```no_run
     /// use sarissa::lexical::core::document::Document;
-    /// use sarissa::lexical::core::field::{BlobOption, VectorConfig};
+    /// use sarissa::lexical::core::field::BlobOption;
     ///
     /// let doc = Document::builder()
     ///     .add_blob("image", "image/png", vec![0x89, 0x50], BlobOption::default())
-    ///     .add_blob("desc_vector", "text/plain", "description".as_bytes().to_vec(), BlobOption::vector(VectorConfig::default()))
+    ///     .add_blob("desc_vector", "text/plain", "description".as_bytes().to_vec(), BlobOption::default())
     ///     .build();
     /// ```
     pub fn add_blob<S: Into<String>, M: Into<String>>(

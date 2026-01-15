@@ -55,7 +55,6 @@ use rkyv::{Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize};
 use serde::{Deserialize, Serialize};
 
 use crate::lexical::index::inverted::query::geo::GeoPoint;
-use crate::vector::core::distance::DistanceMetric;
 
 /// Helper for archiving DateTime as micros timestamp (i64)
 pub struct MicroSeconds;
@@ -331,300 +330,30 @@ impl Default for TextOption {
     }
 }
 
-/// Vector index types for semantic search.
-#[derive(
-    Debug,
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    Serialize,
-    Deserialize,
-    Archive,
-    RkyvSerialize,
-    RkyvDeserialize,
-)]
-
-pub enum VectorIndexType {
-    /// Flat index (brute-force exact search).
-    /// Best for small datasets (< 100K vectors).
-    Flat,
-
-    /// HNSW index (hierarchical navigable small world graph).
-    /// Best for medium to large datasets with fast approximate search.
-    HNSW,
-
-    /// IVF index (inverted file with clustering).
-    /// Best for very large datasets with memory-efficient indexing.
-    IVF,
-}
-
-/// Flat-specific configuration options.
-#[derive(
-    Debug,
-    Clone,
-    PartialEq,
-    Serialize,
-    Deserialize,
-    Default,
-    Archive,
-    RkyvSerialize,
-    RkyvDeserialize,
-)]
-
-pub struct FlatOption {
-    // Flat index currently has no specific options
-    // This struct is here for consistency and future extensibility
-}
-
-/// HNSW-specific configuration options.
-#[derive(
-    Debug, Clone, PartialEq, Serialize, Deserialize, Archive, RkyvSerialize, RkyvDeserialize,
-)]
-pub struct HnswOption {
-    /// Number of connections per layer (M parameter).
-    /// Higher values improve recall but increase memory usage.
-    #[serde(default = "default_m")]
-    pub m: usize,
-
-    /// Size of the dynamic candidate list during construction.
-    /// Higher values improve index quality but slow down construction.
-    #[serde(default = "default_ef_construction")]
-    pub ef_construction: usize,
-
-    /// Maximum number of layers in the graph.
-    #[serde(default = "default_max_layers")]
-    pub max_layers: usize,
-}
-
-fn default_m() -> usize {
-    16
-}
-fn default_ef_construction() -> usize {
-    200
-}
-fn default_max_layers() -> usize {
-    6
-}
-
-impl Default for HnswOption {
-    fn default() -> Self {
-        Self {
-            m: 16,
-            ef_construction: 200,
-            max_layers: 6,
-        }
-    }
-}
-
-/// IVF-specific configuration options.
-#[derive(
-    Debug, Clone, PartialEq, Serialize, Deserialize, Archive, RkyvSerialize, RkyvDeserialize,
-)]
-pub struct IvfOption {
-    /// Number of clusters for inverted file.
-    #[serde(default = "default_n_clusters")]
-    pub n_clusters: usize,
-
-    /// Number of clusters to probe during search.
-    #[serde(default = "default_n_probes")]
-    pub n_probes: usize,
-}
-
-fn default_n_clusters() -> usize {
-    100
-}
-fn default_n_probes() -> usize {
-    10
-}
-
-impl Default for IvfOption {
-    fn default() -> Self {
-        Self {
-            n_clusters: 100,
-            n_probes: 10,
-        }
-    }
-}
-
-/// Options for Vector fields (used by Vector semantic search).
-///
-/// Configures how text is embedded and indexed as vectors.
-///
-/// # Examples
-///
-/// ```
-/// use sarissa::lexical::core::field::{VectorConfig, VectorIndexType};
-/// use sarissa::vector::DistanceMetric;
-///
-/// // Simple flat index
-/// let flat = VectorConfig::flat(384);
-///
-/// // HNSW with default settings
-/// let hnsw = VectorConfig::hnsw(768);
-///
-/// // Custom configuration
-/// let custom = VectorConfig {
-///     index_type: VectorIndexType::HNSW,
-///     dimension: 1536,
-///     distance_metric: DistanceMetric::Euclidean,
-///     normalize: false,
-///     ..Default::default()
-/// };
-/// ```
-#[derive(
-    Debug, Clone, PartialEq, Serialize, Deserialize, Archive, RkyvSerialize, RkyvDeserialize,
-)]
-pub struct VectorConfig {
-    /// Vector index type (Flat, HNSW, or IVF).
-    pub index_type: VectorIndexType,
-
-    /// Dimension of the embedding vectors.
-    pub dimension: usize,
-
-    /// Distance metric for similarity computation.
-    pub distance_metric: DistanceMetric,
-
-    /// Whether to normalize vectors to unit length.
-    /// Recommended for cosine similarity.
-    #[serde(default = "default_true")]
-    pub normalize: bool,
-
-    /// Flat-specific configuration (used when index_type = Flat).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub flat: Option<FlatOption>,
-
-    /// HNSW-specific configuration (used when index_type = HNSW).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub hnsw: Option<HnswOption>,
-
-    /// IVF-specific configuration (used when index_type = IVF).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub ivf: Option<IvfOption>,
-}
-
 fn default_true() -> bool {
     true
 }
 
-impl Default for VectorConfig {
-    fn default() -> Self {
-        Self {
-            index_type: VectorIndexType::HNSW,
-            dimension: 384,
-            distance_metric: DistanceMetric::Cosine,
-            normalize: true,
-            flat: None,
-            hnsw: Some(HnswOption::default()),
-            ivf: None,
-        }
-    }
-}
-
-impl VectorConfig {
-    /// Create a Flat index configuration.
-    ///
-    /// # Arguments
-    ///
-    /// * `dimension` - The embedding dimension
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use sarissa::lexical::core::field::VectorConfig;
-    ///
-    /// let opt = VectorConfig::flat(384);
-    /// ```
-    pub fn flat(dimension: usize) -> Self {
-        Self {
-            index_type: VectorIndexType::Flat,
-            dimension,
-            flat: Some(FlatOption::default()),
-            hnsw: None,
-            ivf: None,
-            ..Default::default()
-        }
-    }
-
-    /// Create an HNSW index configuration with default parameters.
-    ///
-    /// # Arguments
-    ///
-    /// * `dimension` - The embedding dimension
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use sarissa::lexical::core::field::VectorConfig;
-    ///
-    /// let opt = VectorConfig::hnsw(768);
-    /// ```
-    pub fn hnsw(dimension: usize) -> Self {
-        Self {
-            index_type: VectorIndexType::HNSW,
-            dimension,
-            flat: None,
-            hnsw: Some(HnswOption::default()),
-            ivf: None,
-            ..Default::default()
-        }
-    }
-
-    /// Create an IVF index configuration with default parameters.
-    ///
-    /// # Arguments
-    ///
-    /// * `dimension` - The embedding dimension
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use sarissa::lexical::core::field::VectorConfig;
-    ///
-    /// let opt = VectorConfig::ivf(1536);
-    /// ```
-    pub fn ivf(dimension: usize) -> Self {
-        Self {
-            index_type: VectorIndexType::IVF,
-            dimension,
-            flat: None,
-            hnsw: None,
-            ivf: Some(IvfOption::default()),
-            ..Default::default()
-        }
-    }
-}
-
-/// Options for Blob fields (including binary data and vectors).
+/// Option for Blob field.
 #[derive(
     Debug, Clone, PartialEq, Serialize, Deserialize, Archive, RkyvSerialize, RkyvDeserialize,
 )]
-pub struct BlobOption {
-    /// Whether to store the blob data.
-    #[serde(default = "default_true")]
-    pub stored: bool,
 
-    /// Optional vector configuration if this blob represents a vector.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub vector: Option<VectorConfig>,
+pub struct BlobOption {
+    /// If true, the value is stored.
+    pub stored: bool,
 }
 
 impl Default for BlobOption {
     fn default() -> Self {
-        Self {
-            stored: true,
-            vector: None,
-        }
+        Self { stored: true }
     }
 }
 
 impl BlobOption {
-    /// Create a new BlobOption with vector configuration.
-    pub fn vector(config: VectorConfig) -> Self {
-        Self {
-            stored: true,
-            vector: Some(config),
-        }
+    /// Create a new blob option.
+    pub fn new() -> Self {
+        Self::default()
     }
 }
 
@@ -742,7 +471,7 @@ pub struct GeoOption {
 /// # Examples
 ///
 /// ```
-/// use sarissa::lexical::core::field::{FieldOption, TextOption, BlobOption, VectorConfig};
+/// use sarissa::lexical::core::field::{FieldOption, TextOption, BlobOption};
 ///
 /// // Text field with custom options
 /// let text_opt = FieldOption::Text(TextOption {
@@ -751,8 +480,8 @@ pub struct GeoOption {
 ///     term_vectors: true,
 /// });
 ///
-/// // Vector field with HNSW index via BlobOption
-/// let vector_opt = FieldOption::Blob(BlobOption::vector(VectorConfig::hnsw(768)));
+/// // Blob field (e.g. for vector source)
+/// let blob_opt = FieldOption::Blob(BlobOption::default());
 /// ```
 #[derive(
     Debug, Clone, PartialEq, Serialize, Deserialize, Archive, RkyvSerialize, RkyvDeserialize,
