@@ -188,6 +188,8 @@ Sarissa provides several built-in analyzers with pre-configured pipelines:
 - **SimpleAnalyzer**: Basic tokenization without filtering.
     - Tokenizer: Configurable (defaults to `RegexTokenizer` in some contexts)
     - No filters.
+- **No-op Analyzer**: Performs no analysis, yielding an empty token stream.
+    - Useful for stored-only fields or when a field should not be searchable.
 - **PipelineAnalyzer**: A flexible builder for creating custom analysis pipelines.
     - Allows combining any **Char Filter**, **Tokenizer**, and **Token Filter** chain.
     - Example: `PipelineAnalyzer::new(tokenizer).add_char_filter(...).add_filter(...)`
@@ -357,6 +359,16 @@ graph TD
 4. **Fetching**:
    - Once the top document IDs are identified, their original content is retrieved from the `Doc Store`.
 
+### Query Rewriting
+Sarissa implements a **Multi-Term Query** framework (similar to Lucene) for queries like `FuzzyQuery`, `PrefixQuery`, `WildcardQuery`, and `RegexpQuery`.
+
+Instead of matching these complex patterns directly against every document, they undergo a **rewrite** process:
+1. **Term Enumeration**: The query identifies all unique terms in the `Term Dictionary` that match the pattern (e.g., `hel*` matches `hello`, `help`, `held`).
+2. **Expansion**: These terms are expanded into a large `BooleanQuery`.
+3. **Scoring Strategy**:
+   - **TopTermsScoring**: (Default) Only the top N terms by score are included to maintain performance.
+   - **ConstantScore**: All matching terms contribute equally to the document score.
+
 ## Search Components
 The search architecture is composed of several modular components that work together to execute queries and rank results.
 
@@ -412,6 +424,7 @@ Sarissa supports a diverse set of queries for different use cases.
 - **TermQuery**: Exact match for a single token.
   - *Example*: Field "status" matches "active".
 - **BooleanQuery**: Combines queries with `MUST` (+), `SHOULD` (OR), `MUST_NOT` (-).
+  - *Minimum Should Match*: Supports specifying a minimum number of `SHOULD` clauses that must match for the document to be considered a hit.
   - *Example*: `+rust -c++` (Must contain "rust", must not contain "c++").
 
 
@@ -443,3 +456,11 @@ Sarissa supports a diverse set of queries for different use cases.
 ### Geospatial (Requires `geo` feature)
 - **GeoDistanceQuery**: Matches points within a radius from a center point.
 - **GeoBoundingBoxQuery**: Matches points within a rectangular area.
+
+### Complex Queries
+- **MultiFieldQuery**: Executes a search across several fields simultaneously.
+  - *Strategies*: Matches can be combined using `BestFields` (highest score wins) or `MostFields` (scores are summed).
+  - *Example*: Search "query string" across "title^2" and "content".
+- **AdvancedQuery**: A high-level wrapper for complex query orchestration.
+  - *Features*: Supports query-level boosts, minimum score thresholds, and tiered filtering (Must, MustNot, Post-Filtering).
+  - *Optimization*: Automatically optimizes query structure and handles execution timeouts.
