@@ -1189,8 +1189,6 @@ pub struct PreComputedMatcher {
     current_index: usize,
     /// Whether this matcher is exhausted.
     exhausted: bool,
-    /// Whether the matcher has started.
-    started: bool,
 }
 
 impl PreComputedMatcher {
@@ -1205,7 +1203,6 @@ impl PreComputedMatcher {
             doc_ids,
             current_index: 0,
             exhausted,
-            started: false,
         }
     }
 
@@ -1215,14 +1212,13 @@ impl PreComputedMatcher {
             doc_ids: Vec::new(),
             current_index: 0,
             exhausted: true,
-            started: false,
         }
     }
 }
 
 impl Matcher for PreComputedMatcher {
     fn doc_id(&self) -> u64 {
-        if self.exhausted || !self.started || self.current_index >= self.doc_ids.len() {
+        if self.exhausted || self.current_index >= self.doc_ids.len() {
             u64::MAX
         } else {
             self.doc_ids[self.current_index]
@@ -1232,15 +1228,6 @@ impl Matcher for PreComputedMatcher {
     fn next(&mut self) -> Result<bool> {
         if self.exhausted {
             return Ok(false);
-        }
-
-        if !self.started {
-            self.started = true;
-            if self.doc_ids.is_empty() {
-                self.exhausted = true;
-                return Ok(false);
-            }
-            return Ok(true);
         }
 
         self.current_index += 1;

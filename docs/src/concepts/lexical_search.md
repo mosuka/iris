@@ -96,7 +96,7 @@ A container representing a single data point within a document.
 - **Integer / Float**: Numeric values. Used for range queries (BKD Tree) and sorting.
 - **Boolean**: True/False values.
 - **DateTime**: UTC timestamps.
-- **Geo**: Latitude/Longitude coordinates. Currently stored for scan-based queries or indexed as "lat,lon" text string for exact matching.
+- **Geo**: Latitude/Longitude coordinates. Indexed in a 2D BKD tree for efficient spatial queries (distance and bounding box) and stored for precise calculations.
 - **Blob**: Raw byte data with MIME type. Used for storing binary content (images, etc.) or vector source data. **Stored only**, never indexed by the lexical engine.
 
 ### Field Options
@@ -116,8 +116,8 @@ Configuration for the field defining how it should be indexed and stored.
     - `indexed`: If true, the timestamp is added to the BKD tree (range searchable).
     - `stored`: If true, the original timestamp is stored.
 - **GeoOption**:
-    - `indexed`: If true, the coordinates are indexed as text "lat,lon" (exact match).
-    - `stored`: If true, the original coordinates are stored (required for distance queries).
+    - `indexed`: If true, the coordinates are added to the 2D BKD tree (efficient spatial search).
+    - `stored`: If true, the original coordinates are stored.
 - **BlobOption**:
     - `stored`: If true, the binary data is stored. **Note**: Blobs cannot be indexed by the lexical engine.
 
@@ -132,7 +132,7 @@ graph TD
         subgraph "Processing (InvertedIndexWriter)"
             DocBuilder -->|Text| CharFilter["Char Filter"]
             DocBuilder -->|Numeric/Date/Geo| Normalizer["String Normalizer"]
-            DocBuilder -->|Numeric/Date| PtExt["Point Extractor"]
+            DocBuilder -->|Numeric/Date/Geo| PtExt["Point Extractor"]
             DocBuilder -->|Stored Field| StoreProc["Field Values Collector"]
             DocBuilder -->|All Fields| LenTracker["Field Length Tracker"]
             DocBuilder -->|Doc Values| DVTracker["Doc Values Collector"]
@@ -163,7 +163,7 @@ graph TD
 
 1. **Document Processing**:
    - **Analysis & Normalization**: Text is processed through the Analysis Chain (`Char Filter`, `Tokenizer`, `Token Filter`). Non-text fields are handled by the `String Normalizer`.
-   - **Point Extraction**: Multidimensional values (Numeric/Date) are extracted by the `Point Extractor` for spatial indexing.
+   - **Point Extraction**: Multidimensional values (Numeric, Date, and Geo) are extracted by the `Point Extractor` for spatial indexing (BKD Tree).
    - **Tracking & Collection**: `Field Length Tracker` and `Doc Values Collector` gather metadata and columnar data.
 2. **In-Memory Buffering**:
    - Terms are added to the `Term Posting Index`.
@@ -221,7 +221,7 @@ The primary interface for adding documents to the index. It orchestrates the flo
 ### Document Processing
 - **Analysis Chain**: Performs sequentially through a `Char Filter`, a `Tokenizer`, and a `Token Filter` on text fields to produce searchable terms.
 - **String Normalizer**: Converts Numeric, Date, and Geo values into text form for basic keyword matching in the inverted index.
-- **Point Extractor**: Isolates numeric and temporal data for 1-dimensional range search (BKD Tree).
+- **Point Extractor**: Isolates numeric, temporal, and geographical data for multi-dimensional range and spatial search (BKD Tree).
 - **Data Collectors & Trackers**:
     - **Field Values Collector**: Buffers fields marked as `stored` for the Doc Store.
     - **Field Length Tracker**: Records token counts per field for length-normalized scoring (BM25).
@@ -279,7 +279,7 @@ A persistent tree structure for multi-dimensional data.
 - **Format**:
     - **Magic**: `BKDT`
     - **Index Section**: Internal nodes for tree traversal.
-    - **Leaf Blocks**: Contiguous blocks of `(Value, DocID)` pairs.
+    - **Leaf Blocks**: Contiguous blocks of `(Value Vector, DocID)` pairs.
 
 ### Document Store (`.docs`)
 **Component for Data Retrieval.**
@@ -326,7 +326,6 @@ graph TD
             subgraph "Index Access"
                 MatcherObj -.->|Look up| II["Inverted Index"]
                 MatcherObj -.->|Range Scan| BKD["BKD Tree"]
-                MatcherObj -.->|Geo Scan| Docs["Doc Store"]
             end
             
             MatcherObj -->|Doc IDs| CollectorObj["Collector"]
@@ -447,6 +446,8 @@ Sarissa supports a diverse set of queries for different use cases.
 ### Geospatial (Requires `geo` feature)
 - **GeoDistanceQuery**: Matches points within a radius from a center point.
 - **GeoBoundingBoxQuery**: Matches points within a rectangular area.
+
+*Both queries are optimized using a 2D BKD tree for fast candidate retrieval.*
 
 ### Complex Queries
 - **MultiFieldQuery**: Executes a search across several fields simultaneously.

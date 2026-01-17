@@ -914,17 +914,18 @@ struct MultiSegmentBKDTree {
 impl BKDTree for MultiSegmentBKDTree {
     fn range_search(
         &self,
-        min: Option<f64>,
-        max: Option<f64>,
+        mins: &[Option<f64>],
+        maxs: &[Option<f64>],
         include_min: bool,
         include_max: bool,
     ) -> Result<Vec<u64>> {
         let mut results = Vec::new();
         for tree in &self.trees {
-            let mut tree_results = tree.range_search(min, max, include_min, include_max)?;
+            let mut tree_results = tree.range_search(mins, maxs, include_min, include_max)?;
             results.append(&mut tree_results);
         }
         results.sort_unstable();
+        results.dedup();
         Ok(results)
     }
 }

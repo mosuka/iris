@@ -390,7 +390,7 @@ impl InvertedIndexWriter {
                         };
 
                         field_terms.insert(field_name.clone(), vec![analyzed_term]);
-                        point_values.insert(field_name.clone(), *num as f64);
+                        point_values.insert(field_name.clone(), vec![*num as f64]);
                     }
                     FieldValue::Float(num) => {
                         // Convert float to text for indexing
@@ -404,7 +404,7 @@ impl InvertedIndexWriter {
                         };
 
                         field_terms.insert(field_name.clone(), vec![analyzed_term]);
-                        point_values.insert(field_name.clone(), *num);
+                        point_values.insert(field_name.clone(), vec![*num]);
                     }
                     FieldValue::Boolean(boolean) => {
                         // Convert boolean to text
@@ -433,7 +433,7 @@ impl InvertedIndexWriter {
                         field_terms.insert(field_name.clone(), vec![analyzed_term]);
                         let ts = dt.timestamp() as f64
                             + dt.timestamp_subsec_nanos() as f64 / 1_000_000_000.0;
-                        point_values.insert(field_name.clone(), ts);
+                        point_values.insert(field_name.clone(), vec![ts]);
                     }
                     FieldValue::Geo(geo) => {
                         // Index geo field as "lat,lon" for basic text search
@@ -447,6 +447,7 @@ impl InvertedIndexWriter {
                         };
 
                         field_terms.insert(field_name.clone(), vec![analyzed_term]);
+                        point_values.insert(field_name.clone(), vec![geo.lat, geo.lon]);
                     }
                     FieldValue::Blob(_, _) | FieldValue::Null => {
                         // These types are not indexed in lexical index
@@ -811,30 +812,29 @@ impl InvertedIndexWriter {
         Ok(())
     }
 
-    /// Write BKD trees for numeric fields.
+    /// Write BKD trees for numeric and geo fields.
     fn write_bkd_trees(&self, segment_name: &str) -> Result<()> {
-        let mut field_points: AHashMap<String, Vec<(f64, u64)>> = AHashMap::new();
+        let mut field_points: AHashMap<String, Vec<(Vec<f64>, u64)>> = AHashMap::new();
 
         for (doc_id, doc) in &self.buffered_docs {
-            for (field, value) in &doc.point_values {
+            for (field, values) in &doc.point_values {
                 field_points
                     .entry(field.clone())
                     .or_default()
-                    .push((*value, *doc_id));
+                    .push((values.clone(), *doc_id));
             }
         }
 
-        for (field, mut points) in field_points {
-            // Sort points
-            points.sort_by(|a, b| {
-                a.0.partial_cmp(&b.0)
-                    .unwrap_or(std::cmp::Ordering::Equal)
-                    .then(a.1.cmp(&b.1))
-            });
+        for (field, points) in field_points {
+            if points.is_empty() {
+                continue;
+            }
+
+            let num_dims = points[0].0.len() as u32;
 
             let file_name = format!("{segment_name}.{field}.bkd");
             let output = self.storage.create_output(&file_name)?;
-            let mut writer = BKDWriter::new(output);
+            let mut writer = BKDWriter::new(output, num_dims);
             writer.write(&points)?;
             writer.finish()?;
         }
