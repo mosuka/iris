@@ -130,9 +130,12 @@ graph TD
         Input["Raw Data"] --> DocBuilder["Document Construction"]
         
         subgraph "Processing (InvertedIndexWriter)"
-            DocBuilder -->|Text/Geo Field| Analyzer["Analyzer Pipeline"]
-            DocBuilder -->|Numeric/Date Field| NumProc["Values Extraction"]
-            DocBuilder -->|Stored Field| StoreProc["Field Encoding"]
+            DocBuilder -->|Text| Analyzer["Analyzer Pipeline"]
+            DocBuilder -->|Numeric/Date/Geo| Normalizer["String Normalizer"]
+            DocBuilder -->|Numeric/Date| PtExt["Point Extraction"]
+            DocBuilder -->|Stored Field| StoreProc["Field Values Collector"]
+            DocBuilder -->|All Fields| LenTracker["Field Length Tracker"]
+            DocBuilder -->|Doc Values| DVTracker["Doc Values Collector"]
             
             subgraph "Analysis Chain"
                 Analyzer --> CharFilter["Char Filter"]
@@ -143,15 +146,18 @@ graph TD
         
         subgraph "In-Memory Buffering"
             TokenFilter -->|Terms| InvBuffer["Term Posting Index"]
-            NumProc -->|Points| DocBuffer["Buffered Documents"]
-            StoreProc -->|Encoded Values| DocBuffer
+            Normalizer -->|Terms| InvBuffer
+            PtExt -->|Points| BkdBuffer["Point Values Buffer"]
+            StoreProc -->|Data| DocsBuffer["Stored Docs Buffer"]
         end
         
         subgraph "Segment Flushing (Disk)"
-            InvBuffer -->|Write| Files1[".dict / .post"]
-            DocBuffer -->|Sort & Write| Files2[".bkd"]
-            DocBuffer -->|Write| Files3[".docs"]
-            InvBuffer -.->|Stats| Files4[".meta / .fstats"]
+            InvBuffer -->|Write| Postings[".dict / .post"]
+            BkdBuffer -->|Sort & Write| BKD[".bkd"]
+            DocsBuffer -->|Write| DOCS[".docs"]
+            DVTracker -->|Write| DV[".dv"]
+            LenTracker -->|Write| LENS[".lens"]
+            InvBuffer -.->|Stats| Meta[".meta / .fstats"]
         end
     end
 ```
