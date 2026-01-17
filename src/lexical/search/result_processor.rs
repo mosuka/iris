@@ -100,7 +100,7 @@ pub struct ProcessedSearchResults {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProcessedHit {
     /// The document ID.
-    pub doc_id: u32,
+    pub doc_id: u64,
 
     /// The relevance score.
     pub score: f32,
@@ -378,10 +378,10 @@ impl ResultProcessor {
     }
 
     /// Retrieve document fields.
-    fn retrieve_document_fields(&self, doc_id: u32) -> Result<HashMap<String, String>> {
+    fn retrieve_document_fields(&self, doc_id: u64) -> Result<HashMap<String, String>> {
         let mut fields = HashMap::new();
 
-        if let Some(document) = self.reader.document(doc_id as u64)? {
+        if let Some(document) = self.reader.document(doc_id)? {
             for (field_name, field_value) in document.fields() {
                 // Check if field should be retrieved
                 if self.should_retrieve_field(field_name) {
@@ -422,7 +422,7 @@ impl ResultProcessor {
     /// Generate highlights for a document.
     fn generate_highlights<Q: Query>(
         &self,
-        _doc_id: u32,
+        _doc_id: u64,
         fields: &HashMap<String, String>,
         query: &Q,
     ) -> Result<HashMap<String, Vec<String>>> {
@@ -450,7 +450,7 @@ impl ResultProcessor {
     /// Generate snippets for a document.
     fn generate_snippets(
         &self,
-        _doc_id: u32,
+        _doc_id: u64,
         fields: &HashMap<String, String>,
     ) -> Result<HashMap<String, String>> {
         let mut snippets = HashMap::new();

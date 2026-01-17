@@ -33,7 +33,7 @@ classDiagram
 
 The `HybridEngine` coordinates the indexing into two specialized sub-engines.
 
-1. **ID Synchronization**: The `HybridEngine` maintains a global document ID counter to ensure that a document has the same ID in both the lexical and vector indexes.
+1. **ID Synchronization**: The `HybridEngine` assigns a **Shard-Prefixed Stable ID (u64)** to each document. This ensures that a document maintains a consistent and globally unique identifier across lexical, vector, and multiple distributed nodes.
 2. **Lexical Indexing**: The `lexical_doc` is passed to the `LexicalEngine`, analyzed, and stored in inverted indexes/BKD trees.
 3. **Vector Indexing**: The `vector_payload` is processed by the `VectorEngine` (including embedding generation if configured) and stored in ANN structures like HNSW.
 
@@ -118,7 +118,7 @@ graph LR
 ```
 
 ### Hybrid Engine (`HybridEngine`)
-The top-level API for the Sarissa library. It manages the lifecycle of both `LexicalEngine` and `VectorEngine`, handling manifest persistence and consistent ID allocation.
+The top-level API for the Sarissa library. It manages the lifecycle of both `LexicalEngine` and `VectorEngine`, handling manifest persistence and consistent Shard-Prefixed Stable ID allocation.
 
 ### Hybrid Index (`HybridIndex`)
 A unified read-only interface that wraps both `LexicalIndexReader` and `VectorIndexReader`. It is used by the `ResultMerger` to fetch document content and aggregate statistics.

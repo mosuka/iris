@@ -135,9 +135,11 @@ impl VectorEngine {
             closed: AtomicU64::new(0),
         };
         // Ensure global deletion bitmap is initialized
+        let shard_id = engine.config.shard_id;
         engine.deletion_manager.initialize_segment(
             "global",
-            engine.next_doc_id.load(Ordering::SeqCst) + 1000, // Reserve some space
+            crate::util::id::create_doc_id(shard_id, 0),
+            crate::util::id::create_doc_id(shard_id, crate::util::id::MAX_LOCAL_ID),
         )?;
 
         engine.load_persisted_state()?;
@@ -1043,6 +1045,35 @@ impl VectorEngine {
         Ok(doc_id)
     }
 
+    /// Add or update vectors for an external ID.
+    pub fn index_vectors(&self, external_id: &str, mut doc: DocumentVector) -> Result<u64> {
+        let doc_id = if let Some(existing_id) = self.registry.get_doc_id_by_external_id(external_id)
+        {
+            existing_id
+        } else {
+            self.next_doc_id.fetch_add(1, Ordering::SeqCst)
+        };
+        doc.metadata
+            .insert("_id".to_string(), external_id.to_string());
+        self.upsert_document_internal(doc_id, doc)?;
+        Ok(doc_id)
+    }
+
+    /// Add or update payloads for an external ID.
+    pub fn index_payloads(&self, external_id: &str, mut payload: DocumentPayload) -> Result<u64> {
+        let doc_id = if let Some(existing_id) = self.registry.get_doc_id_by_external_id(external_id)
+        {
+            existing_id
+        } else {
+            self.next_doc_id.fetch_add(1, Ordering::SeqCst)
+        };
+        payload
+            .metadata
+            .insert("_id".to_string(), external_id.to_string());
+        self.upsert_document_payload(doc_id, payload)?;
+        Ok(doc_id)
+    }
+
     /// Add multiple vectors with automatically assigned doc_ids.
     pub fn add_vectors_batch(
         &self,
@@ -1078,6 +1109,30 @@ impl VectorEngine {
         let document = self.embed_document_payload_internal(doc_id, payload)?;
         self.upsert_document_internal(doc_id, document)?;
         Ok(())
+    }
+
+    /// Get a document by its internal ID.
+    pub fn get_document(&self, doc_id: u64) -> Result<Option<DocumentVector>> {
+        Ok(self.documents.read().get(&doc_id).cloned())
+    }
+
+    /// Get a document by its external ID.
+    pub fn get_document_by_id(&self, external_id: &str) -> Result<Option<DocumentVector>> {
+        if let Some(doc_id) = self.registry.get_doc_id_by_external_id(external_id) {
+            self.get_document(doc_id)
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Delete a document by its external ID.
+    pub fn delete_document_by_id(&self, external_id: &str) -> Result<bool> {
+        if let Some(doc_id) = self.registry.get_doc_id_by_external_id(external_id) {
+            self.delete_vectors(doc_id)?;
+            Ok(true)
+        } else {
+            Ok(false)
+        }
     }
 
     /// Delete a document by ID.
@@ -1560,6 +1615,7 @@ mod tests {
             implicit_schema: false,
             embedder: Arc::new(PrecomputedEmbedder::new()),
             deletion_config: DeletionConfig::default(),
+            shard_id: 0,
         }
     }
 
@@ -1658,5 +1714,41 @@ mod tests {
         let results = engine.search(sample_query(5)).expect("search");
         assert_eq!(results.hits.len(), 1);
         assert_eq!(results.hits[0].doc_id, 10);
+    }
+
+    #[test]
+    fn engine_id_based_operations() {
+        let config = sample_config();
+        let storage: Arc<dyn Storage> =
+            Arc::new(MemoryStorage::new(MemoryStorageConfig::default()));
+        let engine = create_engine(config, storage);
+
+        let mut doc = DocumentVector::new();
+        doc.set_field(
+            "body",
+            StoredVector::new(Arc::<[f32]>::from([1.0, 0.0, 0.0])),
+        );
+
+        // 1. Index by external ID
+        let internal_id = engine.index_vectors("v_ext_1", doc).expect("index vectors");
+
+        // 2. Get by internal ID
+        let found = engine.get_document(internal_id).expect("get doc");
+        assert!(found.is_some());
+
+        // 3. Get by external ID
+        let found_ext = engine.get_document_by_id("v_ext_1").expect("get doc ext");
+        assert!(found_ext.is_some());
+
+        // 4. Delete by external ID
+        let deleted = engine.delete_document_by_id("v_ext_1").expect("delete ext");
+        assert!(deleted);
+
+        // 5. Verify deletion
+        let found_after = engine.get_document_by_id("v_ext_1").expect("get after");
+        assert!(found_after.is_none());
+
+        // 6. Non-existent
+        assert!(!engine.delete_document_by_id("non_existent").unwrap());
     }
 }

@@ -415,9 +415,11 @@ mod tests {
         let segment_info = SegmentInfo {
             segment_id: id.to_string(),
             doc_count,
-            doc_offset: 0,
+            min_doc_id: 0,
+            max_doc_id: doc_count.saturating_sub(1),
             generation: 1,
             has_deletions: false,
+            shard_id: 0,
         };
 
         let mut managed_info = ManagedSegmentInfo::new(segment_info);

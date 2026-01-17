@@ -19,14 +19,20 @@ pub struct SegmentInfo {
     /// Number of documents in this segment.
     pub doc_count: u64,
 
-    /// Document ID offset for this segment.
-    pub doc_offset: u64,
+    /// Minimum document ID in this segment.
+    pub min_doc_id: u64,
+
+    /// Maximum document ID in this segment.
+    pub max_doc_id: u64,
 
     /// Generation number of this segment.
     pub generation: u64,
 
     /// Whether this segment has deletions.
     pub has_deletions: bool,
+
+    /// Shard ID for this segment.
+    pub shard_id: u16,
 }
 
 pub mod manager;

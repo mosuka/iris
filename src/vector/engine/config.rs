@@ -110,6 +110,9 @@ pub struct VectorIndexConfig {
 
     /// Deletion maintenance configuration.
     pub deletion_config: DeletionConfig,
+
+    /// Shard ID for the collection.
+    pub shard_id: u16,
 }
 
 impl std::fmt::Debug for VectorIndexConfig {
@@ -125,6 +128,7 @@ impl std::fmt::Debug for VectorIndexConfig {
             .field("implicit_schema", &self.implicit_schema)
             .field("embedder", &format_args!("{:?}", self.embedder))
             .field("deletion_config", &self.deletion_config)
+            .field("shard_id", &self.shard_id)
             .finish()
     }
 }
@@ -213,6 +217,7 @@ pub struct VectorIndexConfigBuilder {
     default_base_weight: f32,
     implicit_schema: bool,
     deletion_config: Option<DeletionConfig>,
+    shard_id: Option<u16>,
 }
 
 impl VectorIndexConfigBuilder {
@@ -229,6 +234,7 @@ impl VectorIndexConfigBuilder {
             default_base_weight: VectorFieldConfig::default_weight(),
             implicit_schema: false,
             deletion_config: None,
+            shard_id: None,
         }
     }
 
@@ -356,6 +362,12 @@ impl VectorIndexConfigBuilder {
         self
     }
 
+    /// Set shard ID.
+    pub fn shard_id(mut self, shard_id: u16) -> Self {
+        self.shard_id = Some(shard_id);
+        self
+    }
+
     /// Build the configuration.
     ///
     /// If no embedder is set, defaults to `PrecomputedEmbedder` for pre-computed vectors.
@@ -375,6 +387,7 @@ impl VectorIndexConfigBuilder {
             implicit_schema: self.implicit_schema,
             embedder,
             deletion_config: self.deletion_config.unwrap_or_default(),
+            shard_id: self.shard_id.unwrap_or(0),
         };
         config.validate()?;
         Ok(config)
@@ -395,7 +408,7 @@ impl Serialize for VectorIndexConfig {
     {
         use serde::ser::SerializeStruct;
 
-        let mut state = serializer.serialize_struct("VectorIndexConfig", 8)?;
+        let mut state = serializer.serialize_struct("VectorIndexConfig", 9)?;
         state.serialize_field("fields", &self.fields)?;
         state.serialize_field("default_fields", &self.default_fields)?;
         state.serialize_field("metadata", &self.metadata)?;
@@ -405,6 +418,7 @@ impl Serialize for VectorIndexConfig {
         state.serialize_field("default_base_weight", &self.default_base_weight)?;
         state.serialize_field("implicit_schema", &self.implicit_schema)?;
         state.serialize_field("deletion_config", &self.deletion_config)?;
+        state.serialize_field("shard_id", &self.shard_id)?;
         state.end()
     }
 }
@@ -433,6 +447,8 @@ impl<'de> Deserialize<'de> for VectorIndexConfig {
             implicit_schema: bool,
             #[serde(default)]
             deletion_config: DeletionConfig,
+            #[serde(default)]
+            shard_id: u16,
         }
 
         let helper = VectorIndexConfigHelper::deserialize(deserializer)?;
@@ -446,6 +462,7 @@ impl<'de> Deserialize<'de> for VectorIndexConfig {
             default_base_weight: helper.default_base_weight,
             implicit_schema: helper.implicit_schema,
             deletion_config: helper.deletion_config,
+            shard_id: helper.shard_id,
             // Default to PrecomputedEmbedder; can be replaced programmatically
             embedder: Arc::new(PrecomputedEmbedder::new()),
         })

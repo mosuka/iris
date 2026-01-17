@@ -187,10 +187,10 @@ impl AdvancedQuery {
                 break;
             }
 
-            let doc_id = matcher.doc_id() as u32;
+            let doc_id = matcher.doc_id();
 
             // Calculate score with field boosts
-            let mut score = scorer.score(doc_id as u64, 1.0, None); // Use default term frequency
+            let mut score = scorer.score(doc_id, 1.0, None); // Use default term frequency
             score = self.apply_field_boosts(doc_id, score, reader)?;
             score *= self.boost;
 
@@ -221,7 +221,7 @@ impl AdvancedQuery {
     /// Apply field boosts to the score.
     fn apply_field_boosts(
         &self,
-        _doc_id: u32,
+        _doc_id: u64,
         base_score: f32,
         _reader: &dyn LexicalIndexReader,
     ) -> Result<f32> {
@@ -235,11 +235,11 @@ impl AdvancedQuery {
     }
 
     /// Apply post filters to a document.
-    fn apply_post_filters(&self, doc_id: u32, reader: &dyn LexicalIndexReader) -> Result<bool> {
+    fn apply_post_filters(&self, doc_id: u64, reader: &dyn LexicalIndexReader) -> Result<bool> {
         for filter in &self.post_filters {
             let mut matcher = filter.matcher(reader)?;
             // Skip to the target document and check if it matches
-            if !matcher.skip_to(doc_id as u64)? || matcher.doc_id() != doc_id as u64 {
+            if !matcher.skip_to(doc_id)? || matcher.doc_id() != doc_id {
                 return Ok(false);
             }
         }

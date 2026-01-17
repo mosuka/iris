@@ -67,6 +67,7 @@ async fn test_vector_segment_integration() {
         default_fields: vec!["vector_field".to_string()],
         metadata: std::collections::HashMap::new(),
         deletion_config: sarissa::maintenance::deletion::DeletionConfig::default(),
+        shard_id: 0,
     };
 
     // We construct engine manually to inject storage

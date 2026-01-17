@@ -36,30 +36,30 @@ mod tests {
         // Cluster 0 area (around [0, 0])
         vectors.push((0, "f".to_string(), Vector::new(vec![0.0, 0.0])));
 
-        // Cluster 1 area (around [10, 10]) - Dense
+        // Cluster 1 area (around [100, 100]) - Dense
         for i in 0..10 {
             vectors.push((
                 i + 1,
                 "f".to_string(),
-                Vector::new(vec![10.0 + i as f32 * 0.1, 10.0 + i as f32 * 0.1]),
+                Vector::new(vec![100.0 + i as f32 * 0.1, 100.0 + i as f32 * 0.1]),
             ));
         }
 
-        // Cluster 2 area (around [0, 10])
+        // Cluster 2 area (around [0, 100])
         for i in 0..4 {
             vectors.push((
                 i + 11,
                 "f".to_string(),
-                Vector::new(vec![0.0 + i as f32 * 0.1, 10.0 + i as f32 * 0.1]),
+                Vector::new(vec![0.0 + i as f32 * 0.1, 100.0 + i as f32 * 0.1]),
             ));
         }
 
-        // Cluster 3 area (around [10, 0])
+        // Cluster 3 area (around [100, 0])
         for i in 0..4 {
             vectors.push((
                 i + 15,
                 "f".to_string(),
-                Vector::new(vec![10.0 + i as f32 * 0.1, 0.0 + i as f32 * 0.1]),
+                Vector::new(vec![100.0 + i as f32 * 0.1, 0.0 + i as f32 * 0.1]),
             ));
         }
 

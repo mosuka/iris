@@ -338,16 +338,21 @@ impl SegmentManager {
 
             // Read core segment info
             let doc_count = reader.read_u64()?;
-            let doc_offset = reader.read_u64()?;
+            let min_doc_id = reader.read_u64()?;
+            let max_doc_id = reader.read_u64()?;
             let generation = reader.read_u64()?;
             let has_deletions = reader.read_u8()? != 0;
+
+            let shard_id = reader.read_u16()?;
 
             let segment_info = SegmentInfo {
                 segment_id: segment_id.clone(),
                 doc_count,
-                doc_offset,
+                min_doc_id,
+                max_doc_id,
                 generation,
                 has_deletions,
+                shard_id,
             };
 
             // Read management metadata
@@ -399,9 +404,11 @@ impl SegmentManager {
             // Write core segment info
             let seg_info = &managed_info.segment_info;
             writer.write_u64(seg_info.doc_count)?;
-            writer.write_u64(seg_info.doc_offset)?;
+            writer.write_u64(seg_info.min_doc_id)?;
+            writer.write_u64(seg_info.max_doc_id)?;
             writer.write_u64(seg_info.generation)?;
             writer.write_u8(if seg_info.has_deletions { 1 } else { 0 })?;
+            writer.write_u16(seg_info.shard_id)?;
 
             // Write management metadata
             writer.write_u64(managed_info.size_bytes)?;
@@ -1125,9 +1132,11 @@ mod tests {
         SegmentInfo {
             segment_id: segment_id.to_string(),
             doc_count,
-            doc_offset: 0,
+            min_doc_id: 0,
+            max_doc_id: doc_count.saturating_sub(1),
             generation: 1,
             has_deletions: false,
+            shard_id: 0,
         }
     }
 

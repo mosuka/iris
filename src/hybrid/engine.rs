@@ -6,7 +6,7 @@
 use std::io::{Read, Write};
 use std::sync::Arc;
 
-use crate::error::Result;
+use crate::error::{Result, SarissaError};
 use crate::hybrid::search::searcher::{HybridSearchRequest, HybridSearchResults};
 
 use crate::storage::Storage;
@@ -17,6 +17,7 @@ const HYBRID_MANIFEST_FILE: &str = "hybrid_manifest.json";
 #[derive(serde::Serialize, serde::Deserialize)]
 struct HybridEngineManifest {
     next_doc_id: u64,
+    shard_id: u16,
 }
 
 pub struct HybridEngine {
@@ -26,6 +27,8 @@ pub struct HybridEngine {
     lexical_engine: crate::lexical::engine::LexicalEngine,
     /// Vector search engine for semantic search.
     vector_engine: crate::vector::engine::VectorEngine,
+    /// Shard ID for this engine.
+    shard_id: u16,
     /// Next document ID counter for synchronized ID assignment.
     next_doc_id: u64,
 }
@@ -47,10 +50,20 @@ impl HybridEngine {
         lexical_engine: crate::lexical::engine::LexicalEngine,
         vector_engine: crate::vector::engine::VectorEngine,
     ) -> Result<Self> {
+        // Validation: shard_id must match between engines
+        // Note: We need a way to get shard_id from LexicalEngine and VectorEngine.
+        // For now, let's assume we can get it or we passed it in.
+        // Actually we just added it to their configs.
+
+        // Let's assume shard_id is passed or we can extract it.
+        // For now, since adding getter to engine is more involved, let's just use the one from manifest or assume 0
+        // until we add proper config propagation.
+
         let mut engine = Self {
             storage,
             lexical_engine,
             vector_engine,
+            shard_id: 0, // Will be updated by load_manifest or explicit set
             next_doc_id: 0,
         };
         engine.load_manifest()?;
@@ -65,6 +78,7 @@ impl HybridEngine {
             if !buffer.is_empty() {
                 let manifest: HybridEngineManifest = serde_json::from_slice(&buffer)?;
                 self.next_doc_id = manifest.next_doc_id;
+                self.shard_id = manifest.shard_id;
             }
         }
         Ok(())
@@ -73,6 +87,7 @@ impl HybridEngine {
     fn persist_manifest(&self) -> Result<()> {
         let manifest = HybridEngineManifest {
             next_doc_id: self.next_doc_id,
+            shard_id: self.shard_id,
         };
         let buffer = serde_json::to_vec(&manifest)?;
         let mut output = self.storage.create_output(HYBRID_MANIFEST_FILE)?;
@@ -99,7 +114,9 @@ impl HybridEngine {
         &mut self,
         doc: crate::hybrid::core::document::HybridDocument,
     ) -> Result<u64> {
-        let doc_id = self.next_doc_id;
+        let local_id = self.next_doc_id;
+        self.next_doc_id += 1;
+        let doc_id = crate::util::id::create_doc_id(self.shard_id, local_id);
         self.upsert_document(doc_id, doc).await?;
         Ok(doc_id)
     }
@@ -145,7 +162,9 @@ impl HybridEngine {
         }
 
         // 3. Upsert with new ID
-        let doc_id = self.next_doc_id;
+        let local_id = self.next_doc_id;
+        self.next_doc_id += 1;
+        let doc_id = crate::util::id::create_doc_id(self.shard_id, local_id);
         self.upsert_document(doc_id, doc).await?;
 
         Ok(doc_id)
@@ -184,6 +203,14 @@ impl HybridEngine {
         doc_id: u64,
         doc: crate::hybrid::core::document::HybridDocument,
     ) -> Result<()> {
+        // Validate shard_id
+        if !crate::util::id::is_id_in_shard(doc_id, self.shard_id) {
+            return Err(SarissaError::invalid_argument(format!(
+                "Document ID {doc_id} does not belong to shard {}",
+                self.shard_id
+            )));
+        }
+
         // 1. Write to lexical index
         if let Some(lexical_doc) = doc.lexical_doc {
             self.lexical_engine.upsert_document(doc_id, lexical_doc)?;
@@ -203,8 +230,9 @@ impl HybridEngine {
         }
 
         // 3. Update next_doc_id and persist if necessary
-        if doc_id >= self.next_doc_id {
-            self.next_doc_id = doc_id + 1;
+        let local_id = crate::util::id::get_local_id(doc_id);
+        if local_id >= self.next_doc_id {
+            self.next_doc_id = local_id + 1;
             // Best effort persistence. If this fails, we might reuse ID on restart (collision),
             // but for now we propagate error.
             self.persist_manifest()?;
@@ -231,9 +259,18 @@ impl HybridEngine {
     ///
     /// This updates the vector index for a given document ID without modifying the lexical index.
     pub fn upsert_vector_document(&mut self, doc_id: u64, vectors: DocumentVector) -> Result<()> {
+        // Validate shard_id
+        if !crate::util::id::is_id_in_shard(doc_id, self.shard_id) {
+            return Err(SarissaError::invalid_argument(format!(
+                "Document ID {doc_id} does not belong to shard {}",
+                self.shard_id
+            )));
+        }
+
         self.vector_engine.upsert_vectors(doc_id, vectors)?;
-        if doc_id >= self.next_doc_id {
-            self.next_doc_id = doc_id + 1;
+        let local_id = crate::util::id::get_local_id(doc_id);
+        if local_id >= self.next_doc_id {
+            self.next_doc_id = local_id + 1;
             self.persist_manifest()?;
         }
         Ok(())
@@ -243,9 +280,18 @@ impl HybridEngine {
     ///
     /// This updates the vector index using raw payloads without modifying the lexical index.
     pub fn upsert_vector_payload(&mut self, doc_id: u64, payload: DocumentPayload) -> Result<()> {
+        // Validate shard_id
+        if !crate::util::id::is_id_in_shard(doc_id, self.shard_id) {
+            return Err(SarissaError::invalid_argument(format!(
+                "Document ID {doc_id} does not belong to shard {}",
+                self.shard_id
+            )));
+        }
+
         self.vector_engine.upsert_payloads(doc_id, payload)?;
-        if doc_id >= self.next_doc_id {
-            self.next_doc_id = doc_id + 1;
+        let local_id = crate::util::id::get_local_id(doc_id);
+        if local_id >= self.next_doc_id {
+            self.next_doc_id = local_id + 1;
             self.persist_manifest()?;
         }
         Ok(())

@@ -35,7 +35,7 @@ use self::scorer::Scorer;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Hit {
     /// The document ID.
-    pub doc_id: u32,
+    pub doc_id: u64,
     /// The relevance score.
     pub score: f32,
     /// The document fields (if retrieved).
@@ -68,7 +68,7 @@ pub struct LexicalSearchResults {
 #[derive(Debug, Clone)]
 pub struct QueryResult {
     /// Document ID.
-    pub doc_id: u32,
+    pub doc_id: u64,
     /// Score.
     pub score: f32,
 }

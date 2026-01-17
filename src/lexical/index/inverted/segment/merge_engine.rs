@@ -87,6 +87,9 @@ pub struct MergeStats {
 
     /// Postings merged.
     pub postings_merged: u64,
+
+    /// Shard ID for the merged segment.
+    pub shard_id: u16,
 }
 
 impl MergeStats {
@@ -269,6 +272,10 @@ impl MergeEngine {
     ) -> Result<MergeResult> {
         let mut stats = MergeStats {
             segments_merged: segments.len(),
+            shard_id: segments
+                .get(0)
+                .map(|s| s.segment_info.shard_id)
+                .unwrap_or(0),
             ..Default::default()
         };
 
@@ -276,9 +283,7 @@ impl MergeEngine {
         let mut merged_index = TermPostingIndex::new();
         let mut all_documents = Vec::new();
         let mut deleted_doc_ids = AHashSet::<u64>::new();
-        let mut next_doc_id = 0u64;
 
-        // Load deletion information for each segment
         // Load deletion information for each segment
         for segment in segments {
             if segment.segment_info.has_deletions {
@@ -289,9 +294,8 @@ impl MergeEngine {
 
                     if let Ok(mut reader) = StructReader::new(input) {
                         if let Ok(bitmap) = DeletionBitmap::read_from_storage(&mut reader) {
-                            for local_doc_id in bitmap.get_deleted_docs() {
-                                let global_doc_id = segment.segment_info.doc_offset + local_doc_id;
-                                deleted_doc_ids.insert(global_doc_id);
+                            for doc_id in bitmap.get_deleted_docs() {
+                                deleted_doc_ids.insert(doc_id);
                             }
                         }
                     }
@@ -306,21 +310,18 @@ impl MergeEngine {
 
             // Process documents in batches
             let mut batch_docs = Vec::new();
-            let total_docs = segment.segment_info.doc_count;
 
-            for doc_id in 0..total_docs {
-                let global_doc_id = segment.segment_info.doc_offset + doc_id;
-
+            // In Stable ID mode, we iterate over actual document IDs present in the segment.
+            for doc_id in segment_reader.doc_ids()? {
                 // Skip deleted documents if configured
-                if self.config.remove_deleted_docs && deleted_doc_ids.contains(&global_doc_id) {
+                if self.config.remove_deleted_docs && deleted_doc_ids.contains(&doc_id) {
                     stats.deleted_docs_removed += 1;
                     continue;
                 }
 
                 // Load document
-                if let Some(document) = segment_reader.document(global_doc_id)? {
-                    batch_docs.push((next_doc_id, document));
-                    next_doc_id += 1;
+                if let Some(document) = segment_reader.document(doc_id)? {
+                    batch_docs.push((doc_id, document));
 
                     // Process batch when full
                     if batch_docs.len() >= self.config.batch_size {
@@ -344,13 +345,18 @@ impl MergeEngine {
             all_documents.sort_by_key(|(doc_id, _)| *doc_id);
         }
 
+        let min_doc_id = all_documents.iter().map(|(id, _)| *id).min().unwrap_or(0);
+        let max_doc_id = all_documents.iter().map(|(id, _)| *id).max().unwrap_or(0);
+
         // Create new segment info
         let segment_info = SegmentInfo {
             segment_id: new_segment_id.to_string(),
             doc_count: all_documents.len() as u64,
-            doc_offset: 0, // Will be assigned by segment manager
-            generation: 0, // Will be assigned by segment manager
-            has_deletions: false,
+            min_doc_id,
+            max_doc_id,
+            generation: 0,        // Will be assigned by segment manager
+            has_deletions: false, // New merged segment has no deleted docs until updated
+            shard_id: stats.shard_id,
         };
 
         // Write merged segment to storage
@@ -540,9 +546,11 @@ mod tests {
         let segment_info = SegmentInfo {
             segment_id: id.to_string(),
             doc_count,
-            doc_offset: 0,
+            min_doc_id: 0,
+            max_doc_id: doc_count.saturating_sub(1),
             generation: 1,
             has_deletions: false,
+            shard_id: 0, // Added shard_id for test segments
         };
 
         ManagedSegmentInfo::new(segment_info)

@@ -35,6 +35,7 @@ fn test_vacuum_reduces_file_size() {
         implicit_schema: false,
         embedder: Arc::new(sarissa::embedding::precomputed::PrecomputedEmbedder::new()),
         deletion_config: sarissa::maintenance::deletion::DeletionConfig::default(),
+        shard_id: 0,
     };
 
     // Correctly construct FileStorageConfig
@@ -171,6 +172,7 @@ fn test_vacuum_reduces_file_size_hnsw() {
         implicit_schema: false,
         embedder: Arc::new(sarissa::embedding::precomputed::PrecomputedEmbedder::new()),
         deletion_config: sarissa::maintenance::deletion::DeletionConfig::default(),
+        shard_id: 0,
     };
 
     let file_config = FileStorageConfig::new(path.to_str().unwrap());

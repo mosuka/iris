@@ -15,9 +15,9 @@ Handles semantic search using dense vectors.
 
 ## 3. Hybrid Engine
 The unifying layer that coordinates Lexical and Vector engines.
-- **ID Management**: Synchronizes Document IDs across both sub-engines.
+- **ID Management**: Synchronizes Shard-Prefixed Stable IDs across sub-engines. Ensures consistency between Lexical and Vector indexes.
 - **Result Merging**: Combines search results using algorithms like RRF (Reciprocal Rank Fusion) or Weighted Sum.
-- **Manifest**: Persists global state like the next available Document ID.
+- **Manifest**: Persists global and shard-specific state, including the next available Local ID for each shard.
 
 ```mermaid
 graph TD
@@ -31,8 +31,8 @@ graph TD
         RM[ResultMerger]
         
         subgraph "Coordination"
-            ID[ID Management]
-            Manifest["Manifest (Next DocID)"]
+            ID[Stable ID Management]
+            Manifest["Manifest<br>(Next Local ID)"]
         end
     end
 
@@ -69,7 +69,7 @@ graph TD
 
     %% Indexing Flow
     HE -->|1. Check _id| LE
-    HE -->|2. Assign Internal ID| ID
+    HE -->|2. Assign Shard-Prefixed ID| ID
     HE -->|3. Upsert| LE
     HE -->|4. Upsert Payload| VE
 
