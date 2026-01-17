@@ -340,6 +340,19 @@ impl SegmentReader {
         Ok(reader)
     }
 
+    /// Get all document IDs in this segment.
+    pub fn doc_ids(&self) -> Result<Vec<u64>> {
+        if !self.loaded.load(Ordering::Acquire) {
+            self.load_stored_documents()?;
+        }
+        let docs = self.stored_documents.read().unwrap();
+        if let Some(ref documents) = *docs {
+            Ok(documents.keys().cloned().collect())
+        } else {
+            Ok(Vec::new())
+        }
+    }
+
     /// Deprecated: Use `open()` instead. Schema is no longer required.
     #[deprecated(
         since = "0.2.0",
@@ -406,7 +419,7 @@ impl SegmentReader {
 
             let mut documents = BTreeMap::new();
             for (idx, doc) in docs.into_iter().enumerate() {
-                let doc_id = self.info.doc_offset + idx as u64;
+                let doc_id = self.info.min_doc_id + idx as u64;
                 documents.insert(doc_id, doc);
             }
 
@@ -546,26 +559,20 @@ impl SegmentReader {
     }
 
     /// Check whether a global doc_id is marked as deleted in this segment.
-    pub fn is_deleted(&self, global_doc_id: u64) -> Result<bool> {
-        if !self.info.has_deletions {
-            return Ok(false);
-        }
-
-        // Outside this segment's range.
-        if global_doc_id < self.info.doc_offset
-            || global_doc_id >= self.info.doc_offset + self.info.doc_count
-        {
-            return Ok(false);
-        }
-
+    pub fn is_deleted(&self, doc_id: u64) -> Result<bool> {
+        // Find deletion bitmap
         if self.deletion_bitmap.read().unwrap().is_none() {
-            self.load_deletion_bitmap()?;
+            // Try to load bitmap if segment has deletions
+            if self.info.has_deletions {
+                self.load_deletion_bitmap()?;
+            } else {
+                return Ok(false);
+            }
         }
 
-        let maybe_bitmap = self.deletion_bitmap.read().unwrap().clone();
-        if let Some(bitmap) = maybe_bitmap {
-            let local_doc_id = global_doc_id - self.info.doc_offset;
-            Ok(bitmap.is_deleted(local_doc_id))
+        let bitmap_lock = self.deletion_bitmap.read().unwrap();
+        if let Some(ref bitmap) = *bitmap_lock {
+            Ok(bitmap.is_deleted(doc_id))
         } else {
             Ok(false)
         }
@@ -700,15 +707,19 @@ impl SegmentReader {
     }
 
     /// Get field length for a specific document and field.
-    pub fn field_length(&self, local_doc_id: u64, field: &str) -> Result<Option<u32>> {
+    pub fn field_length(&self, doc_id: u64, field: &str) -> Result<Option<u32>> {
         // Ensure field lengths are loaded
         if self.field_lengths.read().unwrap().is_none() {
             self.load_field_lengths()?;
         }
 
+        if self.is_deleted(doc_id)? {
+            return Ok(None);
+        }
+
         let field_lengths = self.field_lengths.read().unwrap();
         if let Some(ref lengths_map) = *field_lengths
-            && let Some(doc_lengths) = lengths_map.get(&local_doc_id)
+            && let Some(doc_lengths) = lengths_map.get(&doc_id)
         {
             return Ok(doc_lengths.get(field).copied());
         }
@@ -716,28 +727,20 @@ impl SegmentReader {
     }
 
     /// Get a document by ID from this segment.
-    pub fn document(&self, local_doc_id: u64) -> Result<Option<Document>> {
+    pub fn document(&self, doc_id: u64) -> Result<Option<Document>> {
         // Ensure documents are loaded
         if !self.loaded.load(Ordering::Acquire) {
             // Load documents on-demand
             self.load_stored_documents()?;
         }
 
-        // Check if local_doc_id is within this segment's range
-        if local_doc_id >= self.info.doc_count {
-            return Ok(None);
-        }
-
-        // Convert local doc_id to global doc_id for storage lookup
-        let global_doc_id = self.info.doc_offset + local_doc_id;
-
-        if self.is_deleted(global_doc_id)? {
+        if self.is_deleted(doc_id)? {
             return Ok(None);
         }
 
         let docs = self.stored_documents.read().unwrap();
         if let Some(ref documents) = *docs {
-            Ok(documents.get(&global_doc_id).cloned())
+            Ok(documents.get(&doc_id).cloned())
         } else {
             Ok(None)
         }
@@ -1099,19 +1102,11 @@ impl InvertedIndexReader {
     pub fn field_length(&self, doc_id: u64, field: &str) -> Result<Option<u32>> {
         self.check_closed()?;
 
-        // Find the segment containing this document
+        // Search across all segments
         for segment_reader in &self.segment_readers {
             let reader = segment_reader.read().unwrap();
-            let segment_info = &reader.info;
-
-            // Check if this doc_id belongs to this segment
-            let segment_start = segment_info.doc_offset;
-            let segment_end = segment_start + segment_info.doc_count;
-
-            if doc_id >= segment_start && doc_id < segment_end {
-                // Convert to segment-local doc_id
-                let local_doc_id = doc_id - segment_start;
-                return reader.field_length(local_doc_id, field);
+            if let Ok(Some(length)) = reader.field_length(doc_id, field) {
+                return Ok(Some(length));
             }
         }
 
@@ -1132,11 +1127,10 @@ impl crate::lexical::reader::LexicalIndexReader for InvertedIndexReader {
         // Find the segment containing this document
         for segment_reader in &self.segment_readers {
             let reader = segment_reader.read().unwrap();
-            let segment_start = reader.info.doc_offset;
-            let segment_end = segment_start + reader.info.doc_count;
-
-            if doc_id >= segment_start && doc_id < segment_end {
-                return reader.is_deleted(doc_id).unwrap_or(false);
+            // In Stable ID mode, we ask the reader directly.
+            // A reader returns false if it doesn't own the document.
+            if let Ok(true) = reader.is_deleted(doc_id) {
+                return true;
             }
         }
         false
@@ -1145,23 +1139,26 @@ impl crate::lexical::reader::LexicalIndexReader for InvertedIndexReader {
     fn document(&self, doc_id: u64) -> Result<Option<Document>> {
         self.check_closed()?;
 
-        // Find the segment containing this document
+        // Search across all segments
         for segment_reader in &self.segment_readers {
             let reader = segment_reader.read().unwrap();
-            let segment_info = &reader.info;
-
-            // Check if this doc_id belongs to this segment
-            let segment_start = segment_info.doc_offset;
-            let segment_end = segment_start + segment_info.doc_count;
-
-            if doc_id >= segment_start && doc_id < segment_end {
-                // Convert to segment-local doc_id
-                let local_doc_id = doc_id - segment_start;
-                return reader.document(local_doc_id);
+            if let Ok(Some(doc)) = reader.document(doc_id) {
+                return Ok(Some(doc));
             }
         }
 
         Ok(None)
+    }
+
+    fn doc_ids(&self) -> Result<Vec<u64>> {
+        self.check_closed()?;
+
+        let mut all_ids = Vec::new();
+        for segment_reader in &self.segment_readers {
+            let reader = segment_reader.read().unwrap();
+            all_ids.extend(reader.doc_ids()?);
+        }
+        Ok(all_ids)
     }
 
     fn term_info(
@@ -1247,10 +1244,11 @@ impl crate::lexical::reader::LexicalIndexReader for InvertedIndexReader {
             // Single segment case
             Ok(Some(iterators.into_iter().next().unwrap()))
         } else {
-            // Multi-segment case - need to merge iterators
-            // For now, return the first iterator
-            // TODO: Implement proper merged iterator
-            Ok(Some(iterators.into_iter().next().unwrap()))
+            // Multi-segment case - merge iterators
+            let merged = MergedPostingIterator::new(iterators)?;
+            // If the merged iterator has no documents (all underlying iterators empty),
+            // it's effectively empty, but we return it anyway as it handles logic correctly.
+            Ok(Some(Box::new(merged)))
         }
     }
 
@@ -1315,19 +1313,12 @@ impl crate::lexical::reader::LexicalIndexReader for InvertedIndexReader {
     }
 
     fn get_doc_value(&self, field: &str, doc_id: u64) -> Result<Option<FieldValue>> {
-        // Find which segment contains this doc_id and convert to segment-local doc_id
-        let mut offset = 0u64;
+        // Search across all segments
         for segment_lock in &self.segment_readers {
             let segment = segment_lock.read().unwrap();
-            let segment_doc_count = segment.info.doc_count;
-
-            if doc_id < offset + segment_doc_count {
-                // This segment contains the document
-                let local_doc_id = doc_id - offset;
-                return segment.get_doc_value(field, local_doc_id);
+            if let Ok(Some(value)) = segment.get_doc_value(field, doc_id) {
+                return Ok(Some(value));
             }
-
-            offset += segment_doc_count;
         }
         Ok(None)
     }
@@ -1380,6 +1371,135 @@ impl TermDictionaryAccess for InvertedIndexReader {
         }
 
         Ok(None)
+    }
+}
+
+/// Iterator that merges multiple posting iterators into a single stream.
+///
+/// This iterator maintains a priority queue of active iterators, always
+/// processing the one with the smallest document ID first. This ensures
+/// that document IDs are returned in ascending order across all segments.
+#[derive(Debug)]
+pub struct MergedPostingIterator {
+    /// Min-heap of iterators, ordered by their current document ID.
+    heap: std::collections::BinaryHeap<IteratorWrapper>,
+
+    /// The current document ID of the merged stream.
+    current_doc: u64,
+}
+
+/// Wrapper for PostingIterator to make it orderable for BinaryHeap.
+#[derive(Debug)]
+struct IteratorWrapper {
+    iter: Box<dyn crate::lexical::reader::PostingIterator>,
+    current_doc: u64,
+}
+
+impl PartialEq for IteratorWrapper {
+    fn eq(&self, other: &Self) -> bool {
+        self.current_doc == other.current_doc
+    }
+}
+
+impl Eq for IteratorWrapper {}
+
+impl PartialOrd for IteratorWrapper {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for IteratorWrapper {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        // Reverse order for Min-Heap (smallest doc_id at top)
+        other.current_doc.cmp(&self.current_doc)
+    }
+}
+
+impl MergedPostingIterator {
+    /// Create a new merged iterator from a list of iterators.
+    pub fn new(iterators: Vec<Box<dyn crate::lexical::reader::PostingIterator>>) -> Result<Self> {
+        let mut heap = std::collections::BinaryHeap::new();
+
+        for mut iter in iterators {
+            // Initialize each iterator to the first document
+            if iter.next()? {
+                let doc_id = iter.doc_id();
+                heap.push(IteratorWrapper {
+                    iter,
+                    current_doc: doc_id,
+                });
+            }
+        }
+
+        let current_doc = if let Some(wrapper) = heap.peek() {
+            wrapper.current_doc
+        } else {
+            u64::MAX
+        };
+
+        Ok(MergedPostingIterator { heap, current_doc })
+    }
+}
+
+impl crate::lexical::reader::PostingIterator for MergedPostingIterator {
+    fn doc_id(&self) -> u64 {
+        self.current_doc
+    }
+
+    fn term_freq(&self) -> u64 {
+        // Return term freq of the current best iterator
+        if let Some(wrapper) = self.heap.peek() {
+            wrapper.iter.term_freq()
+        } else {
+            0
+        }
+    }
+
+    fn positions(&self) -> Result<Vec<u64>> {
+        if let Some(wrapper) = self.heap.peek() {
+            wrapper.iter.positions()
+        } else {
+            Ok(Vec::new())
+        }
+    }
+
+    fn next(&mut self) -> Result<bool> {
+        if let Some(mut wrapper) = self.heap.pop() {
+            // Advance the current iterator
+            if wrapper.iter.next()? {
+                wrapper.current_doc = wrapper.iter.doc_id();
+                self.heap.push(wrapper);
+            }
+
+            // Update current_doc from the new top of the heap
+            if let Some(new_top) = self.heap.peek() {
+                self.current_doc = new_top.current_doc;
+                Ok(true)
+            } else {
+                self.current_doc = u64::MAX;
+                Ok(false)
+            }
+        } else {
+            self.current_doc = u64::MAX;
+            Ok(false)
+        }
+    }
+
+    fn skip_to(&mut self, target: u64) -> Result<bool> {
+        // Naive implementation: just call next until we reach or pass target
+        // A better implementation would potentially seek the underlying iterators
+        while self.doc_id() < target {
+            if !self.next()? {
+                return Ok(false);
+            }
+        }
+
+        Ok(self.doc_id() != u64::MAX)
+    }
+
+    fn cost(&self) -> u64 {
+        self.heap.iter().map(|w| w.iter.cost()).sum()
     }
 }
 
@@ -1464,13 +1584,17 @@ mod tests {
         let info = SegmentInfo {
             segment_id: "seg_000001".to_string(),
             doc_count: 1000,
-            doc_offset: 0,
+            min_doc_id: 0,
+            max_doc_id: 999,
             generation: 1,
             has_deletions: false,
+            shard_id: 0,
         };
 
         assert_eq!(info.segment_id, "seg_000001");
         assert_eq!(info.doc_count, 1000);
+        assert_eq!(info.min_doc_id, 0);
+        assert_eq!(info.max_doc_id, 999);
         assert!(!info.has_deletions);
     }
 }

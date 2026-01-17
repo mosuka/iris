@@ -62,6 +62,10 @@ pub struct InvertedIndexConfig {
     /// Default fields to search when no field is specified.
     #[serde(default)]
     pub default_fields: Vec<String>,
+
+    /// Shard ID for the index.
+    #[serde(default)]
+    pub shard_id: u16,
 }
 
 fn default_analyzer() -> Arc<dyn Analyzer> {
@@ -82,6 +86,7 @@ impl Default for InvertedIndexConfig {
                     .expect("StandardAnalyzer should be creatable"),
             ),
             default_fields: Vec::new(),
+            shard_id: 0,
         }
     }
 }

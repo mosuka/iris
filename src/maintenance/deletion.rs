@@ -8,7 +8,6 @@ use std::sync::{Arc, RwLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use ahash::AHashMap;
-use bit_vec::BitVec;
 use serde::{Deserialize, Serialize};
 
 use crate::error::{Result, SarissaError};
@@ -56,11 +55,17 @@ pub struct DeletionBitmap {
     /// Segment ID this bitmap belongs to.
     pub segment_id: String,
 
-    /// Bitmap of deleted documents (bit set = deleted).
-    pub deleted_docs: RwLock<BitVec>,
+    /// Set of deleted document IDs.
+    pub deleted_docs: RwLock<ahash::AHashSet<u64>>,
 
     /// Total number of documents in the segment.
     pub total_docs: AtomicU64,
+
+    /// Minimum document ID in this segment.
+    pub min_doc_id: u64,
+
+    /// Maximum document ID in this segment.
+    pub max_doc_id: u64,
 
     /// Number of deleted documents.
     pub deleted_count: AtomicU64,
@@ -74,11 +79,18 @@ pub struct DeletionBitmap {
 
 impl DeletionBitmap {
     /// Create a new deletion bitmap for a segment.
-    pub fn new(segment_id: String, total_docs: u64) -> Self {
+    pub fn new(segment_id: String, min_doc_id: u64, max_doc_id: u64) -> Self {
+        let total_docs = if max_doc_id >= min_doc_id {
+            max_doc_id - min_doc_id + 1
+        } else {
+            0
+        };
         DeletionBitmap {
             segment_id,
-            deleted_docs: RwLock::new(BitVec::from_elem(total_docs as usize, false)),
+            deleted_docs: RwLock::new(ahash::AHashSet::new()),
             total_docs: AtomicU64::new(total_docs),
+            min_doc_id,
+            max_doc_id,
             deleted_count: AtomicU64::new(0),
             last_modified: AtomicU64::new(
                 SystemTime::now()
@@ -92,18 +104,18 @@ impl DeletionBitmap {
 
     /// Mark a document as deleted.
     pub fn delete_document(&self, doc_id: u64) -> Result<bool> {
-        let current_total = self.total_docs.load(Ordering::SeqCst);
-        if doc_id >= current_total {
+        // Range check
+        if doc_id < self.min_doc_id || doc_id > self.max_doc_id {
             return Err(SarissaError::index(format!(
-                "Document ID {doc_id} out of range for segment {} (max {})",
-                self.segment_id, current_total
+                "Document ID {doc_id} is out of range [{}, {}] for segment {}",
+                self.min_doc_id, self.max_doc_id, self.segment_id
             )));
         }
 
         let mut docs = self.deleted_docs.write().unwrap();
-        let was_already_deleted = docs.get(doc_id as usize).unwrap_or(false);
+        let was_already_deleted = docs.contains(&doc_id);
         if !was_already_deleted {
-            docs.set(doc_id as usize, true);
+            docs.insert(doc_id);
             self.deleted_count.fetch_add(1, Ordering::SeqCst);
             self.last_modified.store(
                 SystemTime::now()
@@ -120,28 +132,12 @@ impl DeletionBitmap {
 
     /// Resize the bitmap to accommodate more documents.
     pub fn resize(&self, new_size: u64) {
-        if new_size <= self.total_docs.load(Ordering::SeqCst) {
-            return;
-        }
-
-        let mut docs = self.deleted_docs.write().unwrap();
-        let current_size = docs.len();
-        if (new_size as usize) > current_size {
-            docs.grow((new_size as usize) - current_size, false);
-            self.total_docs.store(new_size, Ordering::SeqCst);
-        }
+        self.total_docs.store(new_size, Ordering::SeqCst);
     }
 
     /// Check if a document is deleted.
     pub fn is_deleted(&self, doc_id: u64) -> bool {
-        if doc_id >= self.total_docs.load(Ordering::SeqCst) {
-            return false;
-        }
-        self.deleted_docs
-            .read()
-            .unwrap()
-            .get(doc_id as usize)
-            .unwrap_or(false)
+        self.deleted_docs.read().unwrap().contains(&doc_id)
     }
 
     /// Get deletion ratio (0.0 to 1.0).
@@ -166,14 +162,8 @@ impl DeletionBitmap {
 
     /// Get all deleted document IDs.
     pub fn get_deleted_docs(&self) -> Vec<u64> {
-        let mut deleted = Vec::new();
         let docs = self.deleted_docs.read().unwrap();
-        for (i, bit) in docs.iter().enumerate() {
-            if bit {
-                deleted.push(i as u64);
-            }
-        }
-        deleted
+        docs.iter().cloned().collect()
     }
 
     /// Get memory usage of this bitmap in bytes.
@@ -187,7 +177,7 @@ impl DeletionBitmap {
     pub fn write_to_storage<W: StorageOutput>(&self, writer: &mut StructWriter<W>) -> Result<()> {
         // Write header
         writer.write_u32(0x44454C42)?; // "DELB" - Deletion Bitmap
-        writer.write_u32(1)?; // Version
+        writer.write_u32(3)?; // Version 3 (HashSet based with min/max doc_id)
 
         // Write metadata
         writer.write_string(&self.segment_id)?;
@@ -195,11 +185,15 @@ impl DeletionBitmap {
         writer.write_u64(self.deleted_count.load(Ordering::SeqCst))?;
         writer.write_u64(self.last_modified.load(Ordering::SeqCst))?;
         writer.write_u64(self.version.load(Ordering::SeqCst))?;
+        writer.write_u64(self.min_doc_id)?;
+        writer.write_u64(self.max_doc_id)?;
 
-        // Write bitmap data
-        let bitmap_bytes = self.deleted_docs.read().unwrap().to_bytes();
-        writer.write_varint(bitmap_bytes.len() as u64)?;
-        writer.write_bytes(&bitmap_bytes)?;
+        // Write deleted IDs
+        let docs = self.deleted_docs.read().unwrap();
+        writer.write_varint(docs.len() as u64)?;
+        for &doc_id in docs.iter() {
+            writer.write_u64(doc_id)?;
+        }
 
         Ok(())
     }
@@ -213,32 +207,120 @@ impl DeletionBitmap {
         }
 
         let version = reader.read_u32()?;
-        if version != 1 {
-            return Err(SarissaError::index(format!(
+        if version == 1 {
+            // Legacy BitVec format
+            let segment_id = reader.read_string()?;
+            let total_docs = reader.read_u64()?;
+            let deleted_count = reader.read_u64()?;
+            let last_modified = reader.read_u64()?;
+            let bitmap_version = reader.read_u64()?;
+
+            let _bitmap_size = reader.read_varint()? as usize;
+            let bitmap_bytes = reader.read_bytes()?;
+            let bitvec = bit_vec::BitVec::from_bytes(&bitmap_bytes);
+
+            let mut deleted_docs = ahash::AHashSet::new();
+            let mut min_doc_id = u64::MAX;
+            let mut max_doc_id = 0;
+            for (idx, bit) in bitvec.iter().enumerate() {
+                if bit {
+                    let doc_id = idx as u64;
+                    deleted_docs.insert(doc_id);
+                    min_doc_id = min_doc_id.min(doc_id);
+                    max_doc_id = max_doc_id.max(doc_id);
+                }
+            }
+            // If no docs were deleted, min/max might be default values,
+            // but total_docs should give a hint for the range.
+            // For version 1, we don't have explicit min/max, so we infer.
+            // If total_docs is 0, min/max can be 0. Otherwise, assume 0 to total_docs-1.
+            if total_docs > 0 && deleted_docs.is_empty() {
+                min_doc_id = 0;
+                max_doc_id = total_docs - 1;
+            } else if total_docs == 0 {
+                min_doc_id = 0;
+                max_doc_id = 0;
+            }
+
+            Ok(DeletionBitmap {
+                segment_id,
+                deleted_docs: RwLock::new(deleted_docs),
+                total_docs: AtomicU64::new(total_docs),
+                min_doc_id,
+                max_doc_id,
+                deleted_count: AtomicU64::new(deleted_count),
+                last_modified: AtomicU64::new(last_modified),
+                version: AtomicU64::new(bitmap_version),
+            })
+        } else if version == 2 {
+            // New HashSet format
+            let segment_id = reader.read_string()?;
+            let total_docs = reader.read_u64()?;
+            let deleted_count = reader.read_u64()?;
+            let last_modified = reader.read_u64()?;
+            let bitmap_version = reader.read_u64()?;
+
+            let deleted_id_count = reader.read_varint()? as usize;
+            let mut deleted_docs = ahash::AHashSet::with_capacity(deleted_id_count);
+            let mut min_doc_id = u64::MAX;
+            let mut max_doc_id = 0;
+            for _ in 0..deleted_id_count {
+                let doc_id = reader.read_u64()?;
+                deleted_docs.insert(doc_id);
+                min_doc_id = min_doc_id.min(doc_id);
+                max_doc_id = max_doc_id.max(doc_id);
+            }
+            // For version 2, we don't have explicit min/max, so we infer.
+            // If total_docs is 0, min/max can be 0. Otherwise, assume 0 to total_docs-1.
+            if total_docs > 0 && deleted_docs.is_empty() {
+                min_doc_id = 0;
+                max_doc_id = total_docs - 1;
+            } else if total_docs == 0 {
+                min_doc_id = 0;
+                max_doc_id = 0;
+            }
+
+            Ok(DeletionBitmap {
+                segment_id,
+                deleted_docs: RwLock::new(deleted_docs),
+                total_docs: AtomicU64::new(total_docs),
+                min_doc_id,
+                max_doc_id,
+                deleted_count: AtomicU64::new(deleted_count),
+                last_modified: AtomicU64::new(last_modified),
+                version: AtomicU64::new(bitmap_version),
+            })
+        } else if version == 3 {
+            // Version 3 (HashSet based with min/max doc_id)
+            let segment_id = reader.read_string()?;
+            let total_docs = reader.read_u64()?;
+            let deleted_count = reader.read_u64()?;
+            let last_modified = reader.read_u64()?;
+            let bitmap_version = reader.read_u64()?;
+            let min_doc_id = reader.read_u64()?;
+            let max_doc_id = reader.read_u64()?;
+
+            let deleted_id_count = reader.read_varint()? as usize;
+            let mut deleted_docs = ahash::AHashSet::with_capacity(deleted_id_count);
+            for _ in 0..deleted_id_count {
+                deleted_docs.insert(reader.read_u64()?);
+            }
+
+            Ok(DeletionBitmap {
+                segment_id,
+                deleted_docs: RwLock::new(deleted_docs),
+                total_docs: AtomicU64::new(total_docs),
+                min_doc_id,
+                max_doc_id,
+                deleted_count: AtomicU64::new(deleted_count),
+                last_modified: AtomicU64::new(last_modified),
+                version: AtomicU64::new(bitmap_version),
+            })
+        } else {
+            Err(SarissaError::index(format!(
                 "Unsupported bitmap version: {version}"
-            )));
+            )))
         }
-
-        // Read metadata
-        let segment_id = reader.read_string()?;
-        let total_docs = reader.read_u64()?;
-        let deleted_count = reader.read_u64()?;
-        let last_modified = reader.read_u64()?;
-        let bitmap_version = reader.read_u64()?;
-
-        // Read bitmap data
-        let _bitmap_size = reader.read_varint()? as usize;
-        let bitmap_bytes = reader.read_bytes()?;
-        let deleted_docs = RwLock::new(BitVec::from_bytes(&bitmap_bytes));
-
-        Ok(DeletionBitmap {
-            segment_id,
-            deleted_docs,
-            total_docs: AtomicU64::new(total_docs),
-            deleted_count: AtomicU64::new(deleted_count),
-            last_modified: AtomicU64::new(last_modified),
-            version: AtomicU64::new(bitmap_version),
-        })
     }
 }
 
@@ -501,14 +583,26 @@ impl DeletionManager {
     }
 
     /// Initialize deletion tracking for a segment.
-    pub fn initialize_segment(&self, segment_id: &str, total_docs: u64) -> Result<()> {
+    pub fn initialize_segment(
+        &self,
+        segment_id: &str,
+        min_doc_id: u64,
+        max_doc_id: u64,
+    ) -> Result<()> {
         let bitmaps = self.bitmaps.read().unwrap();
         if bitmaps.contains_key(segment_id) {
+            // If segment already exists, update its min/max if necessary, or just return.
+            // For now, we assume it's already correctly initialized.
+            // A more robust system might check if min/max changed and update.
             return Ok(());
         }
         drop(bitmaps);
 
-        let bitmap = Arc::new(DeletionBitmap::new(segment_id.to_string(), total_docs));
+        let bitmap = Arc::new(DeletionBitmap::new(
+            segment_id.to_string(),
+            min_doc_id,
+            max_doc_id,
+        ));
 
         {
             let mut bitmaps = self.bitmaps.write().unwrap();
@@ -1018,7 +1112,7 @@ mod tests {
 
     #[test]
     fn test_deletion_bitmap_creation() {
-        let bitmap = DeletionBitmap::new("seg001".to_string(), 1000);
+        let bitmap = DeletionBitmap::new("seg001".to_string(), 0, 999);
 
         assert_eq!(bitmap.segment_id, "seg001");
         assert_eq!(bitmap.total_docs.load(Ordering::SeqCst), 1000);
@@ -1029,7 +1123,7 @@ mod tests {
 
     #[test]
     fn test_deletion_bitmap_operations() {
-        let bitmap = DeletionBitmap::new("seg001".to_string(), 100);
+        let bitmap = DeletionBitmap::new("seg001".to_string(), 0, 99);
 
         // Delete some documents
         assert!(bitmap.delete_document(5).unwrap());
@@ -1054,7 +1148,7 @@ mod tests {
 
     #[test]
     fn test_deletion_bitmap_out_of_range() {
-        let bitmap = DeletionBitmap::new("seg001".to_string(), 100);
+        let bitmap = DeletionBitmap::new("seg001".to_string(), 0, 99);
 
         let result = bitmap.delete_document(150);
         assert!(result.is_err());
@@ -1081,7 +1175,7 @@ mod tests {
         let manager = DeletionManager::new(config, storage).unwrap();
 
         // Initialize segment
-        manager.initialize_segment("seg001", 1000).unwrap();
+        manager.initialize_segment("seg001", 0, 999).unwrap();
 
         // Delete documents
         assert!(
@@ -1115,7 +1209,7 @@ mod tests {
         let storage = Arc::new(MemoryStorage::new(MemoryStorageConfig::default()));
         let manager = DeletionManager::new(config, storage).unwrap();
 
-        manager.initialize_segment("seg001", 20).unwrap(); // Reduced from 1000 to 20
+        manager.initialize_segment("seg001", 0, 19).unwrap(); // Reduced from 1000 to 20
 
         let doc_ids = vec![1, 2, 3, 4, 5]; // 5 docs out of 20
         let deleted_count = manager
@@ -1143,8 +1237,8 @@ mod tests {
         let manager = DeletionManager::new(config, storage).unwrap();
 
         // Initialize segments (reduced sizes)
-        manager.initialize_segment("seg001", 10).unwrap(); // Reduced from 1000 to 10
-        manager.initialize_segment("seg002", 10).unwrap(); // Reduced from 1000 to 10
+        manager.initialize_segment("seg001", 0, 9).unwrap(); // Reduced from 1000 to 10
+        manager.initialize_segment("seg002", 0, 9).unwrap(); // Reduced from 1000 to 10
 
         // Delete enough docs in seg001 to trigger compaction
         let doc_ids: Vec<u64> = vec![0, 1]; // 20% deletion (2/10)
@@ -1167,8 +1261,8 @@ mod tests {
         let manager = DeletionManager::new(config, storage).unwrap();
 
         // Initialize multiple segments (reduced sizes)
-        manager.initialize_segment("seg001", 10).unwrap(); // Reduced from 1000 to 10
-        manager.initialize_segment("seg002", 20).unwrap(); // Reduced from 2000 to 20
+        manager.initialize_segment("seg001", 0, 9).unwrap(); // Reduced from 1000 to 10
+        manager.initialize_segment("seg002", 0, 19).unwrap(); // Reduced from 2000 to 20
 
         // Delete documents in different segments
         let doc_ids1: Vec<u64> = (0..4).collect(); // 40% deletion (4/10)
@@ -1202,8 +1296,8 @@ mod tests {
         let manager = DeletionManager::new(config, storage).unwrap();
 
         // Initialize segments and add deletions (reduced sizes)
-        manager.initialize_segment("seg001", 10).unwrap(); // Reduced from 1000 to 10
-        manager.initialize_segment("seg002", 20).unwrap(); // Reduced from 2000 to 20
+        manager.initialize_segment("seg001", 0, 9).unwrap(); // Reduced from 1000 to 10
+        manager.initialize_segment("seg002", 0, 19).unwrap(); // Reduced from 2000 to 20
 
         let doc_ids: Vec<u64> = (0..4).collect(); // 40% deletion in seg001 (4/10)
         manager
@@ -1265,7 +1359,7 @@ mod tests {
         let manager = DeletionManager::new(config, storage).unwrap();
 
         // Initialize segment and delete enough to trigger compaction
-        manager.initialize_segment("seg001", 100).unwrap();
+        manager.initialize_segment("seg001", 0, 99).unwrap();
         let doc_ids: Vec<u64> = (0..25).collect(); // 25% deletion
         manager
             .delete_documents("seg001", &doc_ids, "test")
@@ -1283,8 +1377,8 @@ mod tests {
         let manager = DeletionManager::new(config, storage).unwrap();
 
         // Initialize segments
-        manager.initialize_segment("seg001", 1000).unwrap();
-        manager.initialize_segment("seg002", 2000).unwrap();
+        manager.initialize_segment("seg001", 0, 999).unwrap();
+        manager.initialize_segment("seg002", 0, 1999).unwrap();
 
         // Mark compaction as completed for seg001
         let compacted_segments = vec!["seg001".to_string()];

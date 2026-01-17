@@ -34,6 +34,7 @@ pub struct DocumentEntry {
 #[derive(Debug, Default)]
 pub struct DocumentVectorRegistry {
     entries: RwLock<HashMap<u64, DocumentEntry>>,
+    external_id_to_doc_id: RwLock<HashMap<String, u64>>,
     next_version: AtomicU64,
 }
 
@@ -55,20 +56,34 @@ impl DocumentVectorRegistry {
         let doc_entry = DocumentEntry {
             doc_id,
             version,
-            metadata,
+            metadata: metadata.clone(),
             fields: map,
         };
 
-        self.entries.write().insert(doc_id, doc_entry);
+        let mut entries_guard = self.entries.write();
+        entries_guard.insert(doc_id, doc_entry);
+
+        // Update external ID mapping if present
+        if let Some(ext_id) = metadata.get("_id") {
+            self.external_id_to_doc_id
+                .write()
+                .insert(ext_id.clone(), doc_id);
+        }
+
         Ok(version)
     }
 
     pub fn delete(&self, doc_id: u64) -> Result<()> {
         let mut guard = self.entries.write();
-        guard
-            .remove(&doc_id)
-            .ok_or_else(|| SarissaError::not_found(format!("doc_id {doc_id}")))?;
-        Ok(())
+        if let Some(entry) = guard.remove(&doc_id) {
+            // Remove from external ID mapping if present
+            if let Some(ext_id) = entry.metadata.get("_id") {
+                self.external_id_to_doc_id.write().remove(ext_id);
+            }
+            Ok(())
+        } else {
+            Err(SarissaError::not_found(format!("doc_id {doc_id}")))
+        }
     }
 
     pub fn contains(&self, doc_id: u64) -> bool {
@@ -88,6 +103,10 @@ impl DocumentVectorRegistry {
         self.entries.read().get(&doc_id).cloned()
     }
 
+    pub fn get_doc_id_by_external_id(&self, external_id: &str) -> Option<u64> {
+        self.external_id_to_doc_id.read().get(external_id).copied()
+    }
+
     pub fn snapshot(&self) -> Result<Vec<u8>> {
         let guard = self.entries.read();
         serde_json::to_vec(&*guard).map_err(SarissaError::from)
@@ -99,13 +118,21 @@ impl DocumentVectorRegistry {
         }
 
         let entries: HashMap<u64, DocumentEntry> = serde_json::from_slice(bytes)?;
-        let max_version = entries
-            .values()
-            .map(|entry| entry.version)
-            .max()
-            .unwrap_or(0);
+        let mut external_id_to_doc_id = HashMap::new();
+        let mut max_version = 0;
+
+        for (doc_id, entry) in &entries {
+            if entry.version > max_version {
+                max_version = entry.version;
+            }
+            if let Some(ext_id) = entry.metadata.get("_id") {
+                external_id_to_doc_id.insert(ext_id.clone(), *doc_id);
+            }
+        }
+
         Ok(Self {
             entries: RwLock::new(entries),
+            external_id_to_doc_id: RwLock::new(external_id_to_doc_id),
             next_version: AtomicU64::new(max_version),
         })
     }

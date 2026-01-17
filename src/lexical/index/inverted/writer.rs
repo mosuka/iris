@@ -22,7 +22,7 @@ use crate::lexical::index::structures::bkd_tree::BKDWriter;
 use crate::lexical::index::structures::dictionary::{TermDictionaryBuilder, TermInfo};
 use crate::lexical::index::structures::doc_values::DocValuesWriter;
 use crate::lexical::writer::LexicalIndexWriter;
-use crate::maintenance::deletion::{DeletionConfig, DeletionManager};
+
 use crate::storage::Storage;
 use crate::storage::structured::StructWriter;
 
@@ -50,6 +50,9 @@ pub struct InvertedIndexWriterConfig {
 
     /// Analyzer for text fields (can be PerFieldAnalyzer for field-specific analysis).
     pub analyzer: Arc<dyn Analyzer>,
+
+    /// Shard ID for this writer.
+    pub shard_id: u16,
 }
 
 impl std::fmt::Debug for InvertedIndexWriterConfig {
@@ -74,6 +77,7 @@ impl Default for InvertedIndexWriterConfig {
             store_term_positions: true,
             optimize_segments: false,
             analyzer: Arc::new(StandardAnalyzer::new().unwrap()),
+            shard_id: 0,
         }
     }
 }
@@ -148,9 +152,12 @@ impl InvertedIndexWriter {
                 if file.ends_with(".meta") && file != "index.meta" {
                     // unexpected error handling: ignore malformed files
                     if let Ok(input) = storage.open_input(&file) {
-                        use crate::lexical::index::inverted::segment::SegmentInfo;
                         if let Ok(meta) = serde_json::from_reader::<_, SegmentInfo>(input) {
-                            next_doc_id = next_doc_id.max(meta.doc_offset + meta.doc_count);
+                            // Only consider segments from the same shard for next_doc_id (local counter part)
+                            if meta.shard_id == config.shard_id {
+                                let local_id = crate::util::id::get_local_id(meta.max_doc_id);
+                                next_doc_id = next_doc_id.max(local_id + 1);
+                            }
                             max_segment_id = max_segment_id.max(meta.generation as i32);
                         }
                     }
@@ -287,9 +294,10 @@ impl InvertedIndexWriter {
     pub fn add_analyzed_document(&mut self, analyzed_doc: AnalyzedDocument) -> Result<u64> {
         self.check_closed()?;
 
-        // Assign document ID
-        let doc_id = self.next_doc_id;
+        // Assign document ID using shard-prefixed strategy
+        let local_id = self.next_doc_id;
         self.next_doc_id += 1;
+        let doc_id = crate::util::id::create_doc_id(self.config.shard_id, local_id);
 
         // Add the analyzed document with the assigned ID
         self.upsert_analyzed_document(doc_id, analyzed_doc)?;
@@ -843,20 +851,33 @@ impl InvertedIndexWriter {
 
     /// Write segment metadata.
     fn write_segment_metadata(&self, segment_name: &str) -> Result<()> {
-        use crate::lexical::index::inverted::segment::SegmentInfo;
+        let min_id = self
+            .buffered_docs
+            .iter()
+            .map(|(id, _)| *id)
+            .min()
+            .unwrap_or(0);
+        let max_id = self
+            .buffered_docs
+            .iter()
+            .map(|(id, _)| *id)
+            .max()
+            .unwrap_or(0);
 
         // Create SegmentInfo
-        let segment_info = SegmentInfo {
+        let info = SegmentInfo {
             segment_id: segment_name.to_string(),
             doc_count: self.buffered_docs.len() as u64,
-            doc_offset: self.next_doc_id - self.buffered_docs.len() as u64,
+            min_doc_id: min_id,
+            max_doc_id: max_id,
             generation: self.current_segment as u64,
-            has_deletions: false,
+            has_deletions: false, // New segments initially have no deletions
+            shard_id: self.config.shard_id,
         };
 
         // Write as JSON for compatibility with InvertedIndex::load_segments()
         let meta_file = format!("{segment_name}.meta");
-        let json_data = serde_json::to_string_pretty(&segment_info).map_err(|e| {
+        let json_data = serde_json::to_string_pretty(&info).map_err(|e| {
             SarissaError::index(format!("Failed to serialize segment metadata: {e}"))
         })?;
 
@@ -1000,27 +1021,40 @@ impl InvertedIndexWriter {
         Ok(())
     }
 
-    /// Mark an already flushed document as deleted by locating its segment via metadata.
+    /// Mark a persisted document as deleted.
+    ///
+    /// This updates the deletion bitmap for the segment containing the document.
     fn mark_persisted_doc_deleted(&self, doc_id: u64) -> Result<()> {
-        if let Some((segment_id, local_doc_id, doc_count)) = self.find_segment_for_doc(doc_id)? {
-            let manager = DeletionManager::new(DeletionConfig::default(), self.storage.clone())?;
+        let segments = self.find_segments_for_doc(doc_id)?;
 
-            // Ensure bitmap exists; if not, initialize then delete.
-            let delete_result = manager.delete_document(&segment_id, local_doc_id, "upsert");
+        for (segment_id, min_doc_id, max_doc_id) in segments {
+            // Found the segment, update deletion bitmap
+            let manager = crate::maintenance::deletion::DeletionManager::new(
+                Default::default(), // Use default config for now
+                self.storage.clone(),
+            )?;
+
+            manager.initialize_segment(&segment_id, min_doc_id, max_doc_id)?;
+
+            let delete_result = manager.delete_document(&segment_id, doc_id, "upsert");
             if let Err(_) = delete_result {
-                manager.initialize_segment(&segment_id, doc_count)?;
-                manager.delete_document(&segment_id, local_doc_id, "upsert")?;
+                // If initializing failed (e.g. bitmap corrupted), try force re-init
+                // In production code we should be more careful, but here we prioritize consistency
+                manager.initialize_segment(&segment_id, min_doc_id, max_doc_id)?;
+                manager.delete_document(&segment_id, doc_id, "upsert")?;
             }
 
             // Update segment metadata to reflect deletions
             self.update_segment_meta_deletions(&segment_id)?;
         }
+
         Ok(())
     }
 
-    /// Find the segment containing the global doc_id by scanning segment metadata files.
-    /// Returns (segment_id, local_doc_id, doc_count) if found.
-    fn find_segment_for_doc(&self, doc_id: u64) -> Result<Option<(String, u64, u64)>> {
+    /// Find all segments containing the global doc_id by scanning segment metadata files.
+    /// Returns a list of (segment_id, min_doc_id, max_doc_id).
+    fn find_segments_for_doc(&self, doc_id: u64) -> Result<Vec<(String, u64, u64)>> {
+        let mut segments = Vec::new();
         let files = self.storage.list_files()?;
         for file in files {
             if !file.ends_with(".meta") || file == "index.meta" {
@@ -1034,14 +1068,17 @@ impl InvertedIndexWriter {
                 Ok(m) => m,
                 Err(_) => continue,
             };
-            let start = meta.doc_offset;
-            let end = meta.doc_offset + meta.doc_count;
-            if doc_id >= start && doc_id < end {
-                let local = doc_id - start;
-                return Ok(Some((meta.segment_id.clone(), local, meta.doc_count)));
+
+            // In Stable ID mode, we check if the ID is within the min/max range.
+            // Note: This might match multiple segments if ranges overlap across shards,
+            // or if we have multiple versions of the same document (upserts).
+            if doc_id >= meta.min_doc_id && doc_id <= meta.max_doc_id {
+                // To be 100% sure, we should check if the document actually exists in this segment.
+                // For now, assume this range is specific enough.
+                segments.push((meta.segment_id.clone(), meta.min_doc_id, meta.max_doc_id));
             }
         }
-        Ok(None)
+        Ok(segments)
     }
 
     /// Rewrite segment metadata to mark `has_deletions = true`.

@@ -204,6 +204,25 @@ impl LexicalEngine {
         Ok(doc_ids)
     }
 
+    /// Add or update a document for an external ID.
+    pub fn index_document(&self, external_id: &str, mut doc: Document) -> Result<u64> {
+        use crate::lexical::core::field::{Field, FieldOption, FieldValue, TextOption};
+        doc.add_field(
+            "_id",
+            Field::new(
+                FieldValue::Text(external_id.to_string()),
+                FieldOption::Text(TextOption::default()),
+            ),
+        );
+
+        if let Some(existing_id) = self.find_doc_id_by_term("_id", external_id)? {
+            self.upsert_document(existing_id, doc)?;
+            Ok(existing_id)
+        } else {
+            self.add_document(doc)
+        }
+    }
+
     /// Delete a document by ID.
     ///
     /// Note: You must call `commit()` to persist the changes.
@@ -213,6 +232,34 @@ impl LexicalEngine {
             *guard = Some(self.index.writer()?);
         }
         guard.as_mut().unwrap().delete_document(doc_id)
+    }
+
+    /// Get a document by its internal ID.
+    pub fn get_document(&self, doc_id: u64) -> Result<Option<Document>> {
+        self.index.reader()?.document(doc_id)
+    }
+
+    /// Get a document by its external ID.
+    ///
+    /// This uses the system-reserved `_id` field to find the internal ID first.
+    pub fn get_document_by_id(&self, external_id: &str) -> Result<Option<Document>> {
+        if let Some(doc_id) = self.find_doc_id_by_term("_id", external_id)? {
+            self.get_document(doc_id)
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Delete a document by its external ID.
+    ///
+    /// Returns `true` if the document was found and deleted, `false` otherwise.
+    pub fn delete_document_by_id(&self, external_id: &str) -> Result<bool> {
+        if let Some(doc_id) = self.find_doc_id_by_term("_id", external_id)? {
+            self.delete_document(doc_id)?;
+            Ok(true)
+        } else {
+            Ok(false)
+        }
     }
 
     /// Find the internal document ID for a given term (field:value).
@@ -874,5 +921,76 @@ mod tests {
 
         // Should not find anything (empty index)
         assert_eq!(results.hits.len(), 0);
+    }
+
+    #[test]
+    fn test_id_based_operations() {
+        let temp_dir = TempDir::new().unwrap();
+        let config = LexicalIndexConfig::default();
+        let storage = Arc::new(
+            FileStorage::new(temp_dir.path(), FileStorageConfig::new(temp_dir.path())).unwrap(),
+        );
+        let engine = LexicalEngine::new(storage.clone(), config).unwrap();
+
+        // 1. Index document with external ID
+        let doc = Document::builder()
+            .add_text("title", "Test Doc", TextOption::default())
+            .build();
+
+        let internal_id = engine.index_document("ext_1", doc).unwrap();
+        engine.commit().unwrap();
+
+        // 2. Get by internal ID
+        let found = engine.get_document(internal_id).unwrap();
+        assert!(found.is_some());
+        assert_eq!(
+            found.unwrap().get_field("title").unwrap().value.as_text(),
+            Some("Test Doc")
+        );
+
+        // 3. Get by external ID
+        let found_ext = engine.get_document_by_id("ext_1").unwrap();
+        assert!(found_ext.is_some());
+        assert_eq!(
+            found_ext
+                .unwrap()
+                .get_field("title")
+                .unwrap()
+                .value
+                .as_text(),
+            Some("Test Doc")
+        );
+
+        // 4. Update existing by index_document
+        let doc_v2 = Document::builder()
+            .add_text("title", "Test Doc V2", TextOption::default())
+            .build();
+        let internal_id_v2 = engine.index_document("ext_1", doc_v2).unwrap();
+        assert_eq!(internal_id, internal_id_v2);
+        engine.commit().unwrap();
+
+        let found_v2 = engine.get_document_by_id("ext_1").unwrap();
+        assert_eq!(
+            found_v2
+                .unwrap()
+                .get_field("title")
+                .unwrap()
+                .value
+                .as_text(),
+            Some("Test Doc V2")
+        );
+
+        // 5. Delete by external ID
+        let deleted = engine.delete_document_by_id("ext_1").unwrap();
+        assert!(deleted);
+        engine.commit().unwrap();
+
+        // 6. Verify deletion
+        let found_after = engine.get_document_by_id("ext_1").unwrap();
+        assert!(found_after.is_none());
+
+        // 7. Delete non-existent
+        let deleted_non = engine.delete_document_by_id("non_existent").unwrap();
+        assert!(!deleted_non);
     }
 }

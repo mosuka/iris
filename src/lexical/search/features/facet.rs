@@ -175,7 +175,7 @@ impl FacetCollector {
     }
 
     /// Add a document to the facet counts.
-    pub fn collect_doc(&mut self, doc_id: u32, reader: &dyn LexicalIndexReader) -> Result<()> {
+    pub fn collect_doc(&mut self, doc_id: u64, reader: &dyn LexicalIndexReader) -> Result<()> {
         for field_name in &self.facet_fields {
             // Get facet values for this document
             let facet_values = self.get_doc_facet_values(doc_id, field_name, reader)?;
@@ -199,14 +199,14 @@ impl FacetCollector {
     /// Get facet values for a document and field.
     fn get_doc_facet_values(
         &self,
-        doc_id: u32,
+        doc_id: u64,
         field_name: &str,
         reader: &dyn LexicalIndexReader,
     ) -> Result<Vec<FacetPath>> {
         let mut facet_paths = Vec::new();
 
         // Try to get the stored document
-        match reader.document(doc_id as u64) {
+        match reader.document(doc_id) {
             Ok(Some(document)) => {
                 if let Some(field_value) = document.get_field(field_name) {
                     match &field_value.value {
@@ -446,7 +446,7 @@ impl FacetedSearchEngine {
 
         // Collect matching documents
         // Note: Simplified implementation as matcher.next() returns bool not Option<u32>
-        for doc_id in 0..10u32 {
+        for doc_id in 0..10u64 {
             // Placeholder logic
             let score = 1.0f32; // Placeholder score as scorer.score needs different arguments
 
@@ -485,7 +485,7 @@ impl FacetedSearchEngine {
     /// Get facet paths for a document.
     fn get_document_facets(
         &self,
-        _doc_id: u32,
+        _doc_id: u64,
         _reader: &dyn LexicalIndexReader,
     ) -> Result<Vec<FacetPath>> {
         // This is a simplified implementation
@@ -696,9 +696,9 @@ impl GroupedSearchEngine {
 
         // Collect matching documents and group them
         // Note: This is a simplified implementation
-        for doc_id in 0..100u32 {
+        for doc_id in 0..100u64 {
             // Placeholder iteration
-            let score = scorer.score(doc_id as u64, 1.0, None);
+            let score = scorer.score(doc_id, 1.0, None);
             if score > 0.0 {
                 // Get group key for this document
                 let group_key = self.get_document_group_key(doc_id, reader)?;
@@ -750,11 +750,11 @@ impl GroupedSearchEngine {
     /// Get the group key for a document.
     fn get_document_group_key(
         &self,
-        doc_id: u32,
+        doc_id: u64,
         reader: &dyn LexicalIndexReader,
     ) -> Result<String> {
         // Try to get the document and extract the group field value
-        match reader.document(doc_id as u64) {
+        match reader.document(doc_id) {
             Ok(Some(document)) => {
                 if let Some(field_value) = document.get_field(&self.group_config.group_field) {
                     match &field_value.value {
@@ -778,12 +778,12 @@ impl GroupedSearchEngine {
     /// Load document fields for display.
     fn load_document_fields(
         &self,
-        doc_id: u32,
+        doc_id: u64,
         reader: &dyn LexicalIndexReader,
     ) -> Result<HashMap<String, String>> {
         let mut fields = HashMap::new();
 
-        match reader.document(doc_id as u64) {
+        match reader.document(doc_id) {
             Ok(Some(document)) => {
                 for (field_name, field_value) in document.fields() {
                     let value_str = match &field_value.value {

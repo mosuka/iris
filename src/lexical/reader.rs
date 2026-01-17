@@ -143,6 +143,12 @@ pub trait LexicalIndexReader: Send + Sync + std::fmt::Debug {
         let _ = field;
         false
     }
+
+    /// Get all document IDs available in the index.
+    fn doc_ids(&self) -> Result<Vec<u64>> {
+        // Default implementation returns empty (no ID enumeration support)
+        Ok(Vec::new())
+    }
 }
 
 /// Iterator over posting lists.

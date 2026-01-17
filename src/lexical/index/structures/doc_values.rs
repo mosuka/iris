@@ -26,8 +26,7 @@ pub struct FieldDocValues {
     /// Field name
     pub field_name: String,
     /// Mapping from doc_id to field value
-    /// Using Vec with sparse storage (None for missing values)
-    values: Vec<Option<FieldValue>>,
+    values: ahash::AHashMap<u64, FieldValue>,
 }
 
 impl FieldDocValues {
@@ -35,30 +34,18 @@ impl FieldDocValues {
     pub fn new(field_name: String) -> Self {
         FieldDocValues {
             field_name,
-            values: Vec::new(),
+            values: ahash::AHashMap::new(),
         }
     }
 
     /// Set a value for a document
     pub fn set(&mut self, doc_id: u64, value: FieldValue) {
-        let doc_id = doc_id as usize;
-
-        // Expand vector if needed
-        if doc_id >= self.values.len() {
-            self.values.resize(doc_id + 1, None);
-        }
-
-        self.values[doc_id] = Some(value);
+        self.values.insert(doc_id, value);
     }
 
     /// Get a value for a document
     pub fn get(&self, doc_id: u64) -> Option<&FieldValue> {
-        let doc_id = doc_id as usize;
-        if doc_id < self.values.len() {
-            self.values[doc_id].as_ref()
-        } else {
-            None
-        }
+        self.values.get(&doc_id)
     }
 
     /// Get the number of values
@@ -125,10 +112,16 @@ impl DocValuesWriter {
             output.write_all(&num_values.to_le_bytes())?;
 
             // Write values using rkyv
-            let serialized =
-                rkyv::to_bytes::<rkyv::rancor::Error>(&field_dv.values).map_err(|e| {
-                    SarissaError::Index(format!("Failed to serialize DocValues: {}", e))
-                })?;
+            // Convert HashMap to Vec for easier serialization if preferred,
+            // but rkyv handles AHashMap if configured. Let's use Vec of pairs for stability.
+            let values_vec: Vec<(u64, FieldValue)> = field_dv
+                .values
+                .iter()
+                .map(|(k, v)| (*k, v.clone()))
+                .collect();
+            let serialized = rkyv::to_bytes::<rkyv::rancor::Error>(&values_vec).map_err(|e| {
+                SarissaError::Index(format!("Failed to serialize DocValues: {}", e))
+            })?;
 
             output.write_all(&(serialized.len() as u64).to_le_bytes())?;
             output.write_all(&serialized)?;
@@ -213,11 +206,12 @@ impl DocValuesReader {
             let mut data = vec![0u8; data_len];
             input.read_exact(&mut data)?;
 
-            let values: Vec<Option<FieldValue>> =
-                rkyv::from_bytes::<Vec<Option<FieldValue>>, rkyv::rancor::Error>(&data).map_err(
+            let values_vec: Vec<(u64, FieldValue)> =
+                rkyv::from_bytes::<Vec<(u64, FieldValue)>, rkyv::rancor::Error>(&data).map_err(
                     |e| SarissaError::Index(format!("Failed to deserialize DocValues: {}", e)),
                 )?;
 
+            let values = values_vec.into_iter().collect();
             fields.insert(field_name.clone(), FieldDocValues { field_name, values });
         }
 

@@ -297,9 +297,10 @@ impl LexicalIndex for InvertedIndex {
     fn writer(&self) -> Result<Box<dyn LexicalIndexWriter>> {
         self.check_closed()?;
 
-        // Use analyzer from index config
+        // Use analyzer and shard_id from index config
         let writer_config = InvertedIndexWriterConfig {
             analyzer: self.config.analyzer.clone(),
+            shard_id: self.config.shard_id,
             ..Default::default()
         };
         let writer = InvertedIndexWriter::new(self.storage.clone(), writer_config)?;
