@@ -121,6 +121,23 @@ Configuration for the field defining how it should be indexed and stored.
 - **BlobOption**:
     - `stored`: If true, the binary data is stored. **Note**: Blobs cannot be indexed by the lexical engine.
 
+## Core Concepts
+Sarissa uses two primary data structures to enable efficient searching across different field types.
+
+### Inverted Index
+The inverted index is the fundamental structure for full-text search. While a traditional database maps documents to their terms, an inverted index maps **terms to the list of documents** containing them.
+
+It consists of two main parts:
+1. **Term Dictionary**: A sorted repository of all unique terms across the index.
+2. **Postings Lists**: For each term, a list of document IDs (postings) where the term appears, along with frequency and position data for scoring.
+
+This structure allows Sarissa to instantly locate all documents containing specific keywords without scanning the entire corpus.
+
+### BKD Tree
+For non-textual data like numbers, dates, and geographic coordinates, Sarissa uses a **BKD Tree**. It is a multi-dimensional tree structure optimized for block-based storage on disk.
+
+Unlike an inverted index which is best for exact matches, a BKD tree is designed for **range search** (e.g., price between $10 and $50) and **spatial search** (e.g., within 10km of a point). It effectively "partitions" the data space into hierarchical blocks, allowing the search engine to skip large portions of data that do not match the query bounds.
+
 ## Indexing Process
 The indexing process converts raw documents into a searchable index.
 
