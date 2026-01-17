@@ -121,25 +121,8 @@ Configuration for the field defining how it should be indexed and stored.
 - **BlobOption**:
     - `stored`: If true, the binary data is stored. **Note**: Blobs cannot be indexed by the lexical engine.
 
-## Core Concepts
-Sarissa uses two primary data structures to enable efficient searching across different field types.
-
-### Inverted Index
-The inverted index is the fundamental structure for full-text search. While a traditional database maps documents to their terms, an inverted index maps **terms to the list of documents** containing them.
-
-It consists of two main parts:
-1. **Term Dictionary**: A sorted repository of all unique terms across the index.
-2. **Postings Lists**: For each term, a list of document IDs (postings) where the term appears, along with frequency and position data for scoring.
-
-This structure allows Sarissa to instantly locate all documents containing specific keywords without scanning the entire corpus.
-
-### BKD Tree
-For non-textual data like numbers, dates, and geographic coordinates, Sarissa uses a **BKD Tree**. It is a multi-dimensional tree structure optimized for block-based storage on disk.
-
-Unlike an inverted index which is best for exact matches, a BKD tree is designed for **range search** (e.g., price between $10 and $50) and **spatial search** (e.g., within 10km of a point). It effectively "partitions" the data space into hierarchical blocks, allowing the search engine to skip large portions of data that do not match the query bounds.
-
 ## Indexing Process
-The indexing process converts raw documents into a searchable index.
+The lexical indexing process translates documents into inverted indexes and BKD trees.
 
 ```mermaid
 graph TD
@@ -197,137 +180,51 @@ Text analysis is the process of converting raw text into tokens. An Analyzer is 
 2. **Tokenizer**: Splits the character stream into a token stream (e.g., splitting by whitespace).
 3. **Token Filters**: Modify the token stream (e.g., lowercasing, stemming, removing stop words).
 
-Sarissa provides several built-in analyzers with pre-configured pipelines:
-
-- **StandardAnalyzer**: Good default for most European languages (alias for a generic English setup).
-    - Tokenizer: `RegexTokenizer` (Splits on Unicode word boundaries)
-    - Token Filters: `LowercaseFilter`, `StopFilter` (English stop words)
+Sarissa provides several built-in analyzers:
+- **StandardAnalyzer**: Good default for most European languages.
+- **JapaneseAnalyzer**: Optimized for Japanese text using Lindera (morphological analysis).
 - **KeywordAnalyzer**: Treats the entire input as a single token.
-    - Tokenizer: `WholeTokenizer`
-    - No filters.
-- **SimpleAnalyzer**: Basic tokenization without filtering.
-    - Tokenizer: Configurable (defaults to `RegexTokenizer` in some contexts)
-    - No filters.
-- **No-op Analyzer**: Performs no analysis, yielding an empty token stream.
-    - Useful for stored-only fields or when a field should not be searchable.
 - **PipelineAnalyzer**: A flexible builder for creating custom analysis pipelines.
-    - Allows combining any **Char Filter**, **Tokenizer**, and **Token Filter** chain.
-    - Example: `PipelineAnalyzer::new(tokenizer).add_char_filter(...).add_filter(...)`
-- **LanguageAnalyzer**: Analyzers specialized for specific languages.
-    - **EnglishAnalyzer**: Specialized for English (similar to StandardAnalyzer but explicit).
-        - Tokenizer: `RegexTokenizer` (Splits on Unicode word boundaries)
-        - Token Filters: `LowercaseFilter`, `StopFilter` (English stop words)
-    - **JapaneseAnalyzer**: Optimized for Japanese text.
-        - Char Filters: `UnicodeNormalizationCharFilter` (NFKC), `JapaneseIterationMarkCharFilter` (Normalizes iteration marks like 々)
-        - Tokenizer: `LinderaTokenizer` (Morphological analysis using UniDic)
-        - Token Filters: `LowercaseFilter`, `StopFilter` (Japanese stop words)
-- **PerFieldAnalyzer**: Wraps multiple analyzers to apply them based on field names (Lucene-compatible).
-    - Useful when different fields require different analysis strategies (e.g., standard for "body", keyword for "tags").
-    - Example:
-      ```rust
-      let mut analyzer = PerFieldAnalyzer::new(default_analyzer);
-      analyzer.add_analyzer("tags", keyword_analyzer);
-      ```
 
-## Index Components
-The indexing architecture is responsible for transforming raw documents into efficient, searchable structures. It consists of several logical components, each managing a specific part of the lifecycle.
+## Core Concepts
 
-### Index Writer (`InvertedIndexWriter`)
-The primary interface for adding documents to the index. It orchestrates the flow from processing to buffering and triggers flushes.
+### Inverted Index
+The inverted index is the fundamental structure for full-text search. While a traditional database maps documents to their terms, an inverted index maps **terms to the list of documents** containing them.
+- **Term Dictionary**: A sorted repository of all unique terms across the index.
+- **Postings Lists**: For each term, a list of document IDs (postings) where the term appears, along with frequency and position data for scoring.
 
-### Document Processing
-- **Analysis Chain**: Performs sequentially through a `Char Filter`, a `Tokenizer`, and a `Token Filter` on text fields to produce searchable terms.
-- **String Normalizer**: Converts Numeric, Date, and Geo values into text form for basic keyword matching in the inverted index.
-- **Point Extractor**: Isolates numeric, temporal, and geographical data for multi-dimensional range and spatial search (BKD Tree).
-- **Data Collectors & Trackers**:
-    - **Field Values Collector**: Buffers fields marked as `stored` for the Doc Store.
-    - **Field Length Tracker**: Records token counts per field for length-normalized scoring (BM25).
-    - **Doc Values Collector**: Gathers values for columnar storage (`.dv`), enabling fast sorting and aggregations (SIMD-optimized).
+### BKD Tree
+For non-textual data like numbers, dates, and geographic coordinates, Sarissa uses a **BKD Tree**. It is a multi-dimensional tree structure optimized for block-based storage on disk.
+Unlike an inverted index, a BKD tree is designed for **range search** and **spatial search**. It effectively partitions the data space into hierarchical blocks, allowing the search engine to skip large portions of irrelevant data.
 
-### In-Memory Buffering
-- **Term Posting Index (`TermPostingIndex`)**: A high-performance buffer mapping terms to their occurrences (postings).
-- **Point Values Buffer**: Stages multidimensional data before it is structured into a BKD tree.
-- **Stored Docs Buffer**: Buffers serialized field data until a segment flush occurs.
+### SIMD Optimization
+Sarissa uses SIMD-accelerated batch scoring for high-throughput ranking. The BM25 scoring algorithm is optimized to process multiple documents simultaneously, leveraging modern CPU instructions to provide a several-fold increase in performance compared to scalar processing.
 
-### Segment Manager
-Manages the lifecycle and visibility of segments, maintaining the `segments.manifest` file and tracking document deletions.
+## Engine Architecture
 
-### Index Segment Files
+### Lexical Engine (`LexicalEngine`)
+The high-level orchestrator that manages indexing and searching. It coordinates between `InvertedIndexWriter` and `InvertedIndexSearcher`, providing a unified interface for document updates and retrieval with automatic caching and NRT (Near-Real-Time) capabilities.
+
+### Index Components
+- **InvertedIndexWriter**: The primary interface for adding documents. It orchestrates analysis, point extraction, and buffering.
+- **Segment Manager**: Controls the lifecycle and visibility of segments, maintaining the manifest and tracking deletions.
+- **In-Memory Buffering**: High-performance mapping of terms and staged BKD/Stored data before merging into disk segments.
+
+## Index Segment Files
 A single segment is composed of several specialized files:
-- **Term Dictionary (.dict)**: Maps terms to their locations in the postings list.
-- **Postings Lists (.post)**: Stores document IDs, frequencies, and positions for each term.
-- **BKD Tree (.bkd)**: Provides multidimensional indexing for numeric and date fields.
-- **Doc Store (.docs)**: Stores the original (stored) field values.
-- **Doc Values (.dv)**: Stores field values in a columnar format for sorting and scoring.
-- **Segment Metadata (.meta)**: JSON file containing segment statistics and ID ranges.
-- **Field Statistics (.fstats)**: Stores per-field information like document frequency and average length.
-- **Field Lengths (.lens)**: Stores the length of each field for every document (used in BM25 scoring).
-**Core component of the Text Inverted Index.**
-A sorted list of all unique terms (tokens) extracted from the documents. It acts as the primary entry point for text search.
-- **Function**: Maps a term (e.g., "rust") to its location in the Postings List.
-- **Features**: Supports fast distinct term lookup, prefix search, and range scans.
-- **Format**:
-    - **Magic**: `STDC` (Sorted) or `HTDC` (Hash)
-    - **Entries**:
-        - `Term`: String
-        - `Pointer`: `PostingOffset` (u64), `PostingLength` (u64)
-        - `Stats`: `DocFrequency` (u64), `TotalFrequency` (u64)
 
-### Postings Lists (`.post`)
-**Core component of the Text Inverted Index.**
-Stores the relationships between terms and documents.
-- **Function**: For a given term, provides the list of Document IDs containing it.
-- **Features**: Highly compressed using delta encoding and varints. Includes frequency and position data for scoring and phrase queries.
-- **Format**:
-    - **Header**: `Term` (String), `TotalFreq` (Varint), `DocFreq` (Varint), `PostingCount` (Varint).
-    - **Postings List**: Sequence of:
-        - `DocIDDelta`: VarInt (difference from previous DocID)
-        - `Frequency`: VarInt (term freq in doc)
-        - `Weight`: Float32 (contribution to score)
-        - `HasPositions`: Byte (0 or 1)
-        - `Positions`: (Optional) `Count` (VarInt) + `PositionDeltas` (VarInts)
-
-### BKD Tree (`.bkd`)
-**Component for Numeric and Geospatial Search.**
-A persistent tree structure for multi-dimensional data.
-- **Function**: Efficiently handles range queries (e.g., `price > 100`, `date in 2023`).
-
-- **Features**: Block-based storage optimized for disk I/O.
-- **Format**:
-    - **Magic**: `BKDT`
-    - **Index Section**: Internal nodes for tree traversal.
-    - **Leaf Blocks**: Contiguous blocks of `(Value Vector, DocID)` pairs.
-
-### Document Store (`.docs`)
-**Component for Data Retrieval.**
-Stores the original content of fields marked as `stored`.
-- **Function**: Retrieves the full document content (JSON) after the search has identified the matching DocIDs.
-- **Format**:
-    - **Magic**: `DOCS` + Version + DocCount
-    - **Data**: Sequential list of documents. Each document contains `DocID`, `FieldCount`, and then for each field: `Name`, `TypeTag`, and `Value`.
-
-### Auxiliary Components
-
-#### Doc Values (`.dv`)
-Columnar storage for sorting and aggregations.
-- **Function**: Fast access to specific field values across many documents.
-
-#### Field Statistics (`.fstats`)
-Global statistics for each field (min/max length, doc count).
-- **Usage**: Query planning and optimization.
-
-#### Field Lengths (`.lens`)
-Stores the number of tokens per field per document.
-- **Usage**: Essential for BM25 scoring (length normalization).
-
-#### Segment Metadata (`.meta`) & Manifest (`segments.manifest`)
-Registry and metadata files.
-- **Format**: JSON (`SegmentInfo`).
-- **Fields**: `segment_id`, `doc_count`, `doc_offset`, `generation`, `has_deletions`.
-- **Usage**: Managing segment lifecycle, versioning, and status.
+| Extension | Component | Description |
+| :--- | :--- | :--- |
+| `.dict` | Term Dictionary | Maps terms to their locations in the postings list. |
+| `.post` | Postings Lists | Stores document IDs, frequencies, and positions for each term. |
+| `.bkd` | BKD Tree | Provides multidimensional indexing for numeric and geospatial fields. |
+| `.docs` | Document Store | Stores the original (stored) field values in a compressed format. |
+| `.dv` | Doc Values | Columnar storage for fast sorting and aggregations. |
+| `.meta` | Segment Metadata | Statistics, document count, and configuration. |
+| `.lens` | Field Lengths | Token counts per field per document (used for scoring). |
 
 ## Search Process
-The search process in Sarissa involves several stages to efficiently retrieve and rank documents.
+The search process involves structure-aware traversal and weighted scoring.
 
 ```mermaid
 graph TD
@@ -356,120 +253,109 @@ graph TD
     end
 ```
 
-1. **Query Parsing**: The `Query Parser` converts the input query string into a structured `Query` tree.
-2. **Weight Creation**: The `Query` creates a `Weight` component, which calculates global statistics and normalization factors across all segments.
+1. **Query Parsing**: Translates a human-friendly string or DSL into a structured `Query` tree.
+2. **Weight Creation**: Precomputes global statistics (like IDF) to prepare for execution across multiple segments.
 3. **Matching & Scoring**:
-   - For each segment, the `Weight` creates a `Matcher` and a `Scorer`.
-   - The `Matcher` iterates over the `Inverted Index` or `BKD Tree` to identify matching `Doc IDs`.
-   - The `Scorer` calculates relevance (e.g., BM25) for each matching document.
-4. **Collection & Fetching**:
-   - The `Collector` aggregates the top results, potentially using `Doc Values` for custom sorting.
-   - The `Fetcher` retrieves the original field content from the `Doc Store` for the final result set.
-
-### Query Rewriting
-Sarissa implements a **Multi-Term Query** framework (similar to Lucene) for queries like `FuzzyQuery`, `PrefixQuery`, `WildcardQuery`, and `RegexpQuery`.
-
-Instead of matching these complex patterns directly against every document, they undergo a **rewrite** process:
-1. **Term Enumeration**: The query identifies all unique terms in the `Term Dictionary` that match the pattern (e.g., `hel*` matches `hello`, `help`, `held`).
-2. **Expansion**: These terms are expanded into a `BooleanQuery` based on the selected strategy.
-3. **Scoring Strategy (`RewriteMethod`)**:
-   - **TopTermsBlended**: (Default) Collects top N terms by frequency and assigns a constant score.
-   - **TopTermsScoring**: Collects top N terms and maintains their individual BM25 scores.
-   - **ConstantScore**: All matching terms receive a score equal to the query boost.
-   - **BooleanQuery**: Expands to all matching terms without limits (may hit clause limits).
-
-## Search Components
-The search architecture is composed of several modular components that work together to execute queries and rank results.
-
-### Searcher (`InvertedIndexSearcher`)
-The primary entry point for search operations.
-- **Coordination**: It coordinates the search across multiple immutable segments.
-- **Parallelism**: Supports parallel execution of sub-queries (e.g., within a `BooleanQuery`) to improve performance.
-- **API**: Provides high-level methods for searching with string queries or structured `Query` objects.
-
-### Query Parser
-Translates human-readable query strings into structured objects.
-- **Grammar**: Uses a recursive descent parser to handle operators like `+`, `-`, `OR`, `*`, and field-specific searches (e.g., `title:rust`).
-- **Flexible**: Can be configured with default fields and analyzers.
-
-### Query
-A logical representation of the search criteria (Term, Prefix, Fuzzy, etc.). It acts as a factory for creating `Weight` objects.
-
-### Weight
-An intermediate component that bridges the query and the segment-level execution. It handles global scoring statistics (like IDF) and creates segment-specific `Matcher` and `Scorer` instances.
-
-### Matcher
-A low-level iterator that identifies matching documents within a single segment. It supports efficient skipping (`skip_to`) for boolean operations.
-
-### Scorer
-Calculates the relevance score for a document.
-- **BM25**: Default implementation using the Okapi BM25 algorithm.
-- **Constant**: Assigns a fixed score to all matched documents.
-- **SIMD Optimization**: Supports SIMD-accelerated batch scoring for high-throughput ranking across large result sets.
-
-### Collector
-Aggregates and sorts matching documents.
-- **TopDocsCollector**: Collects the top N documents by score.
-- **TopFieldCollector**: Collects documents sorted by a specific field value (e.g., price, date).
-- **CountCollector**: Returns only the total number of hits without retrieving document IDs.
-
-### Index Reader (`InvertedIndexReader`)
-The unified interface for accessing indexed data across all segments. It handles resource loading and provides the necessary contexts to the `Searcher`.
-
-## Scoring (BM25)
-Sarissa uses the **Okapi BM25** algorithm as its default similarity function. It is a probabilistic retrieval framework that improves upon TF-IDF by adding saturation and length normalization.
-
-**Formula Components**:
-- **TF (Term Frequency)**: How often the term appears in the document. Contribution saturates (diminishing returns) to prevent keyword spamming.
-- **IDF (Inverse Document Frequency)**: How rare the term is across the entire index. Rare terms carry more weight.
-- **Field Length Norm**: Shorter fields (e.g., "Title") are considered more relevant than long fields (e.g., "Body") for the same match.
+   - **Matcher**: Navigates the Term Dictionary or BKD Tree to identify document IDs.
+   - **Scorer**: Computes the relevance score (BM25) using precomputed weights and segment-local frequencies.
+4. **Collection & Fetching**: Aggregates top results into a sorted list and retrieves original field data for the final response.
 
 ## Query Types
-Sarissa supports a diverse set of queries for different use cases.
+Sarissa supports a wide range of queries for different information needs.
 
-### Core Queries
-- **TermQuery**: Exact match for a single token.
-  - *Example*: Field "status" matches "active".
-- **BooleanQuery**: Combines queries with `MUST` (+), `SHOULD` (OR), `MUST_NOT` (-).
-  - *Minimum Should Match*: Supports specifying a minimum number of `SHOULD` clauses that must match for the document to be considered a hit.
-  - *Example*: `+rust -c++` (Must contain "rust", must not contain "c++").
+- **Term Query**: Match a single analyzed term exactly.
+- **Boolean Query**: Logical combinations (`MUST`, `SHOULD`, `MUST_NOT`).
+- **Approximate Queries**: `Fuzzy`, `Prefix`, `Wildcard`, and `Regexp` queries.
+- **Phrase Query**: Matches terms in a specific order with optional "slop".
+- **Numeric Range Query**: High-performance range search using the BKD tree.
+- **Geospatial Queries**: Distance-based or bounding-box search for geographic points.
 
+## Scoring (BM25)
+Sarissa uses **Okapi BM25** as its default scoring function. It improves results by prioritizing rare terms and normalizing for document length, ensuring that matches in shorter, focused documents are ranked appropriately.
 
-### Approximate Queries
-- **FuzzyQuery**: Matches terms within a specific Levenshtein edit distance (default 2).
-  - *Example*: "helo" matches "hello".
-- **WildcardQuery**: Supported standard wildcards `*` (any) and `?` (single char).
-  - *Example*: `te*t` matches "test", "text".
-- **PrefixQuery**: Matches terms starting with a specific prefix.
-  - *Example*: `data*` matches "database", "datum".
-- **RegexpQuery**: Full regular expression support.
-  - *Example*: `[0-9]{3}-[0-9]{4}`.
+## Code Examples
 
-### Range Queries
-- **NumericRangeQuery**: Efficient BKD-tree based range search for integers and floats. Supports inclusive/exclusive bounds.
-  - *Example*: `price` in `[100, 500]`, `age` > 18.
-- **DateTimeRangeQuery**: Specialized range query for timestamps.
-  - *Example*: `created_at` in `[2023-01-01, 2023-12-31]`.
+### 1. Configuring LexicalEngine
+Setting up a schema-less engine with a default analyzer.
 
-### Positional Queries
-- **PhraseQuery**: Matches an exact sequence of terms. "Slop" allows for some distance/permutation.
-  - *Example*: "distributed search engine" (slop 0), "search distributed" (slop 2).
-- **SpanQuery**: Advanced control over term positions.
-  - `SpanTerm`: Basic unit.
-  - `SpanNear`: Matches spans within a certain distance.
-  - `SpanOr`: Union of spans.
-  - `SpanNot`: Exclude matches if another span overlaps.
+```rust
+use std::sync::Arc;
+use sarissa::lexical::engine::LexicalEngine;
+use sarissa::lexical::engine::config::LexicalIndexConfig;
+use sarissa::storage::memory::{MemoryStorage, MemoryStorageConfig};
 
-### Geospatial (Requires `geo` feature)
-- **GeoDistanceQuery**: Matches points within a radius from a center point.
-- **GeoBoundingBoxQuery**: Matches points within a rectangular area.
+fn setup_engine() -> sarissa::error::Result<LexicalEngine> {
+    let storage = Arc::new(MemoryStorage::new(MemoryStorageConfig::default()));
+    
+    // Default configuration uses StandardAnalyzer
+    let config = LexicalIndexConfig::default();
+    let engine = LexicalEngine::new(storage, config)?;
+    Ok(engine)
+}
+```
 
-*Both queries are optimized using a 2D BKD tree for fast candidate retrieval.*
+### 2. Adding Documents
+Creating and indexing documents with various field types.
 
-### Complex Queries
-- **MultiFieldQuery**: Executes a search across several fields simultaneously.
-  - *Strategies*: Matches can be combined using `BestFields` (highest score wins) or `MostFields` (scores are summed).
-  - *Example*: Search "query string" across "title^2" and "content".
-- **AdvancedQuery**: A high-level wrapper for complex query orchestration.
-  - *Features*: Supports query-level boosts, minimum score thresholds, and tiered filtering (Must, MustNot, Post-Filtering).
-  - *Optimization*: Automatically optimizes query structure and handles execution timeouts.
+```rust
+use sarissa::lexical::core::document::Document;
+use sarissa::lexical::core::field::TextOption;
+
+fn add_documents(engine: &LexicalEngine) -> sarissa::error::Result<()> {
+    let doc = Document::builder()
+        .add_text("title", "Sarissa Search", TextOption::default())
+        .add_text("content", "Fast and semantic search engine in Rust", TextOption::default())
+        .add_integer("price", 100)
+        .build();
+
+    engine.add_document(doc)?;
+    engine.commit()?; // Flush and commit to make searchable
+    Ok(())
+}
+```
+
+### 3. Searching via DSL
+Executing a simple search using the query string parser.
+
+```rust
+use sarissa::lexical::search::searcher::LexicalSearchRequest;
+
+fn search(engine: &LexicalEngine) -> sarissa::error::Result<()> {
+    // Search for matches in the default fields
+    let request = LexicalSearchRequest::new("content:rust")
+        .max_docs(10);
+
+    let results = engine.search(request)?;
+    for hit in results.hits {
+        println!("Doc ID: {}, Score: {}", hit.doc_id, hit.score);
+    }
+    Ok(())
+}
+```
+
+### 4. Custom Analyzer Setup
+Configuring a Japanese analyzer for specific fields.
+
+```rust
+use sarissa::analysis::analyzer::japanese::JapaneseAnalyzer;
+use sarissa::lexical::engine::config::LexicalIndexConfig;
+
+fn setup_japanese_engine() -> sarissa::error::Result<LexicalEngine> {
+    let storage = Arc::new(MemoryStorage::new(MemoryStorageConfig::default()));
+    
+    // Configure default analyzer to Japanese
+    let analyzer = Arc::new(JapaneseAnalyzer::default());
+    let config = LexicalIndexConfig::builder()
+        .analyzer(analyzer)
+        .build();
+
+    LexicalEngine::new(storage, config)
+}
+```
+
+## Future Outlook
+
+- **Advanced Scoring Functions**: Support for BM25F and custom script-based scoring.
+- **Improved NRT (Near-Real-Time)**: Faster segment flushing and background merging optimizations.
+- **Multilingual Support**: Integration with more language-specific tokenizers and dictionaries.
+- **Tiered Storage**: Support for moving older segments to slower/cheaper storage automatically.
