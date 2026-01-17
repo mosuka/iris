@@ -96,7 +96,7 @@ A container representing a single data point within a document.
 - **Integer / Float**: Numeric values. Used for range queries (BKD Tree) and sorting.
 - **Boolean**: True/False values.
 - **DateTime**: UTC timestamps.
-- **Geo**: Latitude/Longitude coordinates. Currently stored for scan-based queries or indexed as "lat,lon" text string.
+- **Geo**: Latitude/Longitude coordinates. Currently stored for scan-based queries or indexed as "lat,lon" text string for exact matching.
 - **Blob**: Raw byte data with MIME type. Used for storing binary content (images, etc.) or vector source data. **Stored only**, never indexed by the lexical engine.
 
 ### Field Options
@@ -130,12 +130,14 @@ graph TD
         Input["Raw Data"] --> DocBuilder["Document Construction"]
         
         subgraph "Processing (InvertedIndexWriter)"
-            DocBuilder -->|Text/Geo Field| Analyzer["Analyzer Pipeline"]
-            DocBuilder -->|Numeric/Date Field| NumProc["Values Extraction"]
-            DocBuilder -->|Stored Field| StoreProc["Field Encoding"]
+            DocBuilder -->|Text| CharFilter["Char Filter"]
+            DocBuilder -->|Numeric/Date/Geo| Normalizer["String Normalizer"]
+            DocBuilder -->|Numeric/Date| PtExt["Point Extractor"]
+            DocBuilder -->|Stored Field| StoreProc["Field Values Collector"]
+            DocBuilder -->|All Fields| LenTracker["Field Length Tracker"]
+            DocBuilder -->|Doc Values| DVTracker["Doc Values Collector"]
             
             subgraph "Analysis Chain"
-                Analyzer --> CharFilter["Char Filter"]
                 CharFilter --> Tokenizer["Tokenizer"]
                 Tokenizer --> TokenFilter["Token Filter"]
             end
@@ -143,119 +145,33 @@ graph TD
         
         subgraph "In-Memory Buffering"
             TokenFilter -->|Terms| InvBuffer["Term Posting Index"]
-            NumProc -->|Points| DocBuffer["Buffered Documents"]
-            StoreProc -->|Encoded Values| DocBuffer
+            Normalizer -->|Terms| InvBuffer
+            PtExt -->|Points| BkdBuffer["Point Values Buffer"]
+            StoreProc -->|Data| DocsBuffer["Stored Docs Buffer"]
         end
         
         subgraph "Segment Flushing (Disk)"
-            InvBuffer -->|Write| Files1[".dict / .post"]
-            DocBuffer -->|Sort & Write| Files2[".bkd"]
-            DocBuffer -->|Write| Files3[".docs"]
-            InvBuffer -.->|Stats| Files4[".meta / .fstats"]
+            InvBuffer -->|Write| Postings[".dict / .post"]
+            BkdBuffer -->|Sort & Write| BKD[".bkd"]
+            DocsBuffer -->|Write| DOCS[".docs"]
+            DVTracker -->|Write| DV[".dv"]
+            LenTracker -->|Write| LENS[".lens"]
+            InvBuffer -.->|Stats| Meta[".meta / .fstats"]
         end
     end
 ```
 
-1. **Analysis**:
-   - **Char Filters**: Pre-process the text (e.g., removing HTML tags).
-   - **Tokenizer**: Split text into tokens (e.g., words).
-   - **Token Filters**: Normalize tokens (lowercase, stemming, stop-word removal).
-2. **Indexing**:
-   - **Inverted Index**: Tokens are added to the Term Dictionary and Postings Lists for full-text search.
-   - **BKD Tree**: Numeric and DateTime values are added to the BKD Tree for efficient range filtering.
-   - **Doc Store**: All fields marked as `stored` are serialized and saved for retrieval.
-3. **Segment Creation**:
-   - Documents are buffered in memory and periodically flushed to disk as a new **Segment**.
-   - Segments are immutable once written, ensuring thread safety and simplifying concurrency.
+1. **Document Processing**:
+   - **Analysis & Normalization**: Text is processed through the Analysis Chain (`Char Filter`, `Tokenizer`, `Token Filter`). Non-text fields are handled by the `String Normalizer`.
+   - **Point Extraction**: Multidimensional values (Numeric/Date) are extracted by the `Point Extractor` for spatial indexing.
+   - **Tracking & Collection**: `Field Length Tracker` and `Doc Values Collector` gather metadata and columnar data.
+2. **In-Memory Buffering**:
+   - Terms are added to the `Term Posting Index`.
+   - Extracted points and stored fields are staged in the `Point Values Buffer` and `Stored Docs Buffer`.
+3. **Segment Flushing**:
+   - Buffered data is periodically sorted and serialized into immutable **Segment** files on disk.
 4. **Merging**:
    - A background process automatically merges smaller segments into larger ones to optimize read performance and reclaim space from deleted documents.
-
-## Search Process
-The search process in Sarissa involves several stages to efficiently retrieve and rank documents.
-
-```mermaid
-graph TD
-    subgraph "Search Flow"
-        UserQuery["User Query"] --> Parser
-        
-        subgraph "Searcher"
-            Parser["Query Parser"] --> QueryObj["Query Object"]
-            QueryObj --> Matcher["Matcher/Scorer"]
-            
-            subgraph "Index Access"
-                Matcher -.->|Look up| II["Inverted Index"]
-                Matcher -.->|Range Scan| BKD["BKD Tree"]
-                Matcher -.->|Geo Scan| Docs["Doc Store"]
-            end
-            
-            Matcher -->|DocIDs & Scores| Collector["Top-N Collector"]
-            Collector -.->|Sort by Field| DV["Doc Values"]
-            Collector -->|Top DocIDs| Fetcher["Doc Fetcher"]
-            Fetcher -.->|Retrieve Fields| Docs
-        end
-        
-        Fetcher --> Result["Search Results"]
-    end
-```
-
-1. **Query Parsing**: The input query string (if using a parser) is converted into a structured `Query` object (e.g., `BooleanQuery` combining `TermQuery`s).
-2. **Matching**:
-   - The `Query` creates a `Weight` object which calculates normalization factors.
-   - For each segment, the `Weight` creates a `Matcher` (equivalent to Lucene's `Scorer` or `Iterator`).
-   - The `Matcher` iterates over the `Postings Lists` or `BKD Trees` to find matching document IDs.
-   - BitSets are used to efficiently filter out deleted documents.
-3. **Scoring**:
-   - For ranked queries, a scoring function (BM25) calculates a relevance score for each matching document.
-   - Top-N results are collected using a Min-Heap queue to keep only the highest-scoring documents.
-4. **Fetching**:
-   - Once the top document IDs are identified, their original content is retrieved from the `Doc Store`.
-
-### Scoring (BM25)
-Sarissa uses the **Okapi BM25** algorithm as its default similarity function. It is a probabilistic retrieval framework that improves upon TF-IDF by adding saturation and length normalization.
-
-**Formula Components**:
-- **TF (Term Frequency)**: How often the term appears in the document. Contribution saturates (diminishing returns) to prevent keyword spamming.
-- **IDF (Inverse Document Frequency)**: How rare the term is across the entire index. Rare terms carry more weight.
-- **Field Length Norm**: Shorter fields (e.g., "Title") are considered more relevant than long fields (e.g., "Body") for the same match.
-
-## Query Types
-Sarissa supports a diverse set of queries for different use cases.
-
-### Core Queries
-- **TermQuery**: Exact match for a single token.
-  - *Example*: Field "status" matches "active".
-- **BooleanQuery**: Combines queries with `MUST` (+), `SHOULD` (OR), `MUST_NOT` (-).
-  - *Example*: `+rust -c++` (Must contain "rust", must not contain "c++").
-
-
-### Approximate Queries
-- **FuzzyQuery**: Matches terms within a specific Levenshtein edit distance (default 2).
-  - *Example*: "helo" matches "hello".
-- **WildcardQuery**: Supported standard wildcards `*` (any) and `?` (single char).
-  - *Example*: `te*t` matches "test", "text".
-- **PrefixQuery**: Matches terms starting with a specific prefix.
-  - *Example*: `data*` matches "database", "datum".
-- **RegexpQuery**: Full regular expression support.
-  - *Example*: `[0-9]{3}-[0-9]{4}`.
-
-### Range Queries
-- **NumericRangeQuery**: Efficient BKD-tree based range search for integers and floats. Supports inclusive/exclusive bounds.
-  - *Example*: `price` in `[100, 500]`, `age` > 18.
-- **DateTimeRangeQuery**: Specialized range query for timestamps.
-  - *Example*: `created_at` in `[2023-01-01, 2023-12-31]`.
-
-### Positional Queries
-- **PhraseQuery**: Matches an exact sequence of terms. "Slop" allows for some distance/permutation.
-  - *Example*: "distributed search engine" (slop 0), "search distributed" (slop 2).
-- **SpanQuery**: Advanced control over term positions.
-  - `SpanTerm`: Basic unit.
-  - `SpanNear`: Matches spans within a certain distance.
-  - `SpanOr`: Union of spans.
-  - `SpanNot`: Exclude matches if another span overlaps.
-
-### Geospatial (Requires `geo` feature)
-- **GeoDistanceQuery**: Matches points within a radius from a center point.
-- **GeoBoundingBoxQuery**: Matches points within a rectangular area.
 
 ### Analyzers
 Text analysis is the process of converting raw text into tokens. An Analyzer is typically composed of a pipeline:
@@ -275,6 +191,8 @@ Sarissa provides several built-in analyzers with pre-configured pipelines:
 - **SimpleAnalyzer**: Basic tokenization without filtering.
     - Tokenizer: Configurable (defaults to `RegexTokenizer` in some contexts)
     - No filters.
+- **No-op Analyzer**: Performs no analysis, yielding an empty token stream.
+    - Useful for stored-only fields or when a field should not be searchable.
 - **PipelineAnalyzer**: A flexible builder for creating custom analysis pipelines.
     - Allows combining any **Char Filter**, **Tokenizer**, and **Token Filter** chain.
     - Example: `PipelineAnalyzer::new(tokenizer).add_char_filter(...).add_filter(...)`
@@ -294,46 +212,39 @@ Sarissa provides several built-in analyzers with pre-configured pipelines:
       analyzer.add_analyzer("tags", keyword_analyzer);
       ```
 
-## Index Components & File Formats
-A Sarissa Index is a collection of **Segments**. Each segment is a self-contained index composed of several specialized files that work together to support different types of search and retrieval.
+## Index Components
+The indexing architecture is responsible for transforming raw documents into efficient, searchable structures. It consists of several logical components, each managing a specific part of the lifecycle.
 
-The main components of a segment are:
+### Index Writer (`InvertedIndexWriter`)
+The primary interface for adding documents to the index. It orchestrates the flow from processing to buffering and triggers flushes.
 
-```mermaid
-graph TD
-    Segment[Index Segment]
-    
-    subgraph "Text Search (Inverted Index)"
-        Dict["Term Dictionary (.dict)"]
-        Post["Postings Lists (.post)"]
-    end
-    
-    subgraph "Numeric/Date Search"
-        BKD["BKD Tree (.bkd)"]
-    end
-    
-    subgraph "Data Storage"
-        Docs["Doc Store (.docs)"]
-    end
-    
-    subgraph "Metadata & Stats"
-        Meta["Metadata (.meta)"]
-        Stats["Field Stats (.fstats)"]
-        Lens["Field Lengths (.lens)"]
-        DV["Doc Values (.dv)"]
-    end
+### Document Processing
+- **Analysis Chain**: Performs sequentially through a `Char Filter`, a `Tokenizer`, and a `Token Filter` on text fields to produce searchable terms.
+- **String Normalizer**: Converts Numeric, Date, and Geo values into text form for basic keyword matching in the inverted index.
+- **Point Extractor**: Isolates numeric and temporal data for 1-dimensional range search (BKD Tree).
+- **Data Collectors & Trackers**:
+    - **Field Values Collector**: Buffers fields marked as `stored` for the Doc Store.
+    - **Field Length Tracker**: Records token counts per field for length-normalized scoring (BM25).
+    - **Doc Values Collector**: Gathers values for columnar storage (`.dv`), enabling fast sorting and aggregations (SIMD-optimized).
 
-    Segment --> Dict
-    Segment --> Post
-    Segment --> BKD
-    Segment --> Docs
-    Segment --> Meta
-    Segment --> Stats
-    Segment --> Lens
-    Segment --> DV
-```
+### In-Memory Buffering
+- **Term Posting Index (`TermPostingIndex`)**: A high-performance buffer mapping terms to their occurrences (postings).
+- **Point Values Buffer**: Stages multidimensional data before it is structured into a BKD tree.
+- **Stored Docs Buffer**: Buffers serialized field data until a segment flush occurs.
 
-### Term Dictionary (`.dict`)
+### Segment Manager
+Manages the lifecycle and visibility of segments, maintaining the `segments.manifest` file and tracking document deletions.
+
+### Index Segment Files
+A single segment is composed of several specialized files:
+- **Term Dictionary (.dict)**: Maps terms to their locations in the postings list.
+- **Postings Lists (.post)**: Stores document IDs, frequencies, and positions for each term.
+- **BKD Tree (.bkd)**: Provides multidimensional indexing for numeric and date fields.
+- **Doc Store (.docs)**: Stores the original (stored) field values.
+- **Doc Values (.dv)**: Stores field values in a columnar format for sorting and scoring.
+- **Segment Metadata (.meta)**: JSON file containing segment statistics and ID ranges.
+- **Field Statistics (.fstats)**: Stores per-field information like document frequency and average length.
+- **Field Lengths (.lens)**: Stores the length of each field for every document (used in BM25 scoring).
 **Core component of the Text Inverted Index.**
 A sorted list of all unique terms (tokens) extracted from the documents. It acts as the primary entry point for text search.
 - **Function**: Maps a term (e.g., "rust") to its location in the Postings List.
@@ -397,3 +308,150 @@ Registry and metadata files.
 - **Format**: JSON (`SegmentInfo`).
 - **Fields**: `segment_id`, `doc_count`, `doc_offset`, `generation`, `has_deletions`.
 - **Usage**: Managing segment lifecycle, versioning, and status.
+
+## Search Process
+The search process in Sarissa involves several stages to efficiently retrieve and rank documents.
+
+```mermaid
+graph TD
+    subgraph "Search Flow"
+        UserQuery["User Query"] --> Parser
+        
+        subgraph "Searcher"
+            Parser["Query Parser"] --> QueryObj["Query"]
+            QueryObj --> WeightObj["Weight"]
+            WeightObj --> MatcherObj["Matcher"]
+            WeightObj --> ScorerObj["Scorer"]
+            
+            subgraph "Index Access"
+                MatcherObj -.->|Look up| II["Inverted Index"]
+                MatcherObj -.->|Range Scan| BKD["BKD Tree"]
+                MatcherObj -.->|Geo Scan| Docs["Doc Store"]
+            end
+            
+            MatcherObj -->|Doc IDs| CollectorObj["Collector"]
+            ScorerObj -->|Scores| CollectorObj
+            CollectorObj -.->|Sort by Field| DV["Doc Values"]
+            CollectorObj -->|Top Doc IDs| Fetcher["Fetcher"]
+            Fetcher -.->|Retrieve Fields| Docs
+        end
+        
+        Fetcher --> Result["Search Results"]
+    end
+```
+
+1. **Query Parsing**: The `Query Parser` converts the input query string into a structured `Query` tree.
+2. **Weight Creation**: The `Query` creates a `Weight` component, which calculates global statistics and normalization factors across all segments.
+3. **Matching & Scoring**:
+   - For each segment, the `Weight` creates a `Matcher` and a `Scorer`.
+   - The `Matcher` iterates over the `Inverted Index` or `BKD Tree` to identify matching `Doc IDs`.
+   - The `Scorer` calculates relevance (e.g., BM25) for each matching document.
+4. **Collection & Fetching**:
+   - The `Collector` aggregates the top results, potentially using `Doc Values` for custom sorting.
+   - The `Fetcher` retrieves the original field content from the `Doc Store` for the final result set.
+
+### Query Rewriting
+Sarissa implements a **Multi-Term Query** framework (similar to Lucene) for queries like `FuzzyQuery`, `PrefixQuery`, `WildcardQuery`, and `RegexpQuery`.
+
+Instead of matching these complex patterns directly against every document, they undergo a **rewrite** process:
+1. **Term Enumeration**: The query identifies all unique terms in the `Term Dictionary` that match the pattern (e.g., `hel*` matches `hello`, `help`, `held`).
+2. **Expansion**: These terms are expanded into a `BooleanQuery` based on the selected strategy.
+3. **Scoring Strategy (`RewriteMethod`)**:
+   - **TopTermsBlended**: (Default) Collects top N terms by frequency and assigns a constant score.
+   - **TopTermsScoring**: Collects top N terms and maintains their individual BM25 scores.
+   - **ConstantScore**: All matching terms receive a score equal to the query boost.
+   - **BooleanQuery**: Expands to all matching terms without limits (may hit clause limits).
+
+## Search Components
+The search architecture is composed of several modular components that work together to execute queries and rank results.
+
+### Searcher (`InvertedIndexSearcher`)
+The primary entry point for search operations.
+- **Coordination**: It coordinates the search across multiple immutable segments.
+- **Parallelism**: Supports parallel execution of sub-queries (e.g., within a `BooleanQuery`) to improve performance.
+- **API**: Provides high-level methods for searching with string queries or structured `Query` objects.
+
+### Query Parser
+Translates human-readable query strings into structured objects.
+- **Grammar**: Uses a recursive descent parser to handle operators like `+`, `-`, `OR`, `*`, and field-specific searches (e.g., `title:rust`).
+- **Flexible**: Can be configured with default fields and analyzers.
+
+### Query
+A logical representation of the search criteria (Term, Prefix, Fuzzy, etc.). It acts as a factory for creating `Weight` objects.
+
+### Weight
+An intermediate component that bridges the query and the segment-level execution. It handles global scoring statistics (like IDF) and creates segment-specific `Matcher` and `Scorer` instances.
+
+### Matcher
+A low-level iterator that identifies matching documents within a single segment. It supports efficient skipping (`skip_to`) for boolean operations.
+
+### Scorer
+Calculates the relevance score for a document.
+- **BM25**: Default implementation using the Okapi BM25 algorithm.
+- **Constant**: Assigns a fixed score to all matched documents.
+- **SIMD Optimization**: Supports SIMD-accelerated batch scoring for high-throughput ranking across large result sets.
+
+### Collector
+Aggregates and sorts matching documents.
+- **TopDocsCollector**: Collects the top N documents by score.
+- **TopFieldCollector**: Collects documents sorted by a specific field value (e.g., price, date).
+- **CountCollector**: Returns only the total number of hits without retrieving document IDs.
+
+### Index Reader (`InvertedIndexReader`)
+The unified interface for accessing indexed data across all segments. It handles resource loading and provides the necessary contexts to the `Searcher`.
+
+## Scoring (BM25)
+Sarissa uses the **Okapi BM25** algorithm as its default similarity function. It is a probabilistic retrieval framework that improves upon TF-IDF by adding saturation and length normalization.
+
+**Formula Components**:
+- **TF (Term Frequency)**: How often the term appears in the document. Contribution saturates (diminishing returns) to prevent keyword spamming.
+- **IDF (Inverse Document Frequency)**: How rare the term is across the entire index. Rare terms carry more weight.
+- **Field Length Norm**: Shorter fields (e.g., "Title") are considered more relevant than long fields (e.g., "Body") for the same match.
+
+## Query Types
+Sarissa supports a diverse set of queries for different use cases.
+
+### Core Queries
+- **TermQuery**: Exact match for a single token.
+  - *Example*: Field "status" matches "active".
+- **BooleanQuery**: Combines queries with `MUST` (+), `SHOULD` (OR), `MUST_NOT` (-).
+  - *Minimum Should Match*: Supports specifying a minimum number of `SHOULD` clauses that must match for the document to be considered a hit.
+  - *Example*: `+rust -c++` (Must contain "rust", must not contain "c++").
+
+
+### Approximate Queries
+- **FuzzyQuery**: Matches terms within a specific Levenshtein edit distance (default 2).
+  - *Example*: "helo" matches "hello".
+- **WildcardQuery**: Supported standard wildcards `*` (any) and `?` (single char).
+  - *Example*: `te*t` matches "test", "text".
+- **PrefixQuery**: Matches terms starting with a specific prefix.
+  - *Example*: `data*` matches "database", "datum".
+- **RegexpQuery**: Full regular expression support.
+  - *Example*: `[0-9]{3}-[0-9]{4}`.
+
+### Range Queries
+- **NumericRangeQuery**: Efficient BKD-tree based range search for integers and floats. Supports inclusive/exclusive bounds.
+  - *Example*: `price` in `[100, 500]`, `age` > 18.
+- **DateTimeRangeQuery**: Specialized range query for timestamps.
+  - *Example*: `created_at` in `[2023-01-01, 2023-12-31]`.
+
+### Positional Queries
+- **PhraseQuery**: Matches an exact sequence of terms. "Slop" allows for some distance/permutation.
+  - *Example*: "distributed search engine" (slop 0), "search distributed" (slop 2).
+- **SpanQuery**: Advanced control over term positions.
+  - `SpanTerm`: Basic unit.
+  - `SpanNear`: Matches spans within a certain distance.
+  - `SpanOr`: Union of spans.
+  - `SpanNot`: Exclude matches if another span overlaps.
+
+### Geospatial (Requires `geo` feature)
+- **GeoDistanceQuery**: Matches points within a radius from a center point.
+- **GeoBoundingBoxQuery**: Matches points within a rectangular area.
+
+### Complex Queries
+- **MultiFieldQuery**: Executes a search across several fields simultaneously.
+  - *Strategies*: Matches can be combined using `BestFields` (highest score wins) or `MostFields` (scores are summed).
+  - *Example*: Search "query string" across "title^2" and "content".
+- **AdvancedQuery**: A high-level wrapper for complex query orchestration.
+  - *Features*: Supports query-level boosts, minimum score thresholds, and tiered filtering (Must, MustNot, Post-Filtering).
+  - *Optimization*: Automatically optimizes query structure and handles execution timeouts.
