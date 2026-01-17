@@ -89,8 +89,8 @@ pub struct AnalyzedDocument {
     pub stored_fields: AHashMap<String, FieldValue>,
     /// Field name to field length (number of tokens) mapping.
     pub field_lengths: AHashMap<String, u32>,
-    /// Field name to numeric point value (for BKD tree).
-    pub point_values: AHashMap<String, f64>,
+    /// Field name to numeric point values (for BKD tree).
+    pub point_values: AHashMap<String, Vec<f64>>,
 }
 
 /// An analyzed term with position and metadata.

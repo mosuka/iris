@@ -192,7 +192,7 @@ impl DocumentParser {
 
                     field_terms.insert(field_name.clone(), vec![analyzed_term]);
                     stored_fields.insert(field_name.clone(), FieldValue::Integer(*num));
-                    point_values.insert(field_name.clone(), *num as f64);
+                    point_values.insert(field_name.clone(), vec![*num as f64]);
                 }
                 FieldValue::Float(num) => {
                     // Convert float to text for indexing
@@ -207,7 +207,7 @@ impl DocumentParser {
 
                     field_terms.insert(field_name.clone(), vec![analyzed_term]);
                     stored_fields.insert(field_name.clone(), FieldValue::Float(*num));
-                    point_values.insert(field_name.clone(), *num);
+                    point_values.insert(field_name.clone(), vec![*num]);
                 }
                 FieldValue::Boolean(b) => {
                     // Convert boolean to text
@@ -242,7 +242,7 @@ impl DocumentParser {
                     stored_fields.insert(field_name.clone(), FieldValue::DateTime(*dt));
                     let ts = dt.timestamp() as f64
                         + dt.timestamp_subsec_nanos() as f64 / 1_000_000_000.0;
-                    point_values.insert(field_name.clone(), ts);
+                    point_values.insert(field_name.clone(), vec![ts]);
                 }
                 FieldValue::Geo(point) => {
                     // Convert geo point to string representation
@@ -257,6 +257,7 @@ impl DocumentParser {
 
                     field_terms.insert(field_name.clone(), vec![analyzed_term]);
                     stored_fields.insert(field_name.clone(), FieldValue::Geo(*point));
+                    point_values.insert(field_name.clone(), vec![point.lat, point.lon]);
                 }
                 FieldValue::Null => {
                     // Null fields are not indexed, only stored

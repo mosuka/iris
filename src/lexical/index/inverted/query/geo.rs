@@ -283,6 +283,32 @@ impl GeoDistanceQuery {
     ) -> Result<Vec<(u32, GeoPoint)>> {
         let mut candidates = Vec::new();
 
+        // Try to use BKD tree for efficient candidate retrieval
+        if let Some(bkd_tree) = reader.get_bkd_tree(&self.field)? {
+            // Lat range is [min_lat, max_lat], Lon range is [min_lon, max_lon]
+            let mins = [
+                Some(bounding_box.bottom_right.lat), // min_lat
+                Some(bounding_box.top_left.lon),     // min_lon
+            ];
+            let maxs = [
+                Some(bounding_box.top_left.lat),     // max_lat
+                Some(bounding_box.bottom_right.lon), // max_lon
+            ];
+
+            let doc_ids = bkd_tree.range_search(&mins, &maxs, true, true)?;
+            for doc_id in doc_ids {
+                // Retrieve GeoPoint for exact distance calculation
+                if let Some(doc) = reader.document(doc_id)? {
+                    if let Some(field_value) = doc.get_field(&self.field) {
+                        if let Some(geo_point) = field_value.value.as_geo() {
+                            candidates.push((doc_id as u32, *geo_point));
+                        }
+                    }
+                }
+            }
+            return Ok(candidates);
+        }
+
         // Get the maximum document ID to iterate through all documents
         let max_doc = reader.max_doc();
 
@@ -538,6 +564,31 @@ impl GeoBoundingBoxQuery {
     ) -> Result<Vec<(u32, GeoPoint)>> {
         let mut candidates = Vec::new();
 
+        // Try to use BKD tree for efficient candidate retrieval
+        if let Some(bkd_tree) = reader.get_bkd_tree(&self.field)? {
+            let mins = [
+                Some(self.bounding_box.bottom_right.lat), // min_lat
+                Some(self.bounding_box.top_left.lon),     // min_lon
+            ];
+            let maxs = [
+                Some(self.bounding_box.top_left.lat),     // max_lat
+                Some(self.bounding_box.bottom_right.lon), // max_lon
+            ];
+
+            let doc_ids = bkd_tree.range_search(&mins, &maxs, true, true)?;
+            for doc_id in doc_ids {
+                // Retrieve GeoPoint for exact check
+                if let Some(doc) = reader.document(doc_id)? {
+                    if let Some(field_value) = doc.get_field(&self.field) {
+                        if let Some(geo_point) = field_value.value.as_geo() {
+                            candidates.push((doc_id as u32, *geo_point));
+                        }
+                    }
+                }
+            }
+            return Ok(candidates);
+        }
+
         // Get the maximum document ID to iterate through all documents
         let max_doc = reader.max_doc();
 
@@ -751,8 +802,6 @@ pub struct GeoMatcher {
     matches: Vec<GeoMatch>,
     /// Current iteration position
     current_index: usize,
-    /// Current document ID
-    current_doc_id: u64,
 }
 
 impl GeoMatcher {
@@ -765,16 +814,9 @@ impl GeoMatcher {
                 .unwrap_or(std::cmp::Ordering::Equal)
         });
 
-        let current_doc_id = if matches.is_empty() {
-            u64::MAX // Invalid state when no matches
-        } else {
-            matches[0].doc_id as u64 // Position at first match
-        };
-
         GeoMatcher {
             matches,
             current_index: 0,
-            current_doc_id,
         }
     }
 }
@@ -782,23 +824,18 @@ impl GeoMatcher {
 impl Matcher for GeoMatcher {
     fn doc_id(&self) -> u64 {
         if self.current_index >= self.matches.len() {
-            u64::MAX // Invalid state when exhausted
+            u64::MAX
         } else {
-            self.current_doc_id
+            self.matches[self.current_index].doc_id as u64
         }
     }
 
     fn next(&mut self) -> Result<bool> {
-        if self.current_index >= self.matches.len() {
-            return Ok(false);
-        }
-
         self.current_index += 1;
         if self.current_index < self.matches.len() {
-            self.current_doc_id = self.matches[self.current_index].doc_id as u64;
             Ok(true)
         } else {
-            self.current_doc_id = u64::MAX; // Invalid state
+            self.current_index = self.matches.len();
             Ok(false)
         }
     }
@@ -808,12 +845,10 @@ impl Matcher for GeoMatcher {
         while self.current_index < self.matches.len() {
             let doc_id = self.matches[self.current_index].doc_id as u64;
             if doc_id >= target {
-                self.current_doc_id = doc_id;
                 return Ok(true);
             }
             self.current_index += 1;
         }
-        self.current_doc_id = u64::MAX; // No match found
         Ok(false)
     }
 
@@ -1148,7 +1183,6 @@ mod tests {
 
         // Should return documents in distance-sorted order (closest first)
         // After sorting: doc_id: 3 (1.0km) comes before doc_id: 1 (2.0km)
-        // Initial state: pointing to first document (doc_id: 3)
         assert_eq!(matcher.doc_id(), 3); // Initial position: closest document
 
         assert!(matcher.next().unwrap()); // Move to next
