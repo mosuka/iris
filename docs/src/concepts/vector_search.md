@@ -2,7 +2,7 @@
 
 Vector search (finding "nearest neighbors") enables semantic retrieval where matches are based on meaning rather than exact keywords. It is the core technology behind modern AI-powered search, recommendations, and RAG (Retrieval-Augmented Generation) systems.
 
-## Vector Document Structure
+## Document Structure
 While lexical search operates on text documents, vector search operates on high-dimensional numerical representations of data. In Sarissa, vectors can be part of a standard `Document` or managed as standalone entities.
 
 ```mermaid
@@ -89,76 +89,51 @@ graph TD
 
 ## Core Concepts
 
-### ANN (Approximate Nearest Neighbor)
+### Approximate Nearest Neighbor (ANN)
 In large-scale vector search, calculating exact distances to every vector is too slow. ANN algorithms provide a high-speed search with a small, controllable loss in accuracy (Recall).
 
-### HNSW (Hierarchical Navigable Small World)
-Sarissa's primary ANN algorithm. It constructs a multi-layered graph where the top layers are sparse (long-distance "express" links) and bottom layers are dense (short-distance local links).
-- **Efficiency**: Search time is logarithmic $O(\log N)$.
-- **Parameters**: `m` (links per node) and `ef_construction` control the trade-off between index quality and build speed.
+### Index Types
 
-### IVF (Inverted File Index)
-Clusters vectors into $K$ Voronoi cells. During search, only the nearest `n_probe` cells are scanned.
-- **Centroids**: Calculated during a `Training` phase using K-Means.
-- **Use Case**: Efficient for extremely large datasets where HNSW memory overhead becomes prohibitive.
-
-## Distance Metrics
-
-Sarissa leverages Rust's SIMD (Single Instruction Multiple Data) instructions to maximize performance for distance calculations. This ensures efficient processing of high-dimensional vectors.
-
-| Metric | Description | Rust Implementation Class | Features |
-| :--- | :--- | :--- | :--- |
-| **Cosine** | Measures the angle between vectors. | `DistanceMetric::Cosine` | Ideal for semantic text similarity. |
-| **Euclidean (L2)** | Measures straight-line distance. | `DistanceMetric::Euclidean` | Suitable for image retrieval and physical proximity. |
-| **DotProduct** | Calculates the dot product. | `DistanceMetric::DotProduct` | Extremely fast for pre-normalized vectors. |
-| **Manhattan** | L1 distance. | `DistanceMetric::Manhattan` | Sum of absolute differences of coordinates. |
-
-### SIMD Optimization
-Sarissa's distance calculation logic (`src/vector/core/distance.rs`) automatically selects the optimal SIMD instruction set based on the target architecture. This provides significant performance gains compared to standard loop-based processing.
-
-## Quantization
-
-Sarissa supports multiple quantization methods to reduce memory usage and improve search speed.
-
-- **Scalar 8-bit (SQ8)**: Maps 32-bit floating-point values to 8-bit integers. Reduces memory by 4x while maintaining high precision.
-- **Product Quantization (PQ)**: Decomposes vectors into sub-vectors and performs clustering in each sub-space, achieving compression ratios from 16x to 64x.
-
-## Implementation Details for Index Types
-
-### Flat Index (Exact Search)
+#### Flat Index (Exact Search)
 Stores all vectors directly in an array and calculates distances between the query and every vector during search.
 - **Implementation**: `FlatIndexWriter`, `FlatVectorIndexReader`
 - **Characteristics**: 100% precision (Exact Search), but search speed decreases linearly with data volume.
 - **Use Cases**: Small datasets or as a baseline for ANN precision.
 
-### HNSW (Hierarchical Navigable Small World)
-The default ANN algorithm in Sarissa.
+#### HNSW (Hierarchical Navigable Small World)
+Sarissa's primary ANN algorithm. It constructs a multi-layered graph where the top layers are sparse (long-distance "express" links) and bottom layers are dense (short-distance local links).
+- **Efficiency**: Search time is logarithmic $O(\log N)$.
 - **Implementation**: `HnswIndexWriter`, `HnswIndexReader`
-- **Details**: Constructs a multi-layered graph. Supports parallel building using `rayon` for fast construction from large datasets.
-- **Parameters**:
-    - `m`: Number of neighbors per node. Increasing this improves precision but increases memory and build time.
-    - `ef_construction`: Search scope during index building.
+- **Parameters**: `m` (links per node) and `ef_construction` control the trade-off between index quality and build speed.
 
-### IVF (Inverted File Index)
-An index based on vector clustering.
+#### IVF (Inverted File Index)
+Clusters vectors into $K$ Voronoi cells. During search, only the nearest `n_probe` cells are scanned.
+- **Centroids**: Calculated during a `Training` phase using K-Means.
 - **Implementation**: `IvfIndexWriter`, `IvfIndexReader`
-- **Details**: Calculates centroids using the K-means algorithm during a `Training` phase and assigns each vector to its nearest cluster.
-- **Use Cases**: Memory-constrained environments with large datasets. Works best when combined with PQ quantization.
+- **Use Case**: Efficient for extremely large datasets where HNSW memory overhead becomes prohibitive. Works best when combined with PQ quantization.
+
+### Distance Metrics
+Sarissa leverages Rust's SIMD (Single Instruction Multiple Data) instructions to maximize performance for distance calculations.
+| Metric | Description | Rust Implementation Class | Features |
+| :--- | :--- | :--- | :--- |
+| **Cosine** | Measures the angle between vectors. | `DistanceMetric::Cosine` | Ideal for semantic text similarity. |
+| **Euclidean** | Measures straight-line distance. | `DistanceMetric::Euclidean` | Suitable for image retrieval and physical proximity. |
+| **DotProduct** | Calculates the dot product. | `DistanceMetric::DotProduct` | Extremely fast for pre-normalized vectors. |
+
+### Quantization
+To reduce memory usage and improve search speed, Sarissa supports several quantization methods:
+- **Scalar 8-bit (SQ8)**: Maps 32-bit floating-points to 8-bit integers (4x compression).
+- **Product Quantization (PQ)**: Decomposes vectors into sub-vectors and performs clustering (16x-64x compression).
 
 ## Engine Architecture
 
-### 1. VectorEngine
-The high-level orchestrator that manages multiple vector fields, handles persistence (WAL, snapshots), and coordinates aggregated searches.
+### Vector Engine (`VectorEngine`)
+The high-level orchestrator that manages multiple vector fields, handles persistence via WAL (Write-Ahead Log), and coordinates aggregated searches across fields.
 
-### 2. VectorField (`VectorField` Trait)
-Abstracts individual fields:
-- `InMemoryVectorField`: A small, in-memory field.
-- `SegmentedVectorField`: Manages large-scale indexes like HNSW as immutable segments.
-
-### 3. VectorEngineSearcher
-Processes search requests and integrates results from each field based on the specified score mode.
-- **WeightedSum**: Addition of scores considering per-field weights.
-- **MaxSim**: Uses the highest score as the representative value.
+### Index Components
+- **VectorField**: Abstracts individual field implementations (e.g., `InMemoryVectorField`, `SegmentedVectorField`).
+- **Index Writers/Readers**: Specific implementations for each algorithm (e.g., `HnswIndexWriter`, `FlatVectorIndexReader`, `IvfIndexReader`).
+- **VectorEngineSearcher**: Integrates results from multiple fields based on specified score modes (WeightedSum, MaxSim).
 
 ## Index Segment Files
 A vector segment consists of several specialized files:
