@@ -80,4 +80,9 @@ pub trait LexicalIndexWriter: Send + Sync + std::fmt::Debug {
     ///
     /// This allows NRT (Near Real-Time) lookups for ID management.
     fn find_doc_id_by_term(&self, field: &str, term: &str) -> Result<Option<u64>>;
+
+    /// Find all internal document IDs for a given term (field:value).
+    ///
+    /// This allows NRT lookups for multiple documents (chunks).
+    fn find_doc_ids_by_term(&self, field: &str, term: &str) -> Result<Option<Vec<u64>>>;
 }

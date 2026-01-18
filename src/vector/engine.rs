@@ -213,6 +213,13 @@ impl VectorEngine {
     // Internal methods
     // =========================================================================
 
+    fn check_closed(&self) -> Result<()> {
+        if self.closed.load(Ordering::Relaxed) == 1 {
+            return Err(SarissaError::index("VectorEngine is closed"));
+        }
+        Ok(())
+    }
+
     fn embed_document_payload_internal(
         &self,
         _doc_id: u64,
@@ -1006,58 +1013,100 @@ impl VectorEngine {
         self.write_atomic(storage, COLLECTION_MANIFEST_FILE, &serialized)
     }
 
-    /// Upsert a document (internal implementation).
+    /// Upsert a document    // Internal helper for upserting/indexing
     fn upsert_document_internal(&self, document: DocumentVector) -> Result<u64> {
+        self.check_closed()?;
         self.validate_document_fields(&document)?;
 
-        // 1. Extract External ID and Index to LexicalEngine to get Doc ID
-        let external_id = document.metadata.get("_id").cloned().unwrap_or_else(|| {
-            // Generate UUID if missing? Or error?
-            // For now generate UUID to be safe and consistent with Registry behavior
-            uuid::Uuid::new_v4().to_string()
-        });
+        // 1. Extract or generate ID
+        let external_id = document
+            .metadata
+            .get("_id")
+            .cloned()
+            .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
 
-        // Convert to Lexical Document
-        use crate::lexical::core::document::Document as LexicalDocument;
+        // 2. Index metadata (Lexical Engine handles ID assignment)
+        // We construct a Lexical Document for the metadata
+        let mut lex_doc_builder = crate::lexical::core::document::Document::builder();
         use crate::lexical::core::field::TextOption;
 
-        // Initialize builder properly
-        let mut lex_doc_builder = LexicalDocument::builder();
-        // Base metadata
+        // Add _id field explicitly (handled by index_document internally but good to be explicit/consistent)
+        // Actually LexicalEngine::index_document adds _id field. We just need to add other metadata.
         for (k, v) in &document.metadata {
-            if k == "_id" {
-                continue;
+            if k != "_id" {
+                // Heuristic: treat all metadata as text for now
+                // In future, DocumentVector metadata should be typed or we infer type
+                lex_doc_builder = lex_doc_builder.add_text(k, v, TextOption::default());
             }
-            // Use add_text for string metadata
-            lex_doc_builder = lex_doc_builder.add_text(k, v, TextOption::default());
         }
         let lex_doc = lex_doc_builder.build();
 
         // Index into LexicalEngine (handles ID assignment/deduplication)
+        // index_document attempts to FIND existing ID first (Overwrite behavior)
         let doc_id = self.metadata_index.index_document(&external_id, lex_doc)?;
 
-        // Used version 0 as we rely on Lexical/WAL sequence.
-        // Or we could use wal.last_seq() + 1 but that's racy until appended.
-        // Using 0 is safe for non-distributed single-writer setup if we process sequentially.
-        let version = 0;
+        // 3. Write to WAL
+        // Serialize the document for WAL
+        // Note: We persist the FULL document including vectors and metadata
+        self.wal.append(&WalEntry::Upsert {
+            doc_id,
+            document: document.clone(),
+        })?;
 
-        // Update fields (in memory/segments)
-        if let Err(err) = self.apply_field_updates(doc_id, version, &document.fields) {
-            // Rollback Lexical?
-            // Ideally we should transaction, but for now simple compensation:
-            let _ = self.metadata_index.delete_document(doc_id); // Internal delete
-            return Err(err);
-        }
-
-        // Then update documents map and WAL
+        // 4. Update In-Memory Structures
+        // Update document store
         self.documents.write().insert(doc_id, document.clone());
-        self.wal.append(&WalEntry::Upsert { doc_id, document })?;
 
-        self.persist_state()?;
-        // self.bump_next_doc_id(doc_id); // Removed
+        // Update Field Writers
+        // Using version 0 (sequence from WAL/snapshot handling happens elsewhere or 0 during upsert if not tracked tightly here)
+        self.apply_field_updates(doc_id, 0, &document.fields)?;
+
         Ok(doc_id)
     }
 
+    // Internal helper for indexing as chunk (always append)
+    fn upsert_document_internal_chunk(&self, document: DocumentVector) -> Result<u64> {
+        self.check_closed()?;
+        self.validate_document_fields(&document)?;
+
+        // 1. Extract or generate ID
+        let external_id = document
+            .metadata
+            .get("_id")
+            .cloned()
+            .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
+
+        // 2. Index metadata
+        let mut lex_doc_builder = crate::lexical::core::document::Document::builder();
+        use crate::lexical::core::field::TextOption;
+
+        // Add _id field explicitly (LexicalEngine::add_document doesn't do it automatically like index_document)
+        lex_doc_builder = lex_doc_builder.add_text("_id", &external_id, TextOption::default());
+
+        for (k, v) in &document.metadata {
+            if k != "_id" {
+                lex_doc_builder = lex_doc_builder.add_text(k, v, TextOption::default());
+            }
+        }
+        let lex_doc = lex_doc_builder.build();
+
+        // Index into LexicalEngine using add_document (Always Append)
+        let doc_id = self.metadata_index.add_document(lex_doc)?;
+
+        // 3. Write to WAL
+        self.wal.append(&WalEntry::Upsert {
+            doc_id,
+            document: document.clone(),
+        })?;
+
+        // 4. Update In-Memory Structures
+        self.documents.write().insert(doc_id, document.clone());
+
+        // Update Field Writers
+        self.apply_field_updates(doc_id, 0, &document.fields)?;
+
+        Ok(doc_id)
+    }
     fn write_atomic(&self, storage: Arc<dyn Storage>, name: &str, bytes: &[u8]) -> Result<()> {
         let tmp_name = format!("{name}.tmp");
         let mut output = storage.create_output(&tmp_name)?;
@@ -1121,15 +1170,38 @@ impl VectorEngine {
         docs.into_iter().map(|doc| self.add_vectors(doc)).collect()
     }
 
-    /// Add multiple payloads with automatically assigned doc_ids.
-    pub fn add_payloads_batch(
-        &self,
-        payloads: impl IntoIterator<Item = DocumentPayload>,
-    ) -> Result<Vec<u64>> {
-        payloads
-            .into_iter()
-            .map(|payload| self.add_payloads(payload))
-            .collect()
+    /// Index multiple payloads with automatically assigned doc_ids.
+    pub fn index_payloads_batch(&self, payloads: Vec<DocumentPayload>) -> Result<Vec<u64>> {
+        let mut doc_ids = Vec::with_capacity(payloads.len());
+        for payload in payloads {
+            // Note: calling add_payloads (which calls upsert_document_payload).
+            // This is NOT chunk mode, it's standard add.
+            let doc_id = self.add_payloads(payload)?;
+            doc_ids.push(doc_id);
+        }
+        Ok(doc_ids)
+    }
+
+    /// Index a single document payload as a new chunk, sharing the same external ID.
+    /// This bypasses the overwrite check and always appends.
+    pub fn index_payload_chunk(&self, payload: DocumentPayload) -> Result<u64> {
+        self.check_closed()?;
+
+        // Embed payload into vector document
+        // We use a dummy ID (0) here because the real ID is assigned by LexicalEngine later
+        let document = self.embed_document_payload_internal(0, payload)?;
+        let doc_id = self.upsert_document_internal_chunk(document)?;
+        Ok(doc_id)
+    }
+
+    /// Index multiple document payloads as chunks.
+    pub fn index_payloads_chunk(&self, payloads: Vec<DocumentPayload>) -> Result<Vec<u64>> {
+        let mut doc_ids = Vec::with_capacity(payloads.len());
+        for payload in payloads {
+            let doc_id = self.index_payload_chunk(payload)?;
+            doc_ids.push(doc_id);
+        }
+        Ok(doc_ids)
     }
 
     /// Upsert a document with a specific document ID.
@@ -1173,14 +1245,21 @@ impl VectorEngine {
 
     /// Delete a document by its external ID.
     pub fn delete_document_by_id(&self, external_id: &str) -> Result<bool> {
-        if let Some(doc_id) = self
+        let doc_ids = self
             .metadata_index
-            .find_doc_id_by_term("_id", external_id)?
-        {
-            self.delete_vectors(doc_id)?;
-            // Lexical Deletion is handled in delete_vectors (if updated) or needs explicit call?
-            // delete_vectors calls delete_document_internal.
-            Ok(true)
+            .find_doc_ids_by_term("_id", external_id)?;
+
+        if !doc_ids.is_empty() {
+            let mut found = false;
+            for doc_id in doc_ids {
+                // Ignore not found errors for individual chunks (idempotency)
+                match self.delete_vectors(doc_id) {
+                    Ok(_) => found = true,
+                    Err(SarissaError::Other(ref msg)) if msg.starts_with("Not found") => continue,
+                    Err(e) => return Err(e),
+                }
+            }
+            Ok(found)
         } else {
             Ok(false)
         }

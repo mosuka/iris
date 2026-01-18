@@ -254,12 +254,69 @@ impl LexicalEngine {
     ///
     /// Returns `true` if the document was found and deleted, `false` otherwise.
     pub fn delete_document_by_id(&self, external_id: &str) -> Result<bool> {
-        if let Some(doc_id) = self.find_doc_id_by_term("_id", external_id)? {
-            self.delete_document(doc_id)?;
-            Ok(true)
-        } else {
-            Ok(false)
+        let count = self.delete_documents_by_term("_id", external_id)?;
+        Ok(count > 0)
+    }
+
+    /// Find all internal document IDs for a given term (field:value).
+    ///
+    /// This searches both the uncommitted in-memory buffer (via Writer) and
+    /// the committed index (via Searcher).
+    pub fn find_doc_ids_by_term(&self, field: &str, term: &str) -> Result<Vec<u64>> {
+        let mut ids = Vec::new();
+
+        // 1. Check writer (NRT - Uncommitted)
+        {
+            let guard = self.writer_cache.lock();
+            if let Some(writer) = guard.as_ref() {
+                if let Some(writer_ids) = writer.find_doc_ids_by_term(field, term)? {
+                    ids.extend(writer_ids);
+                }
+            }
         }
+
+        // 2. Check reader (Committed)
+        use crate::lexical::index::inverted::query::Query;
+        use crate::lexical::index::inverted::query::term::TermQuery;
+
+        let query = Box::new(TermQuery::new(field, term)) as Box<dyn Query>;
+        let request = LexicalSearchRequest::new(query)
+            .max_docs(usize::MAX) // Retrieve all matches
+            .load_documents(false);
+
+        let results = self.search(request)?;
+        for hit in results.hits {
+            if !ids.contains(&hit.doc_id) {
+                ids.push(hit.doc_id);
+            }
+        }
+
+        Ok(ids)
+    }
+
+    /// Delete all documents matching a given term (field:value).
+    ///
+    /// Returns the number of deleted documents.
+    /// Note: You must call `commit()` to persist the changes.
+    pub fn delete_documents_by_term(&self, field: &str, term: &str) -> Result<usize> {
+        let ids = self.find_doc_ids_by_term(field, term)?;
+        let count = ids.len();
+
+        if count == 0 {
+            return Ok(0);
+        }
+
+        let mut guard = self.writer_cache.lock();
+        if guard.is_none() {
+            *guard = Some(self.index.writer()?);
+        }
+        let writer = guard.as_mut().unwrap();
+
+        for doc_id in ids {
+            writer.delete_document(doc_id)?;
+        }
+
+        Ok(count)
     }
 
     /// Find the internal document ID for a given term (field:value).
