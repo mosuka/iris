@@ -109,9 +109,11 @@ impl VectorSearchRequestBuilder {
     pub fn field(mut self, field: impl Into<String>) -> Self {
         let field = field.into();
         if let Some(fields) = &mut self.request.fields {
-            fields.push(FieldSelector::Exact(field));
+            fields.push(crate::vector::engine::request::FieldSelector::Exact(field));
         } else {
-            self.request.fields = Some(vec![FieldSelector::Exact(field)]);
+            self.request.fields = Some(vec![crate::vector::engine::request::FieldSelector::Exact(
+                field,
+            )]);
         }
         self
     }

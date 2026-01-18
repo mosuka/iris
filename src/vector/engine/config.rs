@@ -40,6 +40,7 @@ use serde::{Deserialize, Serialize};
 use crate::embedding::embedder::Embedder;
 use crate::embedding::precomputed::PrecomputedEmbedder;
 use crate::error::{Result, SarissaError};
+use crate::lexical::engine::config::LexicalIndexConfig;
 use crate::maintenance::deletion::DeletionConfig;
 use crate::vector::DistanceMetric;
 
@@ -113,6 +114,9 @@ pub struct VectorIndexConfig {
 
     /// Shard ID for the collection.
     pub shard_id: u16,
+
+    /// Metadata index configuration (LexicalEngine).
+    pub metadata_config: LexicalIndexConfig,
 }
 
 impl std::fmt::Debug for VectorIndexConfig {
@@ -128,7 +132,9 @@ impl std::fmt::Debug for VectorIndexConfig {
             .field("implicit_schema", &self.implicit_schema)
             .field("embedder", &format_args!("{:?}", self.embedder))
             .field("deletion_config", &self.deletion_config)
+            .field("deletion_config", &self.deletion_config)
             .field("shard_id", &self.shard_id)
+            .field("metadata_config", &self.metadata_config)
             .finish()
     }
 }
@@ -218,6 +224,7 @@ pub struct VectorIndexConfigBuilder {
     implicit_schema: bool,
     deletion_config: Option<DeletionConfig>,
     shard_id: Option<u16>,
+    metadata_config: Option<LexicalIndexConfig>,
 }
 
 impl VectorIndexConfigBuilder {
@@ -235,6 +242,7 @@ impl VectorIndexConfigBuilder {
             implicit_schema: false,
             deletion_config: None,
             shard_id: None,
+            metadata_config: None,
         }
     }
 
@@ -368,6 +376,12 @@ impl VectorIndexConfigBuilder {
         self
     }
 
+    /// Set metadata index configuration.
+    pub fn metadata_config(mut self, config: LexicalIndexConfig) -> Self {
+        self.metadata_config = Some(config);
+        self
+    }
+
     /// Build the configuration.
     ///
     /// If no embedder is set, defaults to `PrecomputedEmbedder` for pre-computed vectors.
@@ -388,6 +402,7 @@ impl VectorIndexConfigBuilder {
             embedder,
             deletion_config: self.deletion_config.unwrap_or_default(),
             shard_id: self.shard_id.unwrap_or(0),
+            metadata_config: self.metadata_config.unwrap_or_default(),
         };
         config.validate()?;
         Ok(config)
@@ -408,7 +423,7 @@ impl Serialize for VectorIndexConfig {
     {
         use serde::ser::SerializeStruct;
 
-        let mut state = serializer.serialize_struct("VectorIndexConfig", 9)?;
+        let mut state = serializer.serialize_struct("VectorIndexConfig", 11)?;
         state.serialize_field("fields", &self.fields)?;
         state.serialize_field("default_fields", &self.default_fields)?;
         state.serialize_field("metadata", &self.metadata)?;
@@ -419,6 +434,7 @@ impl Serialize for VectorIndexConfig {
         state.serialize_field("implicit_schema", &self.implicit_schema)?;
         state.serialize_field("deletion_config", &self.deletion_config)?;
         state.serialize_field("shard_id", &self.shard_id)?;
+        state.serialize_field("metadata_config", &self.metadata_config)?;
         state.end()
     }
 }
@@ -449,6 +465,8 @@ impl<'de> Deserialize<'de> for VectorIndexConfig {
             deletion_config: DeletionConfig,
             #[serde(default)]
             shard_id: u16,
+            #[serde(default)]
+            metadata_config: LexicalIndexConfig,
         }
 
         let helper = VectorIndexConfigHelper::deserialize(deserializer)?;
@@ -463,6 +481,7 @@ impl<'de> Deserialize<'de> for VectorIndexConfig {
             implicit_schema: helper.implicit_schema,
             deletion_config: helper.deletion_config,
             shard_id: helper.shard_id,
+            metadata_config: helper.metadata_config,
             // Default to PrecomputedEmbedder; can be replaced programmatically
             embedder: Arc::new(PrecomputedEmbedder::new()),
         })

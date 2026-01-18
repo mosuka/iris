@@ -122,6 +122,19 @@ impl LexicalIndexFactory {
             } // Future implementations will be added here
         }
     }
+
+    /// Open or create a lexical index.
+    pub fn open_or_create(
+        storage: Arc<dyn Storage>,
+        config: LexicalIndexConfig,
+    ) -> Result<Box<dyn LexicalIndex>> {
+        match config {
+            LexicalIndexConfig::Inverted(inverted_config) => {
+                let index = InvertedIndex::open_or_create(storage, inverted_config)?;
+                Ok(Box::new(index))
+            }
+        }
+    }
 }
 
 #[cfg(test)]

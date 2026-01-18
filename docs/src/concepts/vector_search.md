@@ -181,7 +181,7 @@ The basic vector search query.
 - **Recall vs. Speed**: Adjusted via search parameters like `ef_search` for HNSW.
 
 ### Filtered Vector Search
-Combines vector search with boolean filters. Sarissa supports pre-filtering using registry filters to restrict the search space to documents matching specific metadata criteria.
+Combines vector search with boolean filters. Sarissa supports pre-filtering using metadata filters (backed by LexicalEngine) to restrict the search space to documents matching specific metadata criteria.
 
 ### Hybrid Search
 Leverages both Lexical and Vector engines simultaneously. Results are combined using algorithms like **Reciprocal Rank Fusion (RRF)** to produce a single, high-quality ranked list.
@@ -277,8 +277,8 @@ Example of a search restricted to a specific category.
 use sarissa::vector::engine::filter::{VectorFilter, FilterCondition};
 
 fn filtered_search(engine: &VectorEngine) -> sarissa::error::Result<()> {
-    let mut filter = VectorFilter::new();
-    filter.add_condition("category", FilterCondition::Equals("technology".to_string()));
+    let mut filter = VectorFilter::default();
+    filter.document.equals.insert("category".to_string(), "technology".to_string());
 
     let request = VectorSearchRequest {
         query_vectors: vec![/* query vector */],

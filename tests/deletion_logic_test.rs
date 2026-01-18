@@ -2,6 +2,7 @@
 mod tests {
     use sarissa::lexical::core::document::Document;
     use sarissa::lexical::core::field::TextOption;
+    use sarissa::lexical::engine::config::LexicalIndexConfig;
     use sarissa::lexical::index::inverted::writer::{
         InvertedIndexWriter, InvertedIndexWriterConfig,
     };
@@ -39,6 +40,7 @@ mod tests {
             embedder: Arc::new(sarissa::embedding::precomputed::PrecomputedEmbedder::new()),
             deletion_config: sarissa::maintenance::deletion::DeletionConfig::default(),
             shard_id: 0,
+            metadata_config: LexicalIndexConfig::default(),
         };
 
         let storage =
@@ -47,7 +49,7 @@ mod tests {
         let engine = VectorEngine::new(storage, config).unwrap();
 
         // 2. Add a document
-        let doc_id = 1;
+        let doc_id = 0;
         let mut doc_vector = DocumentVector::new();
         // Use set_field with StoredVector
         doc_vector.set_field("embedding", StoredVector::new(Arc::from(vec![0.1f32; 128])));
