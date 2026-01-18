@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tempfile::Builder;
 
+use sarissa::lexical::engine::config::LexicalIndexConfig;
 use sarissa::storage::file::FileStorageConfig;
 use sarissa::storage::{StorageConfig, StorageFactory};
 use sarissa::vector::core::distance::DistanceMetric;
@@ -36,6 +37,7 @@ fn test_vacuum_reduces_file_size() {
         embedder: Arc::new(sarissa::embedding::precomputed::PrecomputedEmbedder::new()),
         deletion_config: sarissa::maintenance::deletion::DeletionConfig::default(),
         shard_id: 0,
+        metadata_config: LexicalIndexConfig::default(),
     };
 
     // Correctly construct FileStorageConfig
@@ -173,6 +175,7 @@ fn test_vacuum_reduces_file_size_hnsw() {
         embedder: Arc::new(sarissa::embedding::precomputed::PrecomputedEmbedder::new()),
         deletion_config: sarissa::maintenance::deletion::DeletionConfig::default(),
         shard_id: 0,
+        metadata_config: LexicalIndexConfig::default(),
     };
 
     let file_config = FileStorageConfig::new(path.to_str().unwrap());

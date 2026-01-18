@@ -16,6 +16,7 @@ use crate::error::{Result, SarissaError};
 use crate::lexical::core::analyzed::{AnalyzedDocument, AnalyzedTerm};
 use crate::lexical::core::document::Document;
 use crate::lexical::core::field::FieldValue;
+use crate::lexical::index::inverted::IndexMetadata;
 use crate::lexical::index::inverted::core::posting::{Posting, TermPostingIndex};
 use crate::lexical::index::inverted::segment::SegmentInfo;
 use crate::lexical::index::structures::bkd_tree::BKDWriter;
@@ -95,6 +96,8 @@ pub struct WriterStats {
     pub memory_used: usize,
     /// Number of segments created.
     pub segments_created: u32,
+    /// Number of deleted documents (from persisted segments).
+    pub deleted_count: u64,
 }
 
 /// Inverted index writer implementation (schema-less mode).
@@ -125,6 +128,9 @@ pub struct InvertedIndexWriter {
 
     /// Writer statistics.
     stats: WriterStats,
+
+    /// Base metadata read at startup.
+    base_metadata: IndexMetadata,
 }
 
 impl std::fmt::Debug for InvertedIndexWriter {
@@ -171,6 +177,11 @@ impl InvertedIndexWriter {
         let initial_segment_name = format!("{}_{:06}", config.segment_prefix, current_segment);
         let doc_values_writer = DocValuesWriter::new(storage.clone(), initial_segment_name);
 
+        // Read existing metadata or use default
+        let base_metadata =
+            crate::lexical::index::inverted::InvertedIndex::read_metadata(storage.as_ref())
+                .unwrap_or_else(|_| IndexMetadata::default());
+
         Ok(InvertedIndexWriter {
             storage,
             config,
@@ -186,7 +197,9 @@ impl InvertedIndexWriter {
                 total_postings: 0,
                 memory_used: 0,
                 segments_created: 0,
+                deleted_count: 0,
             },
+            base_metadata,
         })
     }
 
@@ -899,6 +912,7 @@ impl InvertedIndexWriter {
 
         // Write index metadata
         self.write_index_metadata()?;
+        self.write_metadata_json()?;
 
         Ok(())
     }
@@ -920,6 +934,26 @@ impl InvertedIndexWriter {
         meta_writer.write_u32(self.stats.segments_created)?;
 
         meta_writer.close()?;
+        Ok(())
+    }
+
+    /// Write metadata.json (used by InvertedIndex).
+    fn write_metadata_json(&self) -> Result<()> {
+        let mut meta = self.base_metadata.clone();
+        meta.doc_count += self.stats.docs_added;
+        meta.deleted_count += self.stats.deleted_count;
+        meta.modified = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+        meta.generation += 1; // Increment generation
+
+        let metadata_json = serde_json::to_string_pretty(&meta)
+            .map_err(|e| SarissaError::index(format!("Failed to serialize metadata: {e}")))?;
+
+        let mut output = self.storage.create_output("metadata.json")?;
+        std::io::Write::write_all(&mut output, metadata_json.as_bytes())?;
+        output.close()?;
         Ok(())
     }
 
@@ -989,7 +1023,17 @@ impl InvertedIndexWriter {
         }
 
         // Rebuild in-memory inverted index and DocValues from the remaining buffered docs
-        self.rebuild_in_memory_index()
+        self.rebuild_in_memory_index()?;
+
+        if changed {
+            // Decrement docs_added for the removed document
+            // Note: remove_pending_document logic in upsert implies removing 1 old version
+            // But if we just removed it from buffer, we un-did the add.
+            if self.stats.docs_added > 0 {
+                self.stats.docs_added -= 1;
+            }
+        }
+        Ok(())
     }
 
     /// Rebuild the in-memory index and DocValues from buffered docs (used after removals).
@@ -1000,7 +1044,8 @@ impl InvertedIndexWriter {
         self.doc_values_writer = DocValuesWriter::new(self.storage.clone(), segment_name);
 
         // Reset stats counters that depend on buffered content
-        self.stats.docs_added = 0;
+        // Do NOT reset docs_added here, as it includes flushed docs.
+        // docs_added is adjusted in remove_pending_document directly.
         self.stats.unique_terms = 0;
         self.stats.total_postings = 0;
 
@@ -1015,7 +1060,7 @@ impl InvertedIndexWriter {
 
             // Re-add postings
             self.add_analyzed_document_to_index(id, &analyzed_doc)?;
-            self.stats.docs_added += 1;
+            // stats.docs_added is ALREADY accounting for these docs (except the one removed)
         }
 
         Ok(())
@@ -1024,7 +1069,7 @@ impl InvertedIndexWriter {
     /// Mark a persisted document as deleted.
     ///
     /// This updates the deletion bitmap for the segment containing the document.
-    fn mark_persisted_doc_deleted(&self, doc_id: u64) -> Result<()> {
+    fn mark_persisted_doc_deleted(&mut self, doc_id: u64) -> Result<()> {
         let segments = self.find_segments_for_doc(doc_id)?;
 
         for (segment_id, min_doc_id, max_doc_id) in segments {
@@ -1046,6 +1091,9 @@ impl InvertedIndexWriter {
 
             // Update segment metadata to reflect deletions
             self.update_segment_meta_deletions(&segment_id)?;
+
+            // Track globally
+            self.stats.deleted_count += 1;
         }
 
         Ok(())

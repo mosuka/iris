@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 use sarissa::embedding::embedder::{EmbedInput, EmbedInputType, Embedder};
 use sarissa::error::{Result, SarissaError};
+use sarissa::lexical::engine::config::LexicalIndexConfig;
 use sarissa::storage::memory::{MemoryStorage, MemoryStorageConfig};
 use sarissa::vector::DistanceMetric;
 use sarissa::vector::core::document::{DocumentPayload, Payload, PayloadSource};
@@ -68,6 +69,7 @@ async fn test_vector_segment_integration() {
         metadata: std::collections::HashMap::new(),
         deletion_config: sarissa::maintenance::deletion::DeletionConfig::default(),
         shard_id: 0,
+        metadata_config: LexicalIndexConfig::default(),
     };
 
     // We construct engine manually to inject storage

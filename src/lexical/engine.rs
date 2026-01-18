@@ -123,7 +123,7 @@ impl LexicalEngine {
     /// let engine = LexicalEngine::new(storage, LexicalIndexConfig::default()).unwrap();
     /// ```
     pub fn new(storage: Arc<dyn Storage>, config: LexicalIndexConfig) -> Result<Self> {
-        let index = LexicalIndexFactory::create(storage, config)?;
+        let index = LexicalIndexFactory::open_or_create(storage, config)?;
         Ok(Self {
             index,
             writer_cache: Mutex::new(None),
@@ -340,6 +340,7 @@ impl LexicalEngine {
         if let Some(mut writer) = self.writer_cache.lock().take() {
             writer.commit()?;
         }
+        self.index.refresh()?;
         *self.searcher_cache.write() = None;
         Ok(())
     }
@@ -400,7 +401,15 @@ impl LexicalEngine {
 
     /// Get index statistics.
     pub fn stats(&self) -> Result<InvertedIndexStats> {
-        self.index.stats()
+        let mut stats = self.index.stats()?;
+
+        // Add pending docs from writer cache
+        let guard = self.writer_cache.lock();
+        if let Some(writer) = guard.as_ref() {
+            stats.doc_count += writer.pending_docs();
+        }
+
+        Ok(stats)
     }
 
     /// Get the storage backend.

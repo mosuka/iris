@@ -59,6 +59,10 @@ pub struct IndexMetadata {
 
     /// Generation number for updates.
     pub generation: u64,
+
+    /// Number of deleted documents.
+    #[serde(default)]
+    pub deleted_count: u64,
 }
 
 /// Statistics about an inverted index.
@@ -96,6 +100,7 @@ impl Default for IndexMetadata {
             modified: now,
             doc_count: 0,
             generation: 0,
+            deleted_count: 0,
         }
     }
 }
@@ -172,6 +177,15 @@ impl InvertedIndex {
         Self::open(storage, config)
     }
 
+    /// Open or create an index.
+    pub fn open_or_create(storage: Arc<dyn Storage>, config: InvertedIndexConfig) -> Result<Self> {
+        if storage.file_exists("metadata.json") {
+            Self::open(storage, config)
+        } else {
+            Self::create(storage, config)
+        }
+    }
+
     /// Write metadata to storage.
     fn write_metadata(&self) -> Result<()> {
         let metadata = self.metadata.read();
@@ -187,7 +201,7 @@ impl InvertedIndex {
     }
 
     /// Read metadata from storage.
-    fn read_metadata(storage: &dyn Storage) -> Result<IndexMetadata> {
+    pub(crate) fn read_metadata(storage: &dyn Storage) -> Result<IndexMetadata> {
         let mut input = storage.open_input("metadata.json")?;
         let mut metadata_json = String::new();
         Read::read_to_string(&mut input, &mut metadata_json)?;
@@ -329,7 +343,7 @@ impl LexicalIndex for InvertedIndex {
             term_count: 0,
             segment_count: 0,
             total_size: 0,
-            deleted_count: 0,
+            deleted_count: metadata.deleted_count,
             last_modified: metadata.modified,
         })
     }
@@ -337,6 +351,13 @@ impl LexicalIndex for InvertedIndex {
     fn optimize(&self) -> Result<()> {
         self.check_closed()?;
         self.update_metadata()?;
+        Ok(())
+    }
+
+    fn refresh(&self) -> Result<()> {
+        self.check_closed()?;
+        let metadata = Self::read_metadata(self.storage.as_ref())?;
+        *self.metadata.write() = metadata;
         Ok(())
     }
 

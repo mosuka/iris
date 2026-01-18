@@ -62,7 +62,7 @@ fn test_wal_recovery_unflushed_data() -> Result<()> {
 
         let results = engine.search(request)?;
         assert!(!results.hits.is_empty(), "Should find hits after recovery");
-        assert_eq!(results.hits[0].doc_id, 1, "First doc should be ID 1");
+        assert_eq!(results.hits[0].doc_id, 0, "First doc should be ID 0");
 
         // 5. Add more data and COMMIT (flush)
         let mut doc = DocumentVector::new();
@@ -97,7 +97,7 @@ fn test_wal_recovery_unflushed_data() -> Result<()> {
             fields: None,
         });
         let results = engine.search(request)?;
-        assert_eq!(results.hits[0].doc_id, 4);
+        assert_eq!(results.hits[0].doc_id, 3);
     }
 
     Ok(())

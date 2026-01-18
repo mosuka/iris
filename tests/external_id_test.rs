@@ -55,6 +55,7 @@ async fn test_external_id_operations() -> sarissa::error::Result<()> {
         embedder: Arc::new(sarissa::embedding::precomputed::PrecomputedEmbedder::new()),
         deletion_config: Default::default(),
         shard_id: 0,
+        metadata_config: LexicalIndexConfig::default(),
     };
     let vector_engine = VectorEngine::new(storage.clone(), vector_config)?;
 

@@ -60,7 +60,19 @@ pub trait LexicalIndex: Send + Sync + std::fmt::Debug {
     ///
     /// Performs index optimization such as merging segments to improve query performance.
     /// Uses interior mutability for thread-safe access.
+    /// Optimize the index (merge segments, etc.).
+    ///
+    /// Performs index optimization such as merging segments to improve query performance.
+    /// Uses interior mutability for thread-safe access.
     fn optimize(&self) -> Result<()>;
+
+    /// Refresh the index metadata from storage.
+    ///
+    /// Should be called after external writes (e.g. by a Writer) to ensure
+    /// the index state (like document count) is up-to-date.
+    fn refresh(&self) -> Result<()> {
+        Ok(())
+    }
 
     /// Create a searcher tailored for this index implementation.
     ///

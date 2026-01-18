@@ -159,8 +159,9 @@ impl HybridIndex {
                     .top_k(vector_req.limit)
                     .min_similarity(vector_req.min_score);
 
-                let target_fields = if let Some(fields) = &query_vector.fields {
-                    fields.clone()
+                let target_fields: Vec<String> = if let Some(fields) = &query_vector.fields {
+                    let f: &Vec<String> = fields;
+                    f.clone()
                 } else {
                     self.vector_index.field_names()?
                 };

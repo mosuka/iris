@@ -12,6 +12,7 @@ Handles keyword-based full-text search.
 Handles semantic search using dense vectors.
 - **HNSW / IVF**: Pluggable vector indexing algorithms.
 - **Embeddings**: Optional integration with models to convert text/images to vectors.
+- **Metadata Store**: Integrated Lexical Engine for ID management and metadata filtering.
 
 ## 3. Hybrid Engine
 The unifying layer that coordinates Lexical and Vector engines.
@@ -56,6 +57,7 @@ graph TD
         VE --> HNSW
         VE --> WAL
         VE --> DelMgr
+        VE --> Meta[Lexical Engine (Metadata)]
     end
 
     subgraph "Storage Layer"
