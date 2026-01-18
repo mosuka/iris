@@ -347,6 +347,24 @@ impl InvertedIndexWriter {
         Ok(None)
     }
 
+    /// Find all internal document IDs for a given term (field:value).
+    ///
+    /// This searches both the in-memory buffer (uncommitted) and, in the future,
+    /// persisted segments (committed).
+    fn find_doc_ids_by_term(&self, field: &str, term: &str) -> Result<Option<Vec<u64>>> {
+        let full_term = format!("{field}:{term}");
+
+        // 1. Check in-memory inverted index
+        if let Some(posting_list) = self.inverted_index.get_posting_list(&full_term) {
+            let ids: Vec<u64> = posting_list.postings.iter().map(|p| p.doc_id).collect();
+            if !ids.is_empty() {
+                return Ok(Some(ids));
+            }
+        }
+
+        Ok(None)
+    }
+
     /// Analyze a document into terms.
     fn analyze_document(&mut self, doc: Document) -> Result<AnalyzedDocument> {
         let mut field_terms = AHashMap::new();
@@ -1265,5 +1283,9 @@ impl LexicalIndexWriter for InvertedIndexWriter {
 
     fn find_doc_id_by_term(&self, field: &str, term: &str) -> Result<Option<u64>> {
         InvertedIndexWriter::find_doc_id_by_term(self, field, term)
+    }
+
+    fn find_doc_ids_by_term(&self, field: &str, term: &str) -> Result<Option<Vec<u64>>> {
+        InvertedIndexWriter::find_doc_ids_by_term(self, field, term)
     }
 }
