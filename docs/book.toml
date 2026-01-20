@@ -5,8 +5,7 @@ src = "src"
 title = "Iris Documentation"
 
 [output.html]
-git-repository-url = "https://github.com/mosuka/iris"
-site-url = "/iris/"
 
 [preprocessor.mermaid]
 command = "mdbook-mermaid"
+
