@@ -12,7 +12,6 @@
 //! ```
 
 #[cfg(feature = "embeddings-candle")]
-use std::collections::HashMap;
 #[cfg(feature = "embeddings-candle")]
 use std::sync::Arc;
 
@@ -35,7 +34,9 @@ use sarissa::vector::core::document::DocumentPayload;
 #[cfg(feature = "embeddings-candle")]
 use sarissa::vector::engine::VectorEngine;
 #[cfg(feature = "embeddings-candle")]
-use sarissa::vector::engine::config::{VectorFieldConfig, VectorIndexConfig, VectorIndexKind};
+use sarissa::vector::engine::config::{
+    HnswOption, VectorFieldConfig, VectorOption, VectorIndexConfig,
+};
 #[cfg(feature = "embeddings-candle")]
 use sarissa::vector::engine::query::VectorSearchRequestBuilder;
 #[cfg(feature = "embeddings-candle")]
@@ -64,11 +65,15 @@ fn main() -> Result<()> {
     // 3. Configure Index with HNSW
     println!("Configuring HNSW index...");
     let field_config = VectorFieldConfig {
-        dimension: 384,
-        distance: DistanceMetric::Cosine,
-        index: VectorIndexKind::Hnsw, // Use HNSW index
-        metadata: HashMap::new(),
-        base_weight: 1.0,
+        vector: Some(VectorOption::Hnsw(HnswOption {
+            dimension: 4,
+            distance: DistanceMetric::Cosine,
+            m: 16,
+            ef_construction: 200,
+            base_weight: 1.0,
+            quantizer: None,
+        })),
+        lexical: None,
     };
 
     let index_config = VectorIndexConfig::builder()

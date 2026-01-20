@@ -28,7 +28,7 @@ pub struct HnswFieldReader {
 
 impl HnswFieldReader {
     /// Default ef_search parameter value.
-    pub const DEFAULT_EF_SEARCH: usize = 50;
+    pub const DEFAULT_EF_SEARCH: usize = 500;
 
     /// Create a new HNSW field reader.
     ///

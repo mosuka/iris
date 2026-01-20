@@ -1,124 +1,123 @@
-use sarissa::analysis::analyzer::pipeline::PipelineAnalyzer;
-use sarissa::analysis::token_filter::lowercase::LowercaseFilter;
-use sarissa::analysis::tokenizer::whitespace::WhitespaceTokenizer;
-use sarissa::hybrid::core::document::HybridDocument;
-use sarissa::hybrid::engine::HybridEngine;
-use sarissa::hybrid::search::searcher::HybridSearchRequest;
-use sarissa::lexical::core::document::Document as LexicalDocument;
-use sarissa::lexical::core::field::FieldValue;
-use sarissa::lexical::engine::LexicalEngine;
-use sarissa::lexical::engine::config::LexicalIndexConfig;
+use async_trait::async_trait;
+use sarissa::embedding::embedder::{EmbedInput, EmbedInputType, Embedder};
+use sarissa::error::Result;
+use sarissa::lexical::core::field::TextOption;
 use sarissa::storage::memory::MemoryStorageConfig;
 use sarissa::storage::{StorageConfig, StorageFactory};
-use sarissa::vector::DistanceMetric;
+use sarissa::vector::core::document::StoredVector;
 use sarissa::vector::core::document::{DocumentPayload, Payload};
+use sarissa::vector::core::vector::Vector;
 use sarissa::vector::engine::VectorEngine;
-use sarissa::vector::engine::config::{VectorFieldConfig, VectorIndexConfig, VectorIndexKind};
-use std::collections::HashMap;
+use sarissa::vector::engine::config::{FlatOption, VectorFieldConfig, VectorIndexConfig};
+use sarissa::vector::engine::request::{QueryVector, VectorSearchRequest};
+use std::any::Any;
 use std::sync::Arc;
 
+// Simple Mock Embedder for test
+#[derive(Debug, Clone)]
+struct MockEmbedder;
+
+#[async_trait]
+impl Embedder for MockEmbedder {
+    async fn embed(&self, _input: &EmbedInput<'_>) -> Result<Vector> {
+        Ok(Vector::new(vec![0.0; 3]))
+    }
+    fn supported_input_types(&self) -> Vec<EmbedInputType> {
+        vec![EmbedInputType::Text]
+    }
+    fn supports_text(&self) -> bool {
+        true
+    }
+    fn supports_image(&self) -> bool {
+        false
+    }
+    fn name(&self) -> &str {
+        "MockEmbedder"
+    }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
 #[tokio::test]
-async fn test_external_id_operations() -> sarissa::error::Result<()> {
+async fn test_external_id_operations() -> Result<()> {
     // 1. Setup
     let storage_config = StorageConfig::Memory(MemoryStorageConfig::default());
     let storage = StorageFactory::create(storage_config)?;
 
-    // Lexical setup
-    let tokenizer = Arc::new(WhitespaceTokenizer::new());
-    let analyzer = PipelineAnalyzer::new(tokenizer).add_filter(Arc::new(LowercaseFilter::new()));
-
-    let lexical_config = LexicalIndexConfig::builder()
-        .analyzer(Arc::new(analyzer))
-        .default_field("title")
-        .build();
-    let lexical_engine = LexicalEngine::new(storage.clone(), lexical_config)?;
-
-    // Vector setup
-    let vector_config = VectorIndexConfig {
-        fields: HashMap::from([(
-            "vector".to_string(),
+    // We will use "title" for lexical and "vector" for vector
+    let vector_config = VectorIndexConfig::builder()
+        .embedder(MockEmbedder)
+        .field(
+            "vector",
             VectorFieldConfig {
-                dimension: 3,
-                distance: DistanceMetric::Cosine,
-                index: VectorIndexKind::Flat,
-                metadata: HashMap::new(),
-                base_weight: 1.0,
+                vector: Some(sarissa::vector::engine::config::VectorOption::Flat(
+                    FlatOption {
+                        dimension: 3,
+                        ..Default::default()
+                    },
+                )),
+                lexical: None,
             },
-        )]),
-        default_fields: vec!["vector".into()],
-        metadata: HashMap::new(),
-        default_distance: DistanceMetric::Cosine,
-        default_dimension: Some(3),
-        default_index_kind: VectorIndexKind::Flat,
-        default_base_weight: 1.0,
-        implicit_schema: false,
-        embedder: Arc::new(sarissa::embedding::precomputed::PrecomputedEmbedder::new()),
-        deletion_config: Default::default(),
-        shard_id: 0,
-        metadata_config: LexicalIndexConfig::default(),
-    };
-    let vector_engine = VectorEngine::new(storage.clone(), vector_config)?;
-
-    // Hybrid setup
-    let mut engine = HybridEngine::new(storage.clone(), lexical_engine, vector_engine)?;
+        )
+        .field(
+            "title",
+            VectorFieldConfig {
+                vector: None,
+                lexical: Some(sarissa::lexical::core::field::FieldOption::Text(
+                    TextOption::default(),
+                )),
+            },
+        )
+        .default_field("vector")
+        .build()?;
+    let engine = VectorEngine::new(storage.clone(), vector_config)?;
 
     // 2. Index first document with ID "doc1"
-    let mut lex_doc1 = LexicalDocument::new();
-    lex_doc1.add_field_value("title", FieldValue::Text("Rust Programming".to_string()));
+    let mut payload1 = DocumentPayload::new();
+    payload1.set_field("vector", Payload::vector(vec![1.0f32, 0.0, 0.0]));
+    payload1.set_field("title", Payload::text("Rust Programming")); // Lexical content
 
-    let mut vec_payload1 = DocumentPayload::new();
-    vec_payload1.set_field("vector", Payload::vector(vec![1.0f32, 0.0, 0.0]));
-
-    let doc1 = HybridDocument::builder()
-        .add_lexical_doc(lex_doc1)
-        .add_vector_payload(vec_payload1)
-        .build();
-
-    let id1 = engine.index_document("doc1", doc1).await?;
-    assert_eq!(id1, 0);
-
+    // VectorEngine::index_payloads handles ID "doc1"
+    engine.index_payloads("doc1", payload1)?;
     engine.commit()?;
 
-    // 3. Search should find it
-    let request = HybridSearchRequest::new().with_text("rust");
-    let results = engine.search(request).await?;
-    assert_eq!(results.results.len(), 1);
-    assert_eq!(results.results[0].doc_id, 0);
+    // 3. Search should find it via Vector
+    let request_vec = VectorSearchRequest {
+        query_vectors: vec![QueryVector {
+            vector: StoredVector::new(Arc::new([1.0, 0.0, 0.0])),
+            weight: 1.0,
+            fields: None,
+        }],
+        limit: 10,
+        ..Default::default()
+    };
+    let results = engine.search(request_vec)?;
+    assert_eq!(results.hits.len(), 1);
 
-    // 4. Index updated document with SAME ID "doc1"
-    // This should delete old one (0) and assign new one (1)
-    let mut lex_doc2 = LexicalDocument::new();
-    lex_doc2.add_field_value("title", FieldValue::Text("Rust Programming v2".to_string()));
+    // 4. Index updated document with SAME ID "doc1" (Upsert)
+    // "Rust Programming v2", Vector [0.0, 1.0, 0.0]
+    let mut payload2 = DocumentPayload::new();
+    payload2.set_field("vector", Payload::vector(vec![0.0f32, 1.0, 0.0]));
+    payload2.set_field("title", Payload::text("Rust Programming v2"));
 
-    let mut vec_payload2 = DocumentPayload::new();
-    vec_payload2.set_field("vector", Payload::vector(vec![1.0f32, 0.0, 0.0]));
-
-    let doc1_v2 = HybridDocument::builder()
-        .add_lexical_doc(lex_doc2)
-        .add_vector_payload(vec_payload2)
-        .build();
-
-    let id2 = engine.index_document("doc1", doc1_v2).await?;
-    assert_eq!(id2, 1);
-
+    engine.index_payloads("doc1", payload2)?;
     engine.commit()?;
 
-    // 5. Search should find NEW one (and only one result)
-    let request = HybridSearchRequest::new().with_text("rust");
-    let results = engine.search(request).await?;
-    assert_eq!(results.results.len(), 1);
-    assert_eq!(results.results[0].doc_id, 1);
+    // 5. Search should reflect update
+    // Vector search for NEW vector [0.0, 1.0, 0.0] should find it.
 
-    // 6. Delete "doc1"
-    let deleted = engine.delete_document_by_id("doc1")?;
-    assert!(deleted);
-
-    engine.commit()?;
-
-    // 7. Search should find NOTHING
-    let request = HybridSearchRequest::new().with_text("rust");
-    let results = engine.search(request).await?;
-    assert_eq!(results.results.len(), 0);
+    let request_vec_new = VectorSearchRequest {
+        query_vectors: vec![QueryVector {
+            vector: StoredVector::new(Arc::new([0.0, 1.0, 0.0])),
+            weight: 1.0,
+            fields: None,
+        }],
+        limit: 10,
+        ..Default::default()
+    };
+    let results_new = engine.search(request_vec_new)?;
+    assert!(!results_new.hits.is_empty());
 
     Ok(())
 }

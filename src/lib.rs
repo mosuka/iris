@@ -15,7 +15,6 @@ pub mod analysis;
 
 pub mod embedding;
 pub mod error;
-pub mod hybrid;
 
 pub mod lexical;
 pub mod maintenance;

@@ -12,7 +12,6 @@
 //! ```
 
 #[cfg(feature = "embeddings-candle")]
-use std::collections::HashMap;
 #[cfg(feature = "embeddings-candle")]
 use std::sync::Arc;
 
@@ -35,7 +34,9 @@ use sarissa::vector::core::document::DocumentPayload;
 #[cfg(feature = "embeddings-candle")]
 use sarissa::vector::engine::VectorEngine;
 #[cfg(feature = "embeddings-candle")]
-use sarissa::vector::engine::config::{VectorFieldConfig, VectorIndexConfig, VectorIndexKind};
+use sarissa::vector::engine::config::{
+    FlatOption, VectorFieldConfig, VectorOption, VectorIndexConfig,
+};
 #[cfg(feature = "embeddings-candle")]
 use sarissa::vector::engine::query::VectorSearchRequestBuilder;
 #[cfg(feature = "embeddings-candle")]
@@ -67,11 +68,13 @@ fn main() -> Result<()> {
 
     // 3. Configure Index
     let field_config = VectorFieldConfig {
-        dimension: 384, // Dimension for all-MiniLM-L6-v2
-        distance: DistanceMetric::Cosine,
-        index: VectorIndexKind::Flat,
-        metadata: HashMap::new(),
-        base_weight: 1.0,
+        vector: Some(VectorOption::Flat(FlatOption {
+            dimension: 384,
+            distance: DistanceMetric::Cosine,
+            base_weight: 1.0,
+            quantizer: None,
+        })),
+        lexical: None,
     };
 
     let index_config = VectorIndexConfig::builder()

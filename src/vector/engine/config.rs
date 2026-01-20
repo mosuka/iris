@@ -37,12 +37,14 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
-use crate::embedding::embedder::Embedder;
+use crate::embedding::embedder::{EmbedInput, EmbedInputType, Embedder};
 use crate::embedding::precomputed::PrecomputedEmbedder;
 use crate::error::{Result, SarissaError};
 use crate::lexical::engine::config::LexicalIndexConfig;
 use crate::maintenance::deletion::DeletionConfig;
-use crate::vector::DistanceMetric;
+use crate::vector::core::distance::DistanceMetric;
+use crate::vector::core::quantization;
+use crate::vector::core::vector::Vector;
 
 /// Configuration for a single vector collection.
 ///
@@ -75,6 +77,443 @@ use crate::vector::DistanceMetric;
 /// # }
 /// # }
 /// ```
+/// Mode of index loading.
+///
+/// Controls how the index data is loaded from storage.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum IndexLoadingMode {
+    /// Load the entire index into memory (RAM).
+    ///
+    /// This provides the fastest search speed but requires memory
+    /// proportional to the index size.
+    InMemory,
+    /// Use memory-mapped files (mmap) to access the index.
+    ///
+    /// This allows accessing the index without loading the entire
+    /// data into RAM, relying on the OS page cache. This is ideal
+    /// for large datasets that exceed available RAM.
+    Mmap,
+}
+
+impl Default for IndexLoadingMode {
+    fn default() -> Self {
+        Self::InMemory
+    }
+}
+
+/// Vector index configuration enum that specifies which index type to use.
+///
+/// This enum provides a unified way to configure different vector index types.
+/// Each variant contains the type-specific configuration.
+///
+/// # Example
+///
+/// ```rust
+/// use sarissa::vector::index::config::{VectorIndexTypeConfig, HnswIndexConfig};
+/// use sarissa::vector::core::distance::DistanceMetric;
+///
+/// let hnsw_config = HnswIndexConfig {
+///     dimension: 384,
+///     distance_metric: DistanceMetric::Cosine,
+///     m: 16,
+///     ef_construction: 200,
+///     ..Default::default()
+/// };
+/// let config = VectorIndexTypeConfig::HNSW(hnsw_config);
+/// ```
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub enum VectorIndexTypeConfig {
+    /// Flat index configuration
+    Flat(FlatIndexConfig),
+    /// HNSW index configuration
+    HNSW(HnswIndexConfig),
+    /// IVF index configuration
+    IVF(IvfIndexConfig),
+}
+
+impl Default for VectorIndexTypeConfig {
+    fn default() -> Self {
+        VectorIndexTypeConfig::Flat(FlatIndexConfig::default())
+    }
+}
+
+impl VectorIndexTypeConfig {
+    /// Get the index type as a string.
+    pub fn index_type_name(&self) -> &'static str {
+        match self {
+            VectorIndexTypeConfig::Flat(_) => "Flat",
+            VectorIndexTypeConfig::HNSW(_) => "HNSW",
+            VectorIndexTypeConfig::IVF(_) => "IVF",
+        }
+    }
+
+    /// Get the dimension from the config.
+    pub fn dimension(&self) -> usize {
+        match self {
+            VectorIndexTypeConfig::Flat(config) => config.dimension,
+            VectorIndexTypeConfig::HNSW(config) => config.dimension,
+            VectorIndexTypeConfig::IVF(config) => config.dimension,
+        }
+    }
+
+    /// Get the distance metric from the config.
+    pub fn distance_metric(&self) -> DistanceMetric {
+        match self {
+            VectorIndexTypeConfig::Flat(config) => config.distance_metric,
+            VectorIndexTypeConfig::HNSW(config) => config.distance_metric,
+            VectorIndexTypeConfig::IVF(config) => config.distance_metric,
+        }
+    }
+
+    /// Get the max vectors per segment from the config.
+    pub fn max_vectors_per_segment(&self) -> u64 {
+        match self {
+            VectorIndexTypeConfig::Flat(config) => config.max_vectors_per_segment,
+            VectorIndexTypeConfig::HNSW(config) => config.max_vectors_per_segment,
+            VectorIndexTypeConfig::IVF(config) => config.max_vectors_per_segment,
+        }
+    }
+
+    /// Get the merge factor from the config.
+    pub fn merge_factor(&self) -> u32 {
+        match self {
+            VectorIndexTypeConfig::Flat(config) => config.merge_factor,
+            VectorIndexTypeConfig::HNSW(config) => config.merge_factor,
+            VectorIndexTypeConfig::IVF(config) => config.merge_factor,
+        }
+    }
+}
+
+/// Configuration specific to Flat index.
+///
+/// These settings control the behavior of the flat index implementation,
+/// including segment management, buffering, and storage options.
+#[derive(Clone, Serialize, Deserialize)]
+pub struct FlatIndexConfig {
+    /// Vector dimension.
+    pub dimension: usize,
+
+    /// Index loading mode.
+    #[serde(default)]
+    pub loading_mode: IndexLoadingMode,
+
+    /// Distance metric to use.
+    pub distance_metric: DistanceMetric,
+
+    /// Whether to normalize vectors.
+    pub normalize_vectors: bool,
+
+    /// Maximum number of vectors per segment.
+    ///
+    /// When a segment reaches this size, it will be considered for merging.
+    /// Larger values reduce merge overhead but increase memory usage.
+    pub max_vectors_per_segment: u64,
+
+    /// Buffer size for writing operations (in bytes).
+    ///
+    /// Controls how much data is buffered in memory before being flushed to disk.
+    /// Larger buffers improve write performance but use more memory.
+    pub write_buffer_size: usize,
+
+    /// Whether to use quantization.
+    pub use_quantization: bool,
+
+    /// Quantization method.
+    pub quantization_method: quantization::QuantizationMethod,
+
+    /// Merge factor for segment merging.
+    ///
+    /// Controls how many segments are merged at once. Higher values reduce
+    /// the number of merge operations but create larger temporary segments.
+    pub merge_factor: u32,
+
+    /// Maximum number of segments before merging.
+    ///
+    /// When the number of segments exceeds this threshold, a merge operation
+    /// will be triggered to consolidate them.
+    pub max_segments: u32,
+
+    /// Embedder for converting text/images to vectors.
+    ///
+    /// This embedder is used when documents contain text or image fields that need to be
+    /// converted to vector representations. For field-specific embedders, use
+    /// `PerFieldEmbedder`.
+    #[serde(skip)]
+    #[serde(default = "default_embedder")]
+    pub embedder: Arc<dyn Embedder>,
+}
+
+/// Default embedder for index configurations.
+///
+/// This is a mock embedder that returns zero vectors. In production use,
+/// you should provide a real embedder implementation.
+fn default_embedder() -> Arc<dyn Embedder> {
+    use async_trait::async_trait;
+
+    #[derive(Debug)]
+    struct MockEmbedder;
+
+    #[async_trait]
+    impl Embedder for MockEmbedder {
+        async fn embed(&self, _input: &EmbedInput<'_>) -> Result<Vector> {
+            Ok(Vector::new(vec![0.0; 384]))
+        }
+
+        fn supported_input_types(&self) -> Vec<EmbedInputType> {
+            vec![EmbedInputType::Text]
+        }
+
+        fn name(&self) -> &str {
+            "MockEmbedder"
+        }
+
+        fn as_any(&self) -> &dyn std::any::Any {
+            self
+        }
+    }
+
+    Arc::new(MockEmbedder)
+}
+
+impl Default for FlatIndexConfig {
+    fn default() -> Self {
+        Self {
+            dimension: 128,
+            loading_mode: IndexLoadingMode::default(),
+            distance_metric: DistanceMetric::Cosine,
+
+            normalize_vectors: true,
+            max_vectors_per_segment: 1000000,
+            write_buffer_size: 1024 * 1024, // 1MB
+            use_quantization: false,
+            quantization_method: quantization::QuantizationMethod::None,
+            merge_factor: 10,
+            max_segments: 100,
+            embedder: default_embedder(),
+        }
+    }
+}
+
+impl std::fmt::Debug for FlatIndexConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("FlatIndexConfig")
+            .field("dimension", &self.dimension)
+            .field("dimension", &self.dimension)
+            .field("loading_mode", &self.loading_mode)
+            .field("distance_metric", &self.distance_metric)
+            .field("distance_metric", &self.distance_metric)
+            .field("normalize_vectors", &self.normalize_vectors)
+            .field("max_vectors_per_segment", &self.max_vectors_per_segment)
+            .field("write_buffer_size", &self.write_buffer_size)
+            .field("use_quantization", &self.use_quantization)
+            .field("quantization_method", &self.quantization_method)
+            .field("merge_factor", &self.merge_factor)
+            .field("max_segments", &self.max_segments)
+            .field("embedder", &self.embedder.name())
+            .finish()
+    }
+}
+
+/// Configuration specific to HNSW index.
+///
+/// These settings control the behavior of the HNSW (Hierarchical Navigable Small World)
+/// index implementation, including graph construction parameters and storage options.
+#[derive(Clone, Serialize, Deserialize)]
+pub struct HnswIndexConfig {
+    /// Vector dimension.
+    pub dimension: usize,
+
+    /// Index loading mode.
+    #[serde(default)]
+    pub loading_mode: IndexLoadingMode,
+
+    /// Distance metric to use.
+    pub distance_metric: DistanceMetric,
+
+    /// Whether to normalize vectors.
+    pub normalize_vectors: bool,
+
+    /// Number of bi-directional links created for every new element during construction.
+    ///
+    /// Higher values improve recall but increase memory usage and construction time.
+    pub m: usize,
+
+    /// Size of the dynamic candidate list during construction.
+    ///
+    /// Higher values improve index quality but increase construction time.
+    pub ef_construction: usize,
+
+    /// Maximum number of vectors per segment.
+    pub max_vectors_per_segment: u64,
+
+    /// Buffer size for writing operations (in bytes).
+    pub write_buffer_size: usize,
+
+    /// Whether to use quantization.
+    pub use_quantization: bool,
+
+    /// Quantization method.
+    pub quantization_method: quantization::QuantizationMethod,
+
+    /// Merge factor for segment merging.
+    pub merge_factor: u32,
+
+    /// Maximum number of segments before merging.
+    pub max_segments: u32,
+
+    /// Embedder for converting text/images to vectors.
+    ///
+    /// This embedder is used when documents contain text or image fields that need to be
+    /// converted to vector representations. For field-specific embedders, use
+    /// `PerFieldEmbedder`.
+    #[serde(skip)]
+    #[serde(default = "default_embedder")]
+    pub embedder: Arc<dyn Embedder>,
+}
+
+impl Default for HnswIndexConfig {
+    fn default() -> Self {
+        Self {
+            dimension: 128,
+            loading_mode: IndexLoadingMode::default(),
+            distance_metric: DistanceMetric::Cosine,
+
+            normalize_vectors: true,
+            m: 16,
+            ef_construction: 200,
+            max_vectors_per_segment: 1000000,
+            write_buffer_size: 1024 * 1024, // 1MB
+            use_quantization: false,
+            quantization_method: quantization::QuantizationMethod::None,
+            merge_factor: 10,
+            max_segments: 100,
+            embedder: default_embedder(),
+        }
+    }
+}
+
+impl std::fmt::Debug for HnswIndexConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("HnswIndexConfig")
+            .field("dimension", &self.dimension)
+            .field("dimension", &self.dimension)
+            .field("loading_mode", &self.loading_mode)
+            .field("distance_metric", &self.distance_metric)
+            .field("distance_metric", &self.distance_metric)
+            .field("normalize_vectors", &self.normalize_vectors)
+            .field("m", &self.m)
+            .field("ef_construction", &self.ef_construction)
+            .field("max_vectors_per_segment", &self.max_vectors_per_segment)
+            .field("write_buffer_size", &self.write_buffer_size)
+            .field("use_quantization", &self.use_quantization)
+            .field("quantization_method", &self.quantization_method)
+            .field("merge_factor", &self.merge_factor)
+            .field("max_segments", &self.max_segments)
+            .field("embedder", &self.embedder.name())
+            .finish()
+    }
+}
+
+/// Configuration specific to IVF index.
+///
+/// These settings control the behavior of the IVF (Inverted File)
+/// index implementation, including clustering parameters and storage options.
+#[derive(Clone, Serialize, Deserialize)]
+pub struct IvfIndexConfig {
+    /// Vector dimension.
+    pub dimension: usize,
+
+    /// Index loading mode.
+    #[serde(default)]
+    pub loading_mode: IndexLoadingMode,
+
+    /// Distance metric to use.
+    pub distance_metric: DistanceMetric,
+
+    /// Whether to normalize vectors.
+    pub normalize_vectors: bool,
+
+    /// Number of clusters for IVF.
+    ///
+    /// Higher values improve search quality but increase memory usage
+    /// and construction time.
+    pub n_clusters: usize,
+
+    /// Number of clusters to probe during search.
+    ///
+    /// Higher values improve recall but increase search time.
+    pub n_probe: usize,
+
+    /// Maximum number of vectors per segment.
+    pub max_vectors_per_segment: u64,
+
+    /// Buffer size for writing operations (in bytes).
+    pub write_buffer_size: usize,
+
+    /// Whether to use quantization.
+    pub use_quantization: bool,
+
+    /// Quantization method.
+    pub quantization_method: quantization::QuantizationMethod,
+
+    /// Merge factor for segment merging.
+    pub merge_factor: u32,
+
+    /// Maximum number of segments before merging.
+    pub max_segments: u32,
+
+    /// Embedder for converting text/images to vectors.
+    ///
+    /// This embedder is used when documents contain text or image fields that need to be
+    /// converted to vector representations. For field-specific embedders, use
+    /// `PerFieldEmbedder`.
+    #[serde(skip)]
+    #[serde(default = "default_embedder")]
+    pub embedder: Arc<dyn Embedder>,
+}
+
+impl Default for IvfIndexConfig {
+    fn default() -> Self {
+        Self {
+            dimension: 128,
+            loading_mode: IndexLoadingMode::default(),
+            distance_metric: DistanceMetric::Cosine,
+
+            normalize_vectors: true,
+            n_clusters: 100,
+            n_probe: 1,
+            max_vectors_per_segment: 1000000,
+            write_buffer_size: 1024 * 1024, // 1MB
+            use_quantization: false,
+            quantization_method: quantization::QuantizationMethod::None,
+            merge_factor: 10,
+            max_segments: 100,
+            embedder: default_embedder(),
+        }
+    }
+}
+
+impl std::fmt::Debug for IvfIndexConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("IvfIndexConfig")
+            .field("dimension", &self.dimension)
+            .field("loading_mode", &self.loading_mode)
+            .field("distance_metric", &self.distance_metric)
+            .field("normalize_vectors", &self.normalize_vectors)
+            .field("n_clusters", &self.n_clusters)
+            .field("n_probe", &self.n_probe)
+            .field("max_vectors_per_segment", &self.max_vectors_per_segment)
+            .field("write_buffer_size", &self.write_buffer_size)
+            .field("use_quantization", &self.use_quantization)
+            .field("quantization_method", &self.quantization_method)
+            .field("merge_factor", &self.merge_factor)
+            .field("max_segments", &self.max_segments)
+            .field("embedder", &self.embedder.name())
+            .finish()
+    }
+}
 #[derive(Clone)]
 pub struct VectorIndexConfig {
     /// Field configurations.
@@ -186,7 +625,7 @@ impl VectorIndexConfig {
 /// use sarissa::embedding::per_field::PerFieldEmbedder;
 /// use sarissa::embedding::candle_bert_embedder::CandleBertEmbedder;
 /// use sarissa::embedding::embedder::Embedder;
-/// use sarissa::vector::engine::config::{VectorIndexConfig, VectorFieldConfig, VectorIndexKind};
+/// use sarissa::vector::engine::config::{VectorIndexConfig, VectorFieldConfig, VectorIndexKind, VectorOption, FlatOption};
 /// use sarissa::vector::DistanceMetric;
 /// use std::sync::Arc;
 ///
@@ -200,11 +639,13 @@ impl VectorIndexConfig {
 /// let config = VectorIndexConfig::builder()
 ///     .embedder(embedder)
 ///     .field("content_embedding", VectorFieldConfig {
-///         dimension: 384,
-///         distance: DistanceMetric::Cosine,
-///         index: VectorIndexKind::Flat,
-///         base_weight: 1.0,
-///         metadata: std::collections::HashMap::new(),
+///         vector: Some(VectorOption::Flat(FlatOption {
+///             dimension: 384,
+///             distance: DistanceMetric::Cosine,
+///             base_weight: 1.0,
+///             quantizer: None,
+///         })),
+///         lexical: None,
 ///     })
 ///     .default_field("content_embedding")
 ///     .build()?;
@@ -277,11 +718,13 @@ impl VectorIndexConfigBuilder {
         let name = name.into();
 
         let config = VectorFieldConfig {
-            dimension,
-            distance: DistanceMetric::Cosine,
-            index: VectorIndexKind::Flat,
-            metadata: HashMap::new(),
-            base_weight: 1.0,
+            vector: Some(VectorOption::Flat(FlatOption {
+                dimension,
+                distance: DistanceMetric::Cosine,
+                base_weight: 1.0,
+                quantizer: None,
+            })),
+            lexical: None,
         };
 
         if !self.default_fields.contains(&name) {
@@ -299,11 +742,13 @@ impl VectorIndexConfigBuilder {
         let name = name.into();
 
         let config = VectorFieldConfig {
-            dimension,
-            distance: DistanceMetric::Cosine,
-            index: VectorIndexKind::Flat,
-            metadata: HashMap::new(),
-            base_weight: 1.0,
+            vector: Some(VectorOption::Flat(FlatOption {
+                dimension,
+                distance: DistanceMetric::Cosine,
+                base_weight: 1.0,
+                quantizer: None,
+            })),
+            lexical: None,
         };
 
         if !self.default_fields.contains(&name) {
@@ -499,38 +944,179 @@ fn default_index_kind() -> VectorIndexKind {
 /// Configuration for a single vector field.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VectorFieldConfig {
-    /// The dimension of vectors in this field.
-    pub dimension: usize,
-    /// The distance metric used for similarity calculations.
-    pub distance: DistanceMetric,
-    /// The type of index to use (Flat, HNSW, IVF).
-    pub index: VectorIndexKind,
-
-    /// Base weight for scoring (default: 1.0).
-    #[serde(default = "VectorFieldConfig::default_weight")]
-    pub base_weight: f32,
-
-    /// Optional metadata for the field (e.g., HNSW parameters).
+    /// Vector index configuration (optional).
     #[serde(default)]
-    pub metadata: HashMap<String, String>,
-}
-
-impl VectorFieldConfig {
-    fn default_weight() -> f32 {
-        1.0
-    }
+    /// Configuration options for the vector field.
+    pub vector: Option<VectorOption>,
+    /// Configuration options for the lexical field.
+    pub lexical: Option<crate::lexical::core::field::FieldOption>,
 }
 
 impl Default for VectorFieldConfig {
     fn default() -> Self {
         Self {
-            dimension: 128,
-            distance: DistanceMetric::Cosine,
-            index: VectorIndexKind::Flat,
-
-            base_weight: Self::default_weight(),
-            metadata: HashMap::new(),
+            vector: Some(VectorOption::default()),
+            lexical: Some(crate::lexical::core::field::FieldOption::default()),
         }
+    }
+}
+
+/// Options for vector fields.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", content = "options", rename_all = "snake_case")]
+pub enum VectorOption {
+    /// Flat index options.
+    Flat(FlatOption),
+    /// HNSW index options.
+    Hnsw(HnswOption),
+    /// IVF index options.
+    Ivf(IvfOption),
+}
+
+impl Default for VectorOption {
+    fn default() -> Self {
+        VectorOption::Flat(FlatOption::default())
+    }
+}
+
+impl VectorOption {
+    /// Get the dimension of the vector field.
+    pub fn dimension(&self) -> usize {
+        match self {
+            VectorOption::Flat(opt) => opt.dimension,
+            VectorOption::Hnsw(opt) => opt.dimension,
+            VectorOption::Ivf(opt) => opt.dimension,
+        }
+    }
+
+    /// Get the distance metric.
+    pub fn distance(&self) -> DistanceMetric {
+        match self {
+            VectorOption::Flat(opt) => opt.distance,
+            VectorOption::Hnsw(opt) => opt.distance,
+            VectorOption::Ivf(opt) => opt.distance,
+        }
+    }
+
+    /// Get the base weight.
+    pub fn base_weight(&self) -> f32 {
+        match self {
+            VectorOption::Flat(opt) => opt.base_weight,
+            VectorOption::Hnsw(opt) => opt.base_weight,
+            VectorOption::Ivf(opt) => opt.base_weight,
+        }
+    }
+
+    /// Get the index kind.
+    pub fn index_kind(&self) -> VectorIndexKind {
+        match self {
+            VectorOption::Flat(_) => VectorIndexKind::Flat,
+            VectorOption::Hnsw(_) => VectorIndexKind::Hnsw,
+            VectorOption::Ivf(_) => VectorIndexKind::Ivf,
+        }
+    }
+}
+
+/// Options for Flat vector index.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FlatOption {
+    pub dimension: usize,
+    #[serde(default = "default_distance_metric")]
+    pub distance: DistanceMetric,
+    #[serde(default = "VectorFieldConfig::default_weight")]
+    pub base_weight: f32,
+    #[serde(default)]
+    pub quantizer: Option<quantization::QuantizationMethod>,
+}
+
+impl Default for FlatOption {
+    fn default() -> Self {
+        Self {
+            dimension: 128,
+            distance: default_distance_metric(),
+            base_weight: VectorFieldConfig::default_weight(),
+            quantizer: None,
+        }
+    }
+}
+
+/// Options for HNSW vector index.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HnswOption {
+    pub dimension: usize,
+    #[serde(default = "default_distance_metric")]
+    pub distance: DistanceMetric,
+    #[serde(default = "default_getting_m")]
+    pub m: usize,
+    #[serde(default = "default_getting_ef_construction")]
+    pub ef_construction: usize,
+    #[serde(default = "VectorFieldConfig::default_weight")]
+    pub base_weight: f32,
+    #[serde(default)]
+    pub quantizer: Option<quantization::QuantizationMethod>,
+}
+
+fn default_getting_m() -> usize {
+    16
+}
+
+fn default_getting_ef_construction() -> usize {
+    200
+}
+
+impl Default for HnswOption {
+    fn default() -> Self {
+        Self {
+            dimension: 128,
+            distance: default_distance_metric(),
+            m: default_getting_m(),
+            ef_construction: default_getting_ef_construction(),
+            base_weight: VectorFieldConfig::default_weight(),
+            quantizer: None,
+        }
+    }
+}
+
+/// Options for IVF vector index.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IvfOption {
+    pub dimension: usize,
+    #[serde(default = "default_distance_metric")]
+    pub distance: DistanceMetric,
+    #[serde(default = "default_getting_n_clusters")]
+    pub n_clusters: usize,
+    #[serde(default = "default_getting_n_probe")]
+    pub n_probe: usize,
+    #[serde(default = "VectorFieldConfig::default_weight")]
+    pub base_weight: f32,
+    #[serde(default)]
+    pub quantizer: Option<quantization::QuantizationMethod>,
+}
+
+fn default_getting_n_clusters() -> usize {
+    100
+}
+
+fn default_getting_n_probe() -> usize {
+    1
+}
+
+impl Default for IvfOption {
+    fn default() -> Self {
+        Self {
+            dimension: 128,
+            distance: default_distance_metric(),
+            n_clusters: default_getting_n_clusters(),
+            n_probe: default_getting_n_probe(),
+            base_weight: VectorFieldConfig::default_weight(),
+            quantizer: None,
+        }
+    }
+}
+
+impl VectorFieldConfig {
+    fn default_weight() -> f32 {
+        1.0
     }
 }
 

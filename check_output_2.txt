@@ -1,0 +1,2 @@
+    Checking sarissa v0.1.0 (/home/minoru/src/github.com/mosuka/sarissa)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.63s
