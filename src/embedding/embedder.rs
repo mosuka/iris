@@ -77,11 +77,10 @@ impl<'a> EmbedInput<'a> {
         match self {
             EmbedInput::Text(_) => EmbedInputType::Text,
             EmbedInput::Bytes(_, mime) => {
-                if let Some(mime) = mime {
-                    if mime.starts_with("text/") {
+                if let Some(mime) = mime
+                    && mime.starts_with("text/") {
                         return EmbedInputType::Text;
                     }
-                }
                 EmbedInputType::Image
             }
         }
@@ -91,14 +90,14 @@ impl<'a> EmbedInput<'a> {
     pub fn is_text(&self) -> bool {
         match self {
             EmbedInput::Text(_) => true,
-            EmbedInput::Bytes(_, mime) => mime.map_or(false, |m| m.starts_with("text/")),
+            EmbedInput::Bytes(_, mime) => mime.is_some_and(|m| m.starts_with("text/")),
         }
     }
 
     /// Check if this is an image input.
     pub fn is_image(&self) -> bool {
         match self {
-            EmbedInput::Bytes(_, mime) => mime.map_or(true, |m| m.starts_with("image/")),
+            EmbedInput::Bytes(_, mime) => mime.is_none_or(|m| m.starts_with("image/")),
             _ => false,
         }
     }

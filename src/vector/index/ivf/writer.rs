@@ -504,6 +504,13 @@ impl IvfIndexWriter {
     }
 }
 
+type SplitClusterResult = (
+    Vector,
+    Vec<(u64, String, Vector)>,
+    Vector,
+    Vec<(u64, String, Vector)>,
+);
+
 /// Statistics for a single IVF cluster.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ClusterStats {
@@ -588,11 +595,10 @@ impl IvfIndexWriter {
                     .index_config
                     .distance_metric
                     .distance(&sparse_centroid.data, &self.centroids[target_idx].data)
+                    && dist < best_dist
                 {
-                    if dist < best_dist {
-                        best_dist = dist;
-                        best_target = target_idx;
-                    }
+                    best_dist = dist;
+                    best_target = target_idx;
                 }
             }
             moves.push((sparse_idx, best_target));
@@ -692,12 +698,7 @@ impl IvfIndexWriter {
     fn split_cluster_kmeans_k2(
         &self,
         vectors: Vec<(u64, String, Vector)>,
-    ) -> Result<(
-        Vector,
-        Vec<(u64, String, Vector)>,
-        Vector,
-        Vec<(u64, String, Vector)>,
-    )> {
+    ) -> Result<SplitClusterResult> {
         use rand::prelude::*;
         let mut rng = rand::rng();
 

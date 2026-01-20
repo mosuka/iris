@@ -78,8 +78,8 @@ impl MultiTermQuery for PrefixQuery {
         &self,
         reader: &dyn LexicalIndexReader,
     ) -> Result<Option<Box<dyn TermsEnum>>> {
-        if let Some(inverted_reader) = reader.as_any().downcast_ref::<InvertedIndexReader>() {
-            if let Some(terms) = inverted_reader.terms(&self.field)? {
+        if let Some(inverted_reader) = reader.as_any().downcast_ref::<InvertedIndexReader>()
+            && let Some(terms) = inverted_reader.terms(&self.field)? {
                 // Use Generic AutomatonTermsEnum with RegexAutomaton for prefix
                 // Pattern: ^escaped_prefix.*
                 let escaped_prefix = regex::escape(&self.prefix);
@@ -98,7 +98,6 @@ impl MultiTermQuery for PrefixQuery {
 
                 return Ok(Some(Box::new(terms_enum)));
             }
-        }
         Ok(None)
     }
 
@@ -108,11 +107,10 @@ impl MultiTermQuery for PrefixQuery {
             let max = self.rewrite_method.max_expansions();
             while let Some(term_stats) = terms_enum.next()? {
                 results.push((term_stats.term.clone(), term_stats.doc_freq, 1.0));
-                if let Some(m) = max {
-                    if results.len() >= m {
+                if let Some(m) = max
+                    && results.len() >= m {
                         break;
                     }
-                }
             }
             return Ok(results);
         }
@@ -156,7 +154,7 @@ impl Query for PrefixQuery {
 
     fn cost(&self, reader: &dyn LexicalIndexReader) -> Result<u64> {
         // Rough estimate
-        Ok(reader.doc_count() as u64)
+        Ok(reader.doc_count())
     }
 
     fn as_any(&self) -> &dyn std::any::Any {

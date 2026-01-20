@@ -12,8 +12,8 @@ fn hiragana_add_dakuon(c: &char) -> char {
     let codepoint = *c as u32;
     match codepoint {
         0x304b..=0x3062 if codepoint % 2 == 1 => unsafe { char::from_u32_unchecked(codepoint + 1) },
-        0x3064..=0x3069 if codepoint % 2 == 0 => unsafe { char::from_u32_unchecked(codepoint + 1) },
-        0x306f..=0x307d if codepoint % 3 == 0 => unsafe { char::from_u32_unchecked(codepoint + 1) },
+        0x3064..=0x3069 if codepoint.is_multiple_of(2) => unsafe { char::from_u32_unchecked(codepoint + 1) },
+        0x306f..=0x307d if codepoint.is_multiple_of(3) => unsafe { char::from_u32_unchecked(codepoint + 1) },
         _ => *c,
     }
 }
@@ -21,7 +21,7 @@ fn hiragana_add_dakuon(c: &char) -> char {
 fn hiragana_remove_dakuon(c: &char) -> char {
     let codepoint = *c as u32;
     match codepoint {
-        0x304b..=0x3062 if codepoint % 2 == 0 => unsafe { char::from_u32_unchecked(codepoint - 1) },
+        0x304b..=0x3062 if codepoint.is_multiple_of(2) => unsafe { char::from_u32_unchecked(codepoint - 1) },
         0x3064..=0x3069 if codepoint % 2 == 1 => unsafe { char::from_u32_unchecked(codepoint - 1) },
         0x306f..=0x307d if codepoint % 3 == 1 => unsafe { char::from_u32_unchecked(codepoint - 1) },
         _ => *c,
@@ -32,8 +32,8 @@ fn katakana_add_dakuon(c: &char) -> char {
     let codepoint = *c as u32;
     match codepoint {
         0x30ab..=0x30c2 if codepoint % 2 == 1 => unsafe { char::from_u32_unchecked(codepoint + 1) },
-        0x30c4..=0x30c9 if codepoint % 2 == 0 => unsafe { char::from_u32_unchecked(codepoint + 1) },
-        0x30cf..=0x30dd if codepoint % 3 == 0 => unsafe { char::from_u32_unchecked(codepoint + 1) },
+        0x30c4..=0x30c9 if codepoint.is_multiple_of(2) => unsafe { char::from_u32_unchecked(codepoint + 1) },
+        0x30cf..=0x30dd if codepoint.is_multiple_of(3) => unsafe { char::from_u32_unchecked(codepoint + 1) },
         _ => *c,
     }
 }
@@ -41,7 +41,7 @@ fn katakana_add_dakuon(c: &char) -> char {
 fn katakana_remove_dakuon(c: &char) -> char {
     let codepoint = *c as u32;
     match codepoint {
-        0x30ab..=0x30c2 if codepoint % 2 == 0 => unsafe { char::from_u32_unchecked(codepoint - 1) },
+        0x30ab..=0x30c2 if codepoint.is_multiple_of(2) => unsafe { char::from_u32_unchecked(codepoint - 1) },
         0x30c4..=0x30c9 if codepoint % 2 == 1 => unsafe { char::from_u32_unchecked(codepoint - 1) },
         0x30cf..=0x30dd if codepoint % 3 == 1 => unsafe { char::from_u32_unchecked(codepoint - 1) },
         _ => *c,

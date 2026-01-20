@@ -157,15 +157,15 @@ impl InvertedIndexWriter {
             for file in files {
                 if file.ends_with(".meta") && file != "index.meta" {
                     // unexpected error handling: ignore malformed files
-                    if let Ok(input) = storage.open_input(&file) {
-                        if let Ok(meta) = serde_json::from_reader::<_, SegmentInfo>(input) {
-                            // Only consider segments from the same shard for next_doc_id (local counter part)
-                            if meta.shard_id == config.shard_id {
-                                let local_id = crate::util::id::get_local_id(meta.max_doc_id);
-                                next_doc_id = next_doc_id.max(local_id + 1);
-                            }
-                            max_segment_id = max_segment_id.max(meta.generation as i32);
+                    if let Ok(input) = storage.open_input(&file)
+                        && let Ok(meta) = serde_json::from_reader::<_, SegmentInfo>(input)
+                    {
+                        // Only consider segments from the same shard for next_doc_id (local counter part)
+                        if meta.shard_id == config.shard_id {
+                            let local_id = crate::util::id::get_local_id(meta.max_doc_id);
+                            next_doc_id = next_doc_id.max(local_id + 1);
                         }
+                        max_segment_id = max_segment_id.max(meta.generation as i32);
                     }
                 }
             }
@@ -1100,7 +1100,7 @@ impl InvertedIndexWriter {
             manager.initialize_segment(&segment_id, min_doc_id, max_doc_id)?;
 
             let delete_result = manager.delete_document(&segment_id, doc_id, "upsert");
-            if let Err(_) = delete_result {
+            if delete_result.is_err() {
                 // If initializing failed (e.g. bitmap corrupted), try force re-init
                 // In production code we should be more careful, but here we prioritize consistency
                 manager.initialize_segment(&segment_id, min_doc_id, max_doc_id)?;

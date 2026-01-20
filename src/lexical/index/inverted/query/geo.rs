@@ -298,13 +298,11 @@ impl GeoDistanceQuery {
             let doc_ids = bkd_tree.range_search(&mins, &maxs, true, true)?;
             for doc_id in doc_ids {
                 // Retrieve GeoPoint for exact distance calculation
-                if let Some(doc) = reader.document(doc_id)? {
-                    if let Some(field_value) = doc.get_field(&self.field) {
-                        if let Some(geo_point) = field_value.value.as_geo() {
+                if let Some(doc) = reader.document(doc_id)?
+                    && let Some(field_value) = doc.get_field(&self.field)
+                        && let Some(geo_point) = field_value.value.as_geo() {
                             candidates.push((doc_id as u32, *geo_point));
                         }
-                    }
-                }
             }
             return Ok(candidates);
         }
@@ -578,13 +576,11 @@ impl GeoBoundingBoxQuery {
             let doc_ids = bkd_tree.range_search(&mins, &maxs, true, true)?;
             for doc_id in doc_ids {
                 // Retrieve GeoPoint for exact check
-                if let Some(doc) = reader.document(doc_id)? {
-                    if let Some(field_value) = doc.get_field(&self.field) {
-                        if let Some(geo_point) = field_value.value.as_geo() {
+                if let Some(doc) = reader.document(doc_id)?
+                    && let Some(field_value) = doc.get_field(&self.field)
+                        && let Some(geo_point) = field_value.value.as_geo() {
                             candidates.push((doc_id as u32, *geo_point));
                         }
-                    }
-                }
             }
             return Ok(candidates);
         }

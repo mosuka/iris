@@ -3,12 +3,11 @@ use sarissa::embedding::embedder::{EmbedInput, EmbedInputType, Embedder};
 use sarissa::error::{Result, SarissaError};
 use sarissa::lexical::engine::config::LexicalIndexConfig;
 use sarissa::storage::memory::{MemoryStorage, MemoryStorageConfig};
-use sarissa::vector::DistanceMetric;
+use sarissa::vector::core::distance::DistanceMetric;
 use sarissa::vector::core::document::{DocumentPayload, Payload, PayloadSource};
+use sarissa::vector::core::field::{HnswOption, VectorIndexKind, VectorOption};
 use sarissa::vector::core::vector::Vector;
-use sarissa::vector::engine::config::{
-    HnswOption, VectorFieldConfig, VectorOption, VectorIndexConfig, VectorIndexKind,
-};
+use sarissa::vector::engine::config::{VectorFieldConfig, VectorIndexConfig};
 use std::any::Any;
 use std::sync::Arc;
 

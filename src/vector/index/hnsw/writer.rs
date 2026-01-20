@@ -50,11 +50,10 @@ impl ConcurrentHnswGraph {
     }
 
     fn set_neighbors(&self, doc_id: u64, level: usize, new_neighbors: Vec<u64>) {
-        if let Some(layers) = self.nodes.get(&doc_id) {
-            if let Some(lock) = layers.get(level) {
+        if let Some(layers) = self.nodes.get(&doc_id)
+            && let Some(lock) = layers.get(level) {
                 *lock.write() = new_neighbors;
             }
-        }
     }
 
     fn add_neighbor_with_pruning(
@@ -65,8 +64,8 @@ impl ConcurrentHnswGraph {
         max_conn: usize,
         writer: &HnswIndexWriter,
     ) -> Result<()> {
-        if let Some(layers) = self.nodes.get(&doc_id) {
-            if let Some(lock) = layers.get(level) {
+        if let Some(layers) = self.nodes.get(&doc_id)
+            && let Some(lock) = layers.get(level) {
                 let mut neighbors = lock.write();
                 if !neighbors.contains(&neighbor_id) {
                     neighbors.push(neighbor_id);
@@ -78,7 +77,6 @@ impl ConcurrentHnswGraph {
                     *neighbors = pruned;
                 }
             }
-        }
         Ok(())
     }
 
@@ -1015,11 +1013,10 @@ impl HnswIndexWriter {
 
         while let Some(curr) = to_visit.pop() {
             // If closest candidate to visit is further than the furthest found candidate, and we found enough, stop
-            if let Some(furthest_found) = found.peek() {
-                if curr.distance > furthest_found.distance && found.len() >= ef {
+            if let Some(furthest_found) = found.peek()
+                && curr.distance > furthest_found.distance && found.len() >= ef {
                     break;
                 }
-            }
 
             if let Some(neighbors) = graph.get_neighbors_view(curr.id, level) {
                 for neighbor_id in neighbors {
@@ -1164,11 +1161,10 @@ impl VectorIndexWriter for HnswIndexWriter {
         self.rebuild_doc_id_map();
 
         // Update next_vec_id
-        if let Some((max_id, _, _)) = self.vectors.iter().max_by_key(|(id, _, _)| id) {
-            if *max_id >= self.next_vec_id {
+        if let Some((max_id, _, _)) = self.vectors.iter().max_by_key(|(id, _, _)| id)
+            && *max_id >= self.next_vec_id {
                 self.next_vec_id = *max_id + 1;
             }
-        }
 
         self.total_vectors_to_add = Some(self.vectors.len());
 
@@ -1202,11 +1198,10 @@ impl VectorIndexWriter for HnswIndexWriter {
         }
 
         // Update next_vec_id
-        if let Some((max_id, _, _)) = self.vectors.iter().max_by_key(|(id, _, _)| id) {
-            if *max_id >= self.next_vec_id {
+        if let Some((max_id, _, _)) = self.vectors.iter().max_by_key(|(id, _, _)| id)
+            && *max_id >= self.next_vec_id {
                 self.next_vec_id = *max_id + 1;
             }
-        }
 
         self.check_memory_limit()?;
         Ok(())

@@ -9,11 +9,10 @@ use sarissa::error::SarissaError;
 use sarissa::lexical::core::field::{FieldOption, TextOption};
 use sarissa::storage::memory::MemoryStorage;
 use sarissa::vector::core::document::{DocumentPayload, Payload, StoredVector};
+use sarissa::vector::core::field::{FlatOption, VectorOption};
 use sarissa::vector::core::vector::Vector;
 use sarissa::vector::engine::VectorEngine;
-use sarissa::vector::engine::config::{
-    FlatOption, VectorFieldConfig, VectorOption, VectorIndexConfig,
-};
+use sarissa::vector::engine::config::{VectorFieldConfig, VectorIndexConfig};
 use sarissa::vector::engine::request::{
     FusionConfig, LexicalQuery, QueryVector, TermQueryOptions, VectorSearchRequest,
 };
@@ -21,14 +20,12 @@ use sarissa::vector::engine::request::{
 #[derive(Debug, Clone)]
 struct MockEmbedder {
     vectors: Arc<Mutex<HashMap<String, Vec<f32>>>>,
-    dimension: usize,
 }
 
 impl MockEmbedder {
-    fn new(dimension: usize) -> Self {
+    fn new() -> Self {
         Self {
             vectors: Arc::new(Mutex::new(HashMap::new())),
-            dimension,
         }
     }
 
@@ -90,7 +87,7 @@ fn create_hybrid_engine() -> std::result::Result<VectorEngine, Box<dyn std::erro
     };
 
     // Embedder setup
-    let embedder = Arc::new(MockEmbedder::new(3));
+    let embedder = Arc::new(MockEmbedder::new());
     embedder.add("apple", vec![1.0, 0.0, 0.0]);
     embedder.add("banana", vec![0.0, 1.0, 0.0]);
 

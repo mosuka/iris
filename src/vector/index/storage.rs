@@ -54,7 +54,7 @@ impl VectorStorage {
 
                     input
                         .seek(SeekFrom::Start(offset))
-                        .map_err(|e| SarissaError::Io(e))?;
+                        .map_err(SarissaError::Io)?;
 
                     let metadata = read_metadata(&mut *input)?;
                     let mut values = vec![0.0f32; dimension];

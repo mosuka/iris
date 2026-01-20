@@ -348,22 +348,11 @@ impl BKDReader {
         &self,
         reader: &mut StructReader<R>,
         offset: u64,
-        mins: &[Option<f64>],
-        maxs: &[Option<f64>],
-        include_min: bool,
-        include_max: bool,
+        ctx: &QueryContext,
         collector: &mut Vec<u64>,
     ) -> Result<()> {
         if offset < self.header.index_start_offset {
-            return self.visit_leaf_block(
-                reader,
-                offset,
-                mins,
-                maxs,
-                include_min,
-                include_max,
-                collector,
-            );
+            return self.visit_leaf_block(reader, offset, ctx, collector);
         }
 
         reader.seek(SeekFrom::Start(offset))?;
@@ -373,11 +362,11 @@ impl BKDReader {
         let right_offset = reader.read_u64()?;
 
         // Logic check for split dimension
-        let min = mins[split_dim];
-        let max = maxs[split_dim];
+        let min = ctx.mins[split_dim];
+        let max = ctx.maxs[split_dim];
 
-        let go_left = min.map_or(true, |m| {
-            if include_min {
+        let go_left = min.is_none_or(|m| {
+            if ctx.include_min {
                 m <= split_value
             } else {
                 m < split_value
@@ -385,19 +374,11 @@ impl BKDReader {
         });
 
         if go_left {
-            self.visit_node(
-                reader,
-                left_offset,
-                mins,
-                maxs,
-                include_min,
-                include_max,
-                collector,
-            )?;
+            self.visit_node(reader, left_offset, ctx, collector)?;
         }
 
-        let go_right = max.map_or(true, |m| {
-            if include_max {
+        let go_right = max.is_none_or(|m| {
+            if ctx.include_max {
                 m >= split_value
             } else {
                 m > split_value
@@ -405,15 +386,7 @@ impl BKDReader {
         });
 
         if go_right {
-            self.visit_node(
-                reader,
-                right_offset,
-                mins,
-                maxs,
-                include_min,
-                include_max,
-                collector,
-            )?;
+            self.visit_node(reader, right_offset, ctx, collector)?;
         }
 
         Ok(())
@@ -423,10 +396,7 @@ impl BKDReader {
         &self,
         reader: &mut StructReader<R>,
         offset: u64,
-        mins: &[Option<f64>],
-        maxs: &[Option<f64>],
-        include_min: bool,
-        include_max: bool,
+        ctx: &QueryContext,
         collector: &mut Vec<u64>,
     ) -> Result<()> {
         reader.seek(SeekFrom::Start(offset))?;
@@ -448,12 +418,11 @@ impl BKDReader {
 
         for (vals, doc_id) in points.iter().zip(doc_ids.iter()) {
             let mut matches = true;
-            for i in 0..self.header.num_dims as usize {
-                let val = vals[i];
+            for (i, &val) in vals.iter().enumerate() {
                 let gte_min =
-                    mins[i].map_or(true, |m| if include_min { val >= m } else { val > m });
+                    ctx.mins[i].is_none_or(|m| if ctx.include_min { val >= m } else { val > m });
                 let lte_max =
-                    maxs[i].map_or(true, |m| if include_max { val <= m } else { val < m });
+                    ctx.maxs[i].is_none_or(|m| if ctx.include_max { val <= m } else { val < m });
                 if !gte_min || !lte_max {
                     matches = false;
                     break;
@@ -465,6 +434,13 @@ impl BKDReader {
         }
         Ok(())
     }
+}
+
+struct QueryContext<'a> {
+    mins: &'a [Option<f64>],
+    maxs: &'a [Option<f64>],
+    include_min: bool,
+    include_max: bool,
 }
 
 impl BKDTree for BKDReader {
@@ -488,25 +464,21 @@ impl BKDTree for BKDReader {
 
         if root_offset < self.header.index_start_offset && self.header.total_point_count > 0 {
             // Single leaf block case or root leaf
-            self.visit_leaf_block(
-                &mut reader,
-                root_offset,
+            let ctx = QueryContext {
                 mins,
                 maxs,
                 include_min,
                 include_max,
-                &mut doc_ids,
-            )?;
+            };
+            self.visit_leaf_block(&mut reader, root_offset, &ctx, &mut doc_ids)?;
         } else {
-            self.visit_node(
-                &mut reader,
-                root_offset,
+            let ctx = QueryContext {
                 mins,
                 maxs,
                 include_min,
                 include_max,
-                &mut doc_ids,
-            )?;
+            };
+            self.visit_node(&mut reader, root_offset, &ctx, &mut doc_ids)?;
         }
 
         doc_ids.sort_unstable();
@@ -539,10 +511,8 @@ impl BKDTree for SimpleBKDTree {
             let mut matches = true;
             for i in 0..self.num_dims as usize {
                 let val = vals[i];
-                let gte_min =
-                    mins[i].map_or(true, |m| if include_min { val >= m } else { val > m });
-                let lte_max =
-                    maxs[i].map_or(true, |m| if include_max { val <= m } else { val < m });
+                let gte_min = mins[i].is_none_or(|m| if include_min { val >= m } else { val > m });
+                let lte_max = maxs[i].is_none_or(|m| if include_max { val <= m } else { val < m });
                 if !gte_min || !lte_max {
                     matches = false;
                     break;

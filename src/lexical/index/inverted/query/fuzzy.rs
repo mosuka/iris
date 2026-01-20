@@ -133,8 +133,8 @@ impl FuzzyQuery {
         &self,
         reader: &dyn LexicalIndexReader,
     ) -> Result<Option<Box<dyn TermsEnum>>> {
-        if let Some(inverted_reader) = reader.as_any().downcast_ref::<InvertedIndexReader>() {
-            if let Some(terms) = inverted_reader.terms(&self.field)? {
+        if let Some(inverted_reader) = reader.as_any().downcast_ref::<InvertedIndexReader>()
+            && let Some(terms) = inverted_reader.terms(&self.field)? {
                 // Use LevenshteinAutomaton
                 let automaton =
                     crate::lexical::index::inverted::core::automaton::LevenshteinAutomaton::new(
@@ -151,7 +151,6 @@ impl FuzzyQuery {
                     );
                 return Ok(Some(Box::new(terms_enum)));
             }
-        }
         Ok(None)
     }
 
@@ -236,7 +235,7 @@ impl Query for FuzzyQuery {
 
     fn cost(&self, reader: &dyn LexicalIndexReader) -> Result<u64> {
         // Rough estimate
-        Ok(reader.doc_count() as u64)
+        Ok(reader.doc_count())
     }
 
     fn as_any(&self) -> &dyn std::any::Any {

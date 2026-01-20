@@ -362,13 +362,12 @@ impl Storage for FileStorage {
 
         let path = self.file_path(name);
 
-        if let Some(parent) = path.parent() {
-            if !parent.exists() {
+        if let Some(parent) = path.parent()
+            && !parent.exists() {
                 std::fs::create_dir_all(parent).map_err(|e| {
                     SarissaError::storage(format!("Failed to create directory {:?}: {}", parent, e))
                 })?;
             }
-        }
 
         let file = OpenOptions::new()
             .write(true)
@@ -389,13 +388,12 @@ impl Storage for FileStorage {
 
         let path = self.file_path(name);
 
-        if let Some(parent) = path.parent() {
-            if !parent.exists() {
+        if let Some(parent) = path.parent()
+            && !parent.exists() {
                 std::fs::create_dir_all(parent).map_err(|e| {
                     SarissaError::storage(format!("Failed to create directory {:?}: {}", parent, e))
                 })?;
             }
-        }
 
         let file = OpenOptions::new()
             .create(true)

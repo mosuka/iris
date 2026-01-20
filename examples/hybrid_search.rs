@@ -8,11 +8,10 @@ use sarissa::lexical::core::field::TextOption;
 use sarissa::storage::memory::MemoryStorageConfig;
 use sarissa::storage::{StorageConfig, StorageFactory};
 use sarissa::vector::core::document::{DocumentPayload, Payload, StoredVector};
+use sarissa::vector::core::field::{FlatOption, VectorOption};
 use sarissa::vector::core::vector::Vector;
 use sarissa::vector::engine::VectorEngine;
-use sarissa::vector::engine::config::{
-    FlatOption, VectorFieldConfig, VectorOption, VectorIndexConfig,
-};
+use sarissa::vector::engine::config::{VectorFieldConfig, VectorIndexConfig};
 use sarissa::vector::engine::request::{
     FusionConfig, LexicalQuery, QueryVector, TermQueryOptions, VectorSearchRequest,
 };

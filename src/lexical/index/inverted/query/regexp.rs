@@ -85,8 +85,8 @@ impl MultiTermQuery for RegexpQuery {
         &self,
         reader: &dyn LexicalIndexReader,
     ) -> Result<Option<Box<dyn TermsEnum>>> {
-        if let Some(inverted_reader) = reader.as_any().downcast_ref::<InvertedIndexReader>() {
-            if let Some(terms) = inverted_reader.terms(&self.field)? {
+        if let Some(inverted_reader) = reader.as_any().downcast_ref::<InvertedIndexReader>()
+            && let Some(terms) = inverted_reader.terms(&self.field)? {
                 let regex_automaton = if let Some(regex) = &self.regex {
                     RegexAutomaton::from_regex(regex.as_ref().clone(), self.pattern.clone())
                 } else {
@@ -96,7 +96,6 @@ impl MultiTermQuery for RegexpQuery {
                 let terms_enum = AutomatonTermsEnum::new(terms.iterator()?, regex_automaton);
                 return Ok(Some(Box::new(terms_enum)));
             }
-        }
         Ok(None)
     }
 
@@ -106,11 +105,10 @@ impl MultiTermQuery for RegexpQuery {
             let max = self.rewrite_method.max_expansions();
             while let Some(term_stats) = terms_enum.next()? {
                 results.push((term_stats.term.clone(), term_stats.doc_freq, 1.0));
-                if let Some(m) = max {
-                    if results.len() >= m {
+                if let Some(m) = max
+                    && results.len() >= m {
                         break;
                     }
-                }
             }
             return Ok(results);
         }
@@ -153,7 +151,7 @@ impl Query for RegexpQuery {
     }
 
     fn cost(&self, reader: &dyn LexicalIndexReader) -> Result<u64> {
-        Ok(reader.doc_count() as u64)
+        Ok(reader.doc_count())
     }
 
     fn as_any(&self) -> &dyn std::any::Any {

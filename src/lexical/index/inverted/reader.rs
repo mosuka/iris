@@ -874,11 +874,10 @@ impl SegmentReader {
         }
 
         // Lazy load bitmap if needed
-        if self.load_deletion_bitmap().is_ok() {
-            if let Some(bitmap) = self.deletion_bitmap.read().unwrap().clone() {
+        if self.load_deletion_bitmap().is_ok()
+            && let Some(bitmap) = self.deletion_bitmap.read().unwrap().clone() {
                 return bitmap.live_count();
             }
-        }
 
         self.info.doc_count
     }

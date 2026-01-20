@@ -7,14 +7,15 @@ use crate::error::{Result, SarissaError};
 use crate::maintenance::deletion::DeletionBitmap;
 use crate::storage::Storage;
 use crate::vector::core::document::{METADATA_WEIGHT, StoredVector};
+use crate::vector::core::field::VectorOption;
 use crate::vector::core::vector::Vector;
-use crate::vector::engine::config::{VectorFieldConfig, VectorOption};
-use crate::vector::field::{
+use crate::vector::engine::config::VectorFieldConfig;
+use crate::vector::index::VectorIndexWriter;
+use crate::vector::index::config::HnswIndexConfig;
+use crate::vector::index::field::{
     FieldHit, FieldSearchInput, FieldSearchResults, VectorField, VectorFieldReader,
     VectorFieldStats, VectorFieldWriter,
 };
-use crate::vector::index::VectorIndexWriter;
-use crate::vector::index::config::HnswIndexConfig;
 use crate::vector::index::hnsw::reader::HnswIndexReader;
 use crate::vector::index::hnsw::searcher::HnswSearcher;
 use crate::vector::index::hnsw::segment::manager::{ManagedSegmentInfo, SegmentManager};
@@ -379,8 +380,10 @@ impl SegmentedVectorField {
                 searcher.set_ef_search(opt.ef_construction.max(50) * 2);
             }
 
-            let mut params = VectorIndexSearchParams::default();
-            params.top_k = limit;
+            let params = VectorIndexSearchParams {
+                top_k: limit,
+                ..Default::default()
+            };
 
             let request = VectorIndexSearchRequest {
                 query: query.clone(),
