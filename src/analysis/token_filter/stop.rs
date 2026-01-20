@@ -7,9 +7,9 @@
 //! # Examples
 //!
 //! ```
-//! use sarissa::analysis::token_filter::Filter;
-//! use sarissa::analysis::token_filter::stop::StopFilter;
-//! use sarissa::analysis::token::Token;
+//! use iris::analysis::token_filter::Filter;
+//! use iris::analysis::token_filter::stop::StopFilter;
+//! use iris::analysis::token::Token;
 //!
 //! let filter = StopFilter::new(); // Uses default English stop words
 //! let tokens = vec![
@@ -313,9 +313,9 @@ pub static DEFAULT_JAPANESE_STOP_WORDS_SET: LazyLock<HashSet<String>> = LazyLock
 /// ## Basic Usage
 ///
 /// ```
-/// use sarissa::analysis::token_filter::Filter;
-/// use sarissa::analysis::token_filter::stop::StopFilter;
-/// use sarissa::analysis::token::Token;
+/// use iris::analysis::token_filter::Filter;
+/// use iris::analysis::token_filter::stop::StopFilter;
+/// use iris::analysis::token::Token;
 ///
 /// let filter = StopFilter::new();
 /// let tokens = vec![
@@ -336,7 +336,7 @@ pub static DEFAULT_JAPANESE_STOP_WORDS_SET: LazyLock<HashSet<String>> = LazyLock
 /// ## Custom Stop Words
 ///
 /// ```
-/// use sarissa::analysis::token_filter::stop::StopFilter;
+/// use iris::analysis::token_filter::stop::StopFilter;
 ///
 /// let filter = StopFilter::from_words(vec!["custom", "words", "list"]);
 /// ```
@@ -344,9 +344,9 @@ pub static DEFAULT_JAPANESE_STOP_WORDS_SET: LazyLock<HashSet<String>> = LazyLock
 /// ## Preserve Stopped Tokens
 ///
 /// ```
-/// use sarissa::analysis::token_filter::Filter;
-/// use sarissa::analysis::token_filter::stop::StopFilter;
-/// use sarissa::analysis::token::Token;
+/// use iris::analysis::token_filter::Filter;
+/// use iris::analysis::token_filter::stop::StopFilter;
+/// use iris::analysis::token::Token;
 ///
 /// // Mark as stopped but don't remove
 /// let filter = StopFilter::from_words(vec!["the"]).remove_stopped(false);
@@ -374,7 +374,7 @@ impl StopFilter {
     /// # Examples
     ///
     /// ```
-    /// use sarissa::analysis::token_filter::stop::StopFilter;
+    /// use iris::analysis::token_filter::stop::StopFilter;
     ///
     /// let filter = StopFilter::new();
     /// assert!(filter.is_stop_word("the"));
@@ -394,7 +394,7 @@ impl StopFilter {
     ///
     /// ```
     /// use std::collections::HashSet;
-    /// use sarissa::analysis::token_filter::stop::StopFilter;
+    /// use iris::analysis::token_filter::stop::StopFilter;
     ///
     /// let mut words = HashSet::new();
     /// words.insert("custom".to_string());
@@ -419,7 +419,7 @@ impl StopFilter {
     /// # Examples
     ///
     /// ```
-    /// use sarissa::analysis::token_filter::stop::StopFilter;
+    /// use iris::analysis::token_filter::stop::StopFilter;
     ///
     /// let filter = StopFilter::from_words(vec!["foo", "bar", "baz"]);
     /// assert_eq!(filter.len(), 3);
@@ -442,7 +442,7 @@ impl StopFilter {
     /// # Examples
     ///
     /// ```
-    /// use sarissa::analysis::token_filter::stop::StopFilter;
+    /// use iris::analysis::token_filter::stop::StopFilter;
     ///
     /// // Keep stopped tokens but mark them
     /// let filter = StopFilter::new().remove_stopped(false);

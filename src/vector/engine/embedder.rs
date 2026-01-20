@@ -10,7 +10,7 @@ use parking_lot::RwLock;
 use tokio::runtime::Builder as TokioRuntimeBuilder;
 
 use crate::embedding::embedder::Embedder;
-use crate::error::{Result, SarissaError};
+use crate::error::{Result, IrisError};
 
 /// Registry for managing embedder instances keyed byフィールド名.
 ///
@@ -38,7 +38,7 @@ impl VectorEmbedderRegistry {
     pub(crate) fn resolve(&self, field_name: &str) -> Result<Arc<dyn Embedder>> {
         let instances = self.instances.read();
         instances.get(field_name).cloned().ok_or_else(|| {
-            SarissaError::invalid_config(format!(
+            IrisError::invalid_config(format!(
                 "embedder '{field_name}' is not registered. Use VectorIndexConfig.embedder field with PerFieldEmbedder to configure embedders."
             ))
         })
@@ -59,7 +59,7 @@ impl EmbedderExecutor {
             .enable_all()
             .build()
             .map_err(|err| {
-                SarissaError::internal(format!("failed to initialize embedder runtime: {err}"))
+                IrisError::internal(format!("failed to initialize embedder runtime: {err}"))
             })?;
         Ok(Self {
             runtime: Arc::new(runtime),
@@ -78,6 +78,6 @@ impl EmbedderExecutor {
             let _ = tx.send(future.await);
         });
         rx.recv()
-            .map_err(|err| SarissaError::internal(format!("embedder task channel closed: {err}")))?
+            .map_err(|err| IrisError::internal(format!("embedder task channel closed: {err}")))?
     }
 }

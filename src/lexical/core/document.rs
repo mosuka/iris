@@ -18,8 +18,8 @@
 //! Basic document creation:
 //!
 //! ```
-//! use sarissa::lexical::core::document::Document;
-//! use sarissa::lexical::core::field::FieldValue;
+//! use iris::lexical::core::document::Document;
+//! use iris::lexical::core::field::FieldValue;
 //!
 //! let mut doc = Document::new();
 //! doc.add_field_value("title", FieldValue::Text("Rust Book".to_string()));
@@ -32,8 +32,8 @@
 //! Using the builder pattern:
 //!
 //! ```
-//! use sarissa::lexical::core::document::Document;
-//! use sarissa::lexical::core::field::{TextOption, IntegerOption, FloatOption, BooleanOption};
+//! use iris::lexical::core::document::Document;
+//! use iris::lexical::core::field::{TextOption, IntegerOption, FloatOption, BooleanOption};
 //!
 //! let doc = Document::builder()
 //!     .add_text("title", "Rust Programming", TextOption::default())
@@ -49,8 +49,8 @@
 //! With geographic data:
 //!
 //! ```
-//! use sarissa::lexical::core::document::Document;
-//! use sarissa::lexical::core::field::{TextOption, GeoOption};
+//! use iris::lexical::core::document::Document;
+//! use iris::lexical::core::field::{TextOption, GeoOption};
 //!
 //! let doc = Document::builder()
 //!     .add_text("name", "Tokyo Tower", TextOption::default())
@@ -93,8 +93,8 @@ use crate::lexical::index::inverted::query::geo::GeoPoint;
 /// # Examples
 ///
 /// ```no_run
-/// use sarissa::lexical::core::document::Document;
-/// use sarissa::lexical::core::field::{Field, FieldValue, FieldOption, TextOption};
+/// use iris::lexical::core::document::Document;
+/// use iris::lexical::core::field::{Field, FieldValue, FieldOption, TextOption};
 ///
 /// let mut doc = Document::new();
 /// doc.add_field("title", Field::new(
@@ -127,7 +127,7 @@ impl Document {
     /// # Examples
     ///
     /// ```
-    /// use sarissa::lexical::core::document::Document;
+    /// use iris::lexical::core::document::Document;
     ///
     /// let doc = Document::new();
     /// assert_eq!(doc.len(), 0);
@@ -151,8 +151,8 @@ impl Document {
     /// # Examples
     ///
     /// ```no_run
-    /// use sarissa::lexical::core::document::Document;
-    /// use sarissa::lexical::core::field::{Field, FieldValue};
+    /// use iris::lexical::core::document::Document;
+    /// use iris::lexical::core::field::{Field, FieldValue};
     ///
     /// let mut doc = Document::new();
     /// doc.add_field("title", Field::with_default_option(FieldValue::Text("Rust".to_string())));
@@ -177,8 +177,8 @@ impl Document {
     /// # Examples
     ///
     /// ```
-    /// use sarissa::lexical::core::document::Document;
-    /// use sarissa::lexical::core::field::FieldValue;
+    /// use iris::lexical::core::document::Document;
+    /// use iris::lexical::core::field::FieldValue;
     ///
     /// let mut doc = Document::new();
     /// doc.add_field_value("title", FieldValue::Text("Rust".to_string()));
@@ -202,8 +202,8 @@ impl Document {
     /// # Examples
     ///
     /// ```no_run
-    /// use sarissa::lexical::core::document::Document;
-    /// use sarissa::lexical::core::field::{Field, FieldValue};
+    /// use iris::lexical::core::document::Document;
+    /// use iris::lexical::core::field::{Field, FieldValue};
     ///
     /// let mut doc = Document::new();
     /// doc.add_field_value("title", FieldValue::Text("Rust".to_string()));
@@ -224,8 +224,8 @@ impl Document {
     /// # Examples
     ///
     /// ```
-    /// use sarissa::lexical::core::document::Document;
-    /// use sarissa::lexical::core::field::FieldValue;
+    /// use iris::lexical::core::document::Document;
+    /// use iris::lexical::core::field::FieldValue;
     ///
     /// let mut doc = Document::new();
     /// doc.add_field_value("title", FieldValue::Text("Rust".to_string()));
@@ -248,8 +248,8 @@ impl Document {
     /// # Examples
     ///
     /// ```
-    /// use sarissa::lexical::core::document::Document;
-    /// use sarissa::lexical::core::field::FieldValue;
+    /// use iris::lexical::core::document::Document;
+    /// use iris::lexical::core::field::FieldValue;
     ///
     /// let mut doc = Document::new();
     /// doc.add_field_value("title", FieldValue::Text("Rust".to_string()));
@@ -270,8 +270,8 @@ impl Document {
     /// # Examples
     ///
     /// ```
-    /// use sarissa::lexical::core::document::Document;
-    /// use sarissa::lexical::core::field::FieldValue;
+    /// use iris::lexical::core::document::Document;
+    /// use iris::lexical::core::field::FieldValue;
     ///
     /// let mut doc = Document::new();
     /// doc.add_field_value("title", FieldValue::Text("Rust".to_string()));
@@ -293,8 +293,8 @@ impl Document {
     /// # Examples
     ///
     /// ```no_run
-    /// use sarissa::lexical::core::document::Document;
-    /// use sarissa::lexical::core::field::FieldValue;
+    /// use iris::lexical::core::document::Document;
+    /// use iris::lexical::core::field::FieldValue;
     ///
     /// let mut doc = Document::new();
     /// doc.add_field_value("title", FieldValue::Text("Rust".to_string()));
@@ -312,8 +312,8 @@ impl Document {
     /// # Examples
     ///
     /// ```
-    /// use sarissa::lexical::core::document::Document;
-    /// use sarissa::lexical::core::field::{TextOption, IntegerOption};
+    /// use iris::lexical::core::document::Document;
+    /// use iris::lexical::core::field::{TextOption, IntegerOption};
     ///
     /// let doc = Document::builder()
     ///     .add_text("title", "Rust", TextOption::default())
@@ -331,8 +331,8 @@ impl Document {
     /// # Examples
     ///
     /// ```
-    /// use sarissa::lexical::core::document::Document;
-    /// use sarissa::lexical::core::field::TextOption;
+    /// use iris::lexical::core::document::Document;
+    /// use iris::lexical::core::field::TextOption;
     ///
     /// let doc = Document::new();
     /// assert!(doc.is_empty());
@@ -353,8 +353,8 @@ impl Document {
     /// # Examples
     ///
     /// ```
-    /// use sarissa::lexical::core::document::Document;
-    /// use sarissa::lexical::core::field::{TextOption, IntegerOption};
+    /// use iris::lexical::core::document::Document;
+    /// use iris::lexical::core::field::{TextOption, IntegerOption};
     ///
     /// let doc = Document::builder()
     ///     .add_text("title", "Rust Programming", TextOption::default())
@@ -383,8 +383,8 @@ impl Default for Document {
 /// # Examples
 ///
 /// ```
-/// use sarissa::lexical::core::document::Document;
-/// use sarissa::lexical::core::field::{TextOption, IntegerOption, FloatOption, BooleanOption};
+/// use iris::lexical::core::document::Document;
+/// use iris::lexical::core::field::{TextOption, IntegerOption, FloatOption, BooleanOption};
 ///
 /// let doc = Document::builder()
 ///     .add_text("title", "Rust Programming", TextOption::default())
@@ -400,8 +400,8 @@ impl Default for Document {
 /// With geographic coordinates:
 ///
 /// ```
-/// use sarissa::lexical::core::document::Document;
-/// use sarissa::lexical::core::field::{TextOption, GeoOption};
+/// use iris::lexical::core::document::Document;
+/// use iris::lexical::core::field::{TextOption, GeoOption};
 ///
 /// let doc = Document::builder()
 ///     .add_text("name", "Tokyo", TextOption::default())
@@ -421,7 +421,7 @@ impl DocumentBuilder {
     /// # Examples
     ///
     /// ```
-    /// use sarissa::lexical::core::document::DocumentBuilder;
+    /// use iris::lexical::core::document::DocumentBuilder;
     ///
     /// let builder = DocumentBuilder::new();
     /// let doc = builder.build();
@@ -447,8 +447,8 @@ impl DocumentBuilder {
     /// # Examples
     ///
     /// ```no_run
-    /// use sarissa::lexical::core::document::Document;
-    /// use sarissa::lexical::core::field::TextOption;
+    /// use iris::lexical::core::document::Document;
+    /// use iris::lexical::core::field::TextOption;
     ///
     /// let doc = Document::builder()
     ///     .add_text("title", "Rust Programming", TextOption::default())
@@ -489,8 +489,8 @@ impl DocumentBuilder {
     /// # Examples
     ///
     /// ```no_run
-    /// use sarissa::lexical::core::document::Document;
-    /// use sarissa::lexical::core::field::{TextOption, IntegerOption};
+    /// use iris::lexical::core::document::Document;
+    /// use iris::lexical::core::field::{TextOption, IntegerOption};
     ///
     /// let doc = Document::builder()
     ///     .add_text("title", "Book", TextOption::default())
@@ -527,8 +527,8 @@ impl DocumentBuilder {
     /// # Examples
     ///
     /// ```no_run
-    /// use sarissa::lexical::core::document::Document;
-    /// use sarissa::lexical::core::field::{TextOption, FloatOption};
+    /// use iris::lexical::core::document::Document;
+    /// use iris::lexical::core::field::{TextOption, FloatOption};
     ///
     /// let doc = Document::builder()
     ///     .add_text("product", "Book", TextOption::default())
@@ -559,8 +559,8 @@ impl DocumentBuilder {
     /// # Examples
     ///
     /// ```no_run
-    /// use sarissa::lexical::core::document::Document;
-    /// use sarissa::lexical::core::field::{TextOption, BooleanOption};
+    /// use iris::lexical::core::document::Document;
+    /// use iris::lexical::core::field::{TextOption, BooleanOption};
     ///
     /// let doc = Document::builder()
     ///     .add_text("product", "Book", TextOption::default())
@@ -597,8 +597,8 @@ impl DocumentBuilder {
     /// # Examples
     ///
     /// ```no_run
-    /// use sarissa::lexical::core::document::Document;
-    /// use sarissa::lexical::core::field::{TextOption, DateTimeOption};
+    /// use iris::lexical::core::document::Document;
+    /// use iris::lexical::core::field::{TextOption, DateTimeOption};
     /// use chrono::Utc;
     ///
     /// let doc = Document::builder()
@@ -638,8 +638,8 @@ impl DocumentBuilder {
     /// # Examples
     ///
     /// ```no_run
-    /// use sarissa::lexical::core::document::Document;
-    /// use sarissa::lexical::core::field::{TextOption, GeoOption};
+    /// use iris::lexical::core::document::Document;
+    /// use iris::lexical::core::field::{TextOption, GeoOption};
     ///
     /// let doc = Document::builder()
     ///     .add_text("name", "Tokyo Tower", TextOption::default())
@@ -679,8 +679,8 @@ impl DocumentBuilder {
     /// # Examples
     ///
     /// ```no_run
-    /// use sarissa::lexical::core::document::Document;
-    /// use sarissa::lexical::core::field::BlobOption;
+    /// use iris::lexical::core::document::Document;
+    /// use iris::lexical::core::field::BlobOption;
     ///
     /// let doc = Document::builder()
     ///     .add_blob("image", "image/png", vec![0x89, 0x50], BlobOption::default())
@@ -723,8 +723,8 @@ impl DocumentBuilder {
     /// # Examples
     ///
     /// ```
-    /// use sarissa::lexical::core::document::Document;
-    /// use sarissa::lexical::core::field::FieldValue;
+    /// use iris::lexical::core::document::Document;
+    /// use iris::lexical::core::field::FieldValue;
     ///
     /// let value = FieldValue::Text("Dynamic value".to_string());
     /// let doc = Document::builder()
@@ -745,8 +745,8 @@ impl DocumentBuilder {
     /// # Examples
     ///
     /// ```
-    /// use sarissa::lexical::core::document::Document;
-    /// use sarissa::lexical::core::field::{TextOption, IntegerOption};
+    /// use iris::lexical::core::document::Document;
+    /// use iris::lexical::core::field::{TextOption, IntegerOption};
     ///
     /// let doc = Document::builder()
     ///     .add_text("title", "Rust", TextOption::default())

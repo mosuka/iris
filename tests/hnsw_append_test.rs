@@ -1,12 +1,12 @@
-use sarissa::storage::file::{FileStorage, FileStorageConfig};
-use sarissa::vector::core::distance::DistanceMetric;
-use sarissa::vector::core::vector::Vector;
-use sarissa::vector::index::config::HnswIndexConfig;
-use sarissa::vector::index::hnsw::reader::HnswIndexReader;
-use sarissa::vector::index::hnsw::searcher::HnswSearcher;
-use sarissa::vector::index::hnsw::writer::HnswIndexWriter;
-use sarissa::vector::search::searcher::{VectorIndexSearchRequest, VectorIndexSearcher};
-use sarissa::vector::writer::{VectorIndexWriter, VectorIndexWriterConfig};
+use iris::storage::file::{FileStorage, FileStorageConfig};
+use iris::vector::core::distance::DistanceMetric;
+use iris::vector::core::vector::Vector;
+use iris::vector::index::config::HnswIndexConfig;
+use iris::vector::index::hnsw::reader::HnswIndexReader;
+use iris::vector::index::hnsw::searcher::HnswSearcher;
+use iris::vector::index::hnsw::writer::HnswIndexWriter;
+use iris::vector::search::searcher::{VectorIndexSearchRequest, VectorIndexSearcher};
+use iris::vector::writer::{VectorIndexWriter, VectorIndexWriterConfig};
 use std::sync::Arc;
 use tempfile::tempdir;
 

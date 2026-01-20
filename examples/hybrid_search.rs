@@ -2,17 +2,17 @@ use std::error::Error;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use sarissa::embedding::embedder::{EmbedInput, EmbedInputType, Embedder};
-use sarissa::error::{Result, SarissaError};
-use sarissa::lexical::core::field::TextOption;
-use sarissa::storage::memory::MemoryStorageConfig;
-use sarissa::storage::{StorageConfig, StorageFactory};
-use sarissa::vector::core::document::{DocumentPayload, Payload, StoredVector};
-use sarissa::vector::core::field::{FlatOption, VectorOption};
-use sarissa::vector::core::vector::Vector;
-use sarissa::vector::engine::VectorEngine;
-use sarissa::vector::engine::config::{VectorFieldConfig, VectorIndexConfig};
-use sarissa::vector::engine::request::{
+use iris::embedding::embedder::{EmbedInput, EmbedInputType, Embedder};
+use iris::error::{Result, IrisError};
+use iris::lexical::core::field::TextOption;
+use iris::storage::memory::MemoryStorageConfig;
+use iris::storage::{StorageConfig, StorageFactory};
+use iris::vector::core::document::{DocumentPayload, Payload, StoredVector};
+use iris::vector::core::field::{FlatOption, VectorOption};
+use iris::vector::core::vector::Vector;
+use iris::vector::engine::VectorEngine;
+use iris::vector::engine::config::{VectorFieldConfig, VectorIndexConfig};
+use iris::vector::engine::request::{
     FusionConfig, LexicalQuery, QueryVector, TermQueryOptions, VectorSearchRequest,
 };
 use std::any::Any;
@@ -37,7 +37,7 @@ impl Embedder for SimpleEmbedder {
                     Ok(Vector::new(vec![0.0, 0.0, 0.0, 0.0]))
                 }
             }
-            _ => Err(SarissaError::invalid_argument("unsupported input")),
+            _ => Err(IrisError::invalid_argument("unsupported input")),
         }
     }
     fn supported_input_types(&self) -> Vec<EmbedInputType> {
@@ -78,7 +78,7 @@ fn main() -> std::result::Result<(), Box<dyn Error>> {
             ..Default::default()
         })),
         // Enable lexical indexing for this field using default settings
-        lexical: Some(sarissa::lexical::core::field::FieldOption::Text(
+        lexical: Some(iris::lexical::core::field::FieldOption::Text(
             TextOption::default(),
         )),
     };

@@ -1,22 +1,22 @@
 //! Span Query Example
 //!
-//! This example demonstrates how to use Span Queries in Sarissa for positional and proximity search.
+//! This example demonstrates how to use Span Queries in Iris for positional and proximity search.
 //! Span queries allow you to find terms that are near each other, or within specific distances.
 
 use std::sync::Arc;
 
-use sarissa::analysis::analyzer::standard::StandardAnalyzer;
-use sarissa::error::Result;
-use sarissa::lexical::core::document::Document;
-use sarissa::lexical::core::field::TextOption;
-use sarissa::lexical::engine::LexicalEngine;
-use sarissa::lexical::engine::config::LexicalIndexConfig;
-use sarissa::lexical::index::config::InvertedIndexConfig;
-use sarissa::lexical::index::inverted::query::span::{SpanQueryBuilder, SpanQueryWrapper};
-use sarissa::lexical::index::inverted::query::{LexicalSearchResults, Query};
-use sarissa::lexical::search::searcher::LexicalSearchRequest;
-use sarissa::storage::file::FileStorageConfig;
-use sarissa::storage::{StorageConfig, StorageFactory};
+use iris::analysis::analyzer::standard::StandardAnalyzer;
+use iris::error::Result;
+use iris::lexical::core::document::Document;
+use iris::lexical::core::field::TextOption;
+use iris::lexical::engine::LexicalEngine;
+use iris::lexical::engine::config::LexicalIndexConfig;
+use iris::lexical::index::config::InvertedIndexConfig;
+use iris::lexical::index::inverted::query::span::{SpanQueryBuilder, SpanQueryWrapper};
+use iris::lexical::index::inverted::query::{LexicalSearchResults, Query};
+use iris::lexical::search::searcher::LexicalSearchRequest;
+use iris::storage::file::FileStorageConfig;
+use iris::storage::{StorageConfig, StorageFactory};
 use tempfile::TempDir;
 
 fn main() -> Result<()> {

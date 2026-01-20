@@ -18,12 +18,12 @@
 //! # Example
 //!
 //! ```no_run
-//! use sarissa::hybrid::engine::HybridEngine;
-//! use sarissa::hybrid::search::searcher::{HybridSearchRequest, HybridSearchParams};
-//! use sarissa::lexical::engine::LexicalEngine;
-//! use sarissa::vector::engine::VectorEngine;
-//! use sarissa::storage::memory::MemoryStorage;
-//! use sarissa::error::Result;
+//! use iris::hybrid::engine::HybridEngine;
+//! use iris::hybrid::search::searcher::{HybridSearchRequest, HybridSearchParams};
+//! use iris::lexical::engine::LexicalEngine;
+//! use iris::vector::engine::VectorEngine;
+//! use iris::storage::memory::MemoryStorage;
+//! use iris::error::Result;
 //! use std::sync::Arc;
 //!
 //! async fn example(lexical_engine: LexicalEngine, vector_engine: VectorEngine) -> Result<()> {

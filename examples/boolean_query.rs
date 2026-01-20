@@ -4,24 +4,24 @@ use std::sync::Arc;
 
 use tempfile::TempDir;
 
-use sarissa::analysis::analyzer::analyzer::Analyzer;
-use sarissa::analysis::analyzer::keyword::KeywordAnalyzer;
-use sarissa::analysis::analyzer::per_field::PerFieldAnalyzer;
-use sarissa::analysis::analyzer::standard::StandardAnalyzer;
-use sarissa::lexical::core::document::Document;
-use sarissa::lexical::core::field::{FloatOption, TextOption};
-use sarissa::error::Result;
-use sarissa::lexical::engine::LexicalEngine;
-use sarissa::lexical::engine::config::LexicalIndexConfig;
-use sarissa::lexical::index::config::InvertedIndexConfig;
-use sarissa::lexical::index::inverted::query::Query;
-use sarissa::lexical::index::inverted::query::boolean::BooleanQuery;
-use sarissa::lexical::index::inverted::query::phrase::PhraseQuery;
-use sarissa::lexical::index::inverted::query::range::NumericRangeQuery;
-use sarissa::lexical::index::inverted::query::term::TermQuery;
-use sarissa::lexical::search::searcher::LexicalSearchRequest;
-use sarissa::storage::file::FileStorageConfig;
-use sarissa::storage::{StorageConfig, StorageFactory};
+use iris::analysis::analyzer::analyzer::Analyzer;
+use iris::analysis::analyzer::keyword::KeywordAnalyzer;
+use iris::analysis::analyzer::per_field::PerFieldAnalyzer;
+use iris::analysis::analyzer::standard::StandardAnalyzer;
+use iris::lexical::core::document::Document;
+use iris::lexical::core::field::{FloatOption, TextOption};
+use iris::error::Result;
+use iris::lexical::engine::LexicalEngine;
+use iris::lexical::engine::config::LexicalIndexConfig;
+use iris::lexical::index::config::InvertedIndexConfig;
+use iris::lexical::index::inverted::query::Query;
+use iris::lexical::index::inverted::query::boolean::BooleanQuery;
+use iris::lexical::index::inverted::query::phrase::PhraseQuery;
+use iris::lexical::index::inverted::query::range::NumericRangeQuery;
+use iris::lexical::index::inverted::query::term::TermQuery;
+use iris::lexical::search::searcher::LexicalSearchRequest;
+use iris::storage::file::FileStorageConfig;
+use iris::storage::{StorageConfig, StorageFactory};
 
 fn main() -> Result<()> {
     println!("=== BooleanQuery Example - Complex Boolean Logic ===\n");
@@ -225,12 +225,12 @@ fn main() -> Result<()> {
                 println!("      Title: {title}");
             }
             if let Some(field) = doc.get_field("price")
-                && let sarissa::lexical::core::field::FieldValue::Float(price) = &field.value
+                && let iris::lexical::core::field::FieldValue::Float(price) = &field.value
             {
                 println!("      Price: ${price:.2}");
             }
             if let Some(field) = doc.get_field("rating")
-                && let sarissa::lexical::core::field::FieldValue::Float(rating) = &field.value
+                && let iris::lexical::core::field::FieldValue::Float(rating) = &field.value
             {
                 println!("      Rating: {rating:.1}");
             }
@@ -320,7 +320,7 @@ fn main() -> Result<()> {
                 println!("      Title: {title}");
             }
             if let Some(field) = doc.get_field("price")
-                && let sarissa::lexical::core::field::FieldValue::Float(price) = &field.value
+                && let iris::lexical::core::field::FieldValue::Float(price) = &field.value
             {
                 println!("      Price: ${price:.2}");
             }
@@ -355,7 +355,7 @@ fn main() -> Result<()> {
                 println!("      Title: {title}");
             }
             if let Some(field) = doc.get_field("rating")
-                && let sarissa::lexical::core::field::FieldValue::Float(rating) = &field.value
+                && let iris::lexical::core::field::FieldValue::Float(rating) = &field.value
             {
                 println!("      Rating: {rating:.1}");
             }
@@ -411,12 +411,12 @@ fn main() -> Result<()> {
                 println!("      Title: {title}");
             }
             if let Some(field) = doc.get_field("price")
-                && let sarissa::lexical::core::field::FieldValue::Float(price) = &field.value
+                && let iris::lexical::core::field::FieldValue::Float(price) = &field.value
             {
                 println!("      Price: ${price:.2}");
             }
             if let Some(field) = doc.get_field("rating")
-                && let sarissa::lexical::core::field::FieldValue::Float(rating) = &field.value
+                && let iris::lexical::core::field::FieldValue::Float(rating) = &field.value
             {
                 println!("      Rating: {rating:.1}");
             }
@@ -471,7 +471,7 @@ fn main() -> Result<()> {
                 println!("      Title: {title}");
             }
             if let Some(field) = doc.get_field("price")
-                && let sarissa::lexical::core::field::FieldValue::Float(price) = &field.value
+                && let iris::lexical::core::field::FieldValue::Float(price) = &field.value
             {
                 println!("      Price: ${price:.2}");
             }

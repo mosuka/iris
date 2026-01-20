@@ -1,19 +1,19 @@
 #[cfg(test)]
 mod tests {
-    use sarissa::lexical::core::document::Document;
-    use sarissa::lexical::core::field::TextOption;
-    use sarissa::lexical::engine::config::LexicalIndexConfig;
-    use sarissa::lexical::index::inverted::writer::{
+    use iris::lexical::core::document::Document;
+    use iris::lexical::core::field::TextOption;
+    use iris::lexical::engine::config::LexicalIndexConfig;
+    use iris::lexical::index::inverted::writer::{
         InvertedIndexWriter, InvertedIndexWriterConfig,
     };
-    use sarissa::storage::memory::MemoryStorageConfig;
-    use sarissa::storage::{StorageConfig, StorageFactory};
-    use sarissa::vector::core::distance::DistanceMetric;
-    use sarissa::vector::core::document::{DocumentVector, StoredVector};
-    use sarissa::vector::core::field::{FlatOption, VectorIndexKind, VectorOption};
-    use sarissa::vector::engine::VectorEngine;
-    use sarissa::vector::engine::config::{VectorFieldConfig, VectorIndexConfig};
-    use sarissa::vector::engine::request::{VectorScoreMode, VectorSearchRequest};
+    use iris::storage::memory::MemoryStorageConfig;
+    use iris::storage::{StorageConfig, StorageFactory};
+    use iris::vector::core::distance::DistanceMetric;
+    use iris::vector::core::document::{DocumentVector, StoredVector};
+    use iris::vector::core::field::{FlatOption, VectorIndexKind, VectorOption};
+    use iris::vector::engine::VectorEngine;
+    use iris::vector::engine::config::{VectorFieldConfig, VectorIndexConfig};
+    use iris::vector::engine::request::{VectorScoreMode, VectorSearchRequest};
     use std::collections::HashMap;
     use std::sync::Arc;
 
@@ -40,8 +40,8 @@ mod tests {
             default_index_kind: VectorIndexKind::Flat,
             default_base_weight: 1.0,
             implicit_schema: false,
-            embedder: Arc::new(sarissa::embedding::precomputed::PrecomputedEmbedder::new()),
-            deletion_config: sarissa::maintenance::deletion::DeletionConfig::default(),
+            embedder: Arc::new(iris::embedding::precomputed::PrecomputedEmbedder::new()),
+            deletion_config: iris::maintenance::deletion::DeletionConfig::default(),
             shard_id: 0,
             metadata_config: LexicalIndexConfig::default(),
         };
@@ -62,7 +62,7 @@ mod tests {
         // 3. Verify it exists
         // Search request
         let request = VectorSearchRequest {
-            query_vectors: vec![sarissa::vector::engine::request::QueryVector {
+            query_vectors: vec![iris::vector::engine::request::QueryVector {
                 vector: StoredVector::new(Arc::from(vec![0.1f32; 128])),
                 weight: 1.0,
                 fields: None,

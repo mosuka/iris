@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 use std::sync::Arc;
 
-use crate::error::{Result, SarissaError};
+use crate::error::{Result, IrisError};
 use crate::maintenance::deletion::DeletionBitmap;
 use crate::storage::Storage;
 use crate::vector::core::document::{METADATA_WEIGHT, StoredVector};
@@ -66,7 +66,7 @@ impl SegmentedVectorField {
         match &config.vector {
             Some(VectorOption::Hnsw(_)) => {}
             _ => {
-                return Err(SarissaError::invalid_config(
+                return Err(IrisError::invalid_config(
                     "SegmentedVectorField requires HNSW configuration",
                 ));
             }
@@ -106,7 +106,7 @@ impl SegmentedVectorField {
                 (opt.dimension, opt.distance, opt.m, opt.ef_construction)
             }
             _ => {
-                return Err(SarissaError::invalid_config(
+                return Err(IrisError::invalid_config(
                     "SegmentedVectorField requires HNSW configuration".to_string(),
                 ));
             }
@@ -151,7 +151,7 @@ impl SegmentedVectorField {
             let (dimension, m, ef_construction) = match &self.config.vector {
                 Some(VectorOption::Hnsw(opt)) => (opt.dimension, opt.m, opt.ef_construction),
                 _ => {
-                    return Err(SarissaError::invalid_config(
+                    return Err(IrisError::invalid_config(
                         "SegmentedVectorField requires HNSW configuration".to_string(),
                     ));
                 }
@@ -227,7 +227,7 @@ impl VectorFieldWriter for SegmentedVectorField {
         if let Some((_, writer)) = active_opt.as_mut() {
             writer.add_vectors(vec![(doc_id, self.name.clone(), vec)])?;
         } else {
-            return Err(SarissaError::internal(
+            return Err(IrisError::internal(
                 "No active segment available".to_string(),
             ));
         }
@@ -410,7 +410,7 @@ impl SegmentedVectorField {
 impl VectorFieldReader for SegmentedVectorField {
     fn search(&self, request: FieldSearchInput) -> Result<FieldSearchResults> {
         if request.field != self.name {
-            return Err(SarissaError::invalid_argument(format!(
+            return Err(IrisError::invalid_argument(format!(
                 "field mismatch: expected '{}', got '{}'",
                 self.name, request.field
             )));

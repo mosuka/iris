@@ -9,7 +9,7 @@ use std::sync::Arc;
 
 use parking_lot::RwLock;
 
-use crate::error::{Result, SarissaError};
+use crate::error::{Result, IrisError};
 use crate::vector::core::document::StoredVector;
 use crate::vector::core::vector::Vector;
 use crate::vector::engine::config::VectorFieldConfig;
@@ -173,7 +173,7 @@ impl InMemoryFieldWriter {
             .unwrap_or(0);
 
         if vector.dimension() != dimension {
-            return Err(SarissaError::invalid_argument(format!(
+            return Err(IrisError::invalid_argument(format!(
                 "vector dimension mismatch for field '{}': expected {}, got {}",
                 self.field_name,
                 dimension,
@@ -181,7 +181,7 @@ impl InMemoryFieldWriter {
             )));
         }
         if !vector.is_valid() {
-            return Err(SarissaError::invalid_argument(format!(
+            return Err(IrisError::invalid_argument(format!(
                 "vector for field '{}' contains invalid values",
                 self.field_name
             )));
@@ -295,7 +295,7 @@ impl InMemoryFieldReader {
 impl VectorFieldReader for InMemoryFieldReader {
     fn search(&self, request: FieldSearchInput) -> Result<FieldSearchResults> {
         if request.field != self.field_name {
-            return Err(SarissaError::invalid_argument(format!(
+            return Err(IrisError::invalid_argument(format!(
                 "field mismatch: expected '{}', got '{}'",
                 self.field_name, request.field
             )));
@@ -316,7 +316,7 @@ impl VectorFieldReader for InMemoryFieldReader {
         for query in &request.query_vectors {
             let query_vector = query.vector.to_vector();
             if query_vector.dimension() != dimension {
-                return Err(SarissaError::invalid_argument(format!(
+                return Err(IrisError::invalid_argument(format!(
                     "query vector dimension mismatch for field '{}': expected {}, got {}",
                     self.field_name,
                     dimension,

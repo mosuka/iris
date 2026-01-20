@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use crate::error::{Result, SarissaError};
+use crate::error::{Result, IrisError};
 use crate::storage::Storage;
 use crate::vector::core::distance::DistanceMetric;
 use crate::vector::core::vector::Vector;
@@ -33,7 +33,7 @@ pub struct HnswIndexReader {
 impl HnswIndexReader {
     /// Create a reader from serialized bytes.
     pub fn from_bytes(_data: &[u8]) -> Result<Self> {
-        Err(SarissaError::InvalidOperation(
+        Err(IrisError::InvalidOperation(
             "from_bytes is deprecated, use load() instead".to_string(),
         ))
     }
@@ -154,7 +154,7 @@ impl HnswIndexReader {
                     let mut field_name_buf = vec![0u8; field_name_len];
                     input.read_exact(&mut field_name_buf)?;
                     let field_name = String::from_utf8(field_name_buf).map_err(|e| {
-                        SarissaError::InvalidOperation(format!(
+                        IrisError::InvalidOperation(format!(
                             "Invalid UTF-8 in field name: {}",
                             e
                         ))
@@ -187,10 +187,10 @@ impl HnswIndexReader {
                 // Seek to start of vectors
                 input
                     .seek(std::io::SeekFrom::Start(start_pos as u64))
-                    .map_err(SarissaError::Io)?;
+                    .map_err(IrisError::Io)?;
 
                 for _ in 0..num_vectors {
-                    let start_offset = input.stream_position().map_err(SarissaError::Io)?;
+                    let start_offset = input.stream_position().map_err(IrisError::Io)?;
 
                     let mut doc_id_buf = [0u8; 8];
                     input.read_exact(&mut doc_id_buf)?;
@@ -204,7 +204,7 @@ impl HnswIndexReader {
                     let mut field_name_buf = vec![0u8; field_name_len];
                     input.read_exact(&mut field_name_buf)?;
                     let field_name = String::from_utf8(field_name_buf).map_err(|e| {
-                        SarissaError::InvalidOperation(format!(
+                        IrisError::InvalidOperation(format!(
                             "Invalid UTF-8 in field name: {}",
                             e
                         ))
@@ -221,7 +221,7 @@ impl HnswIndexReader {
                     // Skip vector data (dimension * 4 bytes)
                     input
                         .seek(std::io::SeekFrom::Current((dimension * 4) as i64))
-                        .map_err(SarissaError::Io)?;
+                        .map_err(IrisError::Io)?;
                 }
                 let graph = read_graph(&mut input)?;
 
@@ -499,7 +499,7 @@ impl VectorIterator for HnswVectorIterator {
                 self.current += 1;
                 Ok(Some((*doc_id, field.clone(), vec)))
             } else {
-                Err(SarissaError::internal(format!(
+                Err(IrisError::internal(format!(
                     "Vector {}:{} found in keys but missing in storage",
                     doc_id, field
                 )))

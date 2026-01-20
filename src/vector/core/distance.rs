@@ -3,7 +3,7 @@
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use crate::error::{Result, SarissaError};
+use crate::error::{Result, IrisError};
 
 /// Distance metrics for vector similarity calculation.
 #[derive(
@@ -38,7 +38,7 @@ impl DistanceMetric {
     /// Calculate the distance between two vectors using this metric.
     pub fn distance(&self, a: &[f32], b: &[f32]) -> Result<f32> {
         if a.len() != b.len() {
-            return Err(SarissaError::InvalidOperation(
+            return Err(IrisError::InvalidOperation(
                 "Vector dimensions must match for distance calculation".to_string(),
             ));
         }
@@ -210,7 +210,7 @@ impl DistanceMetric {
             "manhattan" | "l1" => Ok(DistanceMetric::Manhattan),
             "dot_product" | "dot" => Ok(DistanceMetric::DotProduct),
             "angular" => Ok(DistanceMetric::Angular),
-            _ => Err(SarissaError::InvalidOperation(format!(
+            _ => Err(IrisError::InvalidOperation(format!(
                 "Unknown distance metric: {s}"
             ))),
         }

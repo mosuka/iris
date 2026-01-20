@@ -11,8 +11,8 @@
 //! # Examples
 //!
 //! ```
-//! use sarissa::analysis::analyzer::analyzer::Analyzer;
-//! use sarissa::analysis::analyzer::language::english::EnglishAnalyzer;
+//! use iris::analysis::analyzer::analyzer::Analyzer;
+//! use iris::analysis::analyzer::language::english::EnglishAnalyzer;
 //!
 //! let analyzer = EnglishAnalyzer::new().unwrap();
 //! let tokens: Vec<_> = analyzer.analyze("Hello the world").unwrap().collect();

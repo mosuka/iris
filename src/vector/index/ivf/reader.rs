@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use crate::error::{Result, SarissaError};
+use crate::error::{Result, IrisError};
 use crate::maintenance::deletion::DeletionBitmap;
 use crate::storage::Storage;
 use crate::vector::core::distance::DistanceMetric;
@@ -31,7 +31,7 @@ pub struct IvfIndexReader {
 impl IvfIndexReader {
     /// Create a reader from serialized bytes.
     pub fn from_bytes(_data: &[u8]) -> Result<Self> {
-        Err(SarissaError::InvalidOperation(
+        Err(IrisError::InvalidOperation(
             "from_bytes is deprecated, use load() instead".to_string(),
         ))
     }
@@ -100,7 +100,7 @@ impl IvfIndexReader {
                         let mut field_name_buf = vec![0u8; field_name_len];
                         input.read_exact(&mut field_name_buf)?;
                         let field_name = String::from_utf8(field_name_buf).map_err(|e| {
-                            SarissaError::InvalidOperation(format!(
+                            IrisError::InvalidOperation(format!(
                                 "Invalid UTF-8 in field name: {}",
                                 e
                             ))
@@ -133,7 +133,7 @@ impl IvfIndexReader {
                     let list_size = u32::from_le_bytes(list_size_buf) as usize;
 
                     for _ in 0..list_size {
-                        let start_offset = input.stream_position().map_err(SarissaError::Io)?;
+                        let start_offset = input.stream_position().map_err(IrisError::Io)?;
 
                         let mut doc_id_buf = [0u8; 8];
                         input.read_exact(&mut doc_id_buf)?;
@@ -146,7 +146,7 @@ impl IvfIndexReader {
                         let mut field_name_buf = vec![0u8; field_name_len];
                         input.read_exact(&mut field_name_buf)?;
                         let field_name = String::from_utf8(field_name_buf).map_err(|e| {
-                            SarissaError::InvalidOperation(format!(
+                            IrisError::InvalidOperation(format!(
                                 "Invalid UTF-8 in field name: {}",
                                 e
                             ))
@@ -161,7 +161,7 @@ impl IvfIndexReader {
                         // Skip vector
                         input
                             .seek(SeekFrom::Current((dimension * 4) as i64))
-                            .map_err(SarissaError::Io)?;
+                            .map_err(IrisError::Io)?;
                     }
                 }
                 (
@@ -443,7 +443,7 @@ impl VectorIterator for IvfVectorIterator {
                 self.current += 1;
                 Ok(Some((*doc_id, field.clone(), vec)))
             } else {
-                Err(SarissaError::internal(format!(
+                Err(IrisError::internal(format!(
                     "Vector {}:{} found in keys but missing in storage",
                     doc_id, field
                 )))

@@ -13,8 +13,8 @@
 //! # Examples
 //!
 //! ```
-//! use sarissa::analysis::token_filter::stem::Stemmer;
-//! use sarissa::analysis::token_filter::stem::identity::IdentityStemmer;
+//! use iris::analysis::token_filter::stem::Stemmer;
+//! use iris::analysis::token_filter::stem::identity::IdentityStemmer;
 //!
 //! let stemmer = IdentityStemmer::new();
 //!

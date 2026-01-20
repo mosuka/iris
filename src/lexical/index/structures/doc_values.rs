@@ -12,7 +12,7 @@ use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::sync::Arc;
 
-use crate::error::{Result, SarissaError};
+use crate::error::{Result, IrisError};
 use crate::lexical::core::field::FieldValue;
 use crate::storage::Storage;
 
@@ -120,7 +120,7 @@ impl DocValuesWriter {
                 .map(|(k, v)| (*k, v.clone()))
                 .collect();
             let serialized = rkyv::to_bytes::<rkyv::rancor::Error>(&values_vec).map_err(|e| {
-                SarissaError::Index(format!("Failed to serialize DocValues: {}", e))
+                IrisError::Index(format!("Failed to serialize DocValues: {}", e))
             })?;
 
             output.write_all(&(serialized.len() as u64).to_le_bytes())?;
@@ -159,7 +159,7 @@ impl DocValuesReader {
         let mut magic = [0u8; 4];
         input.read_exact(&mut magic)?;
         if &magic != b"DVFF" {
-            return Err(SarissaError::Index(
+            return Err(IrisError::Index(
                 "Invalid DocValues file format".to_string(),
             ));
         }
@@ -168,7 +168,7 @@ impl DocValuesReader {
         let mut version = [0u8; 2];
         input.read_exact(&mut version)?;
         if version[0] != 1 {
-            return Err(SarissaError::Index(format!(
+            return Err(IrisError::Index(format!(
                 "Unsupported DocValues version: {}.{}",
                 version[0], version[1]
             )));
@@ -191,7 +191,7 @@ impl DocValuesReader {
             let mut name_bytes = vec![0u8; name_len];
             input.read_exact(&mut name_bytes)?;
             let field_name = String::from_utf8(name_bytes)
-                .map_err(|e| SarissaError::Index(format!("Invalid field name: {}", e)))?;
+                .map_err(|e| IrisError::Index(format!("Invalid field name: {}", e)))?;
 
             // Read number of values
             let mut num_values_bytes = [0u8; 8];
@@ -208,7 +208,7 @@ impl DocValuesReader {
 
             let values_vec: Vec<(u64, FieldValue)> =
                 rkyv::from_bytes::<Vec<(u64, FieldValue)>, rkyv::rancor::Error>(&data).map_err(
-                    |e| SarissaError::Index(format!("Failed to deserialize DocValues: {}", e)),
+                    |e| IrisError::Index(format!("Failed to deserialize DocValues: {}", e)),
                 )?;
 
             let values = values_vec.into_iter().collect();

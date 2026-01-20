@@ -33,8 +33,8 @@ use crate::lexical::index::config::InvertedIndexConfig;
 /// # Example
 ///
 /// ```no_run
-/// use sarissa::lexical::engine::config::LexicalIndexConfig;
-/// use sarissa::lexical::index::config::InvertedIndexConfig;
+/// use iris::lexical::engine::config::LexicalIndexConfig;
+/// use iris::lexical::index::config::InvertedIndexConfig;
 ///
 /// // Use default inverted index
 /// let config = LexicalIndexConfig::default();
@@ -70,8 +70,8 @@ impl LexicalIndexConfig {
     /// # Example
     ///
     /// ```no_run
-    /// use sarissa::lexical::engine::config::LexicalIndexConfig;
-    /// use sarissa::analysis::analyzer::standard::StandardAnalyzer;
+    /// use iris::lexical::engine::config::LexicalIndexConfig;
+    /// use iris::analysis::analyzer::standard::StandardAnalyzer;
     /// use std::sync::Arc;
     ///
     /// let config = LexicalIndexConfig::builder()
@@ -112,9 +112,9 @@ impl LexicalIndexConfig {
 /// # Example
 ///
 /// ```no_run
-/// use sarissa::lexical::engine::config::LexicalIndexConfig;
-/// use sarissa::analysis::analyzer::standard::StandardAnalyzer;
-/// use sarissa::analysis::analyzer::per_field::PerFieldAnalyzer;
+/// use iris::lexical::engine::config::LexicalIndexConfig;
+/// use iris::analysis::analyzer::standard::StandardAnalyzer;
+/// use iris::analysis::analyzer::per_field::PerFieldAnalyzer;
 /// use std::sync::Arc;
 ///
 /// // Simple usage with defaults
@@ -175,9 +175,9 @@ impl LexicalIndexConfigBuilder {
     /// # Example
     ///
     /// ```no_run
-    /// use sarissa::lexical::engine::config::LexicalIndexConfig;
-    /// use sarissa::analysis::analyzer::standard::StandardAnalyzer;
-    /// use sarissa::analysis::analyzer::per_field::PerFieldAnalyzer;
+    /// use iris::lexical::engine::config::LexicalIndexConfig;
+    /// use iris::analysis::analyzer::standard::StandardAnalyzer;
+    /// use iris::analysis::analyzer::per_field::PerFieldAnalyzer;
     /// use std::sync::Arc;
     ///
     /// // With a single analyzer

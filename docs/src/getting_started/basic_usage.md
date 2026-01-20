@@ -4,20 +4,20 @@ This guide demonstrates how to perform a **Hybrid Search** using the unified `Ve
 
 ```rust
 use std::sync::Arc;
-use sarissa::vector::engine::VectorEngine;
-use sarissa::vector::engine::config::VectorEngineConfig;
-use sarissa::vector::index::config::HnswIndexConfig;
-use sarissa::storage::file::FileStorageConfig;
-use sarissa::storage::{StorageConfig, StorageFactory};
-use sarissa::vector::core::vector::Vector;
-use sarissa::lexical::core::document::Document as LexicalDocument;
-use sarissa::lexical::core::field::TextOption;
-use sarissa::vector::engine::query::{VectorSearchRequest, HybridSearchQuery};
+use iris::vector::engine::VectorEngine;
+use iris::vector::engine::config::VectorEngineConfig;
+use iris::vector::index::config::HnswIndexConfig;
+use iris::storage::file::FileStorageConfig;
+use iris::storage::{StorageConfig, StorageFactory};
+use iris::vector::core::vector::Vector;
+use iris::lexical::core::document::Document as LexicalDocument;
+use iris::lexical::core::field::TextOption;
+use iris::vector::engine::query::{VectorSearchRequest, HybridSearchQuery};
 
 #[tokio::main]
-async fn main() -> sarissa::error::Result<()> {
+async fn main() -> iris::error::Result<()> {
     // 1. Setup Storage
-    let storage_path = "tmp/sarissa_index";
+    let storage_path = "tmp/iris_index";
     std::fs::create_dir_all(storage_path)?;
     let storage_config = StorageConfig::File(FileStorageConfig::new(storage_path));
     let storage = StorageFactory::create(storage_config.clone())?;

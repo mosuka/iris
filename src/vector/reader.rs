@@ -383,7 +383,7 @@ impl VectorIndexReaderFactory {
                 }
                 Ok(Arc::new(reader))
             }
-            _ => Err(crate::error::SarissaError::InvalidOperation(format!(
+            _ => Err(crate::error::IrisError::InvalidOperation(format!(
                 "Unknown index type: {index_type}"
             ))),
         }

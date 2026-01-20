@@ -6,9 +6,9 @@
 //! # Examples
 //!
 //! ```
-//! use sarissa::analysis::token_filter::Filter;
-//! use sarissa::analysis::token_filter::strip::StripFilter;
-//! use sarissa::analysis::token::Token;
+//! use iris::analysis::token_filter::Filter;
+//! use iris::analysis::token_filter::strip::StripFilter;
+//! use iris::analysis::token::Token;
 //!
 //! let filter = StripFilter::new();
 //! let tokens = vec![Token::new("  hello  ", 0), Token::new("world", 1)];
@@ -39,9 +39,9 @@ use crate::error::Result;
 /// # Examples
 ///
 /// ```
-/// use sarissa::analysis::token_filter::Filter;
-/// use sarissa::analysis::token_filter::strip::StripFilter;
-/// use sarissa::analysis::token::Token;
+/// use iris::analysis::token_filter::Filter;
+/// use iris::analysis::token_filter::strip::StripFilter;
+/// use iris::analysis::token::Token;
 ///
 /// let filter = StripFilter::new();
 /// let tokens = vec![

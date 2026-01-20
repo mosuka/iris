@@ -7,7 +7,7 @@ use std::collections::HashMap;
 
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 
-use crate::error::{Result, SarissaError};
+use crate::error::{Result, IrisError};
 use crate::storage::{StorageInput, StorageOutput};
 use crate::util::varint::{decode_u64, encode_u64};
 
@@ -176,7 +176,7 @@ impl<W: StorageOutput> StructWriter<W> {
     /// Get current stream position from underlying writer.
     /// This is useful when mixing raw writes with structured writes.
     pub fn stream_position(&mut self) -> Result<u64> {
-        self.writer.stream_position().map_err(SarissaError::from)
+        self.writer.stream_position().map_err(IrisError::from)
     }
 }
 
@@ -209,7 +209,7 @@ impl<R: StorageInput> StructReader<R> {
 
     /// Get current stream position from underlying reader.
     pub fn stream_position(&mut self) -> Result<u64> {
-        self.reader.stream_position().map_err(SarissaError::from)
+        self.reader.stream_position().map_err(IrisError::from)
     }
 
     /// Read a u8 value.
@@ -285,7 +285,7 @@ impl<R: StorageInput> StructReader<R> {
         self.update_checksum(&bytes);
         self.position += length as u64;
 
-        String::from_utf8(bytes).map_err(|e| SarissaError::storage(format!("Invalid UTF-8: {e}")))
+        String::from_utf8(bytes).map_err(|e| IrisError::storage(format!("Invalid UTF-8: {e}")))
     }
 
     /// Read bytes with length prefix.
@@ -369,7 +369,7 @@ impl<R: StorageInput> StructReader<R> {
     /// Verify file integrity by checking final checksum.
     pub fn verify_checksum(&mut self) -> Result<bool> {
         if self.position + 4 > self.file_size {
-            return Err(SarissaError::storage("File too short for checksum"));
+            return Err(IrisError::storage("File too short for checksum"));
         }
 
         // Read the stored checksum from the end of file
@@ -479,7 +479,7 @@ impl<R: StorageInput> BlockReader<R> {
 
         // Verify block number
         if block_number != self.blocks_read {
-            return Err(SarissaError::storage(format!(
+            return Err(IrisError::storage(format!(
                 "Block number mismatch: expected {}, got {}",
                 self.blocks_read, block_number
             )));

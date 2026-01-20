@@ -1,10 +1,10 @@
 #[cfg(test)]
 mod tests {
-    use sarissa::storage::memory::MemoryStorage;
-    use sarissa::vector::core::vector::Vector;
-    use sarissa::vector::index::config::FlatIndexConfig;
-    use sarissa::vector::index::flat::writer::FlatIndexWriter;
-    use sarissa::vector::writer::{VectorIndexWriter, VectorIndexWriterConfig};
+    use iris::storage::memory::MemoryStorage;
+    use iris::vector::core::vector::Vector;
+    use iris::vector::index::config::FlatIndexConfig;
+    use iris::vector::index::flat::writer::FlatIndexWriter;
+    use iris::vector::writer::{VectorIndexWriter, VectorIndexWriterConfig};
     use std::sync::Arc;
 
     #[test]

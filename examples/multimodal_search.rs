@@ -19,26 +19,26 @@
 use std::path::Path;
 
 #[cfg(feature = "embeddings-multimodal")]
-use sarissa::embedding::candle_clip_embedder::CandleClipEmbedder;
+use iris::embedding::candle_clip_embedder::CandleClipEmbedder;
 #[cfg(feature = "embeddings-multimodal")]
-use sarissa::embedding::embedder::Embedder;
+use iris::embedding::embedder::Embedder;
 #[cfg(feature = "embeddings-multimodal")]
-use sarissa::error::Result;
+use iris::error::Result;
 #[cfg(feature = "embeddings-multimodal")]
-use sarissa::storage::file::FileStorageConfig;
+use iris::storage::file::FileStorageConfig;
 #[cfg(feature = "embeddings-multimodal")]
-use sarissa::storage::{StorageConfig, StorageFactory};
+use iris::storage::{StorageConfig, StorageFactory};
 #[cfg(feature = "embeddings-multimodal")]
-use sarissa::vector::core::distance::DistanceMetric;
+use iris::vector::core::distance::DistanceMetric;
 #[cfg(feature = "embeddings-multimodal")]
-use sarissa::vector::core::document::{DocumentPayload, Payload};
+use iris::vector::core::document::{DocumentPayload, Payload};
 #[cfg(feature = "embeddings-multimodal")]
-use sarissa::vector::core::field::{FlatOption, VectorOption};
+use iris::vector::core::field::{FlatOption, VectorOption};
 #[cfg(feature = "embeddings-multimodal")]
-use sarissa::vector::engine::VectorEngine;
-use sarissa::vector::engine::config::{VectorFieldConfig, VectorIndexConfig};
+use iris::vector::engine::VectorEngine;
+use iris::vector::engine::config::{VectorFieldConfig, VectorIndexConfig};
 #[cfg(feature = "embeddings-multimodal")]
-use sarissa::vector::engine::query::VectorSearchRequestBuilder;
+use iris::vector::engine::query::VectorSearchRequestBuilder;
 #[cfg(feature = "embeddings-multimodal")]
 use tempfile::TempDir;
 
@@ -198,7 +198,7 @@ fn main() -> Result<()> {
 }
 
 #[cfg(feature = "embeddings-multimodal")]
-fn print_results(results: &sarissa::vector::engine::response::VectorSearchResults) {
+fn print_results(results: &iris::vector::engine::response::VectorSearchResults) {
     for (i, hit) in results.hits.iter().enumerate() {
         println!("{}. Doc ID: {}, Score: {:.4}", i + 1, hit.doc_id, hit.score);
     }

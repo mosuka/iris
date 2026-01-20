@@ -42,7 +42,7 @@ impl WildcardQuery {
         let pattern = pattern.into();
         let regex_pattern = Self::compile_pattern(&pattern)?;
         let regex = Regex::new(&regex_pattern).map_err(|e| {
-            crate::error::SarissaError::analysis(format!("Invalid wildcard pattern: {e}"))
+            crate::error::IrisError::analysis(format!("Invalid wildcard pattern: {e}"))
         })?;
 
         Ok(WildcardQuery {

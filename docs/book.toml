@@ -3,8 +3,8 @@ authors = ["Mosuka"]
 language = "en"
 multilingual = false
 src = "src"
-title = "Sarissa Documentation"
+title = "Iris Documentation"
 
 [output.html]
 git-repository-url = "https://github.com/mosuka/sarissa"
-site-url = "/sarissa/"
+site-url = "/iris/"

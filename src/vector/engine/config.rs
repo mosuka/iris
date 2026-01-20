@@ -10,13 +10,13 @@
 //! ```no_run
 //! # #[cfg(feature = "embeddings-candle")]
 //! # {
-//! use sarissa::embedding::per_field::PerFieldEmbedder;
-//! use sarissa::embedding::candle_bert_embedder::CandleBertEmbedder;
-//! use sarissa::embedding::embedder::Embedder;
-//! use sarissa::vector::engine::config::VectorIndexConfig;
+//! use iris::embedding::per_field::PerFieldEmbedder;
+//! use iris::embedding::candle_bert_embedder::CandleBertEmbedder;
+//! use iris::embedding::embedder::Embedder;
+//! use iris::vector::engine::config::VectorIndexConfig;
 //! use std::sync::Arc;
 //!
-//! # fn example() -> sarissa::error::Result<()> {
+//! # fn example() -> iris::error::Result<()> {
 //! let text_embedder: Arc<dyn Embedder> = Arc::new(
 //!     CandleBertEmbedder::new("sentence-transformers/all-MiniLM-L6-v2")?
 //! );
@@ -39,7 +39,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::embedding::embedder::{EmbedInput, EmbedInputType, Embedder};
 use crate::embedding::precomputed::PrecomputedEmbedder;
-use crate::error::{Result, SarissaError};
+use crate::error::{Result, IrisError};
 use crate::lexical::engine::config::LexicalIndexConfig;
 use crate::maintenance::deletion::DeletionConfig;
 use crate::vector::core::distance::DistanceMetric;
@@ -56,15 +56,15 @@ use crate::vector::core::vector::Vector;
 /// ```no_run
 /// # #[cfg(feature = "embeddings-candle")]
 /// # {
-/// use sarissa::embedding::per_field::PerFieldEmbedder;
-/// use sarissa::embedding::candle_bert_embedder::CandleBertEmbedder;
-/// use sarissa::embedding::embedder::Embedder;
-/// use sarissa::vector::engine::config::{VectorIndexConfig, VectorFieldConfig};
-/// use sarissa::vector::core::field::VectorIndexKind;
-/// use sarissa::vector::core::distance::DistanceMetric;
+/// use iris::embedding::per_field::PerFieldEmbedder;
+/// use iris::embedding::candle_bert_embedder::CandleBertEmbedder;
+/// use iris::embedding::embedder::Embedder;
+/// use iris::vector::engine::config::{VectorIndexConfig, VectorFieldConfig};
+/// use iris::vector::core::field::VectorIndexKind;
+/// use iris::vector::core::distance::DistanceMetric;
 /// use std::sync::Arc;
 ///
-/// # fn example() -> sarissa::error::Result<()> {
+/// # fn example() -> iris::error::Result<()> {
 /// let text_embedder: Arc<dyn Embedder> = Arc::new(
 ///     CandleBertEmbedder::new("sentence-transformers/all-MiniLM-L6-v2")?
 /// );
@@ -109,8 +109,8 @@ pub enum IndexLoadingMode {
 /// # Example
 ///
 /// ```rust
-/// use sarissa::vector::index::config::{VectorIndexTypeConfig, HnswIndexConfig};
-/// use sarissa::vector::core::distance::DistanceMetric;
+/// use iris::vector::index::config::{VectorIndexTypeConfig, HnswIndexConfig};
+/// use iris::vector::core::distance::DistanceMetric;
 ///
 /// let hnsw_config = HnswIndexConfig {
 ///     dimension: 384,
@@ -587,7 +587,7 @@ impl VectorIndexConfig {
     pub fn validate(&self) -> Result<()> {
         for field in &self.default_fields {
             if !self.fields.contains_key(field) {
-                return Err(SarissaError::invalid_config(format!(
+                return Err(IrisError::invalid_config(format!(
                     "default field '{field}' is not defined"
                 )));
             }
@@ -595,10 +595,10 @@ impl VectorIndexConfig {
 
         if self.implicit_schema {
             let dim = self.default_dimension.ok_or_else(|| {
-                SarissaError::invalid_config("implicit_schema requires default_dimension")
+                IrisError::invalid_config("implicit_schema requires default_dimension")
             })?;
             if dim == 0 {
-                return Err(SarissaError::invalid_config(
+                return Err(IrisError::invalid_config(
                     "default_dimension must be greater than zero when implicit_schema is enabled",
                 ));
             }
@@ -621,15 +621,15 @@ impl VectorIndexConfig {
 /// ```no_run
 /// # #[cfg(feature = "embeddings-candle")]
 /// # {
-/// use sarissa::embedding::per_field::PerFieldEmbedder;
-/// use sarissa::embedding::candle_bert_embedder::CandleBertEmbedder;
-/// use sarissa::embedding::embedder::Embedder;
-/// use sarissa::vector::engine::config::{VectorIndexConfig, VectorFieldConfig};
-/// use sarissa::vector::core::field::{VectorIndexKind, VectorOption, FlatOption};
-/// use sarissa::vector::core::distance::DistanceMetric;
+/// use iris::embedding::per_field::PerFieldEmbedder;
+/// use iris::embedding::candle_bert_embedder::CandleBertEmbedder;
+/// use iris::embedding::embedder::Embedder;
+/// use iris::vector::engine::config::{VectorIndexConfig, VectorFieldConfig};
+/// use iris::vector::core::field::{VectorIndexKind, VectorOption, FlatOption};
+/// use iris::vector::core::distance::DistanceMetric;
 /// use std::sync::Arc;
 ///
-/// # fn example() -> sarissa::error::Result<()> {
+/// # fn example() -> iris::error::Result<()> {
 /// let text_embedder: Arc<dyn Embedder> = Arc::new(
 ///     CandleBertEmbedder::new("sentence-transformers/all-MiniLM-L6-v2")?
 /// );

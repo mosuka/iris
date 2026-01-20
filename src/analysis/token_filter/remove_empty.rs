@@ -6,9 +6,9 @@
 //! # Examples
 //!
 //! ```
-//! use sarissa::analysis::token_filter::Filter;
-//! use sarissa::analysis::token_filter::remove_empty::RemoveEmptyFilter;
-//! use sarissa::analysis::token::Token;
+//! use iris::analysis::token_filter::Filter;
+//! use iris::analysis::token_filter::remove_empty::RemoveEmptyFilter;
+//! use iris::analysis::token::Token;
 //!
 //! let filter = RemoveEmptyFilter::new();
 //! let tokens = vec![
@@ -42,9 +42,9 @@ use crate::error::Result;
 /// # Examples
 ///
 /// ```
-/// use sarissa::analysis::token_filter::Filter;
-/// use sarissa::analysis::token_filter::remove_empty::RemoveEmptyFilter;
-/// use sarissa::analysis::token::Token;
+/// use iris::analysis::token_filter::Filter;
+/// use iris::analysis::token_filter::remove_empty::RemoveEmptyFilter;
+/// use iris::analysis::token::Token;
 ///
 /// let filter = RemoveEmptyFilter::new();
 /// let tokens = vec![

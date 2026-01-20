@@ -8,8 +8,8 @@
 //! # Examples
 //!
 //! ```
-//! use sarissa::analysis::tokenizer::Tokenizer;
-//! use sarissa::analysis::tokenizer::whole::WholeTokenizer;
+//! use iris::analysis::tokenizer::Tokenizer;
+//! use iris::analysis::tokenizer::whole::WholeTokenizer;
 //!
 //! let tokenizer = WholeTokenizer::new();
 //! let tokens: Vec<_> = tokenizer.tokenize("user-id-12345").unwrap().collect();
@@ -38,8 +38,8 @@ use crate::error::Result;
 /// # Examples
 ///
 /// ```
-/// use sarissa::analysis::tokenizer::Tokenizer;
-/// use sarissa::analysis::tokenizer::whole::WholeTokenizer;
+/// use iris::analysis::tokenizer::Tokenizer;
+/// use iris::analysis::tokenizer::whole::WholeTokenizer;
 ///
 /// let tokenizer = WholeTokenizer::new();
 ///

@@ -6,7 +6,7 @@
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::error::{Result, SarissaError};
+use crate::error::{Result, IrisError};
 use crate::lexical::index::inverted::segment::manager::{
     ManagedSegmentInfo, MergeStrategy, SegmentManager,
 };
@@ -371,7 +371,7 @@ impl IndexOptimizer {
         segment_manager: &mut SegmentManager,
     ) -> Result<MergeResult> {
         if segments.len() < 2 {
-            return Err(SarissaError::index("Need at least 2 segments to merge"));
+            return Err(IrisError::index("Need at least 2 segments to merge"));
         }
 
         // Create merge candidate

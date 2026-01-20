@@ -2,11 +2,11 @@
 
 Lexical search matches documents based on exact or approximate keyword matches. It is the traditional "search engine" functionality found in Lucene or Elasticsearch.
 
-> **Note**: In the unified Sarissa architecture, Lexical Search is typically handled by the `VectorEngine`, which orchestrates both lexical and vector components concurrently. `LexicalEngine` can still be used as a standalone engine for pure keyword search scenarios.
+> **Note**: In the unified Iris architecture, Lexical Search is typically handled by the `VectorEngine`, which orchestrates both lexical and vector components concurrently. `LexicalEngine` can still be used as a standalone engine for pure keyword search scenarios.
 
 ## Document Structure
 
-In Sarissa, a **Document** is the fundamental unit of indexing. It follows a **schema-less** design, allowing fields to be added dynamically without defining a schema upfront.
+In Iris, a **Document** is the fundamental unit of indexing. It follows a **schema-less** design, allowing fields to be added dynamically without defining a schema upfront.
 
 Each `Document` consists of multiple `Fields` stored in a Map where the key is the field name. Each `Field` has a **Value** and **Options** defining how it should be indexed.
 
@@ -85,7 +85,7 @@ classDiagram
 
 ### Document
 
-The fundamental unit of indexing in Sarissa.
+The fundamental unit of indexing in Iris.
 
 - **Schema-less**: Fields can be added dynamically without a predefined schema.
 - **Map Structure**: Fields are stored in a `HashMap` where the key is the field name (String).
@@ -191,7 +191,7 @@ Text analysis is the process of converting raw text into tokens. An Analyzer is 
 2. **Tokenizer**: Splits the character stream into a token stream (e.g., splitting by whitespace).
 3. **Token Filters**: Modify the token stream (e.g., lowercasing, stemming, removing stop words).
 
-Sarissa provides several built-in analyzers:
+Iris provides several built-in analyzers:
 
 - **StandardAnalyzer**: Good default for most European languages.
 - **JapaneseAnalyzer**: Optimized for Japanese text using Lindera (morphological analysis).
@@ -209,12 +209,12 @@ The inverted index is the fundamental structure for full-text search. While a tr
 
 ### BKD Tree
 
-For non-textual data like numbers, dates, and geographic coordinates, Sarissa uses a **BKD Tree**. It is a multi-dimensional tree structure optimized for block-based storage on disk.
+For non-textual data like numbers, dates, and geographic coordinates, Iris uses a **BKD Tree**. It is a multi-dimensional tree structure optimized for block-based storage on disk.
 Unlike an inverted index, a BKD tree is designed for **range search** and **spatial search**. It effectively partitions the data space into hierarchical blocks, allowing the search engine to skip large portions of irrelevant data.
 
 ### SIMD Optimization
 
-Sarissa uses SIMD-accelerated batch scoring for high-throughput ranking. The BM25 scoring algorithm is optimized to process multiple documents simultaneously, leveraging modern CPU instructions to provide a several-fold increase in performance compared to scalar processing.
+Iris uses SIMD-accelerated batch scoring for high-throughput ranking. The BM25 scoring algorithm is optimized to process multiple documents simultaneously, leveraging modern CPU instructions to provide a several-fold increase in performance compared to scalar processing.
 
 ## Engine Architecture
 
@@ -283,7 +283,7 @@ graph TD
 
 ## Query Types
 
-Sarissa supports a wide range of queries for different information needs.
+Iris supports a wide range of queries for different information needs.
 
 - **Term Query**: Match a single analyzed term exactly.
 - **Boolean Query**: Logical combinations (`MUST`, `SHOULD`, `MUST_NOT`).
@@ -294,7 +294,7 @@ Sarissa supports a wide range of queries for different information needs.
 
 ## Scoring (BM25)
 
-Sarissa uses **Okapi BM25** as its default scoring function. It improves results by prioritizing rare terms and normalizing for document length, ensuring that matches in shorter, focused documents are ranked appropriately.
+Iris uses **Okapi BM25** as its default scoring function. It improves results by prioritizing rare terms and normalizing for document length, ensuring that matches in shorter, focused documents are ranked appropriately.
 
 ## Code Examples
 
@@ -304,11 +304,11 @@ Setting up a schema-less engine with a default analyzer.
 
 ```rust
 use std::sync::Arc;
-use sarissa::lexical::engine::LexicalEngine;
-use sarissa::lexical::engine::config::LexicalIndexConfig;
-use sarissa::storage::memory::{MemoryStorage, MemoryStorageConfig};
+use iris::lexical::engine::LexicalEngine;
+use iris::lexical::engine::config::LexicalIndexConfig;
+use iris::storage::memory::{MemoryStorage, MemoryStorageConfig};
 
-fn setup_engine() -> sarissa::error::Result<LexicalEngine> {
+fn setup_engine() -> iris::error::Result<LexicalEngine> {
     let storage = Arc::new(MemoryStorage::new(MemoryStorageConfig::default()));
     
     // Default configuration uses StandardAnalyzer
@@ -323,12 +323,12 @@ fn setup_engine() -> sarissa::error::Result<LexicalEngine> {
 Creating and indexing documents with various field types.
 
 ```rust
-use sarissa::lexical::core::document::Document;
-use sarissa::lexical::core::field::TextOption;
+use iris::lexical::core::document::Document;
+use iris::lexical::core::field::TextOption;
 
-fn add_documents(engine: &LexicalEngine) -> sarissa::error::Result<()> {
+fn add_documents(engine: &LexicalEngine) -> iris::error::Result<()> {
     let doc = Document::builder()
-        .add_text("title", "Sarissa Search", TextOption::default())
+        .add_text("title", "Iris Search", TextOption::default())
         .add_text("content", "Fast and semantic search engine in Rust", TextOption::default())
         .add_integer("price", 100)
         .build();
@@ -344,9 +344,9 @@ fn add_documents(engine: &LexicalEngine) -> sarissa::error::Result<()> {
 Executing a simple search using the query string parser.
 
 ```rust
-use sarissa::lexical::search::searcher::LexicalSearchRequest;
+use iris::lexical::search::searcher::LexicalSearchRequest;
 
-fn search(engine: &LexicalEngine) -> sarissa::error::Result<()> {
+fn search(engine: &LexicalEngine) -> iris::error::Result<()> {
     // Search for matches in the default fields
     let request = LexicalSearchRequest::new("content:rust")
         .max_docs(10);
@@ -364,10 +364,10 @@ fn search(engine: &LexicalEngine) -> sarissa::error::Result<()> {
 Configuring a Japanese analyzer for specific fields.
 
 ```rust
-use sarissa::analysis::analyzer::japanese::JapaneseAnalyzer;
-use sarissa::lexical::engine::config::LexicalIndexConfig;
+use iris::analysis::analyzer::japanese::JapaneseAnalyzer;
+use iris::lexical::engine::config::LexicalIndexConfig;
 
-fn setup_japanese_engine() -> sarissa::error::Result<LexicalEngine> {
+fn setup_japanese_engine() -> iris::error::Result<LexicalEngine> {
     let storage = Arc::new(MemoryStorage::new(MemoryStorageConfig::default()));
     
     // Configure default analyzer to Japanese

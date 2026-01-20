@@ -1,17 +1,17 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use sarissa::embedding::embedder::{EmbedInput, EmbedInputType, Embedder};
-use sarissa::error::Result;
-use sarissa::lexical::core::field::TextOption;
-use sarissa::storage::memory::MemoryStorageConfig;
-use sarissa::storage::{StorageConfig, StorageFactory};
-use sarissa::vector::core::document::{DocumentPayload, Payload, StoredVector};
-use sarissa::vector::core::field::{FlatOption, VectorOption};
-use sarissa::vector::core::vector::Vector;
-use sarissa::vector::engine::VectorEngine;
-use sarissa::vector::engine::config::{VectorFieldConfig, VectorIndexConfig};
-use sarissa::vector::engine::request::{QueryVector, VectorSearchRequest};
+use iris::embedding::embedder::{EmbedInput, EmbedInputType, Embedder};
+use iris::error::Result;
+use iris::lexical::core::field::TextOption;
+use iris::storage::memory::MemoryStorageConfig;
+use iris::storage::{StorageConfig, StorageFactory};
+use iris::vector::core::document::{DocumentPayload, Payload, StoredVector};
+use iris::vector::core::field::{FlatOption, VectorOption};
+use iris::vector::core::vector::Vector;
+use iris::vector::engine::VectorEngine;
+use iris::vector::engine::config::{VectorFieldConfig, VectorIndexConfig};
+use iris::vector::engine::request::{QueryVector, VectorSearchRequest};
 use std::any::Any;
 
 // Simple Mock Embedder
@@ -72,7 +72,7 @@ fn main() -> Result<()> {
             base_weight: 1.0,
             ..Default::default()
         })),
-        lexical: Some(sarissa::lexical::core::field::FieldOption::Text(
+        lexical: Some(iris::lexical::core::field::FieldOption::Text(
             TextOption::default(),
         )),
     };

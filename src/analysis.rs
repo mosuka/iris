@@ -1,4 +1,4 @@
-//! Text analysis module for Sarissa.
+//! Text analysis module for Iris.
 //!
 //! This module provides comprehensive text analysis functionality for processing
 //! and transforming text before indexing or searching. It includes:
@@ -19,8 +19,8 @@
 //! # Examples
 //!
 //! ```
-//! use sarissa::analysis::analyzer::standard::StandardAnalyzer;
-//! use sarissa::analysis::analyzer::analyzer::Analyzer;
+//! use iris::analysis::analyzer::standard::StandardAnalyzer;
+//! use iris::analysis::analyzer::analyzer::Analyzer;
 //!
 //! let analyzer = StandardAnalyzer::new().unwrap();
 //! let tokens: Vec<_> = analyzer.analyze("Hello World!").unwrap().collect();

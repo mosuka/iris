@@ -19,9 +19,9 @@
 //! # Examples
 //!
 //! ```
-//! use sarissa::analysis::token_filter::Filter;
-//! use sarissa::analysis::token_filter::lowercase::LowercaseFilter;
-//! use sarissa::analysis::token::Token;
+//! use iris::analysis::token_filter::Filter;
+//! use iris::analysis::token_filter::lowercase::LowercaseFilter;
+//! use iris::analysis::token::Token;
 //!
 //! let filter = LowercaseFilter::new();
 //! let tokens = vec![Token::new("Hello", 0), Token::new("WORLD", 1)];
@@ -58,9 +58,9 @@ use crate::error::Result;
 /// Implementing a custom filter:
 ///
 /// ```
-/// use sarissa::analysis::token::{Token, TokenStream};
-/// use sarissa::analysis::token_filter::Filter;
-/// use sarissa::error::Result;
+/// use iris::analysis::token::{Token, TokenStream};
+/// use iris::analysis::token_filter::Filter;
+/// use iris::error::Result;
 ///
 /// struct ReverseFilter;
 ///
@@ -94,9 +94,9 @@ pub trait Filter: Send + Sync {
     /// # Examples
     ///
     /// ```
-    /// use sarissa::analysis::token_filter::Filter;
-    /// use sarissa::analysis::token_filter::lowercase::LowercaseFilter;
-    /// use sarissa::analysis::token::Token;
+    /// use iris::analysis::token_filter::Filter;
+    /// use iris::analysis::token_filter::lowercase::LowercaseFilter;
+    /// use iris::analysis::token::Token;
     ///
     /// let filter = LowercaseFilter::new();
     /// let tokens = vec![Token::new("HELLO", 0)];
@@ -116,8 +116,8 @@ pub trait Filter: Send + Sync {
     /// # Examples
     ///
     /// ```
-    /// use sarissa::analysis::token_filter::Filter;
-    /// use sarissa::analysis::token_filter::lowercase::LowercaseFilter;
+    /// use iris::analysis::token_filter::Filter;
+    /// use iris::analysis::token_filter::lowercase::LowercaseFilter;
     ///
     /// let filter = LowercaseFilter::new();
     /// assert_eq!(filter.name(), "lowercase");

@@ -7,7 +7,7 @@ use std::cmp::Ordering;
 use std::collections::{HashMap, hash_map::Entry};
 use std::sync::Arc;
 
-use crate::error::{Result, SarissaError};
+use crate::error::{Result, IrisError};
 use crate::vector::core::document::METADATA_WEIGHT;
 use crate::vector::core::vector::Vector;
 use crate::vector::index::field::{
@@ -108,7 +108,7 @@ impl VectorFieldReader for FlatFieldReader {
     fn search(&self, request: FieldSearchInput) -> Result<FieldSearchResults> {
         // Validate field name
         if request.field != self.field_name {
-            return Err(SarissaError::invalid_argument(format!(
+            return Err(IrisError::invalid_argument(format!(
                 "field mismatch: expected '{}', got '{}'",
                 self.field_name, request.field
             )));

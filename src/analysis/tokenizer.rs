@@ -16,8 +16,8 @@
 //! # Examples
 //!
 //! ```
-//! use sarissa::analysis::tokenizer::Tokenizer;
-//! use sarissa::analysis::tokenizer::whitespace::WhitespaceTokenizer;
+//! use iris::analysis::tokenizer::Tokenizer;
+//! use iris::analysis::tokenizer::whitespace::WhitespaceTokenizer;
 //!
 //! let tokenizer = WhitespaceTokenizer::new();
 //! let tokens: Vec<_> = tokenizer.tokenize("Hello world").unwrap().collect();
@@ -37,9 +37,9 @@ use crate::error::Result;
 /// Implementing a custom tokenizer:
 ///
 /// ```
-/// use sarissa::analysis::token::{Token, TokenStream};
-/// use sarissa::analysis::tokenizer::Tokenizer;
-/// use sarissa::error::Result;
+/// use iris::analysis::token::{Token, TokenStream};
+/// use iris::analysis::tokenizer::Tokenizer;
+/// use iris::error::Result;
 ///
 /// struct CustomTokenizer;
 ///
@@ -72,8 +72,8 @@ pub trait Tokenizer: Send + Sync {
     /// # Examples
     ///
     /// ```
-    /// use sarissa::analysis::tokenizer::Tokenizer;
-    /// use sarissa::analysis::tokenizer::whitespace::WhitespaceTokenizer;
+    /// use iris::analysis::tokenizer::Tokenizer;
+    /// use iris::analysis::tokenizer::whitespace::WhitespaceTokenizer;
     ///
     /// let tokenizer = WhitespaceTokenizer::new();
     /// let tokens: Vec<_> = tokenizer.tokenize("Hello world").unwrap().collect();
@@ -91,8 +91,8 @@ pub trait Tokenizer: Send + Sync {
     /// # Examples
     ///
     /// ```
-    /// use sarissa::analysis::tokenizer::Tokenizer;
-    /// use sarissa::analysis::tokenizer::whitespace::WhitespaceTokenizer;
+    /// use iris::analysis::tokenizer::Tokenizer;
+    /// use iris::analysis::tokenizer::whitespace::WhitespaceTokenizer;
     ///
     /// let tokenizer = WhitespaceTokenizer::new();
     /// assert_eq!(tokenizer.name(), "whitespace");

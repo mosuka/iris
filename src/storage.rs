@@ -1,4 +1,4 @@
-//! Storage abstraction layer for Sarissa.
+//! Storage abstraction layer for Iris.
 //!
 //! This module exposes a pluggable storage facade shared by the lexical, vector,
 //! and hybrid engines. File and memory backends can be swapped without touching
@@ -24,11 +24,11 @@
 //! # Example
 //!
 //! ```
-//! use sarissa::storage::{StorageFactory, StorageConfig};
-//! use sarissa::storage::file::FileStorageConfig;
-//! use sarissa::storage::memory::MemoryStorageConfig;
+//! use iris::storage::{StorageFactory, StorageConfig};
+//! use iris::storage::file::FileStorageConfig;
+//! use iris::storage::memory::MemoryStorageConfig;
 //!
-//! # fn main() -> sarissa::error::Result<()> {
+//! # fn main() -> iris::error::Result<()> {
 //! // Create file storage with mmap enabled
 //! let mut file_config = FileStorageConfig::new("/tmp/test_index");
 //! file_config.use_mmap = true;
@@ -43,7 +43,7 @@
 use std::io::{Read, Seek, Write};
 use std::sync::Arc;
 
-use crate::error::{Result, SarissaError};
+use crate::error::{Result, IrisError};
 
 pub mod column;
 pub mod file;
@@ -100,16 +100,16 @@ pub trait Storage: Send + Sync + std::fmt::Debug {
     /// # Returns
     ///
     /// * `Ok(Box<dyn StorageInput>)` - A reader for accessing the file contents
-    /// * `Err(SarissaError)` - If the file doesn't exist or cannot be opened
+    /// * `Err(IrisError)` - If the file doesn't exist or cannot be opened
     ///
     /// # Example
     ///
     /// ```
-    /// use sarissa::storage::memory::{MemoryStorage, MemoryStorageConfig};
-    /// use sarissa::storage::Storage;
+    /// use iris::storage::memory::{MemoryStorage, MemoryStorageConfig};
+    /// use iris::storage::Storage;
     /// use std::io::{Read, Write};
     ///
-    /// # fn main() -> sarissa::error::Result<()> {
+    /// # fn main() -> iris::error::Result<()> {
     /// let storage = MemoryStorage::new(MemoryStorageConfig::default());
     ///
     /// // First create a file
@@ -139,16 +139,16 @@ pub trait Storage: Send + Sync + std::fmt::Debug {
     /// # Returns
     ///
     /// * `Ok(Box<dyn StorageOutput>)` - A writer for writing data to the file
-    /// * `Err(SarissaError)` - If the file cannot be created
+    /// * `Err(IrisError)` - If the file cannot be created
     ///
     /// # Example
     ///
     /// ```
-    /// use sarissa::storage::memory::{MemoryStorage, MemoryStorageConfig};
-    /// use sarissa::storage::Storage;
+    /// use iris::storage::memory::{MemoryStorage, MemoryStorageConfig};
+    /// use iris::storage::Storage;
     /// use std::io::Write;
     ///
-    /// # fn main() -> sarissa::error::Result<()> {
+    /// # fn main() -> iris::error::Result<()> {
     /// let storage = MemoryStorage::new(MemoryStorageConfig::default());
     ///
     /// let mut output = storage.create_output("index.bin")?;
@@ -173,16 +173,16 @@ pub trait Storage: Send + Sync + std::fmt::Debug {
     /// # Returns
     ///
     /// * `Ok(Box<dyn StorageOutput>)` - A writer positioned at the end of the file
-    /// * `Err(SarissaError)` - If the file cannot be opened or created
+    /// * `Err(IrisError)` - If the file cannot be opened or created
     ///
     /// # Example
     ///
     /// ```
-    /// use sarissa::storage::memory::{MemoryStorage, MemoryStorageConfig};
-    /// use sarissa::storage::Storage;
+    /// use iris::storage::memory::{MemoryStorage, MemoryStorageConfig};
+    /// use iris::storage::Storage;
     /// use std::io::{Read, Write};
     ///
-    /// # fn main() -> sarissa::error::Result<()> {
+    /// # fn main() -> iris::error::Result<()> {
     /// let storage = MemoryStorage::new(MemoryStorageConfig::default());
     ///
     /// // Create file with initial content
@@ -223,11 +223,11 @@ pub trait Storage: Send + Sync + std::fmt::Debug {
     /// # Example
     ///
     /// ```
-    /// use sarissa::storage::memory::{MemoryStorage, MemoryStorageConfig};
-    /// use sarissa::storage::Storage;
+    /// use iris::storage::memory::{MemoryStorage, MemoryStorageConfig};
+    /// use iris::storage::Storage;
     /// use std::io::Write;
     ///
-    /// # fn main() -> sarissa::error::Result<()> {
+    /// # fn main() -> iris::error::Result<()> {
     /// let storage = MemoryStorage::new(MemoryStorageConfig::default());
     ///
     /// assert!(!storage.file_exists("index.bin"));
@@ -254,16 +254,16 @@ pub trait Storage: Send + Sync + std::fmt::Debug {
     /// # Returns
     ///
     /// * `Ok(())` - If the file was successfully deleted
-    /// * `Err(SarissaError)` - If the file cannot be deleted (e.g., permission denied)
+    /// * `Err(IrisError)` - If the file cannot be deleted (e.g., permission denied)
     ///
     /// # Example
     ///
     /// ```
-    /// use sarissa::storage::memory::{MemoryStorage, MemoryStorageConfig};
-    /// use sarissa::storage::Storage;
+    /// use iris::storage::memory::{MemoryStorage, MemoryStorageConfig};
+    /// use iris::storage::Storage;
     /// use std::io::Write;
     ///
-    /// # fn main() -> sarissa::error::Result<()> {
+    /// # fn main() -> iris::error::Result<()> {
     /// let storage = MemoryStorage::new(MemoryStorageConfig::default());
     ///
     /// // Create a file
@@ -291,16 +291,16 @@ pub trait Storage: Send + Sync + std::fmt::Debug {
     /// # Returns
     ///
     /// * `Ok(Vec<String>)` - A list of all file names in the storage
-    /// * `Err(SarissaError)` - If the storage cannot be read
+    /// * `Err(IrisError)` - If the storage cannot be read
     ///
     /// # Example
     ///
     /// ```
-    /// use sarissa::storage::memory::{MemoryStorage, MemoryStorageConfig};
-    /// use sarissa::storage::Storage;
+    /// use iris::storage::memory::{MemoryStorage, MemoryStorageConfig};
+    /// use iris::storage::Storage;
     /// use std::io::Write;
     ///
-    /// # fn main() -> sarissa::error::Result<()> {
+    /// # fn main() -> iris::error::Result<()> {
     /// let storage = MemoryStorage::new(MemoryStorageConfig::default());
     ///
     /// // Create some files
@@ -334,16 +334,16 @@ pub trait Storage: Send + Sync + std::fmt::Debug {
     /// # Returns
     ///
     /// * `Ok(u64)` - The size of the file in bytes
-    /// * `Err(SarissaError)` - If the file doesn't exist or cannot be accessed
+    /// * `Err(IrisError)` - If the file doesn't exist or cannot be accessed
     ///
     /// # Example
     ///
     /// ```
-    /// use sarissa::storage::memory::{MemoryStorage, MemoryStorageConfig};
-    /// use sarissa::storage::Storage;
+    /// use iris::storage::memory::{MemoryStorage, MemoryStorageConfig};
+    /// use iris::storage::Storage;
     /// use std::io::Write;
     ///
-    /// # fn main() -> sarissa::error::Result<()> {
+    /// # fn main() -> iris::error::Result<()> {
     /// let storage = MemoryStorage::new(MemoryStorageConfig::default());
     ///
     /// // Create a file with known size
@@ -372,16 +372,16 @@ pub trait Storage: Send + Sync + std::fmt::Debug {
     /// # Returns
     ///
     /// * `Ok(FileMetadata)` - Metadata structure with file information
-    /// * `Err(SarissaError)` - If the file doesn't exist or cannot be accessed
+    /// * `Err(IrisError)` - If the file doesn't exist or cannot be accessed
     ///
     /// # Example
     ///
     /// ```
-    /// use sarissa::storage::memory::{MemoryStorage, MemoryStorageConfig};
-    /// use sarissa::storage::Storage;
+    /// use iris::storage::memory::{MemoryStorage, MemoryStorageConfig};
+    /// use iris::storage::Storage;
     /// use std::io::Write;
     ///
-    /// # fn main() -> sarissa::error::Result<()> {
+    /// # fn main() -> iris::error::Result<()> {
     /// let storage = MemoryStorage::new(MemoryStorageConfig::default());
     ///
     /// // Create a file
@@ -412,17 +412,17 @@ pub trait Storage: Send + Sync + std::fmt::Debug {
     /// # Returns
     ///
     /// * `Ok(())` - If the file was successfully renamed
-    /// * `Err(SarissaError)` - If the source file doesn't exist, destination exists,
+    /// * `Err(IrisError)` - If the source file doesn't exist, destination exists,
     ///   or the operation fails
     ///
     /// # Example
     ///
     /// ```
-    /// use sarissa::storage::memory::{MemoryStorage, MemoryStorageConfig};
-    /// use sarissa::storage::Storage;
+    /// use iris::storage::memory::{MemoryStorage, MemoryStorageConfig};
+    /// use iris::storage::Storage;
     /// use std::io::Write;
     ///
-    /// # fn main() -> sarissa::error::Result<()> {
+    /// # fn main() -> iris::error::Result<()> {
     /// let storage = MemoryStorage::new(MemoryStorageConfig::default());
     ///
     /// // Create a temp file
@@ -454,16 +454,16 @@ pub trait Storage: Send + Sync + std::fmt::Debug {
     ///
     /// * `Ok((String, Box<dyn StorageOutput>))` - A tuple of (filename, writer)
     ///   where filename is the unique generated name
-    /// * `Err(SarissaError)` - If the temporary file cannot be created
+    /// * `Err(IrisError)` - If the temporary file cannot be created
     ///
     /// # Example
     ///
     /// ```
-    /// use sarissa::storage::memory::{MemoryStorage, MemoryStorageConfig};
-    /// use sarissa::storage::Storage;
+    /// use iris::storage::memory::{MemoryStorage, MemoryStorageConfig};
+    /// use iris::storage::Storage;
     /// use std::io::Write;
     ///
-    /// # fn main() -> sarissa::error::Result<()> {
+    /// # fn main() -> iris::error::Result<()> {
     /// let storage = MemoryStorage::new(MemoryStorageConfig::default());
     ///
     /// // Create a temp file with prefix
@@ -491,16 +491,16 @@ pub trait Storage: Send + Sync + std::fmt::Debug {
     /// # Returns
     ///
     /// * `Ok(())` - If all pending writes were successfully synced
-    /// * `Err(SarissaError)` - If the sync operation fails
+    /// * `Err(IrisError)` - If the sync operation fails
     ///
     /// # Example
     ///
     /// ```
-    /// use sarissa::storage::memory::{MemoryStorage, MemoryStorageConfig};
-    /// use sarissa::storage::Storage;
+    /// use iris::storage::memory::{MemoryStorage, MemoryStorageConfig};
+    /// use iris::storage::Storage;
     /// use std::io::Write;
     ///
-    /// # fn main() -> sarissa::error::Result<()> {
+    /// # fn main() -> iris::error::Result<()> {
     /// let storage = MemoryStorage::new(MemoryStorageConfig::default());
     ///
     /// // Write some data
@@ -524,17 +524,17 @@ pub trait Storage: Send + Sync + std::fmt::Debug {
     /// # Returns
     ///
     /// * `Ok(())` - If the storage was successfully closed
-    /// * `Err(SarissaError)` - If errors occur during cleanup (though resources
+    /// * `Err(IrisError)` - If errors occur during cleanup (though resources
     ///   should still be released as much as possible)
     ///
     /// # Example
     ///
     /// ```
-    /// use sarissa::storage::memory::{MemoryStorage, MemoryStorageConfig};
-    /// use sarissa::storage::Storage;
+    /// use iris::storage::memory::{MemoryStorage, MemoryStorageConfig};
+    /// use iris::storage::Storage;
     /// use std::io::Write;
     ///
-    /// # fn main() -> sarissa::error::Result<()> {
+    /// # fn main() -> iris::error::Result<()> {
     /// let mut storage = MemoryStorage::new(MemoryStorageConfig::default());
     ///
     /// // Use storage
@@ -647,9 +647,9 @@ pub trait StorageLock: Send + std::fmt::Debug {
 /// # Example
 ///
 /// ```
-/// use sarissa::storage::StorageConfig;
-/// use sarissa::storage::file::FileStorageConfig;
-/// use sarissa::storage::memory::MemoryStorageConfig;
+/// use iris::storage::StorageConfig;
+/// use iris::storage::file::FileStorageConfig;
+/// use iris::storage::memory::MemoryStorageConfig;
 ///
 /// // File storage with custom settings
 /// let mut file_config = FileStorageConfig::new("/data/index");
@@ -695,11 +695,11 @@ impl StorageFactory {
     /// # Example
     ///
     /// ```
-    /// use sarissa::storage::{StorageFactory, StorageConfig};
-    /// use sarissa::storage::file::FileStorageConfig;
-    /// use sarissa::storage::memory::MemoryStorageConfig;
+    /// use iris::storage::{StorageFactory, StorageConfig};
+    /// use iris::storage::file::FileStorageConfig;
+    /// use iris::storage::memory::MemoryStorageConfig;
     ///
-    /// # fn main() -> sarissa::error::Result<()> {
+    /// # fn main() -> iris::error::Result<()> {
     /// // Create memory storage
     /// let config = StorageConfig::Memory(MemoryStorageConfig::default());
     /// let storage = StorageFactory::create(config)?;
@@ -775,9 +775,9 @@ impl std::fmt::Display for StorageError {
 
 impl std::error::Error for StorageError {}
 
-impl From<StorageError> for SarissaError {
+impl From<StorageError> for IrisError {
     fn from(err: StorageError) -> Self {
-        SarissaError::storage(err.to_string())
+        IrisError::storage(err.to_string())
     }
 }
 

@@ -6,9 +6,9 @@
 //! # Examples
 //!
 //! ```
-//! use sarissa::analysis::token_filter::Filter;
-//! use sarissa::analysis::token_filter::boost::BoostFilter;
-//! use sarissa::analysis::token::Token;
+//! use iris::analysis::token_filter::Filter;
+//! use iris::analysis::token_filter::boost::BoostFilter;
+//! use iris::analysis::token::Token;
 //!
 //! let filter = BoostFilter::new(2.0);
 //! let tokens = vec![Token::new("important", 0)];
@@ -39,9 +39,9 @@ use crate::error::Result;
 /// # Examples
 ///
 /// ```
-/// use sarissa::analysis::token_filter::Filter;
-/// use sarissa::analysis::token_filter::boost::BoostFilter;
-/// use sarissa::analysis::token::Token;
+/// use iris::analysis::token_filter::Filter;
+/// use iris::analysis::token_filter::boost::BoostFilter;
+/// use iris::analysis::token::Token;
 ///
 /// // Double the weight of all tokens
 /// let filter = BoostFilter::new(2.0);
@@ -72,7 +72,7 @@ impl BoostFilter {
     /// # Examples
     ///
     /// ```
-    /// use sarissa::analysis::token_filter::boost::BoostFilter;
+    /// use iris::analysis::token_filter::boost::BoostFilter;
     ///
     /// let filter = BoostFilter::new(1.5);
     /// assert_eq!(filter.boost(), 1.5);

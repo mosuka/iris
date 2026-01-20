@@ -12,7 +12,7 @@ use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, RwLock};
 
-use crate::error::{Result, SarissaError};
+use crate::error::{Result, IrisError};
 use crate::storage::Storage;
 use crate::vector::index::config::HnswIndexConfig;
 use crate::vector::index::hnsw::writer::HnswIndexWriter;
@@ -102,7 +102,7 @@ impl HnswIndex {
     pub fn open(storage: Arc<dyn Storage>, name: &str, config: HnswIndexConfig) -> Result<Self> {
         let metadata_file = format!("{}.json", name);
         if !storage.file_exists(&metadata_file) {
-            return Err(SarissaError::index("Index does not exist"));
+            return Err(IrisError::index("Index does not exist"));
         }
 
         let metadata = Self::read_metadata(storage.as_ref(), name)?;
@@ -143,9 +143,9 @@ impl HnswIndex {
         let metadata = self
             .metadata
             .read()
-            .map_err(|_| SarissaError::index("Failed to acquire metadata read lock"))?;
+            .map_err(|_| IrisError::index("Failed to acquire metadata read lock"))?;
         let metadata_json = serde_json::to_string_pretty(&*metadata)
-            .map_err(|e| SarissaError::index(format!("Failed to serialize metadata: {e}")))?;
+            .map_err(|e| IrisError::index(format!("Failed to serialize metadata: {e}")))?;
         drop(metadata);
 
         let metadata_file = format!("{}.json", self.name);
@@ -161,7 +161,7 @@ impl HnswIndex {
         let metadata_file = format!("{}.json", name);
         let input = storage.open_input(&metadata_file)?;
         let metadata: IndexMetadata = serde_json::from_reader(input)
-            .map_err(|e| SarissaError::index(format!("Failed to deserialize metadata: {e}")))?;
+            .map_err(|e| IrisError::index(format!("Failed to deserialize metadata: {e}")))?;
         Ok(metadata)
     }
 
@@ -171,7 +171,7 @@ impl HnswIndex {
             let mut metadata = self
                 .metadata
                 .write()
-                .map_err(|_| SarissaError::index("Failed to acquire metadata write lock"))?;
+                .map_err(|_| IrisError::index("Failed to acquire metadata write lock"))?;
             metadata.modified = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
@@ -183,7 +183,7 @@ impl HnswIndex {
     /// Check if the index is closed.
     fn check_closed(&self) -> Result<()> {
         if self.closed.load(Ordering::SeqCst) {
-            return Err(SarissaError::InvalidOperation(
+            return Err(IrisError::InvalidOperation(
                 "Index is closed".to_string(),
             ));
         }
@@ -233,7 +233,7 @@ impl VectorIndex for HnswIndex {
         let metadata = self
             .metadata
             .read()
-            .map_err(|_| SarissaError::index("Failed to acquire metadata read lock"))?;
+            .map_err(|_| IrisError::index("Failed to acquire metadata read lock"))?;
         Ok(VectorIndexStats {
             vector_count: metadata.vector_count,
             dimension: metadata.dimension,

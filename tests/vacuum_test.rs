@@ -2,15 +2,15 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tempfile::Builder;
 
-use sarissa::lexical::engine::config::LexicalIndexConfig;
-use sarissa::storage::file::FileStorageConfig;
-use sarissa::storage::{StorageConfig, StorageFactory};
-use sarissa::vector::core::distance::DistanceMetric;
-use sarissa::vector::core::document::{DocumentVector, StoredVector};
-use sarissa::vector::core::field::{FlatOption, HnswOption, VectorIndexKind, VectorOption};
-use sarissa::vector::engine::VectorEngine;
-use sarissa::vector::engine::config::{VectorFieldConfig, VectorIndexConfig};
-use sarissa::vector::engine::request::{VectorScoreMode, VectorSearchRequest};
+use iris::lexical::engine::config::LexicalIndexConfig;
+use iris::storage::file::FileStorageConfig;
+use iris::storage::{StorageConfig, StorageFactory};
+use iris::vector::core::distance::DistanceMetric;
+use iris::vector::core::document::{DocumentVector, StoredVector};
+use iris::vector::core::field::{FlatOption, HnswOption, VectorIndexKind, VectorOption};
+use iris::vector::engine::VectorEngine;
+use iris::vector::engine::config::{VectorFieldConfig, VectorIndexConfig};
+use iris::vector::engine::request::{VectorScoreMode, VectorSearchRequest};
 
 #[test]
 fn test_vacuum_reduces_file_size() {
@@ -36,8 +36,8 @@ fn test_vacuum_reduces_file_size() {
         default_index_kind: VectorIndexKind::Flat,
         default_base_weight: 1.0,
         implicit_schema: false,
-        embedder: Arc::new(sarissa::embedding::precomputed::PrecomputedEmbedder::new()),
-        deletion_config: sarissa::maintenance::deletion::DeletionConfig::default(),
+        embedder: Arc::new(iris::embedding::precomputed::PrecomputedEmbedder::new()),
+        deletion_config: iris::maintenance::deletion::DeletionConfig::default(),
         shard_id: 0,
         metadata_config: LexicalIndexConfig::default(),
     };
@@ -113,7 +113,7 @@ fn test_vacuum_reduces_file_size() {
 
     // 5. Verify Search
     let request = VectorSearchRequest {
-        query_vectors: vec![sarissa::vector::engine::request::QueryVector {
+        query_vectors: vec![iris::vector::engine::request::QueryVector {
             vector: StoredVector::new(Arc::from(vec![0.1f32; dim])),
             weight: 1.0,
             fields: None,
@@ -171,8 +171,8 @@ fn test_vacuum_reduces_file_size_hnsw() {
         default_index_kind: VectorIndexKind::Flat,
         default_base_weight: 1.0,
         implicit_schema: false,
-        embedder: Arc::new(sarissa::embedding::precomputed::PrecomputedEmbedder::new()),
-        deletion_config: sarissa::maintenance::deletion::DeletionConfig::default(),
+        embedder: Arc::new(iris::embedding::precomputed::PrecomputedEmbedder::new()),
+        deletion_config: iris::maintenance::deletion::DeletionConfig::default(),
         shard_id: 0,
         metadata_config: LexicalIndexConfig::default(),
     };
@@ -270,7 +270,7 @@ fn test_vacuum_reduces_file_size_hnsw() {
     // If we use MaxSim and min_score 0.0, we match everything.
     // Query vector doesn't matter much if we just want "any 100 items".
     let request = VectorSearchRequest {
-        query_vectors: vec![sarissa::vector::engine::request::QueryVector {
+        query_vectors: vec![iris::vector::engine::request::QueryVector {
             vector: StoredVector::new(Arc::from(vec![0.5f32; dim])), // Generic vector
             weight: 1.0,
             fields: None,

@@ -1,6 +1,6 @@
 # Introduction
 
-Sarissa is a fast, featureful full-text search library for Rust, inspired by Whoosh.
+Iris is a fast, featureful full-text search library for Rust, inspired by Whoosh.
 
 ## Features
 
@@ -12,4 +12,4 @@ Sarissa is a fast, featureful full-text search library for Rust, inspired by Who
 
 ## Philosophy
 
-Sarissa aims to provide a "batteries-included" search experience that is easy to get started with but powerful enough for production use cases requiring customizability. It decouples the complexity of inverted indexes and HNSW graphs behind a clean, high-level API.
+Iris aims to provide a "batteries-included" search experience that is easy to get started with but powerful enough for production use cases requiring customizability. It decouples the complexity of inverted indexes and HNSW graphs behind a clean, high-level API.

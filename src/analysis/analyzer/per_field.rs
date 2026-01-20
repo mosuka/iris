@@ -23,10 +23,10 @@ use crate::error::Result;
 /// # Example
 ///
 /// ```
-/// use sarissa::analysis::analyzer::analyzer::Analyzer;
-/// use sarissa::analysis::analyzer::per_field::PerFieldAnalyzer;
-/// use sarissa::analysis::analyzer::standard::StandardAnalyzer;
-/// use sarissa::analysis::analyzer::keyword::KeywordAnalyzer;
+/// use iris::analysis::analyzer::analyzer::Analyzer;
+/// use iris::analysis::analyzer::per_field::PerFieldAnalyzer;
+/// use iris::analysis::analyzer::standard::StandardAnalyzer;
+/// use iris::analysis::analyzer::keyword::KeywordAnalyzer;
 /// use std::sync::Arc;
 ///
 /// // Reuse analyzer instances to save memory

@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use fst::{Map, MapBuilder, Streamer};
 
-use crate::error::{Result, SarissaError};
+use crate::error::{Result, IrisError};
 
 /// Synonym dictionary for token expansion.
 ///
@@ -66,14 +66,14 @@ impl SynonymDictionary {
     /// ```
     pub fn load_from_file(path: &str) -> Result<Self> {
         let content = std::fs::read_to_string(path).map_err(|e| {
-            SarissaError::storage(format!(
+            IrisError::storage(format!(
                 "Failed to read synonym dictionary file '{}': {}",
                 path, e
             ))
         })?;
 
         let synonym_groups: Vec<Vec<String>> = serde_json::from_str(&content).map_err(|e| {
-            SarissaError::parse(format!(
+            IrisError::parse(format!(
                 "Failed to parse synonym dictionary JSON from '{}': {}",
                 path, e
             ))
@@ -140,14 +140,14 @@ impl SynonymDictionary {
             synonym_lists.push(synonyms);
             builder
                 .insert(term.as_bytes(), index)
-                .map_err(|e| SarissaError::parse(format!("FST build error: {}", e)))?;
+                .map_err(|e| IrisError::parse(format!("FST build error: {}", e)))?;
         }
 
         let fst_bytes = builder
             .into_inner()
-            .map_err(|e| SarissaError::parse(format!("FST finalize error: {}", e)))?;
+            .map_err(|e| IrisError::parse(format!("FST finalize error: {}", e)))?;
         let fst_map = Map::new(Arc::from(fst_bytes))
-            .map_err(|e| SarissaError::parse(format!("FST creation error: {}", e)))?;
+            .map_err(|e| IrisError::parse(format!("FST creation error: {}", e)))?;
 
         Ok(Self {
             fst_map: Arc::new(fst_map),

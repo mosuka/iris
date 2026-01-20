@@ -4,20 +4,20 @@ use std::sync::Arc;
 
 use tempfile::TempDir;
 
-use sarissa::analysis::analyzer::analyzer::Analyzer;
-use sarissa::analysis::analyzer::keyword::KeywordAnalyzer;
-use sarissa::analysis::analyzer::per_field::PerFieldAnalyzer;
-use sarissa::analysis::analyzer::standard::StandardAnalyzer;
-use sarissa::lexical::core::document::Document;
-use sarissa::lexical::core::field::{IntegerOption, TextOption};
-use sarissa::error::Result;
-use sarissa::lexical::engine::LexicalEngine;
-use sarissa::lexical::engine::config::LexicalIndexConfig;
-use sarissa::lexical::index::config::InvertedIndexConfig;
-use sarissa::lexical::index::inverted::query::term::TermQuery;
-use sarissa::lexical::search::searcher::LexicalSearchRequest;
-use sarissa::storage::file::FileStorageConfig;
-use sarissa::storage::{StorageConfig, StorageFactory};
+use iris::analysis::analyzer::analyzer::Analyzer;
+use iris::analysis::analyzer::keyword::KeywordAnalyzer;
+use iris::analysis::analyzer::per_field::PerFieldAnalyzer;
+use iris::analysis::analyzer::standard::StandardAnalyzer;
+use iris::lexical::core::document::Document;
+use iris::lexical::core::field::{IntegerOption, TextOption};
+use iris::error::Result;
+use iris::lexical::engine::LexicalEngine;
+use iris::lexical::engine::config::LexicalIndexConfig;
+use iris::lexical::index::config::InvertedIndexConfig;
+use iris::lexical::index::inverted::query::term::TermQuery;
+use iris::lexical::search::searcher::LexicalSearchRequest;
+use iris::storage::file::FileStorageConfig;
+use iris::storage::{StorageConfig, StorageFactory};
 
 fn main() -> Result<()> {
     println!("=== Field-Specific Search Example ===\n");
@@ -128,7 +128,7 @@ fn main() -> Result<()> {
     // Example 2: Search by author with document loading
     println!("\n2. Search by author with document details (author:Orwell):");
     let request = LexicalSearchRequest::new(Box::new(TermQuery::new("author", "orwell"))
-        as Box<dyn sarissa::lexical::index::inverted::query::Query>)
+        as Box<dyn iris::lexical::index::inverted::query::Query>)
     .load_documents(true);
     let results = lexical_engine.search(request)?;
     println!("   Found {} results", results.total_hits);
@@ -151,7 +151,7 @@ fn main() -> Result<()> {
                 println!("      Category: {category}");
             }
             if let Some(field) = doc.get_field("year")
-                && let sarissa::lexical::core::field::FieldValue::Integer(year) = &field.value
+                && let iris::lexical::core::field::FieldValue::Integer(year) = &field.value
             {
                 println!("      Year: {year}");
             }
@@ -175,7 +175,7 @@ fn main() -> Result<()> {
     // Example 4: Search in tags field
     println!("\n4. Search in tags field (tags:british):");
     let request = LexicalSearchRequest::new(Box::new(TermQuery::new("tags", "british"))
-        as Box<dyn sarissa::lexical::index::inverted::query::Query>)
+        as Box<dyn iris::lexical::index::inverted::query::Query>)
     .load_documents(true);
     let results = lexical_engine.search(request)?;
     println!("   Found {} results", results.total_hits);

@@ -1,13 +1,13 @@
-use sarissa::embedding::precomputed::PrecomputedEmbedder;
-use sarissa::storage::file::FileStorageConfig;
-use sarissa::storage::{StorageConfig, StorageFactory};
+use iris::embedding::precomputed::PrecomputedEmbedder;
+use iris::storage::file::FileStorageConfig;
+use iris::storage::{StorageConfig, StorageFactory};
 
-use sarissa::vector::core::distance::DistanceMetric;
-use sarissa::vector::core::document::{DocumentPayload, Payload, PayloadSource};
-use sarissa::vector::core::field::{FlatOption, VectorOption};
-use sarissa::vector::engine::VectorEngine;
-use sarissa::vector::engine::config::{VectorFieldConfig, VectorIndexConfig};
-use sarissa::vector::engine::query::VectorSearchRequestBuilder;
+use iris::vector::core::distance::DistanceMetric;
+use iris::vector::core::document::{DocumentPayload, Payload, PayloadSource};
+use iris::vector::core::field::{FlatOption, VectorOption};
+use iris::vector::engine::VectorEngine;
+use iris::vector::engine::config::{VectorFieldConfig, VectorIndexConfig};
+use iris::vector::engine::query::VectorSearchRequestBuilder;
 
 use std::sync::Arc;
 use tempfile::tempdir;

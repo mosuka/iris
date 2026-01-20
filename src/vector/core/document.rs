@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize, de::Deserializer, ser::Serializer};
 use super::vector::Vector;
 
 /// Metadata keys used when bridging to the legacy `Vector` representation.
-pub const METADATA_WEIGHT: &str = "__sarissa_vector_weight";
+pub const METADATA_WEIGHT: &str = "__iris_vector_weight";
 
 /// Source material used to produce a vector embedding.
 #[derive(Debug, Clone, Serialize, Deserialize)]

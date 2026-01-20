@@ -12,7 +12,7 @@ use crate::analysis::analyzer::analyzer::Analyzer;
 use crate::analysis::analyzer::per_field::PerFieldAnalyzer;
 use crate::analysis::analyzer::standard::StandardAnalyzer;
 use crate::analysis::token::Token;
-use crate::error::{Result, SarissaError};
+use crate::error::{Result, IrisError};
 use crate::lexical::core::analyzed::{AnalyzedDocument, AnalyzedTerm};
 use crate::lexical::core::document::Document;
 use crate::lexical::core::field::FieldValue;
@@ -278,13 +278,13 @@ impl InvertedIndexWriter {
     /// # Example
     ///
     /// ```rust,no_run
-    /// use sarissa::lexical::core::document::Document;
-    /// use sarissa::lexical::core::parser::DocumentParser;
-    /// use sarissa::analysis::analyzer::per_field::PerFieldAnalyzer;
-    /// use sarissa::analysis::analyzer::standard::StandardAnalyzer;
-    /// use sarissa::lexical::index::inverted::writer::{InvertedIndexWriter, InvertedIndexWriterConfig};
-    /// use sarissa::storage::memory::{MemoryStorage, MemoryStorageConfig};
-    /// use sarissa::storage::StorageConfig;
+    /// use iris::lexical::core::document::Document;
+    /// use iris::lexical::core::parser::DocumentParser;
+    /// use iris::analysis::analyzer::per_field::PerFieldAnalyzer;
+    /// use iris::analysis::analyzer::standard::StandardAnalyzer;
+    /// use iris::lexical::index::inverted::writer::{InvertedIndexWriter, InvertedIndexWriterConfig};
+    /// use iris::storage::memory::{MemoryStorage, MemoryStorageConfig};
+    /// use iris::storage::StorageConfig;
     /// use std::sync::Arc;
     ///
     /// let storage = Arc::new(MemoryStorage::new(MemoryStorageConfig::default()));
@@ -295,7 +295,7 @@ impl InvertedIndexWriter {
     /// };
     /// let mut writer = InvertedIndexWriter::new(storage, config).unwrap();
     ///
-    /// use sarissa::lexical::core::field::TextOption;
+    /// use iris::lexical::core::field::TextOption;
     /// let doc = Document::builder()
     ///     .add_text("title", "Rust Programming", TextOption::default())
     ///     .build();
@@ -844,7 +844,7 @@ impl InvertedIndexWriter {
         let json_file = format!("{segment_name}.json");
         let mut output = self.storage.create_output(&json_file)?;
         let segment_data = serde_json::to_string_pretty(&documents)
-            .map_err(|e| SarissaError::index(format!("Failed to serialize segment: {e}")))?;
+            .map_err(|e| IrisError::index(format!("Failed to serialize segment: {e}")))?;
         std::io::Write::write_all(&mut output, segment_data.as_bytes())?;
         output.close()?;
 
@@ -909,7 +909,7 @@ impl InvertedIndexWriter {
         // Write as JSON for compatibility with InvertedIndex::load_segments()
         let meta_file = format!("{segment_name}.meta");
         let json_data = serde_json::to_string_pretty(&info).map_err(|e| {
-            SarissaError::index(format!("Failed to serialize segment metadata: {e}"))
+            IrisError::index(format!("Failed to serialize segment metadata: {e}"))
         })?;
 
         let mut output = self.storage.create_output(&meta_file)?;
@@ -967,7 +967,7 @@ impl InvertedIndexWriter {
         meta.generation += 1; // Increment generation
 
         let metadata_json = serde_json::to_string_pretty(&meta)
-            .map_err(|e| SarissaError::index(format!("Failed to serialize metadata: {e}")))?;
+            .map_err(|e| IrisError::index(format!("Failed to serialize metadata: {e}")))?;
 
         let mut output = self.storage.create_output("metadata.json")?;
         std::io::Write::write_all(&mut output, metadata_json.as_bytes())?;
@@ -1003,7 +1003,7 @@ impl InvertedIndexWriter {
     /// Check if the writer is closed.
     fn check_closed(&self) -> Result<()> {
         if self.closed {
-            Err(SarissaError::index("Writer is closed"))
+            Err(IrisError::index("Writer is closed"))
         } else {
             Ok(())
         }
@@ -1152,12 +1152,12 @@ impl InvertedIndexWriter {
         let meta_file = format!("{segment_id}.meta");
         let input = self.storage.open_input(&meta_file)?;
         let mut meta: SegmentInfo = serde_json::from_reader(input)
-            .map_err(|e| SarissaError::index(format!("Failed to read segment meta: {e}")))?;
+            .map_err(|e| IrisError::index(format!("Failed to read segment meta: {e}")))?;
 
         if !meta.has_deletions {
             meta.has_deletions = true;
             let json = serde_json::to_string_pretty(&meta).map_err(|e| {
-                SarissaError::index(format!("Failed to serialize segment meta: {e}"))
+                IrisError::index(format!("Failed to serialize segment meta: {e}"))
             })?;
             let mut output = self.storage.create_output(&meta_file)?;
             std::io::Write::write_all(&mut output, json.as_bytes())?;
@@ -1256,7 +1256,7 @@ impl LexicalIndexWriter for InvertedIndexWriter {
                 std::io::Read::read_to_string(&mut std::io::BufReader::new(input), &mut json_data)?;
 
                 let segment_info: SegmentInfo = serde_json::from_str(&json_data).map_err(|e| {
-                    SarissaError::index(format!("Failed to parse segment metadata: {e}"))
+                    IrisError::index(format!("Failed to parse segment metadata: {e}"))
                 })?;
 
                 segments.push(segment_info);

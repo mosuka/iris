@@ -19,12 +19,12 @@
 //! ```no_run
 //! # #[cfg(feature = "embeddings-candle")]
 //! # {
-//! use sarissa::embedding::per_field::PerFieldEmbedder;
-//! use sarissa::embedding::embedder::{Embedder, EmbedInput};
-//! use sarissa::embedding::candle_bert_embedder::CandleBertEmbedder;
+//! use iris::embedding::per_field::PerFieldEmbedder;
+//! use iris::embedding::embedder::{Embedder, EmbedInput};
+//! use iris::embedding::candle_bert_embedder::CandleBertEmbedder;
 //! use std::sync::Arc;
 //!
-//! # async fn example() -> sarissa::error::Result<()> {
+//! # async fn example() -> iris::error::Result<()> {
 //! // Create default embedder
 //! let default_embedder: Arc<dyn Embedder> = Arc::new(
 //!     CandleBertEmbedder::new("sentence-transformers/all-MiniLM-L6-v2")?
@@ -77,12 +77,12 @@ use crate::vector::core::vector::Vector;
 /// ```no_run
 /// # #[cfg(feature = "embeddings-candle")]
 /// # {
-/// use sarissa::embedding::embedder::Embedder;
-/// use sarissa::embedding::per_field::PerFieldEmbedder;
-/// use sarissa::embedding::candle_bert_embedder::CandleBertEmbedder;
+/// use iris::embedding::embedder::Embedder;
+/// use iris::embedding::per_field::PerFieldEmbedder;
+/// use iris::embedding::candle_bert_embedder::CandleBertEmbedder;
 /// use std::sync::Arc;
 ///
-/// # fn example() -> sarissa::error::Result<()> {
+/// # fn example() -> iris::error::Result<()> {
 /// // Create default embedder
 /// let default_embedder: Arc<dyn Embedder> = Arc::new(
 ///     CandleBertEmbedder::new("sentence-transformers/all-MiniLM-L6-v2")?
@@ -131,12 +131,12 @@ impl PerFieldEmbedder {
     /// ```no_run
     /// # #[cfg(feature = "embeddings-candle")]
     /// # {
-    /// use sarissa::embedding::per_field::PerFieldEmbedder;
-    /// use sarissa::embedding::embedder::Embedder;
-    /// use sarissa::embedding::candle_bert_embedder::CandleBertEmbedder;
+    /// use iris::embedding::per_field::PerFieldEmbedder;
+    /// use iris::embedding::embedder::Embedder;
+    /// use iris::embedding::candle_bert_embedder::CandleBertEmbedder;
     /// use std::sync::Arc;
     ///
-    /// # fn example() -> sarissa::error::Result<()> {
+    /// # fn example() -> iris::error::Result<()> {
     /// let default: Arc<dyn Embedder> = Arc::new(
     ///     CandleBertEmbedder::new("sentence-transformers/all-MiniLM-L6-v2")?
     /// );
@@ -241,7 +241,7 @@ impl Embedder for PerFieldEmbedder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::error::SarissaError;
+    use crate::error::IrisError;
 
     #[derive(Debug)]
     struct MockEmbedder {
@@ -254,7 +254,7 @@ mod tests {
         async fn embed(&self, input: &EmbedInput<'_>) -> Result<Vector> {
             match input {
                 EmbedInput::Text(_) => Ok(Vector::new(vec![0.0; self.dim])),
-                _ => Err(SarissaError::invalid_argument("only text supported")),
+                _ => Err(IrisError::invalid_argument("only text supported")),
             }
         }
 

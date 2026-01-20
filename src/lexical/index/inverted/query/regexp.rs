@@ -6,7 +6,7 @@ use std::sync::Arc;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
-use crate::error::{Result, SarissaError};
+use crate::error::{Result, IrisError};
 use crate::lexical::index::inverted::core::automaton::{AutomatonTermsEnum, RegexAutomaton};
 use crate::lexical::index::inverted::core::terms::{TermDictionaryAccess, TermsEnum};
 use crate::lexical::index::inverted::query::Query;
@@ -38,7 +38,7 @@ impl RegexpQuery {
         let field = field.into();
         let pattern = pattern.into();
         let regex = Regex::new(&pattern)
-            .map_err(|e| SarissaError::analysis(format!("Invalid regexp pattern: {e}")))?;
+            .map_err(|e| IrisError::analysis(format!("Invalid regexp pattern: {e}")))?;
 
         Ok(RegexpQuery {
             field,

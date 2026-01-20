@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use crate::error::{Result, SarissaError};
+use crate::error::{Result, IrisError};
 use crate::storage::Storage;
 use crate::vector::core::vector::Vector;
 use crate::vector::index::HnswIndexConfig;
@@ -260,7 +260,7 @@ impl HnswIndexWriter {
         let _ef_construction = u32::from_le_bytes(ef_construction_buf) as usize;
 
         if dimension != index_config.dimension {
-            return Err(SarissaError::InvalidOperation(format!(
+            return Err(IrisError::InvalidOperation(format!(
                 "Dimension mismatch: expected {}, found {}",
                 index_config.dimension, dimension
             )));
@@ -281,7 +281,7 @@ impl HnswIndexWriter {
             let mut field_name_buf = vec![0u8; field_name_len];
             input.read_exact(&mut field_name_buf)?;
             let field_name = String::from_utf8(field_name_buf).map_err(|e| {
-                SarissaError::InvalidOperation(format!("Invalid UTF-8 in field name: {}", e))
+                IrisError::InvalidOperation(format!("Invalid UTF-8 in field name: {}", e))
             })?;
 
             // Read metadata and vector data
@@ -452,7 +452,7 @@ impl HnswIndexWriter {
 
         for (doc_id, _, vector) in vectors {
             if vector.dimension() != self.index_config.dimension {
-                return Err(SarissaError::InvalidOperation(format!(
+                return Err(IrisError::InvalidOperation(format!(
                     "Vector {} has dimension {}, expected {}",
                     doc_id,
                     vector.dimension(),
@@ -461,7 +461,7 @@ impl HnswIndexWriter {
             }
 
             if !vector.is_valid() {
-                return Err(SarissaError::InvalidOperation(format!(
+                return Err(IrisError::InvalidOperation(format!(
                     "Vector {doc_id} contains invalid values (NaN or infinity)"
                 )));
             }
@@ -602,7 +602,7 @@ impl HnswIndexWriter {
             .into_par_iter()
             .try_for_each(|doc_id| -> Result<()> {
                 let doc_vector_idx = *writer_ref.doc_id_map.get(&doc_id).ok_or_else(|| {
-                    SarissaError::internal(format!("Doc ID {} not found in doc_id_map", doc_id))
+                    IrisError::internal(format!("Doc ID {} not found in doc_id_map", doc_id))
                 })?;
                 let _vector = &writer_ref.vectors[doc_vector_idx].2;
 
@@ -825,7 +825,7 @@ impl HnswIndexWriter {
                 // This seems correct.
 
                 let doc_vector_idx = *writer_ref.doc_id_map.get(&doc_id).ok_or_else(|| {
-                    SarissaError::internal(format!("Doc ID {} not found in doc_id_map", doc_id))
+                    IrisError::internal(format!("Doc ID {} not found in doc_id_map", doc_id))
                 })?;
                 let vector = &writer_ref.vectors[doc_vector_idx].2;
 
@@ -949,7 +949,7 @@ impl HnswIndexWriter {
         let idx = *self
             .doc_id_map
             .get(&doc_id)
-            .ok_or_else(|| SarissaError::internal(format!("Doc ID {} not found in map", doc_id)))?;
+            .ok_or_else(|| IrisError::internal(format!("Doc ID {} not found in map", doc_id)))?;
         let target = &self.vectors[idx].2;
         self.index_config
             .distance_metric
@@ -1119,7 +1119,7 @@ impl HnswIndexWriter {
         if let Some(limit) = self.writer_config.memory_limit {
             let current_usage = self.estimated_memory_usage();
             if current_usage > limit {
-                return Err(SarissaError::ResourceExhausted(format!(
+                return Err(IrisError::ResourceExhausted(format!(
                     "Memory usage {current_usage} bytes exceeds limit {limit} bytes"
                 )));
             }
@@ -1145,7 +1145,7 @@ impl VectorIndexWriter for HnswIndexWriter {
 
     fn build(&mut self, vectors: Vec<(u64, String, Vector)>) -> Result<()> {
         if self.is_finalized {
-            return Err(SarissaError::InvalidOperation(
+            return Err(IrisError::InvalidOperation(
                 "Cannot build on finalized index".to_string(),
             ));
         }
@@ -1174,7 +1174,7 @@ impl VectorIndexWriter for HnswIndexWriter {
 
     fn add_vectors(&mut self, mut vectors: Vec<(u64, String, Vector)>) -> Result<()> {
         if self.is_finalized {
-            return Err(SarissaError::InvalidOperation(
+            return Err(IrisError::InvalidOperation(
                 "Cannot add vectors to finalized index".to_string(),
             ));
         }
@@ -1268,7 +1268,7 @@ impl VectorIndexWriter for HnswIndexWriter {
         use std::io::Write;
 
         if !self.is_finalized {
-            return Err(SarissaError::InvalidOperation(
+            return Err(IrisError::InvalidOperation(
                 "Index must be finalized before writing".to_string(),
             ));
         }
@@ -1276,7 +1276,7 @@ impl VectorIndexWriter for HnswIndexWriter {
         let storage = self
             .storage
             .as_ref()
-            .ok_or_else(|| SarissaError::InvalidOperation("No storage configured".to_string()))?;
+            .ok_or_else(|| IrisError::InvalidOperation("No storage configured".to_string()))?;
 
         // Create the index file
         let file_name = format!("{}.hnsw", self.path);
@@ -1363,7 +1363,7 @@ impl VectorIndexWriter for HnswIndexWriter {
 
     fn delete_document(&mut self, doc_id: u64) -> Result<()> {
         if self.is_finalized {
-            return Err(SarissaError::InvalidOperation(
+            return Err(IrisError::InvalidOperation(
                 "Cannot delete documents from finalized index".to_string(),
             ));
         }
@@ -1380,7 +1380,7 @@ impl VectorIndexWriter for HnswIndexWriter {
 
     fn delete_documents(&mut self, field: &str, value: &str) -> Result<usize> {
         if self.is_finalized {
-            return Err(SarissaError::InvalidOperation(
+            return Err(IrisError::InvalidOperation(
                 "Cannot delete documents from finalized index".to_string(),
             ));
         }
@@ -1433,7 +1433,7 @@ impl VectorIndexWriter for HnswIndexWriter {
         use crate::vector::index::hnsw::reader::HnswIndexReader;
 
         let storage = self.storage.as_ref().ok_or_else(|| {
-            SarissaError::InvalidOperation(
+            IrisError::InvalidOperation(
                 "Cannot build reader: storage not configured".to_string(),
             )
         })?;

@@ -1,6 +1,6 @@
 //! Vector index optimization utilities.
 
-use crate::error::{Result, SarissaError};
+use crate::error::{Result, IrisError};
 use crate::vector::writer::VectorIndexWriter;
 
 /// Optimizer for vector indexes after construction.
@@ -166,7 +166,7 @@ impl VectorIndexOptimizer {
         if let Some(memory_target) = self.memory_target
             && report.final_memory_bytes > memory_target
         {
-            return Err(SarissaError::InvalidOperation(format!(
+            return Err(IrisError::InvalidOperation(format!(
                 "Final memory usage {} exceeds target {}",
                 report.final_memory_bytes, memory_target
             )));
@@ -175,7 +175,7 @@ impl VectorIndexOptimizer {
         if let Some(ref target) = self.performance_target
             && report.final_memory_bytes > target.target_memory_bytes
         {
-            return Err(SarissaError::InvalidOperation(format!(
+            return Err(IrisError::InvalidOperation(format!(
                 "Memory target {} not achieved, actual: {}",
                 target.target_memory_bytes, report.final_memory_bytes
             )));

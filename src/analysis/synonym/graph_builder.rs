@@ -59,8 +59,8 @@ impl SynonymGraphBuilder {
     ///
     /// # Example
     /// ```
-    /// use sarissa::analysis::synonym::dictionary::SynonymDictionary;
-    /// use sarissa::analysis::synonym::graph_builder::SynonymGraphBuilder;
+    /// use iris::analysis::synonym::dictionary::SynonymDictionary;
+    /// use iris::analysis::synonym::graph_builder::SynonymGraphBuilder;
     ///
     /// let mut dict = SynonymDictionary::new(None).unwrap();
     /// dict.add_synonym_group(vec!["ml".to_string(), "machine learning".to_string()]);

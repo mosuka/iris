@@ -1,6 +1,6 @@
 # Architecture
 
-Sarissa is built on a unified modular architecture where the **Vector Engine** serves as the core orchestrator.
+Iris is built on a unified modular architecture where the **Vector Engine** serves as the core orchestrator.
 
 ## 1. Vector Engine (Unified)
 
@@ -25,7 +25,7 @@ graph TD
         Req[VectorSearchRequest]
     end
 
-    subgraph "Sarissa Vector Engine"
+    subgraph "Iris Vector Engine"
         VE[VectorEngine]
         
         subgraph "Components"

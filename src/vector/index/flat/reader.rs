@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use crate::error::{Result, SarissaError};
+use crate::error::{Result, IrisError};
 use crate::storage::Storage;
 use crate::vector::core::distance::DistanceMetric;
 use crate::vector::core::vector::Vector;
@@ -29,7 +29,7 @@ pub struct FlatVectorIndexReader {
 impl FlatVectorIndexReader {
     /// Create a reader from serialized bytes.
     pub fn from_bytes(_data: &[u8]) -> Result<Self> {
-        Err(SarissaError::InvalidOperation(
+        Err(IrisError::InvalidOperation(
             "from_bytes is deprecated, use load() instead".to_string(),
         ))
     }
@@ -74,7 +74,7 @@ impl FlatVectorIndexReader {
                     let mut field_name_buf = vec![0u8; field_name_len];
                     input.read_exact(&mut field_name_buf)?;
                     let field_name = String::from_utf8(field_name_buf).map_err(|e| {
-                        SarissaError::InvalidOperation(format!(
+                        IrisError::InvalidOperation(format!(
                             "Invalid UTF-8 in field name: {}",
                             e
                         ))
@@ -102,10 +102,10 @@ impl FlatVectorIndexReader {
                 let start_pos = 8; // num_vectors(4) + dimension(4)
                 input
                     .seek(std::io::SeekFrom::Start(start_pos))
-                    .map_err(SarissaError::Io)?; // Fixed Io argument
+                    .map_err(IrisError::Io)?; // Fixed Io argument
 
                 for _ in 0..num_vectors {
-                    let start_offset = input.stream_position().map_err(SarissaError::Io)?;
+                    let start_offset = input.stream_position().map_err(IrisError::Io)?;
 
                     let mut doc_id_buf = [0u8; 8];
                     input.read_exact(&mut doc_id_buf)?;
@@ -118,7 +118,7 @@ impl FlatVectorIndexReader {
                     let mut field_name_buf = vec![0u8; field_name_len];
                     input.read_exact(&mut field_name_buf)?;
                     let field_name = String::from_utf8(field_name_buf).map_err(|e| {
-                        SarissaError::InvalidOperation(format!(
+                        IrisError::InvalidOperation(format!(
                             "Invalid UTF-8 in field name: {}",
                             e
                         ))
@@ -410,7 +410,7 @@ impl VectorIterator for FlatVectorIterator {
                 // Skip or error? If index says it exists but retrieval fails -> Error ideally.
                 // But for next(), maybe skipping is okay?
                 // If get() returns Ok(None), it means not found, which contradicts consistency.
-                Err(SarissaError::internal(format!(
+                Err(IrisError::internal(format!(
                     "Vector {}:{} found in keys but missing in storage",
                     doc_id, field
                 )))

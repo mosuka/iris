@@ -40,7 +40,7 @@ use parking_lot::{Mutex, RwLock};
 
 use crate::embedding::embedder::{EmbedInput, Embedder};
 use crate::embedding::per_field::PerFieldEmbedder;
-use crate::error::{Result, SarissaError};
+use crate::error::{Result, IrisError};
 use crate::maintenance::deletion::DeletionManager;
 use crate::storage::Storage;
 use crate::storage::prefixed::PrefixedStorage;
@@ -190,7 +190,7 @@ impl VectorEngine {
         let name = field.name().to_string();
         let mut fields = self.fields.write();
         if fields.contains_key(&name) {
-            return Err(SarissaError::invalid_config(format!(
+            return Err(IrisError::invalid_config(format!(
                 "vector field '{name}' is already registered"
             )));
         }
@@ -218,7 +218,7 @@ impl VectorEngine {
 
     fn check_closed(&self) -> Result<()> {
         if self.closed.load(Ordering::Relaxed) == 1 {
-            return Err(SarissaError::index("VectorEngine is closed"));
+            return Err(IrisError::index("VectorEngine is closed"));
         }
         Ok(())
     }
@@ -251,7 +251,7 @@ impl VectorEngine {
         }
 
         if !self.config.implicit_schema {
-            return Err(SarissaError::invalid_argument(format!(
+            return Err(IrisError::invalid_argument(format!(
                 "vector field '{field_name}' is not registered"
             )));
         }
@@ -283,7 +283,7 @@ impl VectorEngine {
         let dimension = match &payload.source {
             PayloadSource::Text { .. } | PayloadSource::Bytes { .. } => {
                 self.config.default_dimension.ok_or_else(|| {
-                    SarissaError::invalid_config(
+                    IrisError::invalid_config(
                         "implicit schema requires default_dimension to be set",
                     )
                 })?
@@ -292,7 +292,7 @@ impl VectorEngine {
         };
 
         if dimension == 0 {
-            return Err(SarissaError::invalid_config(format!(
+            return Err(IrisError::invalid_config(format!(
                 "cannot register field '{field_name}' with zero dimension"
             )));
         }
@@ -346,7 +346,7 @@ impl VectorEngine {
     fn embed_payload(&self, field_name: &str, payload: Payload) -> Result<StoredVector> {
         let fields = self.fields.read();
         let handle = fields.get(field_name).ok_or_else(|| {
-            SarissaError::invalid_argument(format!("vector field '{field_name}' is not registered"))
+            IrisError::invalid_argument(format!("vector field '{field_name}' is not registered"))
         })?;
         let field_config = handle.field.config().clone();
         drop(fields);
@@ -369,7 +369,7 @@ impl VectorEngine {
                 let embedder = self.embedder_registry.resolve(field_name)?;
 
                 if !embedder.supports_text() {
-                    return Err(SarissaError::invalid_config(format!(
+                    return Err(IrisError::invalid_config(format!(
                         "embedder '{}' does not support text embedding",
                         field_name
                     )));
@@ -382,7 +382,7 @@ impl VectorEngine {
                     .run(async move { embedder.embed(&EmbedInput::Text(&text_for_embed)).await })?;
                 vector.validate_dimension(dimension)?;
                 if !vector.is_valid() {
-                    return Err(SarissaError::InvalidOperation(format!(
+                    return Err(IrisError::InvalidOperation(format!(
                         "embedder '{}' produced invalid values for field '{}'",
                         embedder_name_owned, field_name
                     )));
@@ -393,7 +393,7 @@ impl VectorEngine {
                 if field_config.lexical.is_some() {
                     stored
                         .attributes
-                        .insert("__sarissa_lexical_source".to_string(), text_value);
+                        .insert("__iris_lexical_source".to_string(), text_value);
                 }
                 Ok(stored)
             }
@@ -402,7 +402,7 @@ impl VectorEngine {
                 let embedder = self.embedder_registry.resolve(field_name)?;
 
                 if !embedder.supports_image() {
-                    return Err(SarissaError::invalid_config(format!(
+                    return Err(IrisError::invalid_config(format!(
                         "embedder '{}' does not support image embedding",
                         field_name
                     )));
@@ -418,7 +418,7 @@ impl VectorEngine {
                 })?;
                 vector.validate_dimension(dimension)?;
                 if !vector.is_valid() {
-                    return Err(SarissaError::InvalidOperation(format!(
+                    return Err(IrisError::InvalidOperation(format!(
                         "embedder '{}' produced invalid values for field '{}': {:?}",
                         embedder_name_owned, field_name, vector
                     )));
@@ -430,7 +430,7 @@ impl VectorEngine {
                 let vector = Vector::new(data.to_vec());
                 vector.validate_dimension(dimension)?;
                 if !vector.is_valid() {
-                    return Err(SarissaError::InvalidOperation(format!(
+                    return Err(IrisError::InvalidOperation(format!(
                         "provided vector for field '{}' contains invalid values",
                         field_name
                     )));
@@ -578,14 +578,14 @@ impl VectorEngine {
         let vector_option = match &config.vector {
             Some(opt) => opt,
             None => {
-                return Err(SarissaError::invalid_config(format!(
+                return Err(IrisError::invalid_config(format!(
                     "vector field '{field_name}' validation failed: no vector configuration found"
                 )));
             }
         };
 
         if vector_option.dimension() == 0 {
-            return Err(SarissaError::invalid_config(format!(
+            return Err(IrisError::invalid_config(format!(
                 "vector field '{field_name}' cannot materialize a zero-dimension index"
             )));
         }
@@ -669,7 +669,7 @@ impl VectorEngine {
         let vector_option = match &config.vector {
             Some(opt) => opt,
             None => {
-                return Err(SarissaError::invalid_config(format!(
+                return Err(IrisError::invalid_config(format!(
                     "vector field '{field_name}' has no vector configuration"
                 )));
             }
@@ -749,7 +749,7 @@ impl VectorEngine {
         let fields = self.fields.read();
         for field_name in document.fields.keys() {
             if !fields.contains_key(field_name) {
-                return Err(SarissaError::invalid_argument(format!(
+                return Err(IrisError::invalid_argument(format!(
                     "vector field '{field_name}' is not registered"
                 )));
             }
@@ -780,7 +780,7 @@ impl VectorEngine {
         let fields = self.fields.read();
         for field_name in doc.fields.keys() {
             let field = fields.get(field_name).ok_or_else(|| {
-                SarissaError::not_found(format!(
+                IrisError::not_found(format!(
                     "vector field '{field_name}' not registered during delete"
                 ))
             })?;
@@ -803,7 +803,7 @@ impl VectorEngine {
         let fields = self.fields.read();
         for (field_name, stored_vector) in fields_data {
             let field = fields.get(field_name).ok_or_else(|| {
-                SarissaError::not_found(format!("vector field '{field_name}' is not registered"))
+                IrisError::not_found(format!("vector field '{field_name}' is not registered"))
             })?;
             field
                 .runtime
@@ -918,7 +918,7 @@ impl VectorEngine {
 
         let manifest: CollectionManifest = serde_json::from_slice(&buffer)?;
         if manifest.version != COLLECTION_MANIFEST_VERSION {
-            return Err(SarissaError::invalid_config(format!(
+            return Err(IrisError::invalid_config(format!(
                 "collection manifest version mismatch: expected {}, found {}",
                 COLLECTION_MANIFEST_VERSION, manifest.version
             )));
@@ -926,14 +926,14 @@ impl VectorEngine {
 
         let snapshot_seq = self.snapshot_wal_seq.load(Ordering::SeqCst);
         if manifest.snapshot_wal_seq != snapshot_seq {
-            return Err(SarissaError::invalid_config(format!(
+            return Err(IrisError::invalid_config(format!(
                 "collection manifest snapshot sequence {} does not match persisted snapshot {}",
                 manifest.snapshot_wal_seq, snapshot_seq
             )));
         }
 
         if manifest.wal_last_seq < manifest.snapshot_wal_seq {
-            return Err(SarissaError::invalid_config(
+            return Err(IrisError::invalid_config(
                 "collection manifest WAL sequence regressed",
             ));
         }
@@ -1137,7 +1137,7 @@ impl VectorEngine {
                 // Check if value exists in vector fields (embedded text source)
                 else if let Some(stored_vec) = document.fields.get(field_name)
                     && let Some(original_text) =
-                        stored_vec.attributes.get("__sarissa_lexical_source")
+                        stored_vec.attributes.get("__iris_lexical_source")
                     {
                         println!(
                             "DEBUG: indexing field {} lexical source: {}",
@@ -1228,7 +1228,7 @@ impl VectorEngine {
                 // Check if value exists in vector fields (embedded text source)
                 else if let Some(stored_vec) = document.fields.get(field_name)
                     && let Some(original_text) =
-                        stored_vec.attributes.get("__sarissa_lexical_source")
+                        stored_vec.attributes.get("__iris_lexical_source")
                         && let crate::lexical::core::field::FieldOption::Text(text_opt) =
                             lexical_opt
                         {
@@ -1413,7 +1413,7 @@ impl VectorEngine {
                 // Ignore not found errors for individual chunks (idempotency)
                 match self.delete_vectors(doc_id) {
                     Ok(_) => found = true,
-                    Err(SarissaError::Other(ref msg)) if msg.starts_with("Not found") => continue,
+                    Err(IrisError::Other(ref msg)) if msg.starts_with("Not found") => continue,
                     Err(e) => return Err(e),
                 }
             }
@@ -1429,7 +1429,7 @@ impl VectorEngine {
         let documents = self.documents.read();
         let doc = documents
             .get(&doc_id)
-            .ok_or_else(|| SarissaError::not_found(format!("doc_id {doc_id}")))?;
+            .ok_or_else(|| IrisError::not_found(format!("doc_id {doc_id}")))?;
 
         self.delete_fields_for_doc(doc_id, doc)?;
 
@@ -1473,7 +1473,7 @@ impl VectorEngine {
     pub fn field_stats(&self, field_name: &str) -> Result<VectorFieldStats> {
         let fields = self.fields.read();
         let field = fields.get(field_name).ok_or_else(|| {
-            SarissaError::not_found(format!("vector field '{field_name}' is not registered"))
+            IrisError::not_found(format!("vector field '{field_name}' is not registered"))
         })?;
         field.runtime.reader().stats()
     }
@@ -1486,7 +1486,7 @@ impl VectorEngine {
     ) -> Result<()> {
         let fields = self.fields.read();
         let field = fields.get(field_name).ok_or_else(|| {
-            SarissaError::not_found(format!("vector field '{field_name}' is not registered"))
+            IrisError::not_found(format!("vector field '{field_name}' is not registered"))
         })?;
         let reader_arc: Arc<dyn VectorFieldReader> = Arc::from(reader);
         field.runtime.replace_reader(reader_arc);
@@ -1497,7 +1497,7 @@ impl VectorEngine {
     pub fn reset_field_reader(&self, field_name: &str) -> Result<()> {
         let fields = self.fields.read();
         let field = fields.get(field_name).ok_or_else(|| {
-            SarissaError::not_found(format!("vector field '{field_name}' is not registered"))
+            IrisError::not_found(format!("vector field '{field_name}' is not registered"))
         })?;
         field.runtime.reset_reader();
         Ok(())
@@ -1507,7 +1507,7 @@ impl VectorEngine {
     pub fn materialize_delegate_reader(&self, field_name: &str) -> Result<()> {
         let fields = self.fields.read();
         let handle = fields.get(field_name).ok_or_else(|| {
-            SarissaError::not_found(format!("vector field '{field_name}' is not registered"))
+            IrisError::not_found(format!("vector field '{field_name}' is not registered"))
         })?;
 
         let in_memory = handle
@@ -1515,7 +1515,7 @@ impl VectorEngine {
             .as_any()
             .downcast_ref::<InMemoryVectorField>()
             .ok_or_else(|| {
-                SarissaError::InvalidOperation(format!(
+                IrisError::InvalidOperation(format!(
                     "field '{field_name}' does not support delegate materialization"
                 ))
             })?;
@@ -1529,7 +1529,7 @@ impl VectorEngine {
 
         let fields = self.fields.read();
         let handle = fields.get(field_name).ok_or_else(|| {
-            SarissaError::not_found(format!("vector field '{field_name}' is not registered"))
+            IrisError::not_found(format!("vector field '{field_name}' is not registered"))
         })?;
         handle.runtime.replace_reader(reader);
         Ok(())
@@ -1662,7 +1662,7 @@ impl VectorEngineSearcher {
                             result.push(name.clone());
                         }
                     } else {
-                        return Err(SarissaError::not_found(format!(
+                        return Err(IrisError::not_found(format!(
                             "vector field '{name}' is not registered",
                         )));
                     }
@@ -1795,7 +1795,7 @@ impl VectorEngineSearcher {
                     entry.score = entry.score.max(weighted_score);
                 }
                 VectorScoreMode::LateInteraction => {
-                    return Err(SarissaError::invalid_argument(
+                    return Err(IrisError::invalid_argument(
                         "VectorScoreMode::LateInteraction is not supported yet",
                     ));
                 }
@@ -1826,7 +1826,7 @@ impl VectorEngineSearcher {
             parser: &crate::lexical::index::inverted::query::parser::QueryParser,
         ) -> Result<Box<dyn Query>> {
             match lq {
-                LexicalQuery::MatchAll => Err(SarissaError::NotImplemented(
+                LexicalQuery::MatchAll => Err(IrisError::NotImplemented(
                     "MatchAll query not yet supported".to_string(),
                 )),
                 LexicalQuery::Term(TermQueryOptions { field, term, boost }) => {
@@ -2003,7 +2003,7 @@ impl VectorEngineSearcher {
 impl crate::vector::search::searcher::VectorSearcher for VectorEngineSearcher {
     fn search(&self, request: &VectorSearchRequest) -> Result<VectorSearchResults> {
         if request.query_vectors.is_empty() && request.lexical_query.is_none() {
-            return Err(SarissaError::invalid_argument(
+            return Err(IrisError::invalid_argument(
                 "VectorSearchRequest requires at least one query vector or lexical query",
             ));
         }
@@ -2013,13 +2013,13 @@ impl crate::vector::search::searcher::VectorSearcher for VectorEngineSearcher {
         }
 
         if request.overfetch < 1.0 {
-            return Err(SarissaError::invalid_argument(
+            return Err(IrisError::invalid_argument(
                 "VectorSearchRequest overfetch must be >= 1.0",
             ));
         }
 
         if matches!(request.score_mode, VectorScoreMode::LateInteraction) {
-            return Err(SarissaError::invalid_argument(
+            return Err(IrisError::invalid_argument(
                 "VectorScoreMode::LateInteraction is not supported yet",
             ));
         }
@@ -2050,7 +2050,7 @@ impl crate::vector::search::searcher::VectorSearcher for VectorEngineSearcher {
 
             for field_name in target_fields {
                 let field = fields.get(&field_name).ok_or_else(|| {
-                    SarissaError::not_found(format!("vector field '{field_name}'"))
+                    IrisError::not_found(format!("vector field '{field_name}'"))
                 })?;
                 let matching_vectors =
                     self.query_vectors_for_field(&field_name, field.field.config(), request);
@@ -2103,7 +2103,7 @@ impl crate::vector::search::searcher::VectorSearcher for VectorEngineSearcher {
                 // Lexical query executed but returned no results
                 return Ok(VectorSearchResults::default());
             }
-            return Err(SarissaError::invalid_argument(
+            return Err(IrisError::invalid_argument(
                 "no query vectors matched the requested fields and no lexical query provided",
             ));
         }
