@@ -2,9 +2,12 @@ use sarissa::embedding::precomputed::PrecomputedEmbedder;
 use sarissa::storage::file::FileStorageConfig;
 use sarissa::storage::{StorageConfig, StorageFactory};
 
+use sarissa::vector::DistanceMetric;
 use sarissa::vector::core::document::{DocumentPayload, Payload, PayloadSource};
 use sarissa::vector::engine::VectorEngine;
-use sarissa::vector::engine::config::{VectorFieldConfig, VectorIndexConfig};
+use sarissa::vector::engine::config::{
+    FlatOption, VectorFieldConfig, VectorOption, VectorIndexConfig,
+};
 use sarissa::vector::engine::query::VectorSearchRequestBuilder;
 
 use std::sync::Arc;
@@ -19,8 +22,15 @@ fn test_mmap_mode_basic_search() {
     let storage = StorageFactory::create(storage_config).unwrap();
 
     // Configure a fields with Mmap loading
-    let mut field_config = VectorFieldConfig::default();
-    field_config.dimension = 3;
+    let field_config = VectorFieldConfig {
+        vector: Some(VectorOption::Flat(FlatOption {
+            dimension: 3,
+            distance: DistanceMetric::Cosine,
+            base_weight: 1.0,
+            quantizer: None,
+        })),
+        lexical: None,
+    };
 
     let config = VectorIndexConfig::builder()
         .embedder(PrecomputedEmbedder::new())
@@ -69,8 +79,15 @@ fn test_mmap_mode_persistence_reload() {
         let storage_config = StorageConfig::File(FileStorageConfig::new(storage_path.clone()));
         let storage = StorageFactory::create(storage_config).unwrap();
 
-        let mut field_config = VectorFieldConfig::default();
-        field_config.dimension = 3;
+        let field_config = VectorFieldConfig {
+            vector: Some(VectorOption::Flat(FlatOption {
+                dimension: 3,
+                distance: DistanceMetric::Cosine,
+                base_weight: 1.0,
+                quantizer: None,
+            })),
+            lexical: None,
+        };
 
         let config = VectorIndexConfig::builder()
             .embedder(PrecomputedEmbedder::new())
@@ -100,8 +117,15 @@ fn test_mmap_mode_persistence_reload() {
         let storage_config = StorageConfig::File(FileStorageConfig::new(storage_path.clone()));
         let storage = StorageFactory::create(storage_config).unwrap();
 
-        let mut field_config = VectorFieldConfig::default();
-        field_config.dimension = 3;
+        let field_config = VectorFieldConfig {
+            vector: Some(VectorOption::Flat(FlatOption {
+                dimension: 3,
+                distance: DistanceMetric::Cosine,
+                base_weight: 1.0,
+                quantizer: None,
+            })),
+            lexical: None,
+        };
 
         let config = VectorIndexConfig::builder()
             .embedder(PrecomputedEmbedder::new())

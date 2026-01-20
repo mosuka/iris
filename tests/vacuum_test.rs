@@ -8,7 +8,9 @@ use sarissa::storage::{StorageConfig, StorageFactory};
 use sarissa::vector::core::distance::DistanceMetric;
 use sarissa::vector::core::document::{DocumentVector, StoredVector};
 use sarissa::vector::engine::VectorEngine;
-use sarissa::vector::engine::config::{VectorFieldConfig, VectorIndexConfig, VectorIndexKind};
+use sarissa::vector::engine::config::{
+    FlatOption, HnswOption, VectorFieldConfig, VectorIndexConfig, VectorIndexKind, VectorOption,
+};
 use sarissa::vector::engine::request::{VectorScoreMode, VectorSearchRequest};
 
 #[test]
@@ -18,13 +20,14 @@ fn test_vacuum_reduces_file_size() {
 
     // 1. Create VectorEngine using FileStorage
     let field_config = VectorFieldConfig {
-        dimension: 128,
-        distance: DistanceMetric::Cosine,
-        index: VectorIndexKind::Flat,
-        metadata: HashMap::new(),
-        base_weight: 1.0,
+        vector: Some(VectorOption::Flat(FlatOption {
+            dimension: 128,
+            distance: DistanceMetric::Cosine,
+            base_weight: 1.0,
+            quantizer: None,
+        })),
+        lexical: None,
     };
-
     let config = VectorIndexConfig {
         fields: HashMap::from([("vectors".to_string(), field_config)]),
         default_fields: vec!["vectors".to_string()],
@@ -40,11 +43,7 @@ fn test_vacuum_reduces_file_size() {
         metadata_config: LexicalIndexConfig::default(),
     };
 
-    // Correctly construct FileStorageConfig
-    // Note: FileStorageConfig::new(path) might be the way, or struct init.
-    // Based on storage.rs doc example: let mut file_config = FileStorageConfig::new("/tmp/test_index");
     let file_config = FileStorageConfig::new(path.to_str().unwrap());
-
     let storage_config = StorageConfig::File(file_config);
     let storage = StorageFactory::create(storage_config).unwrap();
 
@@ -67,9 +66,6 @@ fn test_vacuum_reduces_file_size() {
     println!("committed.");
 
     // Check file size
-    // Path: {root}/vector_fields/{field_name}/vectors.index.flat
-    // VectorEngine uses "vector_fields/{sanitized_field_name}" as storage prefix.
-    // FlatIndexWriter appends ".flat".
     let index_file_path = path
         .join("vector_fields")
         .join("vectors")
@@ -117,7 +113,6 @@ fn test_vacuum_reduces_file_size() {
     );
 
     // 5. Verify Search
-    // Deleted (even) should not match. Odd should match.
     let request = VectorSearchRequest {
         query_vectors: vec![sarissa::vector::engine::request::QueryVector {
             vector: StoredVector::new(Arc::from(vec![0.1f32; dim])),
@@ -131,6 +126,8 @@ fn test_vacuum_reduces_file_size() {
         filter: None,
         fields: None,
         query_payloads: vec![],
+        lexical_query: None,
+        fusion_config: None,
     };
 
     let searcher = engine.searcher().unwrap();
@@ -148,7 +145,6 @@ fn test_vacuum_reduces_file_size() {
         );
     }
 }
-
 #[test]
 fn test_vacuum_reduces_file_size_hnsw() {
     let dir = Builder::new().prefix("test_vacuum_hnsw").tempdir().unwrap();
@@ -156,11 +152,15 @@ fn test_vacuum_reduces_file_size_hnsw() {
 
     // 1. Create VectorEngine using HNSW
     let field_config = VectorFieldConfig {
-        dimension: 128,
-        distance: DistanceMetric::Cosine,
-        index: VectorIndexKind::Hnsw,
-        metadata: HashMap::new(),
-        base_weight: 1.0,
+        vector: Some(VectorOption::Hnsw(HnswOption {
+            dimension: 16,
+            distance: DistanceMetric::Cosine,
+            m: 48,
+            ef_construction: 200,
+            base_weight: 1.0,
+            quantizer: None,
+        })),
+        lexical: None,
     };
 
     let config = VectorIndexConfig {
@@ -169,7 +169,7 @@ fn test_vacuum_reduces_file_size_hnsw() {
         metadata: HashMap::new(),
         default_distance: DistanceMetric::Cosine,
         default_dimension: None,
-        default_index_kind: VectorIndexKind::Hnsw,
+        default_index_kind: VectorIndexKind::Flat,
         default_base_weight: 1.0,
         implicit_schema: false,
         embedder: Arc::new(sarissa::embedding::precomputed::PrecomputedEmbedder::new()),
@@ -178,23 +178,31 @@ fn test_vacuum_reduces_file_size_hnsw() {
         metadata_config: LexicalIndexConfig::default(),
     };
 
+    // Correctly construct FileStorageConfig
+    // Note: FileStorageConfig::new(path) might be the way, or struct init.
+    // Based on storage.rs doc example: let mut file_config = FileStorageConfig::new("/tmp/test_index");
     let file_config = FileStorageConfig::new(path.to_str().unwrap());
+
     let storage_config = StorageConfig::File(file_config);
     let storage = StorageFactory::create(storage_config).unwrap();
 
     let engine = VectorEngine::new(storage, config).unwrap();
 
-    let dim = 128;
-    // Use enough vectors to force multiple segments if possible,
-    // or just rely on flush causing a segment.
+    let dim = 16;
     let num_vectors = 200;
 
     // 2. Insert vectors
     println!("Inserting {} vectors...", num_vectors);
     for i in 0..num_vectors {
         let mut doc_vector = DocumentVector::new();
-        doc_vector.set_field("vectors", StoredVector::new(Arc::from(vec![0.1f32; dim])));
-        engine.upsert_vectors(i, doc_vector).unwrap();
+        // Use random vectors to avoid equidistant pathology
+        let mut vec_data = vec![0.0f32; dim];
+        for j in 0..dim {
+            vec_data[j] = (i + j) as f32 % 500.0 / 500.0; // Deterministic pseudo-random, unique for i < 500
+        }
+
+        doc_vector.set_field("vectors", StoredVector::new(Arc::from(vec_data)));
+        engine.upsert_vectors(i as u64, doc_vector).unwrap();
     }
 
     println!("Flushing vectors to disk...");
@@ -202,19 +210,17 @@ fn test_vacuum_reduces_file_size_hnsw() {
     engine.commit().unwrap();
     println!("committed.");
 
-    // Path check might be different for SegmentedVectorField structure
-    // It creates segments inside "vector_fields/vectors/" directory.
-    let index_dir = path.join("vector_fields").join("vectors");
-
-    // Calculate total size of segments
-    let get_size = |dir: &std::path::Path| -> u64 {
+    // Check file size by summing all .hnsw segment files
+    let vectors_dir = path.join("vector_fields").join("vectors");
+    let get_total_hnsw_size = |dir: &std::path::Path| -> u64 {
         let mut size = 0;
         if let Ok(entries) = std::fs::read_dir(dir) {
             for entry in entries {
-                if let Ok(entry) = entry {
-                    if let Ok(metadata) = entry.metadata() {
-                        if metadata.is_file() {
-                            size += metadata.len();
+                if let Ok(e) = entry {
+                    let path = e.path();
+                    if let Some(ext) = path.extension() {
+                        if ext == "hnsw" {
+                            size += e.metadata().unwrap().len();
                         }
                     }
                 }
@@ -223,34 +229,31 @@ fn test_vacuum_reduces_file_size_hnsw() {
         size
     };
 
-    let size_before = get_size(&index_dir);
+    let size_before = get_total_hnsw_size(&vectors_dir);
     println!("Size before deletion: {} bytes", size_before);
+    assert!(size_before > 0, "Index size should be greater than 0");
 
     // 3. Delete 100 vectors (even IDs)
     println!("Deleting {} vectors...", num_vectors / 2);
     for i in 0..num_vectors {
         if i % 2 == 0 {
-            engine.delete_vectors(i).unwrap();
+            engine.delete_vectors(i as u64).unwrap();
         }
     }
-    engine.commit().unwrap(); // Persist deletions (bitmaps)
+    engine.commit().unwrap();
 
-    let size_intermediate = get_size(&index_dir);
+    let size_intermediate = get_total_hnsw_size(&vectors_dir);
     println!(
         "Size after delete (before optimize): {} bytes",
         size_intermediate
     );
 
-    // 4. Run Vacuum (Merge)
+    // 4. Run Vacuum
     println!("Running optimize (Vacuum)...");
     engine.optimize().unwrap();
 
-    let size_after = get_size(&index_dir);
+    let size_after = get_total_hnsw_size(&vectors_dir);
     println!("Size after optimize: {} bytes", size_after);
-
-    // If compaction works, size should decrease significantly.
-    // If not, it might stay same or increase (due to new merged segment + old ones if not cleaned).
-    // Note: SegmentManager usually deletes old segments after merge.
 
     assert!(
         size_after < size_before,
@@ -258,4 +261,54 @@ fn test_vacuum_reduces_file_size_hnsw() {
         size_before,
         size_after
     );
+    assert!(
+        size_after < (size_before as f64 * 0.7) as u64,
+        "Size should be roughly half (allow some metadata overhead)"
+    );
+
+    // 5. Verify Search
+    // Deleted (even) should not match. Odd should match.
+    // If we use MaxSim and min_score 0.0, we match everything.
+    // Query vector doesn't matter much if we just want "any 100 items".
+    let request = VectorSearchRequest {
+        query_vectors: vec![sarissa::vector::engine::request::QueryVector {
+            vector: StoredVector::new(Arc::from(vec![0.5f32; dim])), // Generic vector
+            weight: 1.0,
+            fields: None,
+        }],
+        limit: num_vectors as usize,
+        overfetch: 10.0,
+        min_score: 0.0,
+        score_mode: VectorScoreMode::MaxSim,
+        filter: None,
+        fields: None,
+        lexical_query: None,
+        fusion_config: None,
+        query_payloads: vec![],
+    };
+
+    let searcher = engine.searcher().unwrap();
+    let results = searcher.search(&request).unwrap();
+
+    // Expect reasonable recall (HNSW is approximate, and small N + parallel build might miss some)
+    println!("Found {} hits", results.hits.len());
+    assert!(
+        results.hits.len() >= 80,
+        "Should have decent recall (>= 80/100) left. Found {}",
+        results.hits.len()
+    );
+
+    // Verify none are even
+    for hit in results.hits {
+        assert!(
+            hit.doc_id % 2 != 0,
+            "Deleted document {} found in search results",
+            hit.doc_id
+        );
+    }
+    // 5. Verify Compaction
+    // HNSW vacuum is cleaner now.
+    // If it worked, size < size_before (mostly).
+    // But since HNSW adds complexity, strict size comparison is tricky.
+    // We mainly ensure we didn't crash and index is valid.
 }

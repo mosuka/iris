@@ -1,11 +1,10 @@
 use sarissa::storage::memory::{MemoryStorage, MemoryStorageConfig};
 use sarissa::vector::DistanceMetric;
 use sarissa::vector::core::document::StoredVector;
-use sarissa::vector::engine::config::{VectorFieldConfig, VectorIndexKind};
+use sarissa::vector::engine::config::{HnswOption, VectorFieldConfig, VectorOption};
 use sarissa::vector::field::{VectorFieldReader, VectorFieldWriter};
 use sarissa::vector::index::hnsw::segment::manager::{SegmentManager, SegmentManagerConfig};
 use sarissa::vector::index::segmented_field::SegmentedVectorField;
-use std::collections::HashMap;
 use std::sync::Arc;
 
 #[test]
@@ -22,11 +21,15 @@ fn test_segmented_field_manual_merge() -> Result<(), Box<dyn std::error::Error>>
 
     // 2. Setup Field
     let field_config = VectorFieldConfig {
-        dimension: 4,
-        distance: DistanceMetric::Euclidean,
-        index: VectorIndexKind::Hnsw,
-        metadata: HashMap::new(),
-        base_weight: 1.0, // Default weight
+        vector: Some(VectorOption::Hnsw(HnswOption {
+            dimension: 4,
+            distance: DistanceMetric::Euclidean,
+            m: 16, // Default or specific to test? Using defaults or standard values
+            ef_construction: 200, // Standard default
+            base_weight: 1.0,
+            quantizer: None,
+        })),
+        lexical: None,
     };
 
     let field = SegmentedVectorField::create(

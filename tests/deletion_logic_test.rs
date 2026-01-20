@@ -11,7 +11,9 @@ mod tests {
     use sarissa::vector::core::distance::DistanceMetric;
     use sarissa::vector::core::document::{DocumentVector, StoredVector};
     use sarissa::vector::engine::VectorEngine;
-    use sarissa::vector::engine::config::{VectorFieldConfig, VectorIndexConfig, VectorIndexKind};
+    use sarissa::vector::engine::config::{
+        FlatOption, VectorFieldConfig, VectorOption, VectorIndexConfig, VectorIndexKind,
+    };
     use sarissa::vector::engine::request::{VectorScoreMode, VectorSearchRequest};
     use std::collections::HashMap;
     use std::sync::Arc;
@@ -21,11 +23,13 @@ mod tests {
         // 1. Create VectorEngine
         // Configure field
         let field_config = VectorFieldConfig {
-            dimension: 128,
-            distance: DistanceMetric::Cosine,
-            index: VectorIndexKind::Flat,
-            metadata: HashMap::new(),
-            base_weight: 1.0,
+            vector: Some(VectorOption::Flat(FlatOption {
+                dimension: 128,
+                distance: DistanceMetric::Cosine,
+                base_weight: 1.0,
+                quantizer: None,
+            })),
+            lexical: None,
         };
 
         let config = VectorIndexConfig {
@@ -71,6 +75,8 @@ mod tests {
             filter: None,
             fields: None, // All fields
             query_payloads: vec![],
+            lexical_query: None,
+            fusion_config: None,
         };
 
         let searcher = engine.searcher().unwrap();

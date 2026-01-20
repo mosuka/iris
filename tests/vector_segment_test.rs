@@ -6,7 +6,9 @@ use sarissa::storage::memory::{MemoryStorage, MemoryStorageConfig};
 use sarissa::vector::DistanceMetric;
 use sarissa::vector::core::document::{DocumentPayload, Payload, PayloadSource};
 use sarissa::vector::core::vector::Vector;
-use sarissa::vector::engine::config::{VectorFieldConfig, VectorIndexConfig, VectorIndexKind};
+use sarissa::vector::engine::config::{
+    HnswOption, VectorFieldConfig, VectorOption, VectorIndexConfig, VectorIndexKind,
+};
 use std::any::Any;
 use std::sync::Arc;
 
@@ -49,11 +51,15 @@ async fn test_vector_segment_integration() {
     field_configs.insert(
         "vector_field".to_string(),
         VectorFieldConfig {
-            dimension: 4,
-            distance: DistanceMetric::Euclidean,
-            index: VectorIndexKind::Hnsw, // This triggers SegmentedVectorField
-            metadata: std::collections::HashMap::new(),
-            base_weight: 1.0,
+            vector: Some(VectorOption::Hnsw(HnswOption {
+                dimension: 4,
+                distance: DistanceMetric::Euclidean,
+                m: 16,
+                ef_construction: 200,
+                base_weight: 1.0,
+                quantizer: None,
+            })),
+            lexical: None,
         },
     );
 

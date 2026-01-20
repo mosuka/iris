@@ -5,9 +5,11 @@ use sarissa::storage::memory::{MemoryStorage, MemoryStorageConfig};
 use sarissa::vector::DistanceMetric;
 use sarissa::vector::core::document::{DocumentVector, StoredVector};
 use sarissa::vector::engine::VectorEngine;
-use sarissa::vector::engine::config::{VectorFieldConfig, VectorIndexConfig, VectorIndexKind};
+use sarissa::vector::engine::config::{
+    HnswOption, VectorFieldConfig, VectorOption, VectorIndexConfig, VectorIndexKind,
+};
 use sarissa::vector::engine::request::{FieldSelector, QueryVector, VectorSearchRequest};
-use std::collections::HashMap;
+
 use std::sync::Arc;
 
 #[test]
@@ -113,11 +115,15 @@ fn create_test_engine(storage: Arc<dyn Storage>) -> Result<VectorEngine> {
     builder = builder.field(
         "test_field",
         VectorFieldConfig {
-            dimension: 4,
-            distance: DistanceMetric::Euclidean,
-            index: VectorIndexKind::Hnsw,
-            metadata: HashMap::new(),
-            base_weight: 1.0,
+            vector: Some(VectorOption::Hnsw(HnswOption {
+                dimension: 4,
+                distance: DistanceMetric::Euclidean,
+                m: 16,
+                ef_construction: 200,
+                base_weight: 1.0,
+                quantizer: None,
+            })),
+            lexical: None,
         },
     );
 

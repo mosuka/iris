@@ -17,7 +17,9 @@ use sarissa::vector::core::document::{
 };
 use sarissa::vector::core::vector::Vector;
 use sarissa::vector::engine::VectorEngine;
-use sarissa::vector::engine::config::{VectorFieldConfig, VectorIndexConfig, VectorIndexKind};
+use sarissa::vector::engine::config::{
+    FlatOption, VectorFieldConfig, VectorOption, VectorIndexConfig, VectorIndexKind,
+};
 use sarissa::vector::engine::filter::{MetadataFilter, VectorFilter};
 use sarissa::vector::engine::request::{
     FieldSelector, QueryPayload, QueryVector, VectorScoreMode, VectorSearchRequest,
@@ -180,21 +182,25 @@ fn sample_engine_config() -> VectorIndexConfig {
     fields.insert(
         "title_embedding".into(),
         VectorFieldConfig {
-            dimension: 4,
-            distance: DistanceMetric::Cosine,
-            index: VectorIndexKind::Flat,
-            metadata: HashMap::new(),
-            base_weight: 1.4,
+            vector: Some(VectorOption::Flat(FlatOption {
+                dimension: 4,
+                distance: DistanceMetric::Cosine,
+                base_weight: 1.4,
+                quantizer: None,
+            })),
+            lexical: None,
         },
     );
     fields.insert(
         "body_embedding".into(),
         VectorFieldConfig {
-            dimension: 4,
-            distance: DistanceMetric::Cosine,
-            index: VectorIndexKind::Flat,
-            metadata: HashMap::new(),
-            base_weight: 1.0,
+            vector: Some(VectorOption::Flat(FlatOption {
+                dimension: 4,
+                distance: DistanceMetric::Cosine,
+                base_weight: 1.0,
+                quantizer: None,
+            })),
+            lexical: None,
         },
     );
 
@@ -297,11 +303,13 @@ fn build_payload_engine() -> Result<VectorEngine> {
         .field(
             "body_embedding",
             VectorFieldConfig {
-                dimension: 4,
-                distance: DistanceMetric::Cosine,
-                index: VectorIndexKind::Flat,
-                metadata: HashMap::new(),
-                base_weight: 1.0,
+                vector: Some(VectorOption::Flat(FlatOption {
+                    dimension: 4,
+                    distance: DistanceMetric::Cosine,
+                    base_weight: 1.0,
+                    quantizer: None,
+                })),
+                lexical: None,
             },
         )
         .default_field("body_embedding")
@@ -326,11 +334,13 @@ fn build_multimodal_payload_engine() -> Result<VectorEngine> {
         .field(
             "image_embedding",
             VectorFieldConfig {
-                dimension: 3,
-                distance: DistanceMetric::Cosine,
-                index: VectorIndexKind::Flat,
-                metadata: HashMap::new(),
-                base_weight: 1.0,
+                vector: Some(VectorOption::Flat(FlatOption {
+                    dimension: 3,
+                    distance: DistanceMetric::Cosine,
+                    base_weight: 1.0,
+                    quantizer: None,
+                })),
+                lexical: None,
             },
         )
         .default_field("image_embedding")

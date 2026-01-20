@@ -15,7 +15,6 @@
 //! ```
 
 #[cfg(feature = "embeddings-multimodal")]
-use std::collections::HashMap;
 #[cfg(feature = "embeddings-multimodal")]
 use std::path::Path;
 
@@ -36,7 +35,9 @@ use sarissa::vector::core::document::{DocumentPayload, Payload};
 #[cfg(feature = "embeddings-multimodal")]
 use sarissa::vector::engine::VectorEngine;
 #[cfg(feature = "embeddings-multimodal")]
-use sarissa::vector::engine::config::{VectorFieldConfig, VectorIndexConfig, VectorIndexKind};
+use sarissa::vector::engine::config::{
+    FlatOption, VectorFieldConfig, VectorOption, VectorIndexConfig,
+};
 #[cfg(feature = "embeddings-multimodal")]
 use sarissa::vector::engine::query::VectorSearchRequestBuilder;
 #[cfg(feature = "embeddings-multimodal")]
@@ -58,11 +59,13 @@ fn main() -> Result<()> {
     println!("Model loaded: {}", embedder.name());
 
     let field_config = VectorFieldConfig {
-        dimension: 512, // CLIP ViT-B/32 output dimension
-        distance: DistanceMetric::Cosine,
-        index: VectorIndexKind::Flat,
-        metadata: HashMap::new(),
-        base_weight: 1.0,
+        vector: Some(VectorOption::Flat(FlatOption {
+            dimension: 3,
+            distance: DistanceMetric::Cosine,
+            base_weight: 1.0,
+            quantizer: None,
+        })),
+        lexical: None,
     };
 
     let index_config = VectorIndexConfig::builder()

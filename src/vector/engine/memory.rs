@@ -164,11 +164,19 @@ impl InMemoryFieldWriter {
 
     fn convert_vector(&self, stored: &StoredVector) -> Result<Vector> {
         let vector = stored.to_vector();
-        if vector.dimension() != self.config.dimension {
+        // Safe default 0 if no vector config (shouldn't happen if we are adding vectors)
+        let dimension = self
+            .config
+            .vector
+            .as_ref()
+            .map(|v| v.dimension())
+            .unwrap_or(0);
+
+        if vector.dimension() != dimension {
             return Err(SarissaError::invalid_argument(format!(
                 "vector dimension mismatch for field '{}': expected {}, got {}",
                 self.field_name,
-                self.config.dimension,
+                dimension,
                 vector.dimension()
             )));
         }
@@ -300,13 +308,18 @@ impl VectorFieldReader for InMemoryFieldReader {
         let snapshot = self.store.snapshot();
         let mut merged: HashMap<u64, FieldHit> = HashMap::new();
 
+        let (dimension, distance_metric) = match &self.config.vector {
+            Some(opt) => (opt.dimension(), opt.distance()),
+            None => return Ok(FieldSearchResults::default()), // No vector support
+        };
+
         for query in &request.query_vectors {
             let query_vector = query.vector.to_vector();
-            if query_vector.dimension() != self.config.dimension {
+            if query_vector.dimension() != dimension {
                 return Err(SarissaError::invalid_argument(format!(
                     "query vector dimension mismatch for field '{}': expected {}, got {}",
                     self.field_name,
-                    self.config.dimension,
+                    dimension,
                     query_vector.dimension()
                 )));
             }
@@ -317,15 +330,10 @@ impl VectorFieldReader for InMemoryFieldReader {
 
             for (doc_id, entry) in &snapshot {
                 for vector in &entry.vectors {
-                    let similarity = self
-                        .config
-                        .distance
-                        .similarity(&query_vector.data, &vector.data)?;
+                    let similarity =
+                        distance_metric.similarity(&query_vector.data, &vector.data)?;
                     let weighted_score = similarity * effective_weight;
-                    let distance = self
-                        .config
-                        .distance
-                        .distance(&query_vector.data, &vector.data)?;
+                    let distance = distance_metric.distance(&query_vector.data, &vector.data)?;
 
                     match merged.entry(*doc_id) {
                         Entry::Vacant(slot) => {
@@ -360,9 +368,15 @@ impl VectorFieldReader for InMemoryFieldReader {
     }
 
     fn stats(&self) -> Result<VectorFieldStats> {
+        let dimension = self
+            .config
+            .vector
+            .as_ref()
+            .map(|v| v.dimension())
+            .unwrap_or(0);
         Ok(VectorFieldStats {
             vector_count: self.store.total_vectors(),
-            dimension: self.config.dimension,
+            dimension,
         })
     }
 }

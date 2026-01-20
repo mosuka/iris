@@ -1,0 +1,122 @@
+    Checking sarissa v0.1.0 (/home/minoru/src/github.com/mosuka/sarissa)
+error[E0407]: method `search_lexical` is not a member of trait `crate::vector::search::searcher::VectorSearcher`
+    --> src/vector/engine.rs:1917:5
+     |
+1917 | /     fn search_lexical(
+1918 | |         &self,
+1919 | |         query: &crate::vector::engine::request::LexicalQuery,
+1920 | |         limit: usize,
+...    |
+2017 | |         Ok(hits)
+2018 | |     }
+     | |_____^ not a member of trait `crate::vector::search::searcher::VectorSearcher`
+
+error[E0407]: method `merge_results` is not a member of trait `crate::vector::search::searcher::VectorSearcher`
+    --> src/vector/engine.rs:2020:5
+     |
+2020 | /     fn merge_results(
+2021 | |         &self,
+2022 | |         vector_hits: HashMap<u64, VectorHit>,
+2023 | |         lexical_hits: HashMap<u64, VectorHit>,
+...    |
+2128 | |         Ok(final_hits)
+2129 | |     }
+     | |_____^ not a member of trait `crate::vector::search::searcher::VectorSearcher`
+
+warning: unused import: `MatchOperator`
+    --> src/vector/engine.rs:1928:48
+     |
+1928 |             BooleanQueryOptions, LexicalQuery, MatchOperator, MatchQueryOptions, TermQueryOptions,
+     |                                                ^^^^^^^^^^^^^
+     |
+     = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+error[E0599]: no method named `add` found for struct `DocumentBuilder` in the current scope
+    --> src/vector/engine.rs:1136:59
+     |
+1136 |                         lex_doc_builder = lex_doc_builder.add(
+     |                                           ----------------^^^ method not found in `DocumentBuilder`
+     |
+    ::: src/lexical/core/document.rs:414:1
+     |
+ 414 | pub struct DocumentBuilder {
+     | -------------------------- method `add` not found for this struct
+     |
+     = help: items from traits can only be used if the trait is implemented and in scope
+     = note: the following trait defines an item `add`, perhaps you need to implement it:
+             candidate #1: `Add`
+
+error[E0599]: no method named `add` found for struct `DocumentBuilder` in the current scope
+    --> src/vector/engine.rs:1152:63
+     |
+1152 | ...                   lex_doc_builder = lex_doc_builder.add(
+     |                                         ----------------^^^ method not found in `DocumentBuilder`
+     |
+    ::: src/lexical/core/document.rs:414:1
+     |
+ 414 | pub struct DocumentBuilder {
+     | -------------------------- method `add` not found for this struct
+     |
+     = help: items from traits can only be used if the trait is implemented and in scope
+     = note: the following trait defines an item `add`, perhaps you need to implement it:
+             candidate #1: `Add`
+
+error[E0599]: no method named `search_lexical` found for reference `&VectorEngineSearcher` in the current scope
+    --> src/vector/engine.rs:1879:18
+     |
+1879 |             self.search_lexical(lex_query, request.limit)?
+     |                  ^^^^^^^^^^^^^^ method not found in `&VectorEngineSearcher`
+
+error[E0599]: no method named `merge_results` found for reference `&VectorEngineSearcher` in the current scope
+    --> src/vector/engine.rs:1898:25
+     |
+1898 |         let hits = self.merge_results(vector_hits_map, lexical_hits_map, &request.fusion_config)?;
+     |                         ^^^^^^^^^^^^^ method not found in `&VectorEngineSearcher`
+
+error[E0599]: no method named `searcher` found for struct `Arc<LexicalEngine>` in the current scope
+    --> src/vector/engine.rs:1998:14
+     |
+1996 |           let searcher = self
+     |  ________________________-
+1997 | |             .metadata_index
+1998 | |             .searcher()
+     | |_____________-^^^^^^^^
+     |
+     = help: items from traits can only be used if the trait is implemented and in scope
+note: `LexicalIndex` defines an item `searcher`, perhaps you need to implement it
+    --> src/lexical/index.rs:27:1
+     |
+  27 | pub trait LexicalIndex: Send + Sync + std::fmt::Debug {
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: there is a method `search` with a similar name, but with different arguments
+    --> src/lexical/engine.rs:542:5
+     |
+ 542 |     pub fn search(&self, request: LexicalSearchRequest) -> Result<LexicalSearchResults> {
+     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0282]: type annotations needed
+    --> src/vector/engine.rs:1999:23
+     |
+1999 |             .map_err(|e| SarissaError::Index(e.to_string()))?;
+     |                       ^                      - type must be known at this point
+     |
+help: consider giving this closure parameter an explicit type
+     |
+1999 |             .map_err(|e: /* Type */| SarissaError::Index(e.to_string()))?;
+     |                        ++++++++++++
+
+error[E0282]: type annotations needed
+    --> src/vector/engine.rs:2003:23
+     |
+2003 |             .map_err(|e| SarissaError::Index(e.to_string()))?;
+     |                       ^                      - type must be known at this point
+     |
+help: consider giving this closure parameter an explicit type
+     |
+2003 |             .map_err(|e: /* Type */| SarissaError::Index(e.to_string()))?;
+     |                        ++++++++++++
+
+Some errors have detailed explanations: E0282, E0407, E0599.
+For more information about an error, try `rustc --explain E0282`.
+warning: `sarissa` (lib) generated 1 warning
+error: could not compile `sarissa` (lib) due to 9 previous errors; 1 warning emitted

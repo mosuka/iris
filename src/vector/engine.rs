@@ -78,8 +78,11 @@ use self::snapshot::{
     DOCUMENT_SNAPSHOT_FILE, DOCUMENT_SNAPSHOT_TEMP_FILE, DocumentSnapshot, FIELD_INDEX_BASENAME,
     REGISTRY_NAMESPACE, SnapshotDocument,
 };
+use crate::vector::engine::config::{
+    FlatOption, HnswOption, IvfOption, VectorFieldConfig, VectorOption,
+    VectorIndexConfig, VectorIndexKind,
+};
 use crate::vector::wal::{WalEntry, WalManager};
-use config::{VectorFieldConfig, VectorIndexConfig, VectorIndexKind};
 
 /// A high-level vector search engine that provides both indexing and searching.
 ///
@@ -294,12 +297,32 @@ impl VectorEngine {
             )));
         }
 
+        let vector_option = match self.config.default_index_kind {
+            VectorIndexKind::Flat => VectorOption::Flat(FlatOption {
+                dimension,
+                distance: self.config.default_distance,
+                base_weight: self.config.default_base_weight,
+                quantizer: None,
+            }),
+            VectorIndexKind::Hnsw => VectorOption::Hnsw(HnswOption {
+                dimension,
+                distance: self.config.default_distance,
+                base_weight: self.config.default_base_weight,
+                quantizer: None,
+                ..Default::default()
+            }),
+            VectorIndexKind::Ivf => VectorOption::Ivf(IvfOption {
+                dimension,
+                distance: self.config.default_distance,
+                base_weight: self.config.default_base_weight,
+                quantizer: None,
+                ..Default::default()
+            }),
+        };
+
         Ok(VectorFieldConfig {
-            dimension,
-            distance: self.config.default_distance,
-            index: self.config.default_index_kind,
-            metadata: HashMap::new(),
-            base_weight: self.config.default_base_weight,
+            vector: Some(vector_option),
+            lexical: None,
         })
     }
 
@@ -328,6 +351,16 @@ impl VectorEngine {
         let field_config = handle.field.config().clone();
         drop(fields);
 
+        // Check if vector indexing is enabled for this field
+        let dimension = match &field_config.vector {
+            Some(opt) => opt.dimension(),
+            None => {
+                // If not configured for vector indexing, return empty vector
+                // This allows the field to be used for lexical indexing without storing vectors
+                return Ok(StoredVector::new(Arc::from([])));
+            }
+        };
+
         let Payload { source } = payload;
 
         match source {
@@ -344,16 +377,24 @@ impl VectorEngine {
 
                 let embedder_name_owned = field_name.to_string();
                 let text_value = value;
+                let text_for_embed = text_value.clone();
                 let vector = executor
-                    .run(async move { embedder.embed(&EmbedInput::Text(&text_value)).await })?;
-                vector.validate_dimension(field_config.dimension)?;
+                    .run(async move { embedder.embed(&EmbedInput::Text(&text_for_embed)).await })?;
+                vector.validate_dimension(dimension)?;
                 if !vector.is_valid() {
                     return Err(SarissaError::InvalidOperation(format!(
                         "embedder '{}' produced invalid values for field '{}'",
                         embedder_name_owned, field_name
                     )));
                 }
-                let stored: StoredVector = vector.into();
+                let mut stored: StoredVector = vector.into();
+
+                // Store original text if lexical indexing is enabled
+                if field_config.lexical.is_some() {
+                    stored
+                        .attributes
+                        .insert("__sarissa_lexical_source".to_string(), text_value);
+                }
                 Ok(stored)
             }
             PayloadSource::Bytes { bytes, mime } => {
@@ -375,26 +416,27 @@ impl VectorEngine {
                         .embed(&EmbedInput::Bytes(&payload_bytes, mime_hint.as_deref()))
                         .await
                 })?;
-                vector.validate_dimension(field_config.dimension)?;
+                vector.validate_dimension(dimension)?;
                 if !vector.is_valid() {
                     return Err(SarissaError::InvalidOperation(format!(
-                        "embedder '{}' produced invalid values for field '{}'",
-                        embedder_name_owned, field_name
+                        "embedder '{}' produced invalid values for field '{}': {:?}",
+                        embedder_name_owned, field_name, vector
                     )));
                 }
                 let stored: StoredVector = vector.into();
-
                 Ok(stored)
             }
             PayloadSource::Vector { data } => {
-                if data.len() != field_config.dimension {
-                    return Err(SarissaError::invalid_argument(format!(
-                        "vector field '{field_name}' expects dimension {} but received {}",
-                        field_config.dimension,
-                        data.len()
+                let vector = Vector::new(data.to_vec());
+                vector.validate_dimension(dimension)?;
+                if !vector.is_valid() {
+                    return Err(SarissaError::InvalidOperation(format!(
+                        "provided vector for field '{}' contains invalid values",
+                        field_name
                     )));
                 }
-                Ok(StoredVector::new(data.clone()))
+                let stored: StoredVector = vector.into();
+                Ok(stored)
             }
         }
     }
@@ -433,8 +475,13 @@ impl VectorEngine {
         name: String,
         config: VectorFieldConfig,
     ) -> Result<Arc<dyn VectorField>> {
-        match config.index {
-            VectorIndexKind::Hnsw => {
+        // If no vector config is present, we might want to default to something or handle it.
+        // For now, assuming if create_vector_field is called, we expect a vector field
+        // or effectively an "empty" vector field.
+        // However, existing logic matched on config.index.
+
+        match config.vector {
+            Some(VectorOption::Hnsw(_)) => {
                 let storage = self.field_storage(&name);
                 let manager_config = SegmentManagerConfig::default();
                 let segment_manager =
@@ -460,17 +507,24 @@ impl VectorEngine {
         field_name: &str,
         config: &VectorFieldConfig,
     ) -> Result<Option<Arc<dyn VectorFieldWriter>>> {
-        if config.dimension == 0 {
+        let vector_option = match &config.vector {
+            Some(opt) => opt,
+            None => return Ok(None),
+        };
+
+        if vector_option.dimension() == 0 {
             return Ok(None);
         }
 
         let writer_config = VectorIndexWriterConfig::default();
         let storage = self.field_storage(field_name);
-        let delegate: Arc<dyn VectorFieldWriter> = match config.index {
-            VectorIndexKind::Flat => {
+
+        let delegate: Arc<dyn VectorFieldWriter> = match vector_option {
+            VectorOption::Flat(opt) => {
                 let flat = FlatIndexConfig {
-                    dimension: config.dimension,
-                    distance_metric: config.distance,
+                    dimension: opt.dimension,
+                    distance_metric: opt.distance,
+                    embedder: self.config.embedder.clone(), // Pass global embedder or need field specific?
                     ..FlatIndexConfig::default()
                 };
                 let writer = FlatIndexWriter::with_storage(
@@ -481,10 +535,13 @@ impl VectorEngine {
                 )?;
                 Arc::new(LegacyVectorFieldWriter::new(field_name.to_string(), writer))
             }
-            VectorIndexKind::Hnsw => {
+            VectorOption::Hnsw(opt) => {
                 let hnsw = HnswIndexConfig {
-                    dimension: config.dimension,
-                    distance_metric: config.distance,
+                    dimension: opt.dimension,
+                    distance_metric: opt.distance,
+                    m: opt.m,
+                    ef_construction: opt.ef_construction,
+                    embedder: self.config.embedder.clone(),
                     ..HnswIndexConfig::default()
                 };
                 let writer = HnswIndexWriter::with_storage(
@@ -495,10 +552,13 @@ impl VectorEngine {
                 )?;
                 Arc::new(LegacyVectorFieldWriter::new(field_name.to_string(), writer))
             }
-            VectorIndexKind::Ivf => {
+            VectorOption::Ivf(opt) => {
                 let ivf = IvfIndexConfig {
-                    dimension: config.dimension,
-                    distance_metric: config.distance,
+                    dimension: opt.dimension,
+                    distance_metric: opt.distance,
+                    n_clusters: opt.n_clusters,
+                    n_probe: opt.n_probe,
+                    embedder: self.config.embedder.clone(),
                     ..IvfIndexConfig::default()
                 };
                 let writer =
@@ -515,7 +575,16 @@ impl VectorEngine {
         config: &VectorFieldConfig,
         vectors: Vec<(u64, String, Vector)>,
     ) -> Result<()> {
-        if config.dimension == 0 {
+        let vector_option = match &config.vector {
+            Some(opt) => opt,
+            None => {
+                return Err(SarissaError::invalid_config(format!(
+                    "vector field '{field_name}' validation failed: no vector configuration found"
+                )));
+            }
+        };
+
+        if vector_option.dimension() == 0 {
             return Err(SarissaError::invalid_config(format!(
                 "vector field '{field_name}' cannot materialize a zero-dimension index"
             )));
@@ -523,11 +592,13 @@ impl VectorEngine {
 
         let storage = self.field_storage(field_name);
         let mut pending_vectors = Some(vectors);
-        match config.index {
-            VectorIndexKind::Flat => {
+
+        match vector_option {
+            VectorOption::Flat(opt) => {
                 let flat = FlatIndexConfig {
-                    dimension: config.dimension,
-                    distance_metric: config.distance,
+                    dimension: opt.dimension,
+                    distance_metric: opt.distance,
+                    embedder: self.config.embedder.clone(),
                     ..FlatIndexConfig::default()
                 };
                 let mut writer = FlatIndexWriter::with_storage(
@@ -541,10 +612,13 @@ impl VectorEngine {
                 writer.finalize()?;
                 writer.write()?;
             }
-            VectorIndexKind::Hnsw => {
+            VectorOption::Hnsw(opt) => {
                 let hnsw = HnswIndexConfig {
-                    dimension: config.dimension,
-                    distance_metric: config.distance,
+                    dimension: opt.dimension,
+                    distance_metric: opt.distance,
+                    m: opt.m,
+                    ef_construction: opt.ef_construction,
+                    embedder: self.config.embedder.clone(),
                     ..HnswIndexConfig::default()
                 };
                 let mut writer = HnswIndexWriter::with_storage(
@@ -558,10 +632,13 @@ impl VectorEngine {
                 writer.finalize()?;
                 writer.write()?;
             }
-            VectorIndexKind::Ivf => {
+            VectorOption::Ivf(opt) => {
                 let ivf = IvfIndexConfig {
-                    dimension: config.dimension,
-                    distance_metric: config.distance,
+                    dimension: opt.dimension,
+                    distance_metric: opt.distance,
+                    n_clusters: opt.n_clusters,
+                    n_probe: opt.n_probe,
+                    embedder: self.config.embedder.clone(),
                     ..IvfIndexConfig::default()
                 };
                 let mut writer = IvfIndexWriter::with_storage(
@@ -589,11 +666,20 @@ impl VectorEngine {
 
         let global_bitmap = self.deletion_manager.get_bitmap("global");
 
-        Ok(match config.index {
-            VectorIndexKind::Flat => {
+        let vector_option = match &config.vector {
+            Some(opt) => opt,
+            None => {
+                return Err(SarissaError::invalid_config(format!(
+                    "vector field '{field_name}' has no vector configuration"
+                )));
+            }
+        };
+
+        Ok(match vector_option {
+            VectorOption::Flat(opt) => {
                 let flat_config = crate::vector::index::config::FlatIndexConfig {
-                    dimension: config.dimension,
-                    distance_metric: config.distance,
+                    dimension: opt.dimension,
+                    distance_metric: opt.distance,
                     loading_mode: crate::vector::index::config::IndexLoadingMode::default(),
                     ..Default::default()
                 };
@@ -608,18 +694,18 @@ impl VectorEngine {
                 let reader = Arc::new(reader);
                 Arc::new(FlatFieldReader::new(field_name.to_string(), reader))
             }
-            VectorIndexKind::Hnsw => {
+            VectorOption::Hnsw(opt) => {
                 let mut reader =
-                    HnswIndexReader::load(&*storage, FIELD_INDEX_BASENAME, config.distance)?;
+                    HnswIndexReader::load(&*storage, FIELD_INDEX_BASENAME, opt.distance)?;
                 if let Some(bitmap) = &global_bitmap {
                     reader.set_deletion_bitmap(bitmap.clone());
                 }
                 let reader = Arc::new(reader);
                 Arc::new(HnswFieldReader::new(field_name.to_string(), reader))
             }
-            VectorIndexKind::Ivf => {
+            VectorOption::Ivf(opt) => {
                 let mut reader =
-                    IvfIndexReader::load(&*storage, FIELD_INDEX_BASENAME, config.distance)?;
+                    IvfIndexReader::load(&*storage, FIELD_INDEX_BASENAME, opt.distance)?;
                 if let Some(bitmap) = &global_bitmap {
                     reader.set_deletion_bitmap(bitmap.clone());
                 }
@@ -627,7 +713,7 @@ impl VectorEngine {
                 Arc::new(IvfFieldReader::with_n_probe(
                     field_name.to_string(),
                     reader,
-                    4,
+                    opt.n_probe,
                 ))
             }
         })
@@ -1030,15 +1116,60 @@ impl VectorEngine {
         let mut lex_doc_builder = crate::lexical::core::document::Document::builder();
         use crate::lexical::core::field::TextOption;
 
-        // Add _id field explicitly (handled by index_document internally but good to be explicit/consistent)
-        // Actually LexicalEngine::index_document adds _id field. We just need to add other metadata.
+        let field_configs = self.field_configs.read();
+
+        // Iterate over all known fields (from config) to check for lexical options
+        for (field_name, config) in field_configs.iter() {
+            if let Some(lexical_opt) = &config.lexical {
+                // Check if value exists in metadata (explicit metadata)
+                if let Some(metadata_val) = document.metadata.get(field_name) {
+                    // Parse metadata_val based on lexical option type?
+                    // For now, assume TextOption logic (strings) or implement type parsing
+                    // The simple path: all metadata is string -> TextOption
+                    // But config might specify IntegerOption. We should try to parse.
+                    // IMPORTANT: Current LexicalBuilder.add_text expects String.
+                    // We only support Text for now from metadata.
+                    if let crate::lexical::core::field::FieldOption::Text(text_opt) = lexical_opt {
+                        lex_doc_builder =
+                            lex_doc_builder.add_text(field_name, metadata_val, text_opt.clone());
+                    }
+                }
+                // Check if value exists in vector fields (embedded text source)
+                else if let Some(stored_vec) = document.fields.get(field_name) {
+                    if let Some(original_text) =
+                        stored_vec.attributes.get("__sarissa_lexical_source")
+                    {
+                        println!(
+                            "DEBUG: indexing field {} lexical source: {}",
+                            field_name, original_text
+                        );
+                        if let crate::lexical::core::field::FieldOption::Text(text_opt) =
+                            lexical_opt
+                        {
+                            lex_doc_builder = lex_doc_builder.add_text(
+                                field_name,
+                                original_text,
+                                text_opt.clone(),
+                            );
+                        }
+                    }
+                }
+            }
+        }
+
+        // Also add any metadata fields that are NOT in the config but present in document.metadata?
+        // Current behavior (implicit dynamic fields) added ANY non-id metadata.
+        // If we want to maintain dynamic metadata behavior:
         for (k, v) in &document.metadata {
-            if k != "_id" {
-                // Heuristic: treat all metadata as text for now
-                // In future, DocumentVector metadata should be typed or we infer type
+            if k != "_id" && !field_configs.contains_key(k) {
+                // Heuristic: only add if we have some policy? Or always as default text?
+                // Let's keep existing behavior: treat as Default Text.
                 lex_doc_builder = lex_doc_builder.add_text(k, v, TextOption::default());
             }
         }
+
+        // Ensure _id is handled (usually implicit in LexicalEngine logic, but let's leave it to index_document)
+
         let lex_doc = lex_doc_builder.build();
 
         // Index into LexicalEngine (handles ID assignment/deduplication)
@@ -1083,8 +1214,39 @@ impl VectorEngine {
         // Add _id field explicitly (LexicalEngine::add_document doesn't do it automatically like index_document)
         lex_doc_builder = lex_doc_builder.add_text("_id", &external_id, TextOption::default());
 
+        let field_configs = self.field_configs.read();
+
+        // Iterate over all known fields (from config) to check for lexical options
+        for (field_name, config) in field_configs.iter() {
+            if let Some(lexical_opt) = &config.lexical {
+                // Check if value exists in metadata (explicit metadata)
+                if let Some(metadata_val) = document.metadata.get(field_name) {
+                    if let crate::lexical::core::field::FieldOption::Text(text_opt) = lexical_opt {
+                        lex_doc_builder =
+                            lex_doc_builder.add_text(field_name, metadata_val, text_opt.clone());
+                    }
+                }
+                // Check if value exists in vector fields (embedded text source)
+                else if let Some(stored_vec) = document.fields.get(field_name) {
+                    if let Some(original_text) =
+                        stored_vec.attributes.get("__sarissa_lexical_source")
+                    {
+                        if let crate::lexical::core::field::FieldOption::Text(text_opt) =
+                            lexical_opt
+                        {
+                            lex_doc_builder = lex_doc_builder.add_text(
+                                field_name,
+                                original_text,
+                                text_opt.clone(),
+                            );
+                        }
+                    }
+                }
+            }
+        }
+
         for (k, v) in &document.metadata {
-            if k != "_id" {
+            if k != "_id" && !field_configs.contains_key(k) {
                 lex_doc_builder = lex_doc_builder.add_text(k, v, TextOption::default());
             }
         }
@@ -1648,13 +1810,206 @@ impl VectorEngineSearcher {
 
         Ok(())
     }
+    fn search_lexical(
+        &self,
+        query: &crate::vector::engine::request::LexicalQuery,
+        limit: usize,
+    ) -> Result<HashMap<u64, VectorHit>> {
+        use crate::lexical::index::inverted::query::{
+            Query,
+            boolean::{BooleanClause, BooleanQuery, Occur},
+            term::TermQuery,
+        };
+        use crate::vector::engine::request::{
+            BooleanQueryOptions, LexicalQuery, MatchQueryOptions, TermQueryOptions,
+        };
+
+        let parser = self.metadata_index.query_parser()?;
+
+        fn convert_query(
+            lq: &LexicalQuery,
+            parser: &crate::lexical::index::inverted::query::parser::QueryParser,
+        ) -> Result<Box<dyn Query>> {
+            match lq {
+                LexicalQuery::MatchAll => Err(SarissaError::NotImplemented(
+                    "MatchAll query not yet supported".to_string(),
+                )),
+                LexicalQuery::Term(TermQueryOptions { field, term, boost }) => {
+                    let q = TermQuery::new(field.clone(), term.clone()).with_boost(*boost);
+                    Ok(Box::new(q))
+                }
+                LexicalQuery::Match(MatchQueryOptions {
+                    field,
+                    query,
+                    operator: _,
+                    boost,
+                }) => {
+                    let mut q = parser.parse_field(field, query)?;
+                    if *boost != 1.0 {
+                        q.set_boost(*boost);
+                    }
+                    Ok(q)
+                }
+                LexicalQuery::Boolean(BooleanQueryOptions {
+                    must,
+                    must_not,
+                    should,
+                    boost,
+                }) => {
+                    let mut bq = BooleanQuery::new();
+                    bq.set_boost(*boost);
+                    for q in must {
+                        bq.add_clause(BooleanClause::new(convert_query(q, parser)?, Occur::Must));
+                    }
+                    for q in must_not {
+                        bq.add_clause(BooleanClause::new(
+                            convert_query(q, parser)?,
+                            Occur::MustNot,
+                        ));
+                    }
+                    for q in should {
+                        bq.add_clause(BooleanClause::new(convert_query(q, parser)?, Occur::Should));
+                    }
+                    Ok(Box::new(bq))
+                }
+            }
+        }
+
+        let internal_query = convert_query(query, &parser)?;
+
+        use crate::lexical::search::searcher::{LexicalSearchQuery, LexicalSearchRequest};
+        let lex_request = LexicalSearchRequest {
+            query: LexicalSearchQuery::Obj(internal_query),
+            params: crate::lexical::search::searcher::LexicalSearchParams {
+                max_docs: limit,
+                load_documents: false,
+                ..Default::default()
+            },
+        };
+
+        let results = self.metadata_index.search(lex_request)?;
+
+        let mut hits = HashMap::new();
+        for hit in results.hits {
+            hits.insert(
+                hit.doc_id,
+                VectorHit {
+                    doc_id: hit.doc_id,
+                    score: hit.score,
+                    field_hits: Vec::new(),
+                },
+            );
+        }
+
+        Ok(hits)
+    }
+
+    fn merge_results(
+        &self,
+        vector_hits: HashMap<u64, VectorHit>,
+        lexical_hits: HashMap<u64, VectorHit>,
+        config: &Option<crate::vector::engine::request::FusionConfig>,
+    ) -> Result<Vec<VectorHit>> {
+        use crate::vector::engine::request::FusionConfig;
+
+        let mut fused_scores: HashMap<u64, f32> = HashMap::new();
+        for id in vector_hits.keys() {
+            fused_scores.insert(*id, 0.0);
+        }
+        for id in lexical_hits.keys() {
+            fused_scores.insert(*id, 0.0);
+        }
+
+        match config {
+            Some(FusionConfig::Rrf { k }) => {
+                let mut sorted_vector: Vec<_> = vector_hits.values().collect();
+                sorted_vector
+                    .sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(CmpOrdering::Equal));
+
+                let mut sorted_lexical: Vec<_> = lexical_hits.values().collect();
+                sorted_lexical
+                    .sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(CmpOrdering::Equal));
+
+                for (rank, hit) in sorted_vector.iter().enumerate() {
+                    let rrf_score = 1.0 / (*k as f32 + (rank + 1) as f32);
+                    *fused_scores.entry(hit.doc_id).or_default() += rrf_score;
+                }
+
+                for (rank, hit) in sorted_lexical.iter().enumerate() {
+                    let rrf_score = 1.0 / (*k as f32 + (rank + 1) as f32);
+                    *fused_scores.entry(hit.doc_id).or_default() += rrf_score;
+                }
+            }
+            Some(FusionConfig::WeightedSum {
+                vector_weight,
+                lexical_weight,
+            }) => {
+                for (id, hit) in &vector_hits {
+                    *fused_scores.entry(*id).or_default() += hit.score * vector_weight;
+                }
+                for (id, hit) in &lexical_hits {
+                    *fused_scores.entry(*id).or_default() += hit.score * lexical_weight;
+                }
+            }
+            None => {
+                if lexical_hits.is_empty() {
+                    for (id, hit) in &vector_hits {
+                        fused_scores.insert(*id, hit.score);
+                    }
+                } else if vector_hits.is_empty() {
+                    for (id, hit) in &lexical_hits {
+                        fused_scores.insert(*id, hit.score);
+                    }
+                } else {
+                    let k = 60;
+                    let mut sorted_vector: Vec<_> = vector_hits.values().collect();
+                    sorted_vector.sort_by(|a, b| {
+                        b.score.partial_cmp(&a.score).unwrap_or(CmpOrdering::Equal)
+                    });
+                    let mut sorted_lexical: Vec<_> = lexical_hits.values().collect();
+                    sorted_lexical.sort_by(|a, b| {
+                        b.score.partial_cmp(&a.score).unwrap_or(CmpOrdering::Equal)
+                    });
+
+                    for (rank, hit) in sorted_vector.iter().enumerate() {
+                        *fused_scores.entry(hit.doc_id).or_default() +=
+                            1.0 / (k as f32 + (rank + 1) as f32);
+                    }
+                    for (rank, hit) in sorted_lexical.iter().enumerate() {
+                        *fused_scores.entry(hit.doc_id).or_default() +=
+                            1.0 / (k as f32 + (rank + 1) as f32);
+                    }
+                }
+            }
+        }
+
+        let mut final_hits = Vec::with_capacity(fused_scores.len());
+
+        for (doc_id, score) in fused_scores {
+            let field_hits = if let Some(vh) = vector_hits.get(&doc_id) {
+                vh.field_hits.clone()
+            } else {
+                Vec::new()
+            };
+
+            final_hits.push(VectorHit {
+                doc_id,
+                score,
+                field_hits,
+            });
+        }
+
+        final_hits.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(CmpOrdering::Equal));
+
+        Ok(final_hits)
+    }
 }
 
 impl crate::vector::search::searcher::VectorSearcher for VectorEngineSearcher {
     fn search(&self, request: &VectorSearchRequest) -> Result<VectorSearchResults> {
-        if request.query_vectors.is_empty() {
+        if request.query_vectors.is_empty() && request.lexical_query.is_none() {
             return Err(SarissaError::invalid_argument(
-                "VectorSearchRequest requires at least one query vector",
+                "VectorSearchRequest requires at least one query vector or lexical query",
             ));
         }
 
@@ -1674,66 +2029,108 @@ impl crate::vector::search::searcher::VectorSearcher for VectorEngineSearcher {
             ));
         }
 
-        let target_fields = self.resolve_fields(request)?;
-        let allowed_ids = self.build_filter_matches(request, &target_fields)?;
-        if allowed_ids.as_ref().is_some_and(|ids| ids.is_empty()) {
-            return Ok(VectorSearchResults::default());
-        }
-
-        let mut doc_hits: HashMap<u64, VectorHit> = HashMap::new();
+        // 1. Vector Search
+        let mut vector_hits_map: HashMap<u64, VectorHit> = HashMap::new();
         let mut fields_with_queries = 0_usize;
-        let field_limit = self.scaled_field_limit(request.limit, request.overfetch);
 
-        let fields = self.fields.read();
-        for field_name in target_fields {
-            let field = fields
-                .get(&field_name)
-                .ok_or_else(|| SarissaError::not_found(format!("vector field '{field_name}'")))?;
-            let matching_vectors =
-                self.query_vectors_for_field(&field_name, field.field.config(), request);
-            if matching_vectors.is_empty() {
-                continue;
+        if !request.query_vectors.is_empty() {
+            let target_fields = self.resolve_fields(request)?;
+            let allowed_ids = self.build_filter_matches(request, &target_fields)?;
+
+            // If filter allows no IDs, and we only have vector search, we can return empty.
+            // BUT if we have lexical search, we should proceed (lexical search handles its own filtering?
+            // or should we pass allowed_ids to lexical search? LexicalEngine might not accept generic ID list easily yet).
+            // For now, assume lexical search is independent of vector-specific filtering logic unless filters are global.
+            // VectorFilter applies to metadata, so it SHOULD apply to lexical search too.
+            // TODO: Apply filter to lexical search.
+
+            if allowed_ids.as_ref().is_some_and(|ids| ids.is_empty())
+                && request.lexical_query.is_none()
+            {
+                return Ok(VectorSearchResults::default());
             }
 
-            fields_with_queries += 1;
+            let field_limit = self.scaled_field_limit(request.limit, request.overfetch);
+            let fields = self.fields.read();
 
-            let field_query = FieldSearchInput {
-                field: field_name.clone(),
-                query_vectors: matching_vectors,
-                limit: field_limit,
-            };
+            for field_name in target_fields {
+                let field = fields.get(&field_name).ok_or_else(|| {
+                    SarissaError::not_found(format!("vector field '{field_name}'"))
+                })?;
+                let matching_vectors =
+                    self.query_vectors_for_field(&field_name, field.field.config(), request);
+                if matching_vectors.is_empty() {
+                    continue;
+                }
 
-            let field_results = field.runtime.reader().search(field_query)?;
-            let field_weight = field.field.config().base_weight;
+                fields_with_queries += 1;
 
-            self.merge_field_hits(
-                &mut doc_hits,
-                field_results.hits,
-                field_weight,
-                request.score_mode,
-                allowed_ids.as_ref(),
-            )?;
+                let field_query = FieldSearchInput {
+                    field: field_name.clone(),
+                    query_vectors: matching_vectors,
+                    limit: field_limit,
+                };
+
+                let field_results = field.runtime.reader().search(field_query)?;
+                let field_weight = field
+                    .field
+                    .config()
+                    .vector
+                    .as_ref()
+                    .map(|v| v.base_weight())
+                    .unwrap_or(1.0);
+
+                self.merge_field_hits(
+                    &mut vector_hits_map,
+                    field_results.hits,
+                    field_weight,
+                    request.score_mode,
+                    allowed_ids.as_ref(),
+                )?;
+            }
         }
-        drop(fields);
 
-        if fields_with_queries == 0 {
+        // Check if we did any vector search
+        let vector_search_performed = fields_with_queries > 0;
+
+        // 2. Lexical Search
+        let lexical_hits_map = if let Some(lex_query) = &request.lexical_query {
+            self.search_lexical(lex_query, request.limit)?
+        } else {
+            HashMap::new()
+        };
+
+        let lexical_search_performed = !lexical_hits_map.is_empty()
+            || (request.lexical_query.is_some() && vector_search_performed);
+
+        if !vector_search_performed && !lexical_search_performed {
+            if request.lexical_query.is_some() {
+                // Lexical query executed but returned no results
+                return Ok(VectorSearchResults::default());
+            }
             return Err(SarissaError::invalid_argument(
-                "no query vectors matched the requested fields",
+                "no query vectors matched the requested fields and no lexical query provided",
             ));
         }
 
-        let mut hits: Vec<VectorHit> = doc_hits.into_values().collect();
+        // 3. Fusion
+        let hits = self.merge_results(vector_hits_map, lexical_hits_map, &request.fusion_config)?;
+
+        // 4. Post-processing (sort & limit)
+        // Already handled in merge_results usually, but let's double check sort
+        // merge_results should return sorted vector.
+
+        let mut final_hits = hits;
 
         if request.min_score > 0.0 {
-            hits.retain(|hit| hit.score >= request.min_score);
+            final_hits.retain(|hit| hit.score >= request.min_score);
         }
 
-        hits.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(CmpOrdering::Equal));
-        if hits.len() > request.limit {
-            hits.truncate(request.limit);
+        if final_hits.len() > request.limit {
+            final_hits.truncate(request.limit);
         }
 
-        Ok(VectorSearchResults { hits })
+        Ok(VectorSearchResults { hits: final_hits })
     }
 
     fn count(&self, request: &VectorSearchRequest) -> Result<u64> {
@@ -1751,6 +2148,8 @@ impl crate::vector::search::searcher::VectorSearcher for VectorEngineSearcher {
             overfetch: 1.0,
             filter: request.filter.clone(),
             min_score: request.min_score,
+            lexical_query: request.lexical_query.clone(),
+            fusion_config: request.fusion_config.clone(),
         };
 
         let results = self.search(&count_request)?;
@@ -1766,18 +2165,22 @@ mod tests {
     use crate::storage::memory::{MemoryStorage, MemoryStorageConfig};
     use crate::vector::DistanceMetric;
     use crate::vector::core::document::StoredVector;
-    use crate::vector::engine::config::{VectorFieldConfig, VectorIndexKind};
+    use crate::vector::engine::config::{
+        FlatOption, VectorFieldConfig, VectorOption, VectorIndexKind,
+    };
     use crate::vector::engine::filter::VectorFilter;
     use crate::vector::engine::request::QueryVector;
     use std::collections::HashMap;
 
     fn sample_config() -> VectorIndexConfig {
         let field_config = VectorFieldConfig {
-            dimension: 3,
-            distance: DistanceMetric::Cosine,
-            index: VectorIndexKind::Flat,
-            metadata: HashMap::new(),
-            base_weight: 1.0,
+            vector: Some(VectorOption::Flat(FlatOption {
+                dimension: 3,
+                distance: DistanceMetric::Cosine,
+                base_weight: 1.0,
+                quantizer: None,
+            })),
+            lexical: None,
         };
         use crate::embedding::precomputed::PrecomputedEmbedder;
 

@@ -46,6 +46,14 @@ pub struct VectorSearchRequest {
     /// Default is 0.0 (no filtering).
     #[serde(default)]
     pub min_score: f32,
+
+    /// Lexical query (keyword search).
+    #[serde(default)]
+    pub lexical_query: Option<LexicalQuery>,
+
+    /// Rank fusion configuration.
+    #[serde(default)]
+    pub fusion_config: Option<FusionConfig>,
 }
 
 impl Default for VectorSearchRequest {
@@ -59,6 +67,8 @@ impl Default for VectorSearchRequest {
             overfetch: default_overfetch(),
             filter: None,
             min_score: 0.0,
+            lexical_query: None,
+            fusion_config: None,
         }
     }
 }
@@ -136,4 +146,97 @@ impl QueryPayload {
     fn default_weight() -> f32 {
         1.0
     }
+}
+
+/// Lexical query (keyword search).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", content = "options", rename_all = "snake_case")]
+pub enum LexicalQuery {
+    /// Match all documents (useful for purely fetching or combining with filters).
+    MatchAll,
+    /// Term query (exact match).
+    Term(TermQueryOptions),
+    /// Match query (analyzed text search).
+    Match(MatchQueryOptions),
+    /// Boolean query (compound).
+    Boolean(BooleanQueryOptions),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TermQueryOptions {
+    pub field: String,
+    pub term: String,
+    #[serde(default = "default_boost")]
+    pub boost: f32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MatchQueryOptions {
+    pub field: String,
+    pub query: String,
+    #[serde(default = "default_operator_or")]
+    pub operator: MatchOperator,
+    #[serde(default = "default_boost")]
+    pub boost: f32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MatchOperator {
+    Or,
+    And,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BooleanQueryOptions {
+    #[serde(default)]
+    pub must: Vec<LexicalQuery>,
+    #[serde(default)]
+    pub must_not: Vec<LexicalQuery>,
+    #[serde(default)]
+    pub should: Vec<LexicalQuery>,
+    #[serde(default = "default_boost")]
+    pub boost: f32,
+}
+
+/// Configuration for Rank Fusion.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "method", rename_all = "snake_case")]
+pub enum FusionConfig {
+    /// Reciprocal Rank Fusion
+    Rrf {
+        /// constant k in formula: score = 1.0 / (k + rank)
+        #[serde(default = "default_rrf_k")]
+        k: usize,
+    },
+    /// Weighted Sum (Linear Combination)
+    /// vector_score * vector_weight + lexical_score * lexical_weight
+    WeightedSum {
+        #[serde(default = "default_fusion_weight")]
+        vector_weight: f32,
+        #[serde(default = "default_fusion_weight")]
+        lexical_weight: f32,
+    },
+}
+
+impl Default for FusionConfig {
+    fn default() -> Self {
+        FusionConfig::Rrf { k: 60 }
+    }
+}
+
+fn default_boost() -> f32 {
+    1.0
+}
+
+fn default_operator_or() -> MatchOperator {
+    MatchOperator::Or
+}
+
+fn default_rrf_k() -> usize {
+    60
+}
+
+fn default_fusion_weight() -> f32 {
+    1.0
 }

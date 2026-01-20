@@ -8,7 +8,7 @@ use crate::maintenance::deletion::DeletionBitmap;
 use crate::storage::Storage;
 use crate::vector::core::document::{METADATA_WEIGHT, StoredVector};
 use crate::vector::core::vector::Vector;
-use crate::vector::engine::config::VectorFieldConfig;
+use crate::vector::engine::config::{VectorFieldConfig, VectorOption};
 use crate::vector::field::{
     FieldHit, FieldSearchInput, FieldSearchResults, VectorField, VectorFieldReader,
     VectorFieldStats, VectorFieldWriter,
@@ -61,6 +61,16 @@ impl SegmentedVectorField {
     ) -> Result<Self> {
         let name_str = name.into();
 
+        // Validate config
+        match &config.vector {
+            Some(VectorOption::Hnsw(_)) => {}
+            _ => {
+                return Err(SarissaError::invalid_config(
+                    "SegmentedVectorField requires HNSW configuration",
+                ));
+            }
+        }
+
         let field = Self {
             name: name_str,
             config,
@@ -74,6 +84,8 @@ impl SegmentedVectorField {
     }
 
     fn ensure_active_segment(&self) -> Result<()> {
+        // ... same as before
+
         // Optimistic check
         if self.active_segment.read().is_some() {
             return Ok(());
@@ -87,16 +99,24 @@ impl SegmentedVectorField {
         // Create new active segment
         let segment_id = self.segment_manager.generate_segment_id();
 
-        // Get HNSW parameters from metadata if available
-        let hnsw_config_meta = HnswMetadataConfig::from_metadata(&self.config.metadata);
+        // Get HNSW parameters from config
+        let (dimension, distance, m, ef_construction) = match &self.config.vector {
+            Some(VectorOption::Hnsw(opt)) => {
+                (opt.dimension, opt.distance, opt.m, opt.ef_construction)
+            }
+            _ => {
+                return Err(SarissaError::invalid_config(
+                    "SegmentedVectorField requires HNSW configuration".to_string(),
+                ));
+            }
+        };
 
         let hnsw_config = HnswIndexConfig {
-            dimension: self.config.dimension,
-            distance_metric: self.config.distance,
-            m: hnsw_config_meta.m,
-            ef_construction: hnsw_config_meta.ef_construction,
-            normalize_vectors: self.config.distance
-                == crate::vector::core::distance::DistanceMetric::Cosine,
+            dimension,
+            distance_metric: distance,
+            m,
+            ef_construction,
+            normalize_vectors: distance == crate::vector::core::distance::DistanceMetric::Cosine,
             ..Default::default()
         };
 
@@ -127,16 +147,22 @@ impl SegmentedVectorField {
         policy: &dyn crate::vector::index::hnsw::segment::merge_policy::MergePolicy,
     ) -> Result<()> {
         if let Some(candidate) = self.segment_manager.check_merge(policy) {
-            // Get HNSW parameters from metadata if available
-            let hnsw_config_meta = HnswMetadataConfig::from_metadata(&self.config.metadata);
+            let (dimension, m, ef_construction) = match &self.config.vector {
+                Some(VectorOption::Hnsw(opt)) => (opt.dimension, opt.m, opt.ef_construction),
+                _ => {
+                    return Err(SarissaError::invalid_config(
+                        "SegmentedVectorField requires HNSW configuration".to_string(),
+                    ));
+                }
+            };
 
             let mut engine = MergeEngine::new(
                 MergeConfig::default(),
                 self.storage.clone(),
                 HnswIndexConfig {
-                    dimension: self.config.dimension,
-                    m: hnsw_config_meta.m,
-                    ef_construction: hnsw_config_meta.ef_construction,
+                    dimension,
+                    m,
+                    ef_construction,
                     ..Default::default()
                 },
                 VectorIndexWriterConfig {
@@ -261,25 +287,6 @@ impl VectorFieldWriter for SegmentedVectorField {
     }
 }
 
-struct HnswMetadataConfig {
-    m: usize,
-    ef_construction: usize,
-}
-
-impl HnswMetadataConfig {
-    fn from_metadata(metadata: &HashMap<String, String>) -> Self {
-        let m = metadata
-            .get("m")
-            .and_then(|v: &String| v.parse::<usize>().ok())
-            .unwrap_or(16);
-        let ef_construction = metadata
-            .get("ef_construction")
-            .and_then(|v: &String| v.parse::<usize>().ok())
-            .unwrap_or(200);
-        Self { m, ef_construction }
-    }
-}
-
 impl SegmentedVectorField {
     fn search_active_segment(
         &self,
@@ -293,12 +300,18 @@ impl SegmentedVectorField {
             None => return Ok(Vec::new()),
         };
 
+        // Safe unwrap because verified in create()
+        let distance_metric = match &self.config.vector {
+            Some(VectorOption::Hnsw(opt)) => opt.distance,
+            _ => return Ok(Vec::new()), // Should not happen
+        };
+
         let vectors = writer.vectors();
         let mut candidates = Vec::with_capacity(vectors.len());
 
         for (doc_id, _field, vector) in vectors {
-            let similarity = self.config.distance.similarity(&query.data, &vector.data)?;
-            let distance = self.config.distance.distance(&query.data, &vector.data)?;
+            let similarity = distance_metric.similarity(&query.data, &vector.data)?;
+            let distance = distance_metric.distance(&query.data, &vector.data)?;
             candidates.push((*doc_id, similarity, distance, vector.metadata.clone()));
         }
 
@@ -342,20 +355,29 @@ impl SegmentedVectorField {
         let mut all_hits = Vec::new();
         let segments = self.segment_manager.list_segments();
 
+        // Safe unwrap because verified in create()
+        let distance_metric = match &self.config.vector {
+            Some(VectorOption::Hnsw(opt)) => opt.distance,
+            _ => return Ok(Vec::new()),
+        };
+
         for info in segments {
             // Load reader for segment
-            let mut reader = HnswIndexReader::load(
-                self.storage.as_ref(),
-                &info.segment_id,
-                self.config.distance,
-            )?;
+            let mut reader =
+                HnswIndexReader::load(self.storage.as_ref(), &info.segment_id, distance_metric)?;
 
             // Inject deletion bitmap if available
             if let Some(bitmap) = &self.deletion_bitmap {
                 reader.set_deletion_bitmap(bitmap.clone());
             }
 
-            let searcher = HnswSearcher::new(Arc::new(reader))?;
+            let mut searcher = HnswSearcher::new(Arc::new(reader))?;
+
+            // Set ef_search based on config if available
+            if let Some(VectorOption::Hnsw(opt)) = &self.config.vector {
+                // Use a higher ef_search for better recall (increase search effort relative to construction)
+                searcher.set_ef_search(opt.ef_construction.max(50) * 2);
+            }
 
             let mut params = VectorIndexSearchParams::default();
             params.top_k = limit;
@@ -452,9 +474,15 @@ impl VectorFieldReader for SegmentedVectorField {
         let manager_stats = self.segment_manager.stats();
         let managed_count = manager_stats.total_vectors;
 
+        // Safe unwrap because verified in create()
+        let dimension = match &self.config.vector {
+            Some(VectorOption::Hnsw(opt)) => opt.dimension,
+            _ => 0,
+        };
+
         Ok(VectorFieldStats {
             vector_count: active_count + managed_count as usize,
-            dimension: self.config.dimension,
+            dimension,
         })
     }
 }

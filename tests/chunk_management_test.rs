@@ -8,17 +8,21 @@ use sarissa::storage::memory::{MemoryStorage, MemoryStorageConfig};
 use sarissa::vector::DistanceMetric;
 use sarissa::vector::core::document::{DocumentPayload, Payload, PayloadSource};
 use sarissa::vector::engine::VectorEngine;
-use sarissa::vector::engine::config::{VectorFieldConfig, VectorIndexConfig, VectorIndexKind};
+use sarissa::vector::engine::config::{
+    FlatOption, VectorFieldConfig, VectorOption, VectorIndexConfig, VectorIndexKind,
+};
 
 fn build_test_engine() -> Result<VectorEngine> {
     let storage = Arc::new(MemoryStorage::new(MemoryStorageConfig::default()));
 
     let field_config = VectorFieldConfig {
-        dimension: 3,
-        distance: DistanceMetric::Cosine,
-        index: VectorIndexKind::Flat,
-        metadata: HashMap::new(),
-        base_weight: 1.0,
+        vector: Some(VectorOption::Flat(FlatOption {
+            dimension: 3,
+            distance: DistanceMetric::Cosine,
+            base_weight: 1.0,
+            quantizer: None,
+        })),
+        lexical: None,
     };
 
     let config = VectorIndexConfig {
