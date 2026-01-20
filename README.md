@@ -16,11 +16,11 @@ Rather than functioning as a monolithic search engine, IRiS is architected as a 
 
 ## Documentation
 
-Comprehensive documentation is available in the [`docs/`](docs/) directory and online:
+Comprehensive documentation is available in the [`docs/`](docs/) directory and online at [https://mosuka.github.io/iris/](https://mosuka.github.io/iris/):
 
-- [**Getting Started**](docs/src/getting_started.md): Installation and basic usage.
-- [**Core Concepts**](docs/src/concepts.md): Architecture, Lexical Search, and Vector Search.
-- [**Advanced Features**](docs/src/advanced.md): ID Management, Persistence, and Deletions.
+- [**Getting Started**](https://mosuka.github.io/iris/getting_started/index.html): Installation and basic usage.
+- [**Core Concepts**](https://mosuka.github.io/iris/concepts/index.html): Architecture, Lexical Search, and Vector Search.
+- [**Advanced Features**](https://mosuka.github.io/iris/advanced/index.html): ID Management, Persistence, and Deletions.
 - [**API Reference**](https://docs.rs/iris)
 
 ## Features
