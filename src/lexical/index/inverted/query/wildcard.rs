@@ -155,8 +155,8 @@ impl MultiTermQuery for WildcardQuery {
         &self,
         reader: &dyn LexicalIndexReader,
     ) -> Result<Option<Box<dyn TermsEnum>>> {
-        if let Some(inverted_reader) = reader.as_any().downcast_ref::<InvertedIndexReader>() {
-            if let Some(terms) = inverted_reader.terms(&self.field)? {
+        if let Some(inverted_reader) = reader.as_any().downcast_ref::<InvertedIndexReader>()
+            && let Some(terms) = inverted_reader.terms(&self.field)? {
                 let regex_pattern = Self::compile_pattern(&self.pattern)?;
                 let regex_automaton =
                     crate::lexical::index::inverted::core::automaton::RegexAutomaton::new(
@@ -171,7 +171,6 @@ impl MultiTermQuery for WildcardQuery {
 
                 return Ok(Some(Box::new(terms_enum)));
             }
-        }
         Ok(None)
     }
 
@@ -188,11 +187,10 @@ impl MultiTermQuery for WildcardQuery {
             // Simple scan limited by max_expansions (arbitrary selection if not scoring)
             while let Some(term_stats) = terms_enum.next()? {
                 results.push((term_stats.term.clone(), term_stats.doc_freq, 1.0));
-                if let Some(m) = max {
-                    if results.len() >= m {
+                if let Some(m) = max
+                    && results.len() >= m {
                         break;
                     }
-                }
             }
             return Ok(results);
         }
@@ -236,7 +234,7 @@ impl Query for WildcardQuery {
 
     fn cost(&self, reader: &dyn LexicalIndexReader) -> Result<u64> {
         // Wildcard queries can be expensive
-        Ok(reader.doc_count() as u64)
+        Ok(reader.doc_count())
     }
 
     fn as_any(&self) -> &dyn std::any::Any {

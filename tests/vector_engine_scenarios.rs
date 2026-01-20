@@ -11,15 +11,14 @@ use sarissa::error::{Result, SarissaError};
 use sarissa::lexical::engine::config::LexicalIndexConfig;
 use sarissa::storage::Storage;
 use sarissa::storage::memory::MemoryStorage;
-use sarissa::vector::DistanceMetric;
+use sarissa::vector::core::distance::DistanceMetric;
 use sarissa::vector::core::document::{
     DocumentPayload, DocumentVector, Payload, PayloadSource, StoredVector,
 };
+use sarissa::vector::core::field::{FlatOption, VectorIndexKind, VectorOption};
 use sarissa::vector::core::vector::Vector;
 use sarissa::vector::engine::VectorEngine;
-use sarissa::vector::engine::config::{
-    FlatOption, VectorFieldConfig, VectorOption, VectorIndexConfig, VectorIndexKind,
-};
+use sarissa::vector::engine::config::{VectorFieldConfig, VectorIndexConfig};
 use sarissa::vector::engine::filter::{MetadataFilter, VectorFilter};
 use sarissa::vector::engine::request::{
     FieldSelector, QueryPayload, QueryVector, VectorScoreMode, VectorSearchRequest,

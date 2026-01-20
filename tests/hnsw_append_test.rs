@@ -1,5 +1,5 @@
 use sarissa::storage::file::{FileStorage, FileStorageConfig};
-use sarissa::vector::DistanceMetric;
+use sarissa::vector::core::distance::DistanceMetric;
 use sarissa::vector::core::vector::Vector;
 use sarissa::vector::index::config::HnswIndexConfig;
 use sarissa::vector::index::hnsw::reader::HnswIndexReader;

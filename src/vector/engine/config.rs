@@ -43,6 +43,7 @@ use crate::error::{Result, SarissaError};
 use crate::lexical::engine::config::LexicalIndexConfig;
 use crate::maintenance::deletion::DeletionConfig;
 use crate::vector::core::distance::DistanceMetric;
+use crate::vector::core::field::{FlatOption, VectorIndexKind, VectorOption};
 use crate::vector::core::quantization;
 use crate::vector::core::vector::Vector;
 
@@ -58,8 +59,9 @@ use crate::vector::core::vector::Vector;
 /// use sarissa::embedding::per_field::PerFieldEmbedder;
 /// use sarissa::embedding::candle_bert_embedder::CandleBertEmbedder;
 /// use sarissa::embedding::embedder::Embedder;
-/// use sarissa::vector::engine::config::{VectorIndexConfig, VectorFieldConfig, VectorIndexKind};
-/// use sarissa::vector::DistanceMetric;
+/// use sarissa::vector::engine::config::{VectorIndexConfig, VectorFieldConfig};
+/// use sarissa::vector::core::field::VectorIndexKind;
+/// use sarissa::vector::core::distance::DistanceMetric;
 /// use std::sync::Arc;
 ///
 /// # fn example() -> sarissa::error::Result<()> {
@@ -82,11 +84,13 @@ use crate::vector::core::vector::Vector;
 /// Controls how the index data is loaded from storage.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
+#[derive(Default)]
 pub enum IndexLoadingMode {
     /// Load the entire index into memory (RAM).
     ///
     /// This provides the fastest search speed but requires memory
     /// proportional to the index size.
+    #[default]
     InMemory,
     /// Use memory-mapped files (mmap) to access the index.
     ///
@@ -96,11 +100,6 @@ pub enum IndexLoadingMode {
     Mmap,
 }
 
-impl Default for IndexLoadingMode {
-    fn default() -> Self {
-        Self::InMemory
-    }
-}
 
 /// Vector index configuration enum that specifies which index type to use.
 ///
@@ -625,8 +624,9 @@ impl VectorIndexConfig {
 /// use sarissa::embedding::per_field::PerFieldEmbedder;
 /// use sarissa::embedding::candle_bert_embedder::CandleBertEmbedder;
 /// use sarissa::embedding::embedder::Embedder;
-/// use sarissa::vector::engine::config::{VectorIndexConfig, VectorFieldConfig, VectorIndexKind, VectorOption, FlatOption};
-/// use sarissa::vector::DistanceMetric;
+/// use sarissa::vector::engine::config::{VectorIndexConfig, VectorFieldConfig};
+/// use sarissa::vector::core::field::{VectorIndexKind, VectorOption, FlatOption};
+/// use sarissa::vector::core::distance::DistanceMetric;
 /// use std::sync::Arc;
 ///
 /// # fn example() -> sarissa::error::Result<()> {
@@ -961,173 +961,11 @@ impl Default for VectorFieldConfig {
     }
 }
 
-/// Options for vector fields.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type", content = "options", rename_all = "snake_case")]
-pub enum VectorOption {
-    /// Flat index options.
-    Flat(FlatOption),
-    /// HNSW index options.
-    Hnsw(HnswOption),
-    /// IVF index options.
-    Ivf(IvfOption),
-}
-
-impl Default for VectorOption {
-    fn default() -> Self {
-        VectorOption::Flat(FlatOption::default())
-    }
-}
-
-impl VectorOption {
-    /// Get the dimension of the vector field.
-    pub fn dimension(&self) -> usize {
-        match self {
-            VectorOption::Flat(opt) => opt.dimension,
-            VectorOption::Hnsw(opt) => opt.dimension,
-            VectorOption::Ivf(opt) => opt.dimension,
-        }
-    }
-
-    /// Get the distance metric.
-    pub fn distance(&self) -> DistanceMetric {
-        match self {
-            VectorOption::Flat(opt) => opt.distance,
-            VectorOption::Hnsw(opt) => opt.distance,
-            VectorOption::Ivf(opt) => opt.distance,
-        }
-    }
-
-    /// Get the base weight.
-    pub fn base_weight(&self) -> f32 {
-        match self {
-            VectorOption::Flat(opt) => opt.base_weight,
-            VectorOption::Hnsw(opt) => opt.base_weight,
-            VectorOption::Ivf(opt) => opt.base_weight,
-        }
-    }
-
-    /// Get the index kind.
-    pub fn index_kind(&self) -> VectorIndexKind {
-        match self {
-            VectorOption::Flat(_) => VectorIndexKind::Flat,
-            VectorOption::Hnsw(_) => VectorIndexKind::Hnsw,
-            VectorOption::Ivf(_) => VectorIndexKind::Ivf,
-        }
-    }
-}
-
-/// Options for Flat vector index.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FlatOption {
-    pub dimension: usize,
-    #[serde(default = "default_distance_metric")]
-    pub distance: DistanceMetric,
-    #[serde(default = "VectorFieldConfig::default_weight")]
-    pub base_weight: f32,
-    #[serde(default)]
-    pub quantizer: Option<quantization::QuantizationMethod>,
-}
-
-impl Default for FlatOption {
-    fn default() -> Self {
-        Self {
-            dimension: 128,
-            distance: default_distance_metric(),
-            base_weight: VectorFieldConfig::default_weight(),
-            quantizer: None,
-        }
-    }
-}
-
-/// Options for HNSW vector index.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct HnswOption {
-    pub dimension: usize,
-    #[serde(default = "default_distance_metric")]
-    pub distance: DistanceMetric,
-    #[serde(default = "default_getting_m")]
-    pub m: usize,
-    #[serde(default = "default_getting_ef_construction")]
-    pub ef_construction: usize,
-    #[serde(default = "VectorFieldConfig::default_weight")]
-    pub base_weight: f32,
-    #[serde(default)]
-    pub quantizer: Option<quantization::QuantizationMethod>,
-}
-
-fn default_getting_m() -> usize {
-    16
-}
-
-fn default_getting_ef_construction() -> usize {
-    200
-}
-
-impl Default for HnswOption {
-    fn default() -> Self {
-        Self {
-            dimension: 128,
-            distance: default_distance_metric(),
-            m: default_getting_m(),
-            ef_construction: default_getting_ef_construction(),
-            base_weight: VectorFieldConfig::default_weight(),
-            quantizer: None,
-        }
-    }
-}
-
-/// Options for IVF vector index.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct IvfOption {
-    pub dimension: usize,
-    #[serde(default = "default_distance_metric")]
-    pub distance: DistanceMetric,
-    #[serde(default = "default_getting_n_clusters")]
-    pub n_clusters: usize,
-    #[serde(default = "default_getting_n_probe")]
-    pub n_probe: usize,
-    #[serde(default = "VectorFieldConfig::default_weight")]
-    pub base_weight: f32,
-    #[serde(default)]
-    pub quantizer: Option<quantization::QuantizationMethod>,
-}
-
-fn default_getting_n_clusters() -> usize {
-    100
-}
-
-fn default_getting_n_probe() -> usize {
-    1
-}
-
-impl Default for IvfOption {
-    fn default() -> Self {
-        Self {
-            dimension: 128,
-            distance: default_distance_metric(),
-            n_clusters: default_getting_n_clusters(),
-            n_probe: default_getting_n_probe(),
-            base_weight: VectorFieldConfig::default_weight(),
-            quantizer: None,
-        }
-    }
-}
-
 impl VectorFieldConfig {
-    fn default_weight() -> f32 {
+    pub fn default_weight() -> f32 {
         1.0
     }
 }
 
-/// The type of vector index to use.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum VectorIndexKind {
-    /// Flat (brute-force) index - exact but slower for large datasets.
-    Flat,
-    /// HNSW (Hierarchical Navigable Small World) - approximate but fast.
-    Hnsw,
-    /// IVF (Inverted File Index) - approximate with clustering.
-    Ivf,
-}
+// Moved to crate::vector::core::field
+// use crate::vector::core::field::{VectorOption, FlatOption, HnswOption, IvfOption, VectorIndexKind};

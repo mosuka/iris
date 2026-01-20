@@ -15,6 +15,7 @@ pub mod io;
 pub mod ivf;
 pub mod segmented_field;
 pub mod storage;
+pub mod wal;
 
 use std::sync::{Arc, RwLock};
 

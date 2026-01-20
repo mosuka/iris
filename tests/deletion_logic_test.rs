@@ -10,10 +10,9 @@ mod tests {
     use sarissa::storage::{StorageConfig, StorageFactory};
     use sarissa::vector::core::distance::DistanceMetric;
     use sarissa::vector::core::document::{DocumentVector, StoredVector};
+    use sarissa::vector::core::field::{FlatOption, VectorIndexKind, VectorOption};
     use sarissa::vector::engine::VectorEngine;
-    use sarissa::vector::engine::config::{
-        FlatOption, VectorFieldConfig, VectorOption, VectorIndexConfig, VectorIndexKind,
-    };
+    use sarissa::vector::engine::config::{VectorFieldConfig, VectorIndexConfig};
     use sarissa::vector::engine::request::{VectorScoreMode, VectorSearchRequest};
     use std::collections::HashMap;
     use std::sync::Arc;

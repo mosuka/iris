@@ -334,7 +334,7 @@ use sarissa::vector::core::document::DocumentPayload;
 use sarissa::vector::engine::VectorEngine;
 use sarissa::vector::engine::config::{VectorIndexConfig, VectorFieldConfig, VectorIndexKind};
 use sarissa::vector::engine::request::VectorSearchRequestBuilder;
-use sarissa::vector::DistanceMetric;
+use sarissa::vector::core::distance::DistanceMetric;
 use sarissa::storage::memory::{MemoryStorage, MemoryStorageConfig};
 use std::sync::Arc;
 
@@ -557,7 +557,7 @@ use sarissa::vector::engine::request::{QueryVector, VectorSearchRequest};
 use sarissa::vector::core::document::{DocumentVector, StoredVector, VectorType};
 use sarissa::vector::engine::VectorEngine;
 use sarissa::vector::engine::config::{VectorIndexConfig, VectorFieldConfig, VectorIndexKind};
-use sarissa::vector::DistanceMetric;
+use sarissa::vector::core::distance::DistanceMetric;
 use sarissa::storage::memory::{MemoryStorage, MemoryStorageConfig};
 use std::sync::Arc;
 use std::collections::HashMap;

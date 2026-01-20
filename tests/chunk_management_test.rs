@@ -5,12 +5,11 @@ use sarissa::embedding::precomputed::PrecomputedEmbedder;
 use sarissa::error::Result;
 use sarissa::lexical::engine::config::LexicalIndexConfig;
 use sarissa::storage::memory::{MemoryStorage, MemoryStorageConfig};
-use sarissa::vector::DistanceMetric;
+use sarissa::vector::core::distance::DistanceMetric;
 use sarissa::vector::core::document::{DocumentPayload, Payload, PayloadSource};
+use sarissa::vector::core::field::{FlatOption, VectorIndexKind, VectorOption};
 use sarissa::vector::engine::VectorEngine;
-use sarissa::vector::engine::config::{
-    FlatOption, VectorFieldConfig, VectorOption, VectorIndexConfig, VectorIndexKind,
-};
+use sarissa::vector::engine::config::{VectorFieldConfig, VectorIndexConfig};
 
 fn build_test_engine() -> Result<VectorEngine> {
     let storage = Arc::new(MemoryStorage::new(MemoryStorageConfig::default()));

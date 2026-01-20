@@ -28,15 +28,14 @@ use sarissa::storage::file::FileStorageConfig;
 #[cfg(feature = "embeddings-candle")]
 use sarissa::storage::{StorageConfig, StorageFactory};
 #[cfg(feature = "embeddings-candle")]
-use sarissa::vector::DistanceMetric;
+use sarissa::vector::core::distance::DistanceMetric;
 #[cfg(feature = "embeddings-candle")]
 use sarissa::vector::core::document::DocumentPayload;
 #[cfg(feature = "embeddings-candle")]
-use sarissa::vector::engine::VectorEngine;
+use sarissa::vector::core::field::{HnswOption, VectorOption};
 #[cfg(feature = "embeddings-candle")]
-use sarissa::vector::engine::config::{
-    HnswOption, VectorFieldConfig, VectorOption, VectorIndexConfig,
-};
+use sarissa::vector::engine::VectorEngine;
+use sarissa::vector::engine::config::{VectorFieldConfig, VectorIndexConfig};
 #[cfg(feature = "embeddings-candle")]
 use sarissa::vector::engine::query::VectorSearchRequestBuilder;
 #[cfg(feature = "embeddings-candle")]

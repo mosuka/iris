@@ -467,16 +467,16 @@ impl Embedder for CandleClipEmbedder {
         match input {
             EmbedInput::Text(text) => self.embed_text(text).await,
             EmbedInput::Bytes(bytes, mime) => {
-                if let Some(mime_type) = mime {
-                    if mime_type.starts_with("text/") {
-                        let text = std::str::from_utf8(bytes).map_err(|e| {
-                            SarissaError::invalid_argument(format!(
-                                "invalid utf-8 for text bytes: {}",
-                                e
-                            ))
-                        })?;
-                        return self.embed_text(text).await;
-                    }
+                if let Some(mime_type) = mime
+                    && mime_type.starts_with("text/")
+                {
+                    let text = std::str::from_utf8(bytes).map_err(|e| {
+                        SarissaError::invalid_argument(format!(
+                            "invalid utf-8 for text bytes: {}",
+                            e
+                        ))
+                    })?;
+                    return self.embed_text(text).await;
                 }
                 // Default to image processing for other mime types or if no mime type is provided
                 self.embed_image_bytes(bytes).await

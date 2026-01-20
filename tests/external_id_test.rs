@@ -6,9 +6,10 @@ use sarissa::storage::memory::MemoryStorageConfig;
 use sarissa::storage::{StorageConfig, StorageFactory};
 use sarissa::vector::core::document::StoredVector;
 use sarissa::vector::core::document::{DocumentPayload, Payload};
+use sarissa::vector::core::field::{FlatOption, VectorOption};
 use sarissa::vector::core::vector::Vector;
 use sarissa::vector::engine::VectorEngine;
-use sarissa::vector::engine::config::{FlatOption, VectorFieldConfig, VectorIndexConfig};
+use sarissa::vector::engine::config::{VectorFieldConfig, VectorIndexConfig};
 use sarissa::vector::engine::request::{QueryVector, VectorSearchRequest};
 use std::any::Any;
 use std::sync::Arc;
@@ -51,12 +52,10 @@ async fn test_external_id_operations() -> Result<()> {
         .field(
             "vector",
             VectorFieldConfig {
-                vector: Some(sarissa::vector::engine::config::VectorOption::Flat(
-                    FlatOption {
-                        dimension: 3,
-                        ..Default::default()
-                    },
-                )),
+                vector: Some(VectorOption::Flat(FlatOption {
+                    dimension: 3,
+                    ..Default::default()
+                })),
                 lexical: None,
             },
         )

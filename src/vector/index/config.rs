@@ -162,11 +162,13 @@ pub mod utils {
 /// Controls how the index data is loaded from storage.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
+#[derive(Default)]
 pub enum IndexLoadingMode {
     /// Load the entire index into memory (RAM).
     ///
     /// This provides the fastest search speed but requires memory
     /// proportional to the index size.
+    #[default]
     InMemory,
     /// Use memory-mapped files (mmap) to access the index.
     ///
@@ -176,11 +178,6 @@ pub enum IndexLoadingMode {
     Mmap,
 }
 
-impl Default for IndexLoadingMode {
-    fn default() -> Self {
-        Self::InMemory
-    }
-}
 
 /// Vector index configuration enum that specifies which index type to use.
 ///

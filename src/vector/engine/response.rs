@@ -6,7 +6,7 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::vector::field::{FieldHit, VectorFieldStats};
+use crate::vector::index::field::{FieldHit, VectorFieldStats};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct VectorSearchResults {

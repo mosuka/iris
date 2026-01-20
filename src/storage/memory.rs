@@ -322,7 +322,7 @@ impl Write for MemoryOutput {
 
         let end_pos = (self.position as usize)
             .checked_add(buf.len())
-            .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::Other, "File too large"))?;
+            .ok_or_else(|| std::io::Error::other("File too large"))?;
 
         if end_pos > self.buffer.len() {
             // Resize buffer if needed, filling gaps with zeros

@@ -68,8 +68,7 @@ impl VectorSearchRequestBuilder {
     /// # Arguments
     ///
     /// * `field` - The target field name
-    /// * `bytes` - Raw bytes of the content (text as UTF-8, image bytes, etc.)
-    /// Add a generic payload to be embedded.
+    /// * `payload` - The payload to add
     ///
     /// This is the low-level method used by `add_text`, `add_image`, etc.
     pub fn add_payload(mut self, field: impl Into<String>, payload: Payload) -> Self {

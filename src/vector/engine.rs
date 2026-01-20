@@ -48,11 +48,11 @@ use crate::vector::core::document::{
     DocumentPayload, DocumentVector, Payload, PayloadSource, StoredVector,
 };
 use crate::vector::core::vector::Vector;
-use crate::vector::field::{
-    FieldHit, FieldSearchInput, VectorField, VectorFieldReader, VectorFieldStats, VectorFieldWriter,
-};
 use crate::vector::index::config::{FlatIndexConfig, HnswIndexConfig, IvfIndexConfig};
-use crate::vector::index::field::{AdapterBackedVectorField, LegacyVectorFieldWriter};
+use crate::vector::index::field::{
+    AdapterBackedVectorField, FieldHit, FieldSearchInput, LegacyVectorFieldWriter, VectorField,
+    VectorFieldReader, VectorFieldStats, VectorFieldWriter,
+};
 use crate::vector::index::flat::{
     field_reader::FlatFieldReader, reader::FlatVectorIndexReader, writer::FlatIndexWriter,
 };
@@ -78,11 +78,11 @@ use self::snapshot::{
     DOCUMENT_SNAPSHOT_FILE, DOCUMENT_SNAPSHOT_TEMP_FILE, DocumentSnapshot, FIELD_INDEX_BASENAME,
     REGISTRY_NAMESPACE, SnapshotDocument,
 };
-use crate::vector::engine::config::{
-    FlatOption, HnswOption, IvfOption, VectorFieldConfig, VectorOption,
-    VectorIndexConfig, VectorIndexKind,
+use crate::vector::core::field::{
+    FlatOption, HnswOption, IvfOption, VectorIndexKind, VectorOption,
 };
-use crate::vector::wal::{WalEntry, WalManager};
+use crate::vector::engine::config::{VectorFieldConfig, VectorIndexConfig};
+use crate::vector::index::wal::{WalEntry, WalManager};
 
 /// A high-level vector search engine that provides both indexing and searching.
 ///
@@ -1135,8 +1135,8 @@ impl VectorEngine {
                     }
                 }
                 // Check if value exists in vector fields (embedded text source)
-                else if let Some(stored_vec) = document.fields.get(field_name) {
-                    if let Some(original_text) =
+                else if let Some(stored_vec) = document.fields.get(field_name)
+                    && let Some(original_text) =
                         stored_vec.attributes.get("__sarissa_lexical_source")
                     {
                         println!(
@@ -1153,7 +1153,6 @@ impl VectorEngine {
                             );
                         }
                     }
-                }
             }
         }
 
@@ -1227,11 +1226,10 @@ impl VectorEngine {
                     }
                 }
                 // Check if value exists in vector fields (embedded text source)
-                else if let Some(stored_vec) = document.fields.get(field_name) {
-                    if let Some(original_text) =
+                else if let Some(stored_vec) = document.fields.get(field_name)
+                    && let Some(original_text) =
                         stored_vec.attributes.get("__sarissa_lexical_source")
-                    {
-                        if let crate::lexical::core::field::FieldOption::Text(text_opt) =
+                        && let crate::lexical::core::field::FieldOption::Text(text_opt) =
                             lexical_opt
                         {
                             lex_doc_builder = lex_doc_builder.add_text(
@@ -1240,8 +1238,6 @@ impl VectorEngine {
                                 text_opt.clone(),
                             );
                         }
-                    }
-                }
             }
         }
 
@@ -1779,11 +1775,10 @@ impl VectorEngineSearcher {
                 continue;
             }
 
-            if let Some(allowed) = allowed_ids {
-                if !allowed.contains(&hit.doc_id) {
+            if let Some(allowed) = allowed_ids
+                && !allowed.contains(&hit.doc_id) {
                     continue;
                 }
-            }
 
             let weighted_score = hit.score * field_weight;
             let entry = doc_hits.entry(hit.doc_id).or_insert_with(|| VectorHit {
@@ -2163,11 +2158,10 @@ mod tests {
     use crate::lexical::engine::config::LexicalIndexConfig;
     use crate::maintenance::deletion::DeletionConfig;
     use crate::storage::memory::{MemoryStorage, MemoryStorageConfig};
-    use crate::vector::DistanceMetric;
+    use crate::vector::core::distance::DistanceMetric;
     use crate::vector::core::document::StoredVector;
-    use crate::vector::engine::config::{
-        FlatOption, VectorFieldConfig, VectorOption, VectorIndexKind,
-    };
+    use crate::vector::core::field::{FlatOption, VectorIndexKind, VectorOption};
+    use crate::vector::engine::config::VectorFieldConfig;
     use crate::vector::engine::filter::VectorFilter;
     use crate::vector::engine::request::QueryVector;
     use std::collections::HashMap;

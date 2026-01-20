@@ -38,10 +38,9 @@ impl HnswGraph {
 
     /// Set neighbors for a node at a specific level (replacing existing ones).
     pub fn set_neighbors(&mut self, doc_id: u64, level: usize, neighbors: Vec<u64>) {
-        if let Some(layers) = self.nodes.get_mut(&doc_id) {
-            if level < layers.len() {
+        if let Some(layers) = self.nodes.get_mut(&doc_id)
+            && level < layers.len() {
                 layers[level] = neighbors;
             }
-        }
     }
 }

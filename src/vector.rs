@@ -18,12 +18,7 @@ pub mod search;
 
 pub mod engine;
 pub mod reader;
-#[cfg(test)]
-mod tests_deletion;
-pub mod wal;
+// pub mod field;
+// pub mod wal;
+// mod tests_deletion;
 pub mod writer;
-
-pub mod field;
-
-pub use self::core::distance::DistanceMetric;
-pub use self::core::vector::Vector;

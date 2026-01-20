@@ -10,7 +10,7 @@ use std::sync::Arc;
 use crate::error::{Result, SarissaError};
 use crate::vector::core::document::METADATA_WEIGHT;
 use crate::vector::core::vector::Vector;
-use crate::vector::field::{
+use crate::vector::index::field::{
     FieldHit, FieldSearchInput, FieldSearchResults, VectorFieldReader, VectorFieldStats,
 };
 use crate::vector::reader::VectorIndexReader;

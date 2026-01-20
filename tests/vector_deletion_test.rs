@@ -1,10 +1,10 @@
 #[cfg(test)]
 mod tests {
-    use crate::storage::memory::MemoryStorage;
-    use crate::vector::core::vector::Vector;
-    use crate::vector::index::config::FlatIndexConfig;
-    use crate::vector::index::flat::writer::FlatIndexWriter;
-    use crate::vector::writer::{VectorIndexWriter, VectorIndexWriterConfig};
+    use sarissa::storage::memory::MemoryStorage;
+    use sarissa::vector::core::vector::Vector;
+    use sarissa::vector::index::config::FlatIndexConfig;
+    use sarissa::vector::index::flat::writer::FlatIndexWriter;
+    use sarissa::vector::writer::{VectorIndexWriter, VectorIndexWriterConfig};
     use std::sync::Arc;
 
     #[test]

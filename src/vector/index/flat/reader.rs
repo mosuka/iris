@@ -202,11 +202,10 @@ impl VectorIndexReader for FlatVectorIndexReader {
     fn get_vectors_for_doc(&self, doc_id: u64) -> Result<Vec<(String, Vector)>> {
         let mut result = Vec::new();
         for (id, field) in &self.vector_ids {
-            if *id == doc_id && !self.is_deleted(*id) {
-                if let Some(vec) = self.vectors.get(&(*id, field.clone()), self.dimension)? {
+            if *id == doc_id && !self.is_deleted(*id)
+                && let Some(vec) = self.vectors.get(&(*id, field.clone()), self.dimension)? {
                     result.push((field.clone(), vec));
                 }
-            }
         }
         Ok(result)
     }
@@ -273,11 +272,10 @@ impl VectorIndexReader for FlatVectorIndexReader {
     ) -> Result<Vec<(u64, String, Vector)>> {
         let mut result = Vec::new();
         for (id, field) in &self.vector_ids {
-            if *id >= start_doc_id && *id < end_doc_id && !self.is_deleted(*id) {
-                if let Some(vec) = self.vectors.get(&(*id, field.clone()), self.dimension)? {
+            if *id >= start_doc_id && *id < end_doc_id && !self.is_deleted(*id)
+                && let Some(vec) = self.vectors.get(&(*id, field.clone()), self.dimension)? {
                     result.push((*id, field.clone(), vec));
                 }
-            }
         }
         Ok(result)
     }
@@ -285,11 +283,10 @@ impl VectorIndexReader for FlatVectorIndexReader {
     fn get_vectors_by_field(&self, field_name: &str) -> Result<Vec<(u64, Vector)>> {
         let mut result = Vec::new();
         for (id, field) in &self.vector_ids {
-            if field == field_name && !self.is_deleted(*id) {
-                if let Some(vec) = self.vectors.get(&(*id, field.clone()), self.dimension)? {
+            if field == field_name && !self.is_deleted(*id)
+                && let Some(vec) = self.vectors.get(&(*id, field.clone()), self.dimension)? {
                     result.push((*id, vec));
                 }
-            }
         }
         Ok(result)
     }
@@ -397,12 +394,11 @@ impl VectorIterator for FlatVectorIterator {
             let (doc_id, field) = &self.keys[self.current];
 
             // Check deletion
-            if let Some(bitmap) = &self.deletion_bitmap {
-                if bitmap.is_deleted(*doc_id) {
+            if let Some(bitmap) = &self.deletion_bitmap
+                && bitmap.is_deleted(*doc_id) {
                     self.current += 1;
                     return self.next(); // Recursively skip deleted
                 }
-            }
 
             if let Some(vec) = self
                 .storage

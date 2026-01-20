@@ -45,16 +45,14 @@ impl VectorIndexSearcher for HnswSearcher {
         let start = Instant::now();
 
         // correct approach: usage of downcast_ref to check if we can use graph search
-        if let Some(reader) = self.index_reader.as_any().downcast_ref::<HnswIndexReader>() {
-            if let Some(graph) = &reader.graph {
-                if let Some(ref field_name) = request.field_name {
+        if let Some(reader) = self.index_reader.as_any().downcast_ref::<HnswIndexReader>()
+            && let Some(graph) = &reader.graph
+                && let Some(ref field_name) = request.field_name {
                     // Perform Graph Search
                     let mut results = self.search_graph(reader, graph, request, field_name)?;
                     results.search_time_ms = start.elapsed().as_secs_f64() * 1000.0;
                     return Ok(results);
                 }
-            }
-        }
 
         // Fallback to Linear Scan
         let mut results = VectorIndexSearchResults::new();
@@ -245,11 +243,10 @@ impl HnswSearcher {
         visited.insert(curr_obj);
 
         while let Some(curr) = candidates.pop() {
-            if let Some(furthest) = found.peek() {
-                if curr.distance > furthest.distance && found.len() >= ef_search {
+            if let Some(furthest) = found.peek()
+                && curr.distance > furthest.distance && found.len() >= ef_search {
                     break;
                 }
-            }
 
             if let Some(neighbors) = graph.get_neighbors(curr.id, 0) {
                 for &neighbor_id in neighbors {

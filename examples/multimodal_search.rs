@@ -29,15 +29,14 @@ use sarissa::storage::file::FileStorageConfig;
 #[cfg(feature = "embeddings-multimodal")]
 use sarissa::storage::{StorageConfig, StorageFactory};
 #[cfg(feature = "embeddings-multimodal")]
-use sarissa::vector::DistanceMetric;
+use sarissa::vector::core::distance::DistanceMetric;
 #[cfg(feature = "embeddings-multimodal")]
 use sarissa::vector::core::document::{DocumentPayload, Payload};
 #[cfg(feature = "embeddings-multimodal")]
-use sarissa::vector::engine::VectorEngine;
+use sarissa::vector::core::field::{FlatOption, VectorOption};
 #[cfg(feature = "embeddings-multimodal")]
-use sarissa::vector::engine::config::{
-    FlatOption, VectorFieldConfig, VectorOption, VectorIndexConfig,
-};
+use sarissa::vector::engine::VectorEngine;
+use sarissa::vector::engine::config::{VectorFieldConfig, VectorIndexConfig};
 #[cfg(feature = "embeddings-multimodal")]
 use sarissa::vector::engine::query::VectorSearchRequestBuilder;
 #[cfg(feature = "embeddings-multimodal")]

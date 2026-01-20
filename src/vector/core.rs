@@ -6,5 +6,6 @@
 
 pub mod distance;
 pub mod document;
+pub mod field;
 pub mod quantization;
 pub mod vector;

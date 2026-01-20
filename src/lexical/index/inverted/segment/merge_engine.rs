@@ -272,8 +272,7 @@ impl MergeEngine {
     ) -> Result<MergeResult> {
         let mut stats = MergeStats {
             segments_merged: segments.len(),
-            shard_id: segments
-                .get(0)
+            shard_id: segments.first()
                 .map(|s| s.segment_info.shard_id)
                 .unwrap_or(0),
             ..Default::default()
@@ -292,13 +291,12 @@ impl MergeEngine {
                     use crate::maintenance::deletion::DeletionBitmap;
                     use crate::storage::structured::StructReader;
 
-                    if let Ok(mut reader) = StructReader::new(input) {
-                        if let Ok(bitmap) = DeletionBitmap::read_from_storage(&mut reader) {
+                    if let Ok(mut reader) = StructReader::new(input)
+                        && let Ok(bitmap) = DeletionBitmap::read_from_storage(&mut reader) {
                             for doc_id in bitmap.get_deleted_docs() {
                                 deleted_doc_ids.insert(doc_id);
                             }
                         }
-                    }
                 }
             }
         }

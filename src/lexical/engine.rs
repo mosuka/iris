@@ -268,11 +268,10 @@ impl LexicalEngine {
         // 1. Check writer (NRT - Uncommitted)
         {
             let guard = self.writer_cache.lock();
-            if let Some(writer) = guard.as_ref() {
-                if let Some(writer_ids) = writer.find_doc_ids_by_term(field, term)? {
+            if let Some(writer) = guard.as_ref()
+                && let Some(writer_ids) = writer.find_doc_ids_by_term(field, term)? {
                     ids.extend(writer_ids);
                 }
-            }
         }
 
         // 2. Check reader (Committed)
@@ -327,11 +326,10 @@ impl LexicalEngine {
         // 1. Check writer (NRT - Uncommitted)
         {
             let guard = self.writer_cache.lock();
-            if let Some(writer) = guard.as_ref() {
-                if let Some(doc_id) = writer.find_doc_id_by_term(field, term)? {
+            if let Some(writer) = guard.as_ref()
+                && let Some(doc_id) = writer.find_doc_id_by_term(field, term)? {
                     return Ok(Some(doc_id));
                 }
-            }
         }
 
         // 2. Check reader (Committed)
@@ -653,11 +651,10 @@ impl LexicalEngine {
         let analyzer = self.analyzer()?;
         let mut parser = crate::lexical::index::inverted::query::parser::QueryParser::new(analyzer);
 
-        if let Ok(fields) = self.index.default_fields() {
-            if !fields.is_empty() {
+        if let Ok(fields) = self.index.default_fields()
+            && !fields.is_empty() {
                 parser = parser.with_default_fields(fields);
             }
-        }
 
         Ok(parser)
     }

@@ -10,10 +10,10 @@ use std::sync::Arc;
 use parking_lot::RwLock;
 
 use crate::error::{Result, SarissaError};
-use crate::vector::Vector;
 use crate::vector::core::document::StoredVector;
+use crate::vector::core::vector::Vector;
 use crate::vector::engine::config::VectorFieldConfig;
-use crate::vector::field::{
+use crate::vector::index::field::{
     FieldHit, FieldSearchInput, FieldSearchResults, VectorField, VectorFieldReader,
     VectorFieldStats, VectorFieldWriter,
 };

@@ -171,12 +171,11 @@ impl MergeEngine {
 
             let mut iterator = reader.vector_iterator()?;
             while let Some((doc_id, field, vector)) = iterator.next()? {
-                if let Some(bitmap) = &self.deletion_bitmap {
-                    if bitmap.is_deleted(doc_id) {
+                if let Some(bitmap) = &self.deletion_bitmap
+                    && bitmap.is_deleted(doc_id) {
                         deletions_removed += 1;
                         continue;
                     }
-                }
                 all_vectors.push((doc_id, field, vector));
             }
         }
