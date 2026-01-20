@@ -5,7 +5,7 @@
 
 use ahash::AHashMap;
 
-use crate::error::{Result, SarissaError};
+use crate::error::{Result, IrisError};
 use crate::storage::structured::{StructReader, StructWriter};
 use crate::storage::{StorageInput, StorageOutput};
 
@@ -473,12 +473,12 @@ impl TermPostingIndex {
         // Read header
         let magic = reader.read_u32()?;
         if magic != 0x494E5658 {
-            return Err(SarissaError::index("Invalid inverted index file format"));
+            return Err(IrisError::index("Invalid inverted index file format"));
         }
 
         let version = reader.read_u32()?;
         if version != 1 {
-            return Err(SarissaError::index(format!(
+            return Err(IrisError::index(format!(
                 "Unsupported index version: {version}"
             )));
         }

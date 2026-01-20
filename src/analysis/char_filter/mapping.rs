@@ -23,7 +23,7 @@ impl MappingCharFilter {
         let ac = AhoCorasick::builder()
             .match_kind(MatchKind::LeftmostLongest)
             .build(&keys)
-            .map_err(|e| crate::error::SarissaError::Anyhow(anyhow::Error::from(e)))?;
+            .map_err(|e| crate::error::IrisError::Anyhow(anyhow::Error::from(e)))?;
 
         Ok(Self { ac, replacements })
     }

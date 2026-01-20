@@ -19,7 +19,7 @@ pub mod wal;
 
 use std::sync::{Arc, RwLock};
 
-use crate::error::{Result, SarissaError};
+use crate::error::{Result, IrisError};
 use crate::storage::Storage;
 use crate::vector::core::vector::Vector;
 use crate::vector::index::config::{
@@ -182,7 +182,7 @@ impl ManagedVectorIndex {
     pub fn add_vectors(&mut self, vectors: Vec<(u64, String, Vector)>) -> Result<()> {
         let finalized = *self.is_finalized.read().unwrap();
         if finalized {
-            return Err(SarissaError::InvalidOperation(
+            return Err(IrisError::InvalidOperation(
                 "Cannot add vectors to finalized index".to_string(),
             ));
         }
@@ -233,7 +233,7 @@ impl ManagedVectorIndex {
     pub fn vectors(&self) -> Result<Vec<(u64, String, Vector)>> {
         let finalized = *self.is_finalized.read().unwrap();
         if !finalized {
-            return Err(SarissaError::InvalidOperation(
+            return Err(IrisError::InvalidOperation(
                 "Index must be finalized before accessing vectors".to_string(),
             ));
         }
@@ -247,14 +247,14 @@ impl ManagedVectorIndex {
     pub fn write(&self) -> Result<()> {
         let finalized = *self.is_finalized.read().unwrap();
         if !finalized {
-            return Err(SarissaError::InvalidOperation(
+            return Err(IrisError::InvalidOperation(
                 "Index must be finalized before writing".to_string(),
             ));
         }
 
         let builder = self.builder.read().unwrap();
         if !builder.has_storage() {
-            return Err(SarissaError::InvalidOperation(
+            return Err(IrisError::InvalidOperation(
                 "Index was not created with storage support".to_string(),
             ));
         }
@@ -273,7 +273,7 @@ impl ManagedVectorIndex {
     pub fn reader(&self) -> Result<Arc<dyn crate::vector::reader::VectorIndexReader>> {
         let finalized = *self.is_finalized.read().unwrap();
         if !finalized {
-            return Err(SarissaError::InvalidOperation(
+            return Err(IrisError::InvalidOperation(
                 "Index must be finalized before creating a reader".to_string(),
             ));
         }
@@ -306,7 +306,7 @@ impl ManagedVectorIndex {
             // For now, let's error if path is not known, or fallback to in-memory if possible?
             // But writer might have flushed to disk.
             // Let's assume if storage is present, we should have written or we should error if not written.
-            return Err(SarissaError::InvalidOperation(
+            return Err(IrisError::InvalidOperation(
                 "Index has not been written to storage, cannot create reader from storage without path.".to_string(),
             ));
         }

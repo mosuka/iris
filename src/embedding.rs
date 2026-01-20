@@ -1,4 +1,4 @@
-//! Text and multimodal embedding support for Sarissa vector search.
+//! Text and multimodal embedding support for Iris vector search.
 //!
 //! - Core traits: `Embedder`, `PerFieldEmbedder`, `PrecomputedEmbedder`
 //! - Feature flags: `embeddings-candle`, `embeddings-openai`, `embeddings-multimodal`, `embeddings-all`

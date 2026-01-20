@@ -15,8 +15,8 @@
 //! # Examples
 //!
 //! ```
-//! use sarissa::analysis::analyzer::analyzer::Analyzer;
-//! use sarissa::analysis::analyzer::keyword::KeywordAnalyzer;
+//! use iris::analysis::analyzer::analyzer::Analyzer;
+//! use iris::analysis::analyzer::keyword::KeywordAnalyzer;
 //!
 //! let analyzer = KeywordAnalyzer::new();
 //! let tokens: Vec<_> = analyzer.analyze("user-123-abc").unwrap().collect();

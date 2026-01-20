@@ -1,15 +1,15 @@
 # Installation
 
-Add sarissa to your `Cargo.toml`:
+Add iris to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-sarissa = "0.1.0"
+iris = "0.1.0"
 ```
 
 ## Feature Flags
 
-Sarissa provides several feature flags to enable optional functionalities, particularly for embedding generation:
+Iris provides several feature flags to enable optional functionalities, particularly for embedding generation:
 
 - `embeddings-candle`: Enables Hugging Face Candle integration for running models locally.
 - `embeddings-openai`: Enables OpenAI API integration.
@@ -18,5 +18,5 @@ Sarissa provides several feature flags to enable optional functionalities, parti
 
 ```toml
 # Example: interacting with OpenAI
-sarissa = { version = "0.1.0", features = ["embeddings-openai"] }
+iris = { version = "0.1.0", features = ["embeddings-openai"] }
 ```

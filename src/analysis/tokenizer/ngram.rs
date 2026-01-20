@@ -7,8 +7,8 @@
 //! # Examples
 //!
 //! ```
-//! use sarissa::analysis::tokenizer::Tokenizer;
-//! use sarissa::analysis::tokenizer::ngram::NgramTokenizer;
+//! use iris::analysis::tokenizer::Tokenizer;
+//! use iris::analysis::tokenizer::ngram::NgramTokenizer;
 //!
 //! // Create a bigram tokenizer (n=2)
 //! let tokenizer = NgramTokenizer::bigram();
@@ -20,7 +20,7 @@
 
 use crate::analysis::token::{Token, TokenStream};
 use crate::analysis::tokenizer::Tokenizer;
-use crate::error::{Result, SarissaError};
+use crate::error::{Result, IrisError};
 
 /// A tokenizer that generates character n-grams.
 ///
@@ -37,8 +37,8 @@ use crate::error::{Result, SarissaError};
 /// # Examples
 ///
 /// ```
-/// use sarissa::analysis::tokenizer::ngram::NgramTokenizer;
-/// use sarissa::analysis::tokenizer::Tokenizer;
+/// use iris::analysis::tokenizer::ngram::NgramTokenizer;
+/// use iris::analysis::tokenizer::Tokenizer;
 ///
 /// // Bigram (n=2)
 /// let tokenizer = NgramTokenizer::new(2, 2).unwrap();
@@ -84,12 +84,12 @@ impl NgramTokenizer {
     /// - `max_gram` is less than `min_gram`
     pub fn new(min_gram: usize, max_gram: usize) -> Result<Self> {
         if min_gram == 0 {
-            return Err(SarissaError::analysis(
+            return Err(IrisError::analysis(
                 "min_gram must be at least 1".to_string(),
             ));
         }
         if max_gram < min_gram {
-            return Err(SarissaError::analysis(format!(
+            return Err(IrisError::analysis(format!(
                 "max_gram ({}) must be >= min_gram ({})",
                 max_gram, min_gram
             )));

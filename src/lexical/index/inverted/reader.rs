@@ -12,7 +12,7 @@ use ahash::AHashMap;
 use crate::analysis::analyzer::analyzer::Analyzer;
 use crate::analysis::analyzer::standard::StandardAnalyzer;
 use crate::analysis::token::Token;
-use crate::error::{Result, SarissaError};
+use crate::error::{Result, IrisError};
 use crate::lexical::core::document::Document;
 use crate::lexical::core::field::FieldValue;
 use crate::lexical::index::inverted::core::posting::{Posting, PostingList};
@@ -395,7 +395,7 @@ impl SegmentReader {
         if let Ok(input) = self.storage.open_input(&dict_file) {
             let mut reader = StructReader::new(input)?;
             let dictionary = HybridTermDictionary::read_from_storage(&mut reader).map_err(|e| {
-                SarissaError::index(format!(
+                IrisError::index(format!(
                     "Failed to read term dictionary from {dict_file}: {e}"
                 ))
             })?;
@@ -415,7 +415,7 @@ impl SegmentReader {
             std::io::Read::read_to_string(&mut input, &mut json_data)?;
 
             let docs: Vec<Document> = serde_json::from_str(&json_data)
-                .map_err(|e| SarissaError::index(format!("Failed to parse JSON documents: {e}")))?;
+                .map_err(|e| IrisError::index(format!("Failed to parse JSON documents: {e}")))?;
 
             let mut documents = BTreeMap::new();
             for (idx, doc) in docs.into_iter().enumerate() {
@@ -478,7 +478,7 @@ impl SegmentReader {
                             let dt_str = reader.read_string()?;
                             let dt = chrono::DateTime::parse_from_rfc3339(&dt_str)
                                 .map_err(|e| {
-                                    SarissaError::index(format!("Failed to parse DateTime: {e}"))
+                                    IrisError::index(format!("Failed to parse DateTime: {e}"))
                                 })?
                                 .with_timezone(&chrono::Utc);
                             FieldValue::DateTime(dt)
@@ -502,7 +502,7 @@ impl SegmentReader {
                             FieldValue::Blob("text/plain".to_string(), text.into_bytes())
                         }
                         _ => {
-                            return Err(SarissaError::index(format!(
+                            return Err(IrisError::index(format!(
                                 "Unknown field type tag: {type_tag}"
                             )));
                         }
@@ -1091,7 +1091,7 @@ impl InvertedIndexReader {
     /// Check if the reader is closed.
     fn check_closed(&self) -> Result<()> {
         if self.closed.load(Ordering::Acquire) {
-            Err(SarissaError::index("Reader is closed"))
+            Err(IrisError::index("Reader is closed"))
         } else {
             Ok(())
         }

@@ -1,15 +1,15 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use sarissa::embedding::precomputed::PrecomputedEmbedder;
-use sarissa::error::Result;
-use sarissa::lexical::engine::config::LexicalIndexConfig;
-use sarissa::storage::memory::{MemoryStorage, MemoryStorageConfig};
-use sarissa::vector::core::distance::DistanceMetric;
-use sarissa::vector::core::document::{DocumentPayload, Payload, PayloadSource};
-use sarissa::vector::core::field::{FlatOption, VectorIndexKind, VectorOption};
-use sarissa::vector::engine::VectorEngine;
-use sarissa::vector::engine::config::{VectorFieldConfig, VectorIndexConfig};
+use iris::embedding::precomputed::PrecomputedEmbedder;
+use iris::error::Result;
+use iris::lexical::engine::config::LexicalIndexConfig;
+use iris::storage::memory::{MemoryStorage, MemoryStorageConfig};
+use iris::vector::core::distance::DistanceMetric;
+use iris::vector::core::document::{DocumentPayload, Payload, PayloadSource};
+use iris::vector::core::field::{FlatOption, VectorIndexKind, VectorOption};
+use iris::vector::engine::VectorEngine;
+use iris::vector::engine::config::{VectorFieldConfig, VectorIndexConfig};
 
 fn build_test_engine() -> Result<VectorEngine> {
     let storage = Arc::new(MemoryStorage::new(MemoryStorageConfig::default()));
@@ -38,7 +38,7 @@ fn build_test_engine() -> Result<VectorEngine> {
         shard_id: 0,
         metadata_config: LexicalIndexConfig::builder()
             .analyzer(Arc::new(
-                sarissa::analysis::analyzer::keyword::KeywordAnalyzer::default(),
+                iris::analysis::analyzer::keyword::KeywordAnalyzer::default(),
             ))
             .build(),
     };

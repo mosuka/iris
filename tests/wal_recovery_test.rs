@@ -1,13 +1,13 @@
-use sarissa::embedding::precomputed::PrecomputedEmbedder;
-use sarissa::error::Result;
-use sarissa::storage::Storage;
-use sarissa::storage::memory::{MemoryStorage, MemoryStorageConfig};
-use sarissa::vector::core::distance::DistanceMetric;
-use sarissa::vector::core::document::{DocumentVector, StoredVector};
-use sarissa::vector::core::field::{HnswOption, VectorIndexKind, VectorOption};
-use sarissa::vector::engine::VectorEngine;
-use sarissa::vector::engine::config::{VectorFieldConfig, VectorIndexConfig};
-use sarissa::vector::engine::request::{FieldSelector, QueryVector, VectorSearchRequest};
+use iris::embedding::precomputed::PrecomputedEmbedder;
+use iris::error::Result;
+use iris::storage::Storage;
+use iris::storage::memory::{MemoryStorage, MemoryStorageConfig};
+use iris::vector::core::distance::DistanceMetric;
+use iris::vector::core::document::{DocumentVector, StoredVector};
+use iris::vector::core::field::{HnswOption, VectorIndexKind, VectorOption};
+use iris::vector::engine::VectorEngine;
+use iris::vector::engine::config::{VectorFieldConfig, VectorIndexConfig};
+use iris::vector::engine::request::{FieldSelector, QueryVector, VectorSearchRequest};
 
 use std::sync::Arc;
 

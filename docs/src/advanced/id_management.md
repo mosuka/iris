@@ -1,6 +1,6 @@
 # ID Management
 
-Sarissa uses a dual-tiered ID management strategy to ensure efficient document retrieval, updates, and aggregation in distributed environments.
+Iris uses a dual-tiered ID management strategy to ensure efficient document retrieval, updates, and aggregation in distributed environments.
 
 ## 1. External ID (String)
 The External ID is a **logical identifier** used by users and applications to uniquely identify a document.
@@ -12,14 +12,14 @@ The External ID is a **logical identifier** used by users and applications to un
 - **Updates**: Indexing a document with an existing `external_id` triggers an automatic "Delete-then-Insert" (Upsert) operation, replacing the old version with the newest.
 
 ## 2. Internal ID (u64 / Stable ID)
-The Internal ID is a **physical handle** used internally by Sarissa's engines (Lexical and Vector) for high-performance operations.
+The Internal ID is a **physical handle** used internally by Iris's engines (Lexical and Vector) for high-performance operations.
 
 - **Type**: Unsigned 64-bit Integer (`u64`)
 - **Role**: Used for bitmap operations, point references, and routing between distributed nodes.
 - **Immutability (Stable)**: Once assigned, an Internal ID never changes due to index merges (segment compaction) or restarts. This prevents inconsistencies in deletion logs and caches.
 
 ### ID Structure (Shard-Prefixed)
-Sarissa employs a **Shard-Prefixed Stable ID** scheme designed for multi-node distributed environments.
+Iris employs a **Shard-Prefixed Stable ID** scheme designed for multi-node distributed environments.
 
 | Bit Range | Name | Description |
 | :--- | :--- | :--- |
@@ -29,7 +29,7 @@ Sarissa employs a **Shard-Prefixed Stable ID** scheme designed for multi-node di
 #### Why this structure?
 1. **Zero-Cost Aggregation**: Since `u64` IDs are globally unique, the aggregator can perform fast sorting and deduplication without worrying about ID collisions between nodes.
 2. **Fast Routing**: The aggregator can immediately identify the physical node responsible for a document just by looking at the upper bits, avoiding expensive hash lookups.
-3. **High-Performance Fetching**: Internal IDs map directly to physical data structures. This allows Sarissa to skip the "External-to-Internal ID" conversion step during retrieval, achieving **O(1)** access speed.
+3. **High-Performance Fetching**: Internal IDs map directly to physical data structures. This allows Iris to skip the "External-to-Internal ID" conversion step during retrieval, achieving **O(1)** access speed.
 
 ## ID Lifecycle
 1. **Registration (`index_document`)**: User provides a document with an External ID.

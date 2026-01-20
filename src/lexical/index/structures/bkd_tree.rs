@@ -302,7 +302,7 @@ impl BKDReader {
         // Read header
         let magic = reader.read_u32()?;
         if magic != BKD_MAGIC {
-            return Err(crate::error::SarissaError::storage(format!(
+            return Err(crate::error::IrisError::storage(format!(
                 "Invalid BKD magic: {:x}",
                 magic
             )));

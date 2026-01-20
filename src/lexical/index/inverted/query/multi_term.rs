@@ -31,8 +31,8 @@ use crate::lexical::reader::LexicalIndexReader;
 /// # Example (conceptual - not fully implemented yet)
 ///
 /// ```ignore
-/// use sarissa::lexical::index::inverted::query::multi_term::MultiTermQuery;
-/// use sarissa::lexical::index::inverted::query::fuzzy::FuzzyQuery;
+/// use iris::lexical::index::inverted::query::multi_term::MultiTermQuery;
+/// use iris::lexical::index::inverted::query::fuzzy::FuzzyQuery;
 ///
 /// let fuzzy_query = FuzzyQuery::new("content", "hello").max_edits(2);
 ///

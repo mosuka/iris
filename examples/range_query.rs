@@ -4,22 +4,22 @@ use std::sync::Arc;
 
 use tempfile::TempDir;
 
-use sarissa::analysis::analyzer::analyzer::Analyzer;
-use sarissa::analysis::analyzer::keyword::KeywordAnalyzer;
-use sarissa::analysis::analyzer::per_field::PerFieldAnalyzer;
-use sarissa::analysis::analyzer::standard::StandardAnalyzer;
-use sarissa::lexical::core::document::Document;
-use sarissa::lexical::core::field::{FloatOption, IntegerOption, TextOption};
-use sarissa::error::Result;
-use sarissa::lexical::engine::LexicalEngine;
-use sarissa::lexical::engine::config::LexicalIndexConfig;
-use sarissa::lexical::index::config::InvertedIndexConfig;
-use sarissa::lexical::index::inverted::query::Query;
-use sarissa::lexical::index::inverted::query::range::NumericRangeQuery;
-use sarissa::lexical::search::searcher::LexicalSearchRequest;
-use sarissa::storage::StorageConfig;
-use sarissa::storage::StorageFactory;
-use sarissa::storage::file::FileStorageConfig;
+use iris::analysis::analyzer::analyzer::Analyzer;
+use iris::analysis::analyzer::keyword::KeywordAnalyzer;
+use iris::analysis::analyzer::per_field::PerFieldAnalyzer;
+use iris::analysis::analyzer::standard::StandardAnalyzer;
+use iris::lexical::core::document::Document;
+use iris::lexical::core::field::{FloatOption, IntegerOption, TextOption};
+use iris::error::Result;
+use iris::lexical::engine::LexicalEngine;
+use iris::lexical::engine::config::LexicalIndexConfig;
+use iris::lexical::index::config::InvertedIndexConfig;
+use iris::lexical::index::inverted::query::Query;
+use iris::lexical::index::inverted::query::range::NumericRangeQuery;
+use iris::lexical::search::searcher::LexicalSearchRequest;
+use iris::storage::StorageConfig;
+use iris::storage::StorageFactory;
+use iris::storage::file::FileStorageConfig;
 
 fn main() -> Result<()> {
     println!("=== RangeQuery Example - Numeric and Date Range Search ===\n");
@@ -153,7 +153,7 @@ fn main() -> Result<()> {
                 println!("      Title: {title}");
             }
             if let Some(field) = doc.get_field("price")
-                && let sarissa::lexical::core::field::FieldValue::Float(price) = &field.value
+                && let iris::lexical::core::field::FieldValue::Float(price) = &field.value
             {
                 println!("      Price: ${price:.2}");
             }
@@ -181,7 +181,7 @@ fn main() -> Result<()> {
                 println!("      Title: {title}");
             }
             if let Some(field) = doc.get_field("rating")
-                && let sarissa::lexical::core::field::FieldValue::Float(rating) = &field.value
+                && let iris::lexical::core::field::FieldValue::Float(rating) = &field.value
             {
                 println!("      Rating: {rating:.1}");
             }
@@ -209,7 +209,7 @@ fn main() -> Result<()> {
                 println!("      Title: {title}");
             }
             if let Some(field) = doc.get_field("year")
-                && let sarissa::lexical::core::field::FieldValue::Integer(year) = &field.value
+                && let iris::lexical::core::field::FieldValue::Integer(year) = &field.value
             {
                 println!("      Year: {year}");
             }
@@ -237,7 +237,7 @@ fn main() -> Result<()> {
                 println!("      Title: {title}");
             }
             if let Some(field) = doc.get_field("pages")
-                && let sarissa::lexical::core::field::FieldValue::Integer(pages) = &field.value
+                && let iris::lexical::core::field::FieldValue::Integer(pages) = &field.value
             {
                 println!("      Pages: {pages}");
             }
@@ -265,7 +265,7 @@ fn main() -> Result<()> {
                 println!("      Title: {title}");
             }
             if let Some(field) = doc.get_field("year")
-                && let sarissa::lexical::core::field::FieldValue::Integer(year) = &field.value
+                && let iris::lexical::core::field::FieldValue::Integer(year) = &field.value
             {
                 println!("      Year: {year}");
             }
@@ -293,7 +293,7 @@ fn main() -> Result<()> {
                 println!("      Title: {title}");
             }
             if let Some(field) = doc.get_field("price")
-                && let sarissa::lexical::core::field::FieldValue::Float(price) = &field.value
+                && let iris::lexical::core::field::FieldValue::Float(price) = &field.value
             {
                 println!("      Price: ${price:.2}");
             }
@@ -321,7 +321,7 @@ fn main() -> Result<()> {
                 println!("      Title: {title}");
             }
             if let Some(field) = doc.get_field("pages")
-                && let sarissa::lexical::core::field::FieldValue::Integer(pages) = &field.value
+                && let iris::lexical::core::field::FieldValue::Integer(pages) = &field.value
             {
                 println!("      Pages: {pages}");
             }

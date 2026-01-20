@@ -1,11 +1,11 @@
-use sarissa::storage::memory::{MemoryStorage, MemoryStorageConfig};
-use sarissa::vector::core::distance::DistanceMetric;
-use sarissa::vector::core::document::StoredVector;
-use sarissa::vector::core::field::{HnswOption, VectorOption};
-use sarissa::vector::engine::config::VectorFieldConfig;
-use sarissa::vector::index::field::{VectorFieldReader, VectorFieldWriter};
-use sarissa::vector::index::hnsw::segment::manager::{SegmentManager, SegmentManagerConfig};
-use sarissa::vector::index::segmented_field::SegmentedVectorField;
+use iris::storage::memory::{MemoryStorage, MemoryStorageConfig};
+use iris::vector::core::distance::DistanceMetric;
+use iris::vector::core::document::StoredVector;
+use iris::vector::core::field::{HnswOption, VectorOption};
+use iris::vector::engine::config::VectorFieldConfig;
+use iris::vector::index::field::{VectorFieldReader, VectorFieldWriter};
+use iris::vector::index::hnsw::segment::manager::{SegmentManager, SegmentManagerConfig};
+use iris::vector::index::segmented_field::SegmentedVectorField;
 use std::sync::Arc;
 
 #[test]

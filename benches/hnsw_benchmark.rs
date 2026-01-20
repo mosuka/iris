@@ -1,13 +1,13 @@
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use rand::Rng;
-use sarissa::storage::memory::MemoryStorageConfig;
-use sarissa::storage::{StorageConfig, StorageFactory};
-use sarissa::vector::core::distance::DistanceMetric;
-use sarissa::vector::core::vector::Vector;
-use sarissa::vector::index::ManagedVectorIndex;
-use sarissa::vector::index::config::{HnswIndexConfig, VectorIndexTypeConfig};
-use sarissa::vector::index::hnsw::writer::HnswIndexWriter;
-use sarissa::vector::writer::{VectorIndexWriter, VectorIndexWriterConfig};
+use iris::storage::memory::MemoryStorageConfig;
+use iris::storage::{StorageConfig, StorageFactory};
+use iris::vector::core::distance::DistanceMetric;
+use iris::vector::core::vector::Vector;
+use iris::vector::index::ManagedVectorIndex;
+use iris::vector::index::config::{HnswIndexConfig, VectorIndexTypeConfig};
+use iris::vector::index::hnsw::writer::HnswIndexWriter;
+use iris::vector::writer::{VectorIndexWriter, VectorIndexWriterConfig};
 
 fn generate_random_vector(dim: usize) -> Vector {
     let mut rng = rand::rng();
@@ -111,9 +111,9 @@ fn bench_hnsw_search(c: &mut Criterion) {
             // For now, let's look at `HnswSearcher`.
             // It holds an `Arc<HnswIndexReader>`.
             // So we can instantiate it.
-            use sarissa::vector::index::hnsw::searcher::HnswSearcher;
-            use sarissa::vector::search::searcher::VectorIndexSearchRequest;
-            use sarissa::vector::search::searcher::VectorIndexSearcher; // Trait
+            use iris::vector::index::hnsw::searcher::HnswSearcher;
+            use iris::vector::search::searcher::VectorIndexSearchRequest;
+            use iris::vector::search::searcher::VectorIndexSearcher; // Trait
 
             // We need to downcast/cast the generic reader to HnswIndexReader to pass to HnswSearcher::new?
             // Or HnswSearcher::new takes Arc<dyn VectorIndexReader> and downcasts internally?

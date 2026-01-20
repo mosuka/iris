@@ -1,9 +1,9 @@
-use sarissa::vector::core::vector::Vector;
-use sarissa::vector::index::config::{FlatIndexConfig, HnswIndexConfig, IvfIndexConfig};
-use sarissa::vector::index::flat::writer::FlatIndexWriter;
-use sarissa::vector::index::hnsw::writer::HnswIndexWriter;
-use sarissa::vector::index::ivf::writer::IvfIndexWriter;
-use sarissa::vector::writer::{VectorIndexWriter, VectorIndexWriterConfig};
+use iris::vector::core::vector::Vector;
+use iris::vector::index::config::{FlatIndexConfig, HnswIndexConfig, IvfIndexConfig};
+use iris::vector::index::flat::writer::FlatIndexWriter;
+use iris::vector::index::hnsw::writer::HnswIndexWriter;
+use iris::vector::index::ivf::writer::IvfIndexWriter;
+use iris::vector::writer::{VectorIndexWriter, VectorIndexWriterConfig};
 use std::collections::HashMap;
 
 fn create_vector(id: u64, category: &str) -> (u64, String, Vector) {
@@ -20,7 +20,7 @@ fn test_flat() -> Result<(), Box<dyn std::error::Error>> {
     println!("Testing Flat Index Deletion...");
     let config = FlatIndexConfig {
         dimension: 2,
-        distance_metric: sarissa::vector::core::distance::DistanceMetric::Euclidean,
+        distance_metric: iris::vector::core::distance::DistanceMetric::Euclidean,
         ..Default::default()
     };
     let writer_config = VectorIndexWriterConfig::default();
@@ -52,7 +52,7 @@ fn test_hnsw() -> Result<(), Box<dyn std::error::Error>> {
     println!("Testing HNSW Index Deletion...");
     let config = HnswIndexConfig {
         dimension: 2,
-        distance_metric: sarissa::vector::core::distance::DistanceMetric::Euclidean,
+        distance_metric: iris::vector::core::distance::DistanceMetric::Euclidean,
         m: 16,
         ef_construction: 100,
         ..Default::default()
@@ -86,7 +86,7 @@ fn test_ivf() -> Result<(), Box<dyn std::error::Error>> {
     println!("Testing IVF Index Deletion...");
     let config = IvfIndexConfig {
         dimension: 2,
-        distance_metric: sarissa::vector::core::distance::DistanceMetric::Euclidean,
+        distance_metric: iris::vector::core::distance::DistanceMetric::Euclidean,
         n_clusters: 1, // small for test
         n_probe: 1,
         normalize_vectors: false,

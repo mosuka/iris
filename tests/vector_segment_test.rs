@@ -1,13 +1,13 @@
 use async_trait::async_trait;
-use sarissa::embedding::embedder::{EmbedInput, EmbedInputType, Embedder};
-use sarissa::error::{Result, SarissaError};
-use sarissa::lexical::engine::config::LexicalIndexConfig;
-use sarissa::storage::memory::{MemoryStorage, MemoryStorageConfig};
-use sarissa::vector::core::distance::DistanceMetric;
-use sarissa::vector::core::document::{DocumentPayload, Payload, PayloadSource};
-use sarissa::vector::core::field::{HnswOption, VectorIndexKind, VectorOption};
-use sarissa::vector::core::vector::Vector;
-use sarissa::vector::engine::config::{VectorFieldConfig, VectorIndexConfig};
+use iris::embedding::embedder::{EmbedInput, EmbedInputType, Embedder};
+use iris::error::{Result, IrisError};
+use iris::lexical::engine::config::LexicalIndexConfig;
+use iris::storage::memory::{MemoryStorage, MemoryStorageConfig};
+use iris::vector::core::distance::DistanceMetric;
+use iris::vector::core::document::{DocumentPayload, Payload, PayloadSource};
+use iris::vector::core::field::{HnswOption, VectorIndexKind, VectorOption};
+use iris::vector::core::vector::Vector;
+use iris::vector::engine::config::{VectorFieldConfig, VectorIndexConfig};
 use std::any::Any;
 use std::sync::Arc;
 
@@ -21,7 +21,7 @@ impl Embedder for MockTextEmbedder {
     async fn embed(&self, input: &EmbedInput<'_>) -> Result<Vector> {
         match input {
             EmbedInput::Text(_) => Ok(Vector::new(vec![0.0; self.dimension])),
-            _ => Err(SarissaError::invalid_argument(
+            _ => Err(IrisError::invalid_argument(
                 "this embedder only supports text input",
             )),
         }
@@ -72,14 +72,14 @@ async fn test_vector_segment_integration() {
         embedder: Arc::new(MockTextEmbedder { dimension: 4 }),
         default_fields: vec!["vector_field".to_string()],
         metadata: std::collections::HashMap::new(),
-        deletion_config: sarissa::maintenance::deletion::DeletionConfig::default(),
+        deletion_config: iris::maintenance::deletion::DeletionConfig::default(),
         shard_id: 0,
         metadata_config: LexicalIndexConfig::default(),
     };
 
     // We construct engine manually to inject storage
     let engine =
-        sarissa::vector::engine::VectorEngine::new(storage.clone(), collection_config.clone())
+        iris::vector::engine::VectorEngine::new(storage.clone(), collection_config.clone())
             .unwrap();
 
     // 2. Insert vectors
@@ -119,7 +119,7 @@ async fn test_vector_segment_integration() {
     drop(engine);
 
     let engine_2 =
-        sarissa::vector::engine::VectorEngine::new(storage.clone(), collection_config.clone())
+        iris::vector::engine::VectorEngine::new(storage.clone(), collection_config.clone())
             .unwrap();
 
     // We verify stats.

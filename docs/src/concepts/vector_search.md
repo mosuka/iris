@@ -1,6 +1,6 @@
 # Unified Vector Search
 
-Vector search (finding "nearest neighbors") enables semantic retrieval where matches are based on meaning rather than exact keywords. Sarissa provides a **Unified Vector Engine** that combines this semantic search with traditional lexical (keyword) search capabilities.
+Vector search (finding "nearest neighbors") enables semantic retrieval where matches are based on meaning rather than exact keywords. Iris provides a **Unified Vector Engine** that combines this semantic search with traditional lexical (keyword) search capabilities.
 
 ## Document Structure
 
@@ -117,7 +117,7 @@ Stores all vectors directly in an array and calculates distances between the que
 
 #### HNSW (Hierarchical Navigable Small World)
 
-Sarissa's primary ANN algorithm. It constructs a multi-layered graph where the top layers are sparse (long-distance "express" links) and bottom layers are dense (short-distance local links).
+Iris's primary ANN algorithm. It constructs a multi-layered graph where the top layers are sparse (long-distance "express" links) and bottom layers are dense (short-distance local links).
 
 - **Efficiency**: Search time is logarithmic $O(\log N)$.
 - **Implementation**: `HnswIndexWriter`, `HnswIndexReader`
@@ -133,7 +133,7 @@ Clusters vectors into $K$ Voronoi cells. During search, only the nearest `n_prob
 
 ### Distance Metrics
 
-Sarissa leverages Rust's SIMD (Single Instruction Multiple Data) instructions to maximize performance for distance calculations.
+Iris leverages Rust's SIMD (Single Instruction Multiple Data) instructions to maximize performance for distance calculations.
 
 | Metric | Description | Rust Implementation Class | Features |
 | :--- | :--- | :--- | :--- |
@@ -143,7 +143,7 @@ Sarissa leverages Rust's SIMD (Single Instruction Multiple Data) instructions to
 
 ### Quantization
 
-To reduce memory usage and improve search speed, Sarissa supports several quantization methods:
+To reduce memory usage and improve search speed, Iris supports several quantization methods:
 
 - **Scalar 8-bit (SQ8)**: Maps 32-bit floating-points to 8-bit integers (4x compression).
 - **Product Quantization (PQ)**: Decomposes vectors into sub-vectors and performs clustering (16x-64x compression).
@@ -211,7 +211,7 @@ The basic vector search query.
 
 ### Filtered Vector Search
 
-Combines vector search with boolean filters. Sarissa supports pre-filtering using metadata filters (backed by LexicalEngine) to restrict the search space to documents matching specific metadata criteria.
+Combines vector search with boolean filters. Iris supports pre-filtering using metadata filters (backed by LexicalEngine) to restrict the search space to documents matching specific metadata criteria.
 
 ### Hybrid Search
 
@@ -253,13 +253,13 @@ Example of creating an engine with an embedder and field configurations.
 
 ```rust
 use std::sync::Arc;
-use sarissa::vector::engine::VectorEngine;
-use sarissa::vector::engine::config::{VectorIndexConfig, VectorFieldConfig, VectorIndexKind};
-use sarissa::vector::core::distance::DistanceMetric;
-use sarissa::embedding::precomputed::PrecomputedEmbedder;
-use sarissa::storage::memory::{MemoryStorage, MemoryStorageConfig};
+use iris::vector::engine::VectorEngine;
+use iris::vector::engine::config::{VectorIndexConfig, VectorFieldConfig, VectorIndexKind};
+use iris::vector::core::distance::DistanceMetric;
+use iris::embedding::precomputed::PrecomputedEmbedder;
+use iris::storage::memory::{MemoryStorage, MemoryStorageConfig};
 
-fn setup_engine() -> sarissa::error::Result<VectorEngine> {
+fn setup_engine() -> iris::error::Result<VectorEngine> {
     let storage = Arc::new(MemoryStorage::new(MemoryStorageConfig::default()));
     
     // Create configuration
@@ -279,9 +279,9 @@ fn setup_engine() -> sarissa::error::Result<VectorEngine> {
 Example of indexing a document with vector data.
 
 ```rust
-use sarissa::vector::core::document::{DocumentVector, StoredVector};
+use iris::vector::core::document::{DocumentVector, StoredVector};
 
-fn add_document(engine: &VectorEngine) -> sarissa::error::Result<()> {
+fn add_document(engine: &VectorEngine) -> iris::error::Result<()> {
     let mut doc = DocumentVector::new();
     
     // Create vector data
@@ -304,10 +304,10 @@ fn add_document(engine: &VectorEngine) -> sarissa::error::Result<()> {
 Example of performing a search using `VectorSearchRequest`.
 
 ```rust
-use sarissa::vector::engine::request::{VectorSearchRequest, QueryVector};
-use sarissa::vector::core::document::StoredVector;
+use iris::vector::engine::request::{VectorSearchRequest, QueryVector};
+use iris::vector::core::document::StoredVector;
 
-fn search(engine: &VectorEngine) -> sarissa::error::Result<()> {
+fn search(engine: &VectorEngine) -> iris::error::Result<()> {
     // Prepare query vector
     let query_data = Arc::from(vec![0.1; 384]);
     let query_vector = QueryVector {
@@ -337,9 +337,9 @@ fn search(engine: &VectorEngine) -> sarissa::error::Result<()> {
 Example of a search restricted to a specific category.
 
 ```rust
-use sarissa::vector::engine::filter::{VectorFilter, FilterCondition};
+use iris::vector::engine::filter::{VectorFilter, FilterCondition};
 
-fn filtered_search(engine: &VectorEngine) -> sarissa::error::Result<()> {
+fn filtered_search(engine: &VectorEngine) -> iris::error::Result<()> {
     let mut filter = VectorFilter::default();
     filter.document.equals.insert("category".to_string(), "technology".to_string());
 
@@ -360,9 +360,9 @@ fn filtered_search(engine: &VectorEngine) -> sarissa::error::Result<()> {
 Example of combining vector and keyword search.
 
 ```rust
-use sarissa::vector::engine::query::{VectorSearchRequest, HybridSearchQuery};
+use iris::vector::engine::query::{VectorSearchRequest, HybridSearchQuery};
 
-async fn hybrid_search(engine: &VectorEngine, query_vector: Vec<f32>) -> sarissa::error::Result<()> {
+async fn hybrid_search(engine: &VectorEngine, query_vector: Vec<f32>) -> iris::error::Result<()> {
     // Define Hybrid Query
     let request = VectorSearchRequest::builder()
         .vector(query_vector.into())

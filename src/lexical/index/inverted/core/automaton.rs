@@ -119,7 +119,7 @@ impl RegexAutomaton {
     /// Create a new regex automaton.
     pub fn new(pattern: &str) -> Result<Self> {
         let regex = Regex::new(pattern).map_err(|e| {
-            crate::error::SarissaError::analysis(format!("Invalid regexp pattern: {e}"))
+            crate::error::IrisError::analysis(format!("Invalid regexp pattern: {e}"))
         })?;
 
         // Extract prefix optimization

@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "embeddings-openai")]
 use crate::embedding::embedder::{EmbedInput, EmbedInputType, Embedder};
 #[cfg(feature = "embeddings-openai")]
-use crate::error::{Result, SarissaError};
+use crate::error::{Result, IrisError};
 #[cfg(feature = "embeddings-openai")]
 use crate::vector::core::vector::Vector;
 
@@ -69,10 +69,10 @@ struct EmbeddingData {
 /// # Examples
 ///
 /// ```no_run
-/// use sarissa::embedding::embedder::{Embedder, EmbedInput};
-/// use sarissa::embedding::openai_embedder::OpenAIEmbedder;
+/// use iris::embedding::embedder::{Embedder, EmbedInput};
+/// use iris::embedding::openai_embedder::OpenAIEmbedder;
 ///
-/// # async fn example() -> sarissa::error::Result<()> {
+/// # async fn example() -> iris::error::Result<()> {
 /// // Create embedder with API key
 /// let embedder = OpenAIEmbedder::new(
 ///     std::env::var("OPENAI_API_KEY").unwrap(),
@@ -135,9 +135,9 @@ impl OpenAIEmbedder {
     /// # Examples
     ///
     /// ```no_run
-    /// use sarissa::embedding::openai_embedder::OpenAIEmbedder;
+    /// use iris::embedding::openai_embedder::OpenAIEmbedder;
     ///
-    /// # async fn example() -> sarissa::error::Result<()> {
+    /// # async fn example() -> iris::error::Result<()> {
     /// // Small model (recommended for most use cases)
     /// let embedder = OpenAIEmbedder::new(
     ///     "sk-...".to_string(),
@@ -157,13 +157,13 @@ impl OpenAIEmbedder {
             .send()
             .await
             .map_err(|e| {
-                SarissaError::InvalidOperation(format!("Failed to connect to OpenAI API: {}", e))
+                IrisError::InvalidOperation(format!("Failed to connect to OpenAI API: {}", e))
             })?;
 
         if !response.status().is_success() {
             let status = response.status();
             let text = response.text().await.unwrap_or_default();
-            return Err(SarissaError::InvalidOperation(format!(
+            return Err(IrisError::InvalidOperation(format!(
                 "Failed to validate OpenAI model '{}'. Status: {}. Response: {}",
                 model, status, text
             )));
@@ -193,9 +193,9 @@ impl OpenAIEmbedder {
     /// # Examples
     ///
     /// ```no_run
-    /// use sarissa::embedding::openai_embedder::OpenAIEmbedder;
+    /// use iris::embedding::openai_embedder::OpenAIEmbedder;
     ///
-    /// # async fn example() -> sarissa::error::Result<()> {
+    /// # async fn example() -> iris::error::Result<()> {
     /// // Use smaller dimension for cost savings
     /// let embedder = OpenAIEmbedder::with_dimension(
     ///     "sk-...".to_string(),
@@ -260,23 +260,23 @@ impl OpenAIEmbedder {
             .send()
             .await
             .map_err(|e| {
-                SarissaError::InvalidOperation(format!("OpenAI API request failed: {}", e))
+                IrisError::InvalidOperation(format!("OpenAI API request failed: {}", e))
             })?;
 
         let status = http_response.status();
         let response_text = http_response.text().await.map_err(|e| {
-            SarissaError::InvalidOperation(format!("Failed to read response text: {}", e))
+            IrisError::InvalidOperation(format!("Failed to read response text: {}", e))
         })?;
 
         if !status.is_success() {
-            return Err(SarissaError::InvalidOperation(format!(
+            return Err(IrisError::InvalidOperation(format!(
                 "OpenAI API error (status {}): {}",
                 status, response_text
             )));
         }
 
         let response: EmbeddingResponse = serde_json::from_str(&response_text).map_err(|e| {
-            SarissaError::InvalidOperation(format!(
+            IrisError::InvalidOperation(format!(
                 "Failed to parse OpenAI response: {}. Response text: {}",
                 e, response_text
             ))
@@ -286,7 +286,7 @@ impl OpenAIEmbedder {
             .data
             .into_iter()
             .next()
-            .ok_or_else(|| SarissaError::InvalidOperation("No embedding in response".to_string()))?
+            .ok_or_else(|| IrisError::InvalidOperation("No embedding in response".to_string()))?
             .embedding;
 
         Ok(Vector::new(embedding))
@@ -319,23 +319,23 @@ impl OpenAIEmbedder {
             .send()
             .await
             .map_err(|e| {
-                SarissaError::InvalidOperation(format!("OpenAI API request failed: {}", e))
+                IrisError::InvalidOperation(format!("OpenAI API request failed: {}", e))
             })?;
 
         let status = http_response.status();
         let response_text = http_response.text().await.map_err(|e| {
-            SarissaError::InvalidOperation(format!("Failed to read response text: {}", e))
+            IrisError::InvalidOperation(format!("Failed to read response text: {}", e))
         })?;
 
         if !status.is_success() {
-            return Err(SarissaError::InvalidOperation(format!(
+            return Err(IrisError::InvalidOperation(format!(
                 "OpenAI API error (status {}): {}",
                 status, response_text
             )));
         }
 
         let response: EmbeddingResponse = serde_json::from_str(&response_text).map_err(|e| {
-            SarissaError::InvalidOperation(format!(
+            IrisError::InvalidOperation(format!(
                 "Failed to parse OpenAI response: {}. Response text: {}",
                 e, response_text
             ))
@@ -358,7 +358,7 @@ impl Embedder for OpenAIEmbedder {
     async fn embed(&self, input: &EmbedInput<'_>) -> Result<Vector> {
         match input {
             EmbedInput::Text(text) => self.embed_text(text).await,
-            _ => Err(SarissaError::invalid_argument(
+            _ => Err(IrisError::invalid_argument(
                 "OpenAIEmbedder only supports text input",
             )),
         }
@@ -374,7 +374,7 @@ impl Embedder for OpenAIEmbedder {
             .iter()
             .map(|input| match input {
                 EmbedInput::Text(text) => Ok(*text),
-                _ => Err(SarissaError::invalid_argument(
+                _ => Err(IrisError::invalid_argument(
                     "OpenAIEmbedder only supports text input",
                 )),
             })

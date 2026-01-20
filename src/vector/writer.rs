@@ -64,11 +64,11 @@ impl Default for VectorIndexWriterConfig {
 /// # Example
 ///
 /// ```rust,no_run
-/// use sarissa::vector::index::hnsw::writer::HnswIndexWriter;
-/// use sarissa::vector::index::config::HnswIndexConfig;
-/// use sarissa::vector::writer::{VectorIndexWriter, VectorIndexWriterConfig};
-/// use sarissa::storage::memory::{MemoryStorage, MemoryStorageConfig};
-/// use sarissa::storage::StorageConfig;
+/// use iris::vector::index::hnsw::writer::HnswIndexWriter;
+/// use iris::vector::index::config::HnswIndexConfig;
+/// use iris::vector::writer::{VectorIndexWriter, VectorIndexWriterConfig};
+/// use iris::storage::memory::{MemoryStorage, MemoryStorageConfig};
+/// use iris::storage::StorageConfig;
 /// use std::sync::Arc;
 ///
 /// let storage = Arc::new(MemoryStorage::new(MemoryStorageConfig::default()));
@@ -126,7 +126,7 @@ pub trait VectorIndexWriter: Send + Sync + std::fmt::Debug {
     fn delete_documents(&mut self, field: &str, value: &str) -> Result<usize> {
         let _ = field;
         let _ = value;
-        Err(crate::error::SarissaError::InvalidOperation(
+        Err(crate::error::IrisError::InvalidOperation(
             "delete_documents not implemented for this writer".to_string(),
         ))
     }

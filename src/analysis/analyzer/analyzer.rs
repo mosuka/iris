@@ -1,7 +1,7 @@
 //! Core analyzer trait definition.
 //!
 //! This module defines the [`Analyzer`] trait, which is the main interface for
-//! text analysis in Sarissa. Analyzers combine tokenizers and filters to
+//! text analysis in Iris. Analyzers combine tokenizers and filters to
 //! transform raw text into indexed tokens.
 //!
 //! # Role in Analysis Pipeline
@@ -35,8 +35,8 @@
 //! Using a built-in analyzer:
 //!
 //! ```
-//! use sarissa::analysis::analyzer::analyzer::Analyzer;
-//! use sarissa::analysis::analyzer::standard::StandardAnalyzer;
+//! use iris::analysis::analyzer::analyzer::Analyzer;
+//! use iris::analysis::analyzer::standard::StandardAnalyzer;
 //!
 //! let analyzer = StandardAnalyzer::new().unwrap();
 //! let tokens: Vec<_> = analyzer.analyze("Hello World").unwrap().collect();
@@ -48,9 +48,9 @@
 //! Implementing a custom analyzer:
 //!
 //! ```
-//! use sarissa::analysis::analyzer::analyzer::Analyzer;
-//! use sarissa::analysis::token::TokenStream;
-//! use sarissa::error::Result;
+//! use iris::analysis::analyzer::analyzer::Analyzer;
+//! use iris::analysis::token::TokenStream;
+//! use iris::error::Result;
 //!
 //! struct MyAnalyzer;
 //!
@@ -107,8 +107,8 @@ pub trait Analyzer: Send + Sync {
     /// # Examples
     ///
     /// ```
-    /// use sarissa::analysis::analyzer::analyzer::Analyzer;
-    /// use sarissa::analysis::analyzer::standard::StandardAnalyzer;
+    /// use iris::analysis::analyzer::analyzer::Analyzer;
+    /// use iris::analysis::analyzer::standard::StandardAnalyzer;
     ///
     /// let analyzer = StandardAnalyzer::new().unwrap();
     /// let tokens: Vec<_> = analyzer.analyze("The quick brown fox").unwrap().collect();
@@ -131,8 +131,8 @@ pub trait Analyzer: Send + Sync {
     /// # Examples
     ///
     /// ```
-    /// use sarissa::analysis::analyzer::analyzer::Analyzer;
-    /// use sarissa::analysis::analyzer::standard::StandardAnalyzer;
+    /// use iris::analysis::analyzer::analyzer::Analyzer;
+    /// use iris::analysis::analyzer::standard::StandardAnalyzer;
     ///
     /// let analyzer = StandardAnalyzer::new().unwrap();
     /// assert_eq!(analyzer.name(), "standard");
@@ -152,9 +152,9 @@ pub trait Analyzer: Send + Sync {
     /// # Examples
     ///
     /// ```
-    /// use sarissa::analysis::analyzer::analyzer::Analyzer;
-    /// use sarissa::analysis::analyzer::per_field::PerFieldAnalyzer;
-    /// use sarissa::analysis::analyzer::standard::StandardAnalyzer;
+    /// use iris::analysis::analyzer::analyzer::Analyzer;
+    /// use iris::analysis::analyzer::per_field::PerFieldAnalyzer;
+    /// use iris::analysis::analyzer::standard::StandardAnalyzer;
     /// use std::sync::Arc;
     ///
     /// let per_field = PerFieldAnalyzer::new(Arc::new(StandardAnalyzer::new().unwrap()));

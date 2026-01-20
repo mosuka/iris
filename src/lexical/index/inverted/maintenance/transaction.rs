@@ -1,4 +1,4 @@
-//! Transaction management for atomic lexical operations in Sarissa.
+//! Transaction management for atomic lexical operations in Iris.
 //!
 //! This module coordinates schema-less indexing, merges, and deletions with
 //! explicit commit/rollback hooks so concurrent writers keep inverted indexes
@@ -10,7 +10,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use ahash::AHashMap;
 use uuid::Uuid;
 
-use crate::error::{Result, SarissaError};
+use crate::error::{Result, IrisError};
 use crate::lexical::core::document::Document;
 use crate::lexical::index::inverted::segment::manager::SegmentManager;
 use crate::lexical::index::inverted::segment::merge_engine::MergeEngine;
@@ -112,7 +112,7 @@ impl Transaction {
     /// Add an operation to this transaction.
     pub fn add_operation(&mut self, operation: TransactionOperation) -> Result<()> {
         if self.state != TransactionState::Active {
-            return Err(SarissaError::index(
+            return Err(IrisError::index(
                 "Cannot add operations to inactive transaction",
             ));
         }
@@ -123,7 +123,7 @@ impl Transaction {
     /// Mark transaction as preparing for commit.
     pub fn prepare(&mut self) -> Result<()> {
         if self.state != TransactionState::Active {
-            return Err(SarissaError::index("Cannot prepare inactive transaction"));
+            return Err(IrisError::index("Cannot prepare inactive transaction"));
         }
         self.state = TransactionState::Preparing;
         Ok(())
@@ -132,7 +132,7 @@ impl Transaction {
     /// Mark transaction as committed.
     pub fn commit(&mut self) -> Result<()> {
         if self.state != TransactionState::Preparing {
-            return Err(SarissaError::index("Cannot commit unprepared transaction"));
+            return Err(IrisError::index("Cannot commit unprepared transaction"));
         }
         self.state = TransactionState::Committed;
         Ok(())
@@ -141,7 +141,7 @@ impl Transaction {
     /// Mark transaction as aborted.
     pub fn abort(&mut self) -> Result<()> {
         if self.state == TransactionState::Committed {
-            return Err(SarissaError::index("Cannot abort committed transaction"));
+            return Err(IrisError::index("Cannot abort committed transaction"));
         }
         self.state = TransactionState::Aborted;
         Ok(())

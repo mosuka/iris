@@ -14,8 +14,8 @@
 //! # Examples
 //!
 //! ```
-//! use sarissa::analysis::analyzer::analyzer::Analyzer;
-//! use sarissa::analysis::analyzer::noop::NoOpAnalyzer;
+//! use iris::analysis::analyzer::analyzer::Analyzer;
+//! use iris::analysis::analyzer::noop::NoOpAnalyzer;
 //!
 //! let analyzer = NoOpAnalyzer::new();
 //! let tokens: Vec<_> = analyzer.analyze("any text here").unwrap().collect();

@@ -14,8 +14,8 @@
 //! # Examples
 //!
 //! ```
-//! use sarissa::analysis::char_filter::CharFilter;
-//! // use sarissa::analysis::char_filter::unicode_normalize::UnicodeNormalizationCharFilter;
+//! use iris::analysis::char_filter::CharFilter;
+//! // use iris::analysis::char_filter::unicode_normalize::UnicodeNormalizationCharFilter;
 //! // (Example usage to be added after implementation)
 //! ```
 

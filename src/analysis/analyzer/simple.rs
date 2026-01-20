@@ -13,9 +13,9 @@
 //! # Examples
 //!
 //! ```
-//! use sarissa::analysis::analyzer::analyzer::Analyzer;
-//! use sarissa::analysis::analyzer::simple::SimpleAnalyzer;
-//! use sarissa::analysis::tokenizer::regex::RegexTokenizer;
+//! use iris::analysis::analyzer::analyzer::Analyzer;
+//! use iris::analysis::analyzer::simple::SimpleAnalyzer;
+//! use iris::analysis::tokenizer::regex::RegexTokenizer;
 //! use std::sync::Arc;
 //!
 //! let tokenizer = Arc::new(RegexTokenizer::new().unwrap());

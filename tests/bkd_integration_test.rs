@@ -1,13 +1,13 @@
 use chrono::{TimeZone, Utc};
-use sarissa::lexical::core::document::Document;
-use sarissa::lexical::core::field::{DateTimeOption, FloatOption, IntegerOption, NumericType};
-use sarissa::lexical::index::inverted::query::Query;
-use sarissa::lexical::index::inverted::query::geo::{GeoDistanceQuery, GeoPoint};
-use sarissa::lexical::index::inverted::query::range::NumericRangeQuery;
-use sarissa::lexical::index::inverted::writer::{InvertedIndexWriter, InvertedIndexWriterConfig};
-use sarissa::lexical::writer::LexicalIndexWriter;
-use sarissa::storage::Storage;
-use sarissa::storage::memory::{MemoryStorage, MemoryStorageConfig};
+use iris::lexical::core::document::Document;
+use iris::lexical::core::field::{DateTimeOption, FloatOption, IntegerOption, NumericType};
+use iris::lexical::index::inverted::query::Query;
+use iris::lexical::index::inverted::query::geo::{GeoDistanceQuery, GeoPoint};
+use iris::lexical::index::inverted::query::range::NumericRangeQuery;
+use iris::lexical::index::inverted::writer::{InvertedIndexWriter, InvertedIndexWriterConfig};
+use iris::lexical::writer::LexicalIndexWriter;
+use iris::storage::Storage;
+use iris::storage::memory::{MemoryStorage, MemoryStorageConfig};
 use std::sync::Arc;
 
 #[test]
@@ -220,7 +220,7 @@ fn test_geo_bkd_query() {
 }
 
 fn collect_matcher_results(
-    mut m: Box<dyn sarissa::lexical::index::inverted::query::matcher::Matcher>,
+    mut m: Box<dyn iris::lexical::index::inverted::query::matcher::Matcher>,
 ) -> Vec<u64> {
     let mut docs = Vec::new();
     while !m.is_exhausted() {

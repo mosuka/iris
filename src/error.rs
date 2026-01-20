@@ -1,17 +1,17 @@
-//! Error types for the Sarissa library.
+//! Error types for the Iris library.
 //!
-//! This module provides comprehensive error handling for all Sarissa operations.
-//! All errors are represented by the [`SarissaError`] enum, which provides
+//! This module provides comprehensive error handling for all Iris operations.
+//! All errors are represented by the [`IrisError`] enum, which provides
 //! detailed information about what went wrong.
 //!
 //! # Examples
 //!
 //! ```
-//! use sarissa::error::{SarissaError, Result};
+//! use iris::error::{IrisError, Result};
 //!
 //! fn example_operation() -> Result<()> {
 //!     // Return an error
-//!     Err(SarissaError::invalid_argument("Invalid input"))
+//!     Err(IrisError::invalid_argument("Invalid input"))
 //! }
 //!
 //! match example_operation() {
@@ -25,13 +25,13 @@ use std::io;
 use anyhow;
 use thiserror::Error;
 
-/// The main error type for Sarissa operations.
+/// The main error type for Iris operations.
 ///
-/// This enum represents all possible errors that can occur in the Sarissa library.
+/// This enum represents all possible errors that can occur in the Iris library.
 /// It uses the `thiserror` crate for automatic `Error` trait implementation and
 /// provides convenient constructor methods for creating specific error types.
 #[derive(Error, Debug)]
-pub enum SarissaError {
+pub enum IrisError {
     /// I/O errors (file operations, network, etc.)
     #[error("I/O error: {0}")]
     Io(#[from] io::Error),
@@ -101,78 +101,78 @@ pub enum SarissaError {
     Anyhow(#[from] anyhow::Error),
 }
 
-/// Result type alias for operations that may fail with SarissaError.
-pub type Result<T> = std::result::Result<T, SarissaError>;
+/// Result type alias for operations that may fail with IrisError.
+pub type Result<T> = std::result::Result<T, IrisError>;
 
-impl SarissaError {
+impl IrisError {
     /// Create a new index error.
     pub fn index<S: Into<String>>(msg: S) -> Self {
-        SarissaError::Index(msg.into())
+        IrisError::Index(msg.into())
     }
 
     /// Create a new schema error.
     pub fn schema<S: Into<String>>(msg: S) -> Self {
-        SarissaError::Schema(msg.into())
+        IrisError::Schema(msg.into())
     }
 
     /// Create a new analysis error.
     pub fn analysis<S: Into<String>>(msg: S) -> Self {
-        SarissaError::Analysis(msg.into())
+        IrisError::Analysis(msg.into())
     }
 
     /// Create a new query error.
     pub fn query<S: Into<String>>(msg: S) -> Self {
-        SarissaError::Query(msg.into())
+        IrisError::Query(msg.into())
     }
 
     /// Create a new parse error.
     pub fn parse<S: Into<String>>(msg: S) -> Self {
-        SarissaError::Query(msg.into()) // Parse errors are treated as query errors
+        IrisError::Query(msg.into()) // Parse errors are treated as query errors
     }
 
     /// Create a new storage error.
     pub fn storage<S: Into<String>>(msg: S) -> Self {
-        SarissaError::Storage(msg.into())
+        IrisError::Storage(msg.into())
     }
 
     /// Create a new field error.
     pub fn field<S: Into<String>>(msg: S) -> Self {
-        SarissaError::Field(msg.into())
+        IrisError::Field(msg.into())
     }
 
     /// Create a new generic error.
     pub fn other<S: Into<String>>(msg: S) -> Self {
-        SarissaError::Other(msg.into())
+        IrisError::Other(msg.into())
     }
 
     /// Create a new timeout error.
     pub fn timeout<S: Into<String>>(msg: S) -> Self {
-        SarissaError::Other(format!("Timeout: {}", msg.into()))
+        IrisError::Other(format!("Timeout: {}", msg.into()))
     }
 
     /// Create a new invalid config error.
     pub fn invalid_config<S: Into<String>>(msg: S) -> Self {
-        SarissaError::Other(format!("Invalid configuration: {}", msg.into()))
+        IrisError::Other(format!("Invalid configuration: {}", msg.into()))
     }
 
     /// Create a new invalid argument error.
     pub fn invalid_argument<S: Into<String>>(msg: S) -> Self {
-        SarissaError::Other(format!("Invalid argument: {}", msg.into()))
+        IrisError::Other(format!("Invalid argument: {}", msg.into()))
     }
 
     /// Create a new internal error.
     pub fn internal<S: Into<String>>(msg: S) -> Self {
-        SarissaError::Other(format!("Internal error: {}", msg.into()))
+        IrisError::Other(format!("Internal error: {}", msg.into()))
     }
 
     /// Create a new not found error.
     pub fn not_found<S: Into<String>>(msg: S) -> Self {
-        SarissaError::Other(format!("Not found: {}", msg.into()))
+        IrisError::Other(format!("Not found: {}", msg.into()))
     }
 
     /// Create a new cancelled error.
     pub fn cancelled<S: Into<String>>(msg: S) -> Self {
-        SarissaError::OperationCancelled(msg.into())
+        IrisError::OperationCancelled(msg.into())
     }
 }
 
@@ -182,23 +182,23 @@ mod tests {
 
     #[test]
     fn test_error_construction() {
-        let error = SarissaError::index("Test index error");
+        let error = IrisError::index("Test index error");
         assert_eq!(error.to_string(), "Index error: Test index error");
 
-        let error = SarissaError::schema("Test schema error");
+        let error = IrisError::schema("Test schema error");
         assert_eq!(error.to_string(), "Schema error: Test schema error");
 
-        let error = SarissaError::analysis("Test analysis error");
+        let error = IrisError::analysis("Test analysis error");
         assert_eq!(error.to_string(), "Analysis error: Test analysis error");
     }
 
     #[test]
     fn test_io_error_conversion() {
         let io_error = io::Error::new(io::ErrorKind::NotFound, "File not found");
-        let sarissa_error = SarissaError::from(io_error);
+        let iris_error = IrisError::from(io_error);
 
-        match sarissa_error {
-            SarissaError::Io(_) => {} // Expected
+        match iris_error {
+            IrisError::Io(_) => {} // Expected
             _ => panic!("Expected IO error variant"),
         }
     }

@@ -22,12 +22,12 @@ use crate::storage::Storage;
 /// # Example with StorageFactory
 ///
 /// ```
-/// use sarissa::lexical::engine::config::LexicalIndexConfig;
-/// use sarissa::lexical::index::factory::LexicalIndexFactory;
-/// use sarissa::storage::{StorageFactory, StorageConfig};
-/// use sarissa::storage::memory::MemoryStorageConfig;
+/// use iris::lexical::engine::config::LexicalIndexConfig;
+/// use iris::lexical::index::factory::LexicalIndexFactory;
+/// use iris::storage::{StorageFactory, StorageConfig};
+/// use iris::storage::memory::MemoryStorageConfig;
 ///
-/// # fn main() -> sarissa::error::Result<()> {
+/// # fn main() -> iris::error::Result<()> {
 /// // Create storage using factory
 /// let storage = StorageFactory::create(StorageConfig::Memory(MemoryStorageConfig::default()))?;
 ///
@@ -55,13 +55,13 @@ impl LexicalIndexFactory {
     /// # Example
     ///
     /// ```
-    /// use sarissa::lexical::engine::config::LexicalIndexConfig;
-    /// use sarissa::lexical::index::config::InvertedIndexConfig;
-    /// use sarissa::lexical::index::factory::LexicalIndexFactory;
-    /// use sarissa::storage::{StorageFactory, StorageConfig};
-    /// use sarissa::storage::file::FileStorageConfig;
+    /// use iris::lexical::engine::config::LexicalIndexConfig;
+    /// use iris::lexical::index::config::InvertedIndexConfig;
+    /// use iris::lexical::index::factory::LexicalIndexFactory;
+    /// use iris::storage::{StorageFactory, StorageConfig};
+    /// use iris::storage::file::FileStorageConfig;
     ///
-    /// # fn main() -> sarissa::error::Result<()> {
+    /// # fn main() -> iris::error::Result<()> {
     /// // Create file storage
     /// let storage_config = StorageConfig::File(FileStorageConfig::new("/tmp/index"));
     /// let storage = StorageFactory::create(storage_config)?;
@@ -98,13 +98,13 @@ impl LexicalIndexFactory {
     /// # Example
     ///
     /// ```no_run
-    /// use sarissa::lexical::engine::config::LexicalIndexConfig;
-    /// use sarissa::lexical::index::config::InvertedIndexConfig;
-    /// use sarissa::lexical::index::factory::LexicalIndexFactory;
-    /// use sarissa::storage::file::{FileStorage, FileStorageConfig};
+    /// use iris::lexical::engine::config::LexicalIndexConfig;
+    /// use iris::lexical::index::config::InvertedIndexConfig;
+    /// use iris::lexical::index::factory::LexicalIndexFactory;
+    /// use iris::storage::file::{FileStorage, FileStorageConfig};
     /// use std::sync::Arc;
     ///
-    /// # fn main() -> sarissa::error::Result<()> {
+    /// # fn main() -> iris::error::Result<()> {
     /// let storage = Arc::new(FileStorage::new("./index", FileStorageConfig::new("./index"))?);
     /// let config = LexicalIndexConfig::Inverted(InvertedIndexConfig::default());
     /// let index = LexicalIndexFactory::open(storage, config)?;

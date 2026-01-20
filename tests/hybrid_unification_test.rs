@@ -3,17 +3,17 @@ use std::any::Any;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use sarissa::embedding::embedder::{EmbedInput, EmbedInputType, Embedder};
-use sarissa::embedding::per_field::PerFieldEmbedder;
-use sarissa::error::SarissaError;
-use sarissa::lexical::core::field::{FieldOption, TextOption};
-use sarissa::storage::memory::MemoryStorage;
-use sarissa::vector::core::document::{DocumentPayload, Payload, StoredVector};
-use sarissa::vector::core::field::{FlatOption, VectorOption};
-use sarissa::vector::core::vector::Vector;
-use sarissa::vector::engine::VectorEngine;
-use sarissa::vector::engine::config::{VectorFieldConfig, VectorIndexConfig};
-use sarissa::vector::engine::request::{
+use iris::embedding::embedder::{EmbedInput, EmbedInputType, Embedder};
+use iris::embedding::per_field::PerFieldEmbedder;
+use iris::error::IrisError;
+use iris::lexical::core::field::{FieldOption, TextOption};
+use iris::storage::memory::MemoryStorage;
+use iris::vector::core::document::{DocumentPayload, Payload, StoredVector};
+use iris::vector::core::field::{FlatOption, VectorOption};
+use iris::vector::core::vector::Vector;
+use iris::vector::engine::VectorEngine;
+use iris::vector::engine::config::{VectorFieldConfig, VectorIndexConfig};
+use iris::vector::engine::request::{
     FusionConfig, LexicalQuery, QueryVector, TermQueryOptions, VectorSearchRequest,
 };
 
@@ -39,20 +39,20 @@ impl MockEmbedder {
 
 #[async_trait]
 impl Embedder for MockEmbedder {
-    async fn embed(&self, input: &EmbedInput<'_>) -> std::result::Result<Vector, SarissaError> {
+    async fn embed(&self, input: &EmbedInput<'_>) -> std::result::Result<Vector, IrisError> {
         match input {
             EmbedInput::Text(text) => {
                 let map = self.vectors.lock().unwrap();
                 if let Some(vec) = map.get(*text) {
                     Ok(Vector::new(vec.clone()))
                 } else {
-                    Err(SarissaError::invalid_argument(format!(
+                    Err(IrisError::invalid_argument(format!(
                         "MockEmbedder: unknown text '{}'",
                         text
                     )))
                 }
             }
-            _ => Err(SarissaError::invalid_argument(
+            _ => Err(IrisError::invalid_argument(
                 "MockEmbedder only supports text",
             )),
         }

@@ -15,8 +15,8 @@
 //! # Examples
 //!
 //! ```
-//! use sarissa::analysis::token_filter::stem::Stemmer;
-//! use sarissa::analysis::token_filter::stem::porter::PorterStemmer;
+//! use iris::analysis::token_filter::stem::Stemmer;
+//! use iris::analysis::token_filter::stem::porter::PorterStemmer;
 //!
 //! let stemmer = PorterStemmer::new();
 //!

@@ -14,20 +14,20 @@ use std::sync::Arc;
 
 use tempfile::TempDir;
 
-use sarissa::analysis::analyzer::analyzer::Analyzer;
-use sarissa::analysis::analyzer::keyword::KeywordAnalyzer;
-use sarissa::analysis::analyzer::per_field::PerFieldAnalyzer;
-use sarissa::analysis::analyzer::standard::StandardAnalyzer;
-use sarissa::lexical::core::document::Document;
-use sarissa::lexical::core::field::TextOption;
-use sarissa::lexical::core::parser::DocumentParser;
-use sarissa::error::Result;
-use sarissa::lexical::engine::LexicalEngine;
-use sarissa::lexical::engine::config::LexicalIndexConfig;
-use sarissa::lexical::index::inverted::writer::{InvertedIndexWriter, InvertedIndexWriterConfig};
-use sarissa::lexical::search::searcher::LexicalSearchRequest;
-use sarissa::storage::file::FileStorage;
-use sarissa::storage::file::FileStorageConfig;
+use iris::analysis::analyzer::analyzer::Analyzer;
+use iris::analysis::analyzer::keyword::KeywordAnalyzer;
+use iris::analysis::analyzer::per_field::PerFieldAnalyzer;
+use iris::analysis::analyzer::standard::StandardAnalyzer;
+use iris::lexical::core::document::Document;
+use iris::lexical::core::field::TextOption;
+use iris::lexical::core::parser::DocumentParser;
+use iris::error::Result;
+use iris::lexical::engine::LexicalEngine;
+use iris::lexical::engine::config::LexicalIndexConfig;
+use iris::lexical::index::inverted::writer::{InvertedIndexWriter, InvertedIndexWriterConfig};
+use iris::lexical::search::searcher::LexicalSearchRequest;
+use iris::storage::file::FileStorage;
+use iris::storage::file::FileStorageConfig;
 
 fn main() -> Result<()> {
     println!("=== Document Parser Example ===\n");
@@ -116,7 +116,7 @@ fn main() -> Result<()> {
     let query_str = "category:programming";
     println!("Query: {query_str}");
 
-    use sarissa::lexical::index::inverted::query::parser::QueryParser;
+    use iris::lexical::index::inverted::query::parser::QueryParser;
     let parser = QueryParser::new(analyzer.clone());
     let query = parser.parse(query_str)?;
 

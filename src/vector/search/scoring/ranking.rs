@@ -58,7 +58,7 @@ impl VectorRanker {
     /// # Examples
     ///
     /// ```
-    /// use sarissa::vector::search::scoring::ranking::{VectorRanker, RankingConfig};
+    /// use iris::vector::search::scoring::ranking::{VectorRanker, RankingConfig};
     ///
     /// let config = RankingConfig::default();
     /// let ranker = VectorRanker::new(config);

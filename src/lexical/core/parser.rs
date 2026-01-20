@@ -38,10 +38,10 @@
 //! Basic usage with default analyzer:
 //!
 //! ```
-//! use sarissa::lexical::core::document::Document;
-//! use sarissa::lexical::core::parser::DocumentParser;
-//! use sarissa::lexical::core::field::{TextOption, IntegerOption};
-//! use sarissa::analysis::analyzer::standard::StandardAnalyzer;
+//! use iris::lexical::core::document::Document;
+//! use iris::lexical::core::parser::DocumentParser;
+//! use iris::lexical::core::field::{TextOption, IntegerOption};
+//! use iris::analysis::analyzer::standard::StandardAnalyzer;
 //! use std::sync::Arc;
 //!
 //! let parser = DocumentParser::new(Arc::new(StandardAnalyzer::new().unwrap()));
@@ -59,12 +59,12 @@
 //! With per-field analyzers:
 //!
 //! ```
-//! use sarissa::lexical::core::document::Document;
-//! use sarissa::lexical::core::parser::DocumentParser;
-//! use sarissa::lexical::core::field::TextOption;
-//! use sarissa::analysis::analyzer::per_field::PerFieldAnalyzer;
-//! use sarissa::analysis::analyzer::standard::StandardAnalyzer;
-//! use sarissa::analysis::analyzer::keyword::KeywordAnalyzer;
+//! use iris::lexical::core::document::Document;
+//! use iris::lexical::core::parser::DocumentParser;
+//! use iris::lexical::core::field::TextOption;
+//! use iris::analysis::analyzer::per_field::PerFieldAnalyzer;
+//! use iris::analysis::analyzer::standard::StandardAnalyzer;
+//! use iris::analysis::analyzer::keyword::KeywordAnalyzer;
 //! use std::sync::Arc;
 //!
 //! // Configure per-field analyzers
@@ -104,12 +104,12 @@ use crate::lexical::core::field::FieldValue;
 /// # Example
 ///
 /// ```
-/// use sarissa::lexical::core::document::Document;
-/// use sarissa::lexical::core::parser::DocumentParser;
-/// use sarissa::lexical::core::field::TextOption;
-/// use sarissa::analysis::analyzer::per_field::PerFieldAnalyzer;
-/// use sarissa::analysis::analyzer::standard::StandardAnalyzer;
-/// use sarissa::analysis::analyzer::keyword::KeywordAnalyzer;
+/// use iris::lexical::core::document::Document;
+/// use iris::lexical::core::parser::DocumentParser;
+/// use iris::lexical::core::field::TextOption;
+/// use iris::analysis::analyzer::per_field::PerFieldAnalyzer;
+/// use iris::analysis::analyzer::standard::StandardAnalyzer;
+/// use iris::analysis::analyzer::keyword::KeywordAnalyzer;
 /// use std::sync::Arc;
 ///
 /// let mut per_field = PerFieldAnalyzer::new(Arc::new(StandardAnalyzer::new().unwrap()));

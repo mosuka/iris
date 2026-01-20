@@ -24,12 +24,12 @@ use crate::vector::index::ivf::IvfIndex;
 /// # Example with StorageFactory
 ///
 /// ```
-/// use sarissa::vector::index::factory::VectorIndexFactory;
-/// use sarissa::vector::index::config::VectorIndexTypeConfig;
-/// use sarissa::storage::{StorageFactory, StorageConfig};
-/// use sarissa::storage::memory::MemoryStorageConfig;
+/// use iris::vector::index::factory::VectorIndexFactory;
+/// use iris::vector::index::config::VectorIndexTypeConfig;
+/// use iris::storage::{StorageFactory, StorageConfig};
+/// use iris::storage::memory::MemoryStorageConfig;
 ///
-/// # fn main() -> sarissa::error::Result<()> {
+/// # fn main() -> iris::error::Result<()> {
 /// // Create storage using factory
 /// let storage = StorageFactory::create(StorageConfig::Memory(MemoryStorageConfig::default()))?;
 ///
@@ -57,12 +57,12 @@ impl VectorIndexFactory {
     /// # Example
     ///
     /// ```
-    /// use sarissa::vector::index::factory::VectorIndexFactory;
-    /// use sarissa::vector::index::config::{VectorIndexTypeConfig, FlatIndexConfig};
-    /// use sarissa::storage::{StorageFactory, StorageConfig};
-    /// use sarissa::storage::file::FileStorageConfig;
+    /// use iris::vector::index::factory::VectorIndexFactory;
+    /// use iris::vector::index::config::{VectorIndexTypeConfig, FlatIndexConfig};
+    /// use iris::storage::{StorageFactory, StorageConfig};
+    /// use iris::storage::file::FileStorageConfig;
     ///
-    /// # fn main() -> sarissa::error::Result<()> {
+    /// # fn main() -> iris::error::Result<()> {
     /// // Create file storage
     /// let storage_config = StorageConfig::File(FileStorageConfig::new("/tmp/index"));
     /// let storage = StorageFactory::create(storage_config)?;
@@ -108,12 +108,12 @@ impl VectorIndexFactory {
     /// # Example
     ///
     /// ```no_run
-    /// use sarissa::vector::index::factory::VectorIndexFactory;
-    /// use sarissa::vector::index::config::{VectorIndexTypeConfig, FlatIndexConfig};
-    /// use sarissa::storage::file::{FileStorage, FileStorageConfig};
+    /// use iris::vector::index::factory::VectorIndexFactory;
+    /// use iris::vector::index::config::{VectorIndexTypeConfig, FlatIndexConfig};
+    /// use iris::storage::file::{FileStorage, FileStorageConfig};
     /// use std::sync::Arc;
     ///
-    /// # fn main() -> sarissa::error::Result<()> {
+    /// # fn main() -> iris::error::Result<()> {
     /// let storage = Arc::new(FileStorage::new("./index", FileStorageConfig::new("./index"))?);
     /// let config = VectorIndexTypeConfig::Flat(FlatIndexConfig::default());
     /// let index = VectorIndexFactory::open(storage, "test_index", config)?;

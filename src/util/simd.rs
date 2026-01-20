@@ -1,4 +1,4 @@
-//! SIMD-friendly helpers that power hot paths inside Sarissa.
+//! SIMD-friendly helpers that power hot paths inside Iris.
 
 pub mod simd_wide;
 

@@ -1,25 +1,25 @@
 use std::sync::Arc;
 
-use sarissa::analysis::analyzer::standard::StandardAnalyzer;
-use sarissa::lexical::core::document::Document;
-use sarissa::lexical::core::field::TextOption;
-use sarissa::lexical::index::inverted::query::Query;
-use sarissa::lexical::index::inverted::query::span::{
+use iris::analysis::analyzer::standard::StandardAnalyzer;
+use iris::lexical::core::document::Document;
+use iris::lexical::core::field::TextOption;
+use iris::lexical::index::inverted::query::Query;
+use iris::lexical::index::inverted::query::span::{
     SpanQuery, SpanQueryBuilder, SpanQueryWrapper, SpanTermQuery,
 };
-use sarissa::lexical::index::inverted::writer::{InvertedIndexWriter, InvertedIndexWriterConfig};
-use sarissa::lexical::writer::LexicalIndexWriter;
-use sarissa::storage::memory::MemoryStorage;
+use iris::lexical::index::inverted::writer::{InvertedIndexWriter, InvertedIndexWriterConfig};
+use iris::lexical::writer::LexicalIndexWriter;
+use iris::storage::memory::MemoryStorage;
 
 fn create_test_index() -> Result<
     (
-        Arc<sarissa::storage::memory::MemoryStorage>,
-        Arc<dyn sarissa::lexical::reader::LexicalIndexReader>,
+        Arc<iris::storage::memory::MemoryStorage>,
+        Arc<dyn iris::lexical::reader::LexicalIndexReader>,
     ),
     Box<dyn std::error::Error>,
 > {
     let storage = Arc::new(MemoryStorage::new(
-        sarissa::storage::memory::MemoryStorageConfig::default(),
+        iris::storage::memory::MemoryStorageConfig::default(),
     ));
     let config = InvertedIndexWriterConfig {
         analyzer: Arc::new(StandardAnalyzer::new()?),
@@ -39,10 +39,10 @@ fn create_test_index() -> Result<
             .add_text("content", "world hello", TextOption::default())
             .build(),
     )?;
-    // Doc 2: "hello sarissa world"
+    // Doc 2: "hello iris world"
     writer.add_document(
         Document::builder()
-            .add_text("content", "hello sarissa world", TextOption::default())
+            .add_text("content", "hello iris world", TextOption::default())
             .build(),
     )?;
     // Doc 3: "foo bar baz"
@@ -115,7 +115,7 @@ fn test_span_near_query_integration() -> Result<(), Box<dyn std::error::Error>> 
     // Case 1: "hello world", in_order=true, slop=0
     // Doc 0: "hello"(0) "world"(1) -> dist=0. Match.
     // Doc 1: "world"(0) "hello"(1) -> disorder. No match.
-    // Doc 2: "hello"(0) "sarissa"(1) "world"(2) -> dist=1. No match (slop=0).
+    // Doc 2: "hello"(0) "iris"(1) "world"(2) -> dist=1. No match (slop=0).
     let q1 = builder.near(
         vec![
             Box::new(builder.term("hello")),
@@ -183,13 +183,13 @@ fn test_span_containing_query_integration() -> Result<(), Box<dyn std::error::Er
     let (_, reader) = create_test_index()?;
     let builder = SpanQueryBuilder::new("content");
 
-    // Doc 2: "hello sarissa world"
-    // We want to find a span that contains "sarissa".
+    // Doc 2: "hello iris world"
+    // We want to find a span that contains "iris".
     // Let's define a big span "hello ... world" (near, slop=1, in_order=true)
-    // And a little span "sarissa".
+    // And a little span "iris".
     // In Doc 2:
     // "hello"(0) ... "world"(2) -> combined span (0, 3)
-    // "sarissa"(1) -> span (1, 2)
+    // "iris"(1) -> span (1, 2)
     // (0,3) contains (1,2)?
     // 0 <= 1 && 2 <= 3. Yes.
 
@@ -201,7 +201,7 @@ fn test_span_containing_query_integration() -> Result<(), Box<dyn std::error::Er
         1,
         true,
     );
-    let little = builder.term("sarissa");
+    let little = builder.term("iris");
 
     let q = builder.containing(Box::new(big), Box::new(little));
     let wrapper = SpanQueryWrapper::new(Box::new(q));
@@ -219,14 +219,14 @@ fn test_span_within_query_integration() -> Result<(), Box<dyn std::error::Error>
     let (_, reader) = create_test_index()?;
     let builder = SpanQueryBuilder::new("content");
 
-    // Doc 2: "hello sarissa world"
-    // positions: hello=0, sarissa=1, world=2
-    // find "sarissa" within 1 distance of "hello"
-    // include="sarissa", exclude="hello", distance=1
-    // sarissa(1,2), hello(0,1).
+    // Doc 2: "hello iris world"
+    // positions: hello=0, iris=1, world=2
+    // find "iris" within 1 distance of "hello"
+    // include="iris", exclude="hello", distance=1
+    // iris(1,2), hello(0,1).
     // distance?
     // overlap? no.
-    // hello end=1, sarissa start=1.
+    // hello end=1, iris start=1.
     // distance = 1 - 1 = 0.
     // So distance 0 implies immediately following?
     // Let's check Span::distance_to
@@ -234,7 +234,7 @@ fn test_span_within_query_integration() -> Result<(), Box<dyn std::error::Error>
     // 1 <= 1 -> 1-1=0.
     // So distance 0 means adjacent.
 
-    let include = builder.term("sarissa");
+    let include = builder.term("iris");
     let exclude = builder.term("hello");
     let q = builder.within(Box::new(include), Box::new(exclude), 0); // Adjacent
 
@@ -246,12 +246,12 @@ fn test_span_within_query_integration() -> Result<(), Box<dyn std::error::Error>
     assert!(!matcher.next()?);
 
     // Try distance 0 with "world"
-    // sarissa(1,2), world(2,3).
+    // iris(1,2), world(2,3).
     // exclude="world".
-    // include="sarissa".
-    // sarissa end=2, world start=2. dist=0.
+    // include="iris".
+    // iris end=2, world start=2. dist=0.
     // match.
-    let include2 = builder.term("sarissa");
+    let include2 = builder.term("iris");
     let exclude2 = builder.term("world");
     let q2 = builder.within(Box::new(include2), Box::new(exclude2), 0);
     let wrapper2 = SpanQueryWrapper::new(Box::new(q2));

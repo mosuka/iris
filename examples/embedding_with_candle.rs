@@ -11,13 +11,13 @@
 //! ```
 
 #[cfg(feature = "embeddings-candle")]
-use sarissa::embedding::candle_bert_embedder::CandleBertEmbedder;
+use iris::embedding::candle_bert_embedder::CandleBertEmbedder;
 #[cfg(feature = "embeddings-candle")]
-use sarissa::embedding::embedder::{EmbedInput, Embedder};
+use iris::embedding::embedder::{EmbedInput, Embedder};
 
 #[cfg(feature = "embeddings-candle")]
 #[tokio::main]
-async fn main() -> sarissa::error::Result<()> {
+async fn main() -> iris::error::Result<()> {
     println!("=== Candle BERT Embedder Example ===\n");
 
     // Create embedder with a sentence-transformers model

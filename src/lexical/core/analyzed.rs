@@ -21,8 +21,8 @@
 //! Creating an analyzed document (typically done by DocumentParser):
 //!
 //! ```
-//! use sarissa::lexical::core::analyzed::{AnalyzedDocument, AnalyzedTerm};
-//! use sarissa::lexical::core::field::FieldValue;
+//! use iris::lexical::core::analyzed::{AnalyzedDocument, AnalyzedTerm};
+//! use iris::lexical::core::field::FieldValue;
 //! use ahash::AHashMap;
 //!
 //! let mut field_terms = AHashMap::new();

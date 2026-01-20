@@ -12,9 +12,9 @@
 //! # Examples
 //!
 //! ```
-//! use sarissa::analysis::token_filter::Filter;
-//! use sarissa::analysis::token_filter::stem::StemFilter;
-//! use sarissa::analysis::token::Token;
+//! use iris::analysis::token_filter::Filter;
+//! use iris::analysis::token_filter::stem::StemFilter;
+//! use iris::analysis::token::Token;
 //!
 //! let filter = StemFilter::new(); // Uses Porter stemmer by default
 //! let tokens = vec![

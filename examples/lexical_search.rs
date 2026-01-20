@@ -1,6 +1,6 @@
 //! Lexical Search Example - Basic usage guide
 //!
-//! This example demonstrates the fundamental steps to use Sarissa for lexical search:
+//! This example demonstrates the fundamental steps to use Iris for lexical search:
 //! 1. Setup storage and analyzer (using PerFieldAnalyzer)
 //! 2. Configure the index
 //! 3. Add documents
@@ -8,21 +8,21 @@
 
 use std::sync::Arc;
 
-use sarissa::analysis::analyzer::analyzer::Analyzer;
-use sarissa::analysis::analyzer::keyword::KeywordAnalyzer;
-use sarissa::analysis::analyzer::per_field::PerFieldAnalyzer;
-use sarissa::analysis::analyzer::standard::StandardAnalyzer;
-use sarissa::error::Result;
-use sarissa::lexical::core::document::Document;
-use sarissa::lexical::core::field::TextOption;
-use sarissa::lexical::engine::LexicalEngine;
-use sarissa::lexical::engine::config::LexicalIndexConfig;
-use sarissa::lexical::index::config::InvertedIndexConfig;
-use sarissa::lexical::index::inverted::query::Query;
-use sarissa::lexical::index::inverted::query::term::TermQuery;
-use sarissa::lexical::search::searcher::LexicalSearchRequest;
-use sarissa::storage::file::FileStorageConfig;
-use sarissa::storage::{StorageConfig, StorageFactory};
+use iris::analysis::analyzer::analyzer::Analyzer;
+use iris::analysis::analyzer::keyword::KeywordAnalyzer;
+use iris::analysis::analyzer::per_field::PerFieldAnalyzer;
+use iris::analysis::analyzer::standard::StandardAnalyzer;
+use iris::error::Result;
+use iris::lexical::core::document::Document;
+use iris::lexical::core::field::TextOption;
+use iris::lexical::engine::LexicalEngine;
+use iris::lexical::engine::config::LexicalIndexConfig;
+use iris::lexical::index::config::InvertedIndexConfig;
+use iris::lexical::index::inverted::query::Query;
+use iris::lexical::index::inverted::query::term::TermQuery;
+use iris::lexical::search::searcher::LexicalSearchRequest;
+use iris::storage::file::FileStorageConfig;
+use iris::storage::{StorageConfig, StorageFactory};
 use tempfile::TempDir;
 
 fn main() -> Result<()> {

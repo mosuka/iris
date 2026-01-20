@@ -17,8 +17,8 @@
 //!
 //! ```rust,ignore
 //! use std::sync::Arc;
-//! use sarissa::embedding::precomputed::PrecomputedEmbedder;
-//! use sarissa::vector::index::config::VectorIndexConfig;
+//! use iris::embedding::precomputed::PrecomputedEmbedder;
+//! use iris::vector::index::config::VectorIndexConfig;
 //!
 //! let config = VectorIndexConfig::builder()
 //!     .embedder(PrecomputedEmbedder::new())
@@ -39,7 +39,7 @@ use std::any::Any;
 use async_trait::async_trait;
 
 use crate::embedding::embedder::{EmbedInput, EmbedInputType, Embedder};
-use crate::error::{Result, SarissaError};
+use crate::error::{Result, IrisError};
 use crate::vector::core::vector::Vector;
 
 /// An embedder that does not support text or image embedding, used for pre-computed vectors.
@@ -52,8 +52,8 @@ use crate::vector::core::vector::Vector;
 ///
 /// ```rust
 /// use std::sync::Arc;
-/// use sarissa::embedding::precomputed::PrecomputedEmbedder;
-/// use sarissa::embedding::embedder::Embedder;
+/// use iris::embedding::precomputed::PrecomputedEmbedder;
+/// use iris::embedding::embedder::Embedder;
 ///
 /// let embedder: Arc<dyn Embedder> = Arc::new(PrecomputedEmbedder::new());
 /// assert!(!embedder.supports_text());
@@ -74,7 +74,7 @@ impl PrecomputedEmbedder {
     /// # Example
     ///
     /// ```rust
-    /// use sarissa::embedding::precomputed::PrecomputedEmbedder;
+    /// use iris::embedding::precomputed::PrecomputedEmbedder;
     ///
     /// let embedder = PrecomputedEmbedder::new();
     /// ```
@@ -87,7 +87,7 @@ impl PrecomputedEmbedder {
 impl Embedder for PrecomputedEmbedder {
     /// Returns an error for any input, as this embedder does not support embedding.
     async fn embed(&self, _input: &EmbedInput<'_>) -> Result<Vector> {
-        Err(SarissaError::invalid_argument(
+        Err(IrisError::invalid_argument(
             "PrecomputedEmbedder does not support embedding - use pre-computed vectors",
         ))
     }

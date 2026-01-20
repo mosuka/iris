@@ -10,7 +10,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use ahash::AHashMap;
 use serde::{Deserialize, Serialize};
 
-use crate::error::{Result, SarissaError};
+use crate::error::{Result, IrisError};
 use crate::storage::structured::{StructReader, StructWriter};
 use crate::storage::{Storage, StorageInput, StorageOutput};
 
@@ -106,7 +106,7 @@ impl DeletionBitmap {
     pub fn delete_document(&self, doc_id: u64) -> Result<bool> {
         // Range check
         if doc_id < self.min_doc_id || doc_id > self.max_doc_id {
-            return Err(SarissaError::index(format!(
+            return Err(IrisError::index(format!(
                 "Document ID {doc_id} is out of range [{}, {}] for segment {}",
                 self.min_doc_id, self.max_doc_id, self.segment_id
             )));
@@ -203,7 +203,7 @@ impl DeletionBitmap {
         // Read header
         let magic = reader.read_u32()?;
         if magic != 0x44454C42 {
-            return Err(SarissaError::index("Invalid deletion bitmap format"));
+            return Err(IrisError::index("Invalid deletion bitmap format"));
         }
 
         let version = reader.read_u32()?;
@@ -317,7 +317,7 @@ impl DeletionBitmap {
                 version: AtomicU64::new(bitmap_version),
             })
         } else {
-            Err(SarissaError::index(format!(
+            Err(IrisError::index(format!(
                 "Unsupported bitmap version: {version}"
             )))
         }
@@ -634,7 +634,7 @@ impl DeletionManager {
             if let Some(bitmap) = bitmaps.get(segment_id) {
                 bitmap.delete_document(doc_id)?
             } else {
-                return Err(SarissaError::index(format!(
+                return Err(IrisError::index(format!(
                     "Segment {segment_id} not found in deletion manager"
                 )));
             }
@@ -671,7 +671,7 @@ impl DeletionManager {
                         }
                     }
                 } else {
-                    return Err(SarissaError::index(format!(
+                    return Err(IrisError::index(format!(
                         "Segment {segment_id} not found in deletion manager"
                     )));
                 }

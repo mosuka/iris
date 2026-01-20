@@ -16,28 +16,28 @@
 use std::sync::Arc;
 
 #[cfg(feature = "embeddings-candle")]
-use sarissa::embedding::candle_bert_embedder::CandleBertEmbedder;
+use iris::embedding::candle_bert_embedder::CandleBertEmbedder;
 #[cfg(feature = "embeddings-candle")]
-use sarissa::embedding::embedder::Embedder;
+use iris::embedding::embedder::Embedder;
 #[cfg(feature = "embeddings-candle")]
-use sarissa::embedding::per_field::PerFieldEmbedder;
+use iris::embedding::per_field::PerFieldEmbedder;
 #[cfg(feature = "embeddings-candle")]
-use sarissa::error::Result;
+use iris::error::Result;
 #[cfg(feature = "embeddings-candle")]
-use sarissa::storage::file::FileStorageConfig;
+use iris::storage::file::FileStorageConfig;
 #[cfg(feature = "embeddings-candle")]
-use sarissa::storage::{StorageConfig, StorageFactory};
+use iris::storage::{StorageConfig, StorageFactory};
 #[cfg(feature = "embeddings-candle")]
-use sarissa::vector::core::distance::DistanceMetric;
+use iris::vector::core::distance::DistanceMetric;
 #[cfg(feature = "embeddings-candle")]
-use sarissa::vector::core::document::DocumentPayload;
+use iris::vector::core::document::DocumentPayload;
 #[cfg(feature = "embeddings-candle")]
-use sarissa::vector::core::field::{HnswOption, VectorOption};
+use iris::vector::core::field::{HnswOption, VectorOption};
 #[cfg(feature = "embeddings-candle")]
-use sarissa::vector::engine::VectorEngine;
-use sarissa::vector::engine::config::{VectorFieldConfig, VectorIndexConfig};
+use iris::vector::engine::VectorEngine;
+use iris::vector::engine::config::{VectorFieldConfig, VectorIndexConfig};
 #[cfg(feature = "embeddings-candle")]
-use sarissa::vector::engine::query::VectorSearchRequestBuilder;
+use iris::vector::engine::query::VectorSearchRequestBuilder;
 #[cfg(feature = "embeddings-candle")]
 use tempfile::TempDir;
 

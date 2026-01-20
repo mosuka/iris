@@ -28,13 +28,13 @@
 //! ```no_run
 //! # #[cfg(feature = "embeddings-candle")]
 //! # {
-//! use sarissa::embedding::embedder::{Embedder, EmbedInput};
-//! use sarissa::embedding::per_field::PerFieldEmbedder;
-//! use sarissa::embedding::candle_bert_embedder::CandleBertEmbedder;
-//! use sarissa::embedding::precomputed::PrecomputedEmbedder;
+//! use iris::embedding::embedder::{Embedder, EmbedInput};
+//! use iris::embedding::per_field::PerFieldEmbedder;
+//! use iris::embedding::candle_bert_embedder::CandleBertEmbedder;
+//! use iris::embedding::precomputed::PrecomputedEmbedder;
 //! use std::sync::Arc;
 //!
-//! # async fn example() -> sarissa::error::Result<()> {
+//! # async fn example() -> iris::error::Result<()> {
 //! let text_embedder = Arc::new(
 //!     CandleBertEmbedder::new("sentence-transformers/all-MiniLM-L6-v2")?
 //! );
@@ -142,9 +142,9 @@ pub enum EmbedInputType {
 ///
 /// ```
 /// use async_trait::async_trait;
-/// use sarissa::embedding::embedder::{Embedder, EmbedInput, EmbedInputType};
-/// use sarissa::error::{SarissaError, Result};
-/// use sarissa::vector::core::vector::Vector;
+/// use iris::embedding::embedder::{Embedder, EmbedInput, EmbedInputType};
+/// use iris::error::{IrisError, Result};
+/// use iris::vector::core::vector::Vector;
 ///
 /// #[derive(Debug)]
 /// struct MyTextEmbedder {
@@ -159,7 +159,7 @@ pub enum EmbedInputType {
 ///                 // Generate embedding from text
 ///                 Ok(Vector::new(vec![0.0; self.dimension]))
 ///             }
-///             _ => Err(SarissaError::invalid_argument(
+///             _ => Err(IrisError::invalid_argument(
 ///                 "this embedder only supports text input"
 ///             )),
 ///         }
@@ -271,7 +271,7 @@ pub trait Embedder: Send + Sync + Debug {
 
 #[cfg(test)]
 mod tests {
-    use crate::error::SarissaError;
+    use crate::error::IrisError;
 
     use super::*;
 
@@ -285,7 +285,7 @@ mod tests {
         async fn embed(&self, input: &EmbedInput<'_>) -> Result<Vector> {
             match input {
                 EmbedInput::Text(_) => Ok(Vector::new(vec![0.0; self.dimension])),
-                _ => Err(SarissaError::invalid_argument(
+                _ => Err(IrisError::invalid_argument(
                     "this embedder only supports text input",
                 )),
             }

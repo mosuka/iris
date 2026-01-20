@@ -3,24 +3,24 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use sarissa::analysis::analyzer::keyword::KeywordAnalyzer;
-use sarissa::embedding::embedder::{EmbedInput, EmbedInputType, Embedder};
-use sarissa::embedding::per_field::PerFieldEmbedder;
-use sarissa::embedding::precomputed::PrecomputedEmbedder;
-use sarissa::error::{Result, SarissaError};
-use sarissa::lexical::engine::config::LexicalIndexConfig;
-use sarissa::storage::Storage;
-use sarissa::storage::memory::MemoryStorage;
-use sarissa::vector::core::distance::DistanceMetric;
-use sarissa::vector::core::document::{
+use iris::analysis::analyzer::keyword::KeywordAnalyzer;
+use iris::embedding::embedder::{EmbedInput, EmbedInputType, Embedder};
+use iris::embedding::per_field::PerFieldEmbedder;
+use iris::embedding::precomputed::PrecomputedEmbedder;
+use iris::error::{Result, IrisError};
+use iris::lexical::engine::config::LexicalIndexConfig;
+use iris::storage::Storage;
+use iris::storage::memory::MemoryStorage;
+use iris::vector::core::distance::DistanceMetric;
+use iris::vector::core::document::{
     DocumentPayload, DocumentVector, Payload, PayloadSource, StoredVector,
 };
-use sarissa::vector::core::field::{FlatOption, VectorIndexKind, VectorOption};
-use sarissa::vector::core::vector::Vector;
-use sarissa::vector::engine::VectorEngine;
-use sarissa::vector::engine::config::{VectorFieldConfig, VectorIndexConfig};
-use sarissa::vector::engine::filter::{MetadataFilter, VectorFilter};
-use sarissa::vector::engine::request::{
+use iris::vector::core::field::{FlatOption, VectorIndexKind, VectorOption};
+use iris::vector::core::vector::Vector;
+use iris::vector::engine::VectorEngine;
+use iris::vector::engine::config::{VectorFieldConfig, VectorIndexConfig};
+use iris::vector::engine::filter::{MetadataFilter, VectorFilter};
+use iris::vector::engine::request::{
     FieldSelector, QueryPayload, QueryVector, VectorScoreMode, VectorSearchRequest,
 };
 
@@ -374,7 +374,7 @@ impl Embedder for IntegrationTestEmbedder {
                 }
                 Ok(Vector::new(data))
             }
-            _ => Err(SarissaError::invalid_argument(
+            _ => Err(IrisError::invalid_argument(
                 "IntegrationTestEmbedder only supports text input",
             )),
         }

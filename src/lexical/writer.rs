@@ -15,10 +15,10 @@ use crate::lexical::core::document::Document;
 /// # Example
 ///
 /// ```rust,no_run
-/// use sarissa::lexical::index::inverted::writer::{InvertedIndexWriter, InvertedIndexWriterConfig};
-/// use sarissa::lexical::writer::LexicalIndexWriter;
-/// use sarissa::storage::memory::{MemoryStorage, MemoryStorageConfig};
-/// use sarissa::storage::StorageConfig;
+/// use iris::lexical::index::inverted::writer::{InvertedIndexWriter, InvertedIndexWriterConfig};
+/// use iris::lexical::writer::LexicalIndexWriter;
+/// use iris::storage::memory::{MemoryStorage, MemoryStorageConfig};
+/// use iris::storage::StorageConfig;
 /// use std::sync::Arc;
 ///
 /// let storage = Arc::new(MemoryStorage::new(MemoryStorageConfig::default()));

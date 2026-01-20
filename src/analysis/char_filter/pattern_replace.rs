@@ -13,7 +13,7 @@ impl PatternReplaceCharFilter {
     pub fn new(pattern: &str, replacement: &str) -> crate::error::Result<Self> {
         Ok(Self {
             pattern: Regex::new(pattern)
-                .map_err(|e| crate::error::SarissaError::Anyhow(anyhow::Error::from(e)))?,
+                .map_err(|e| crate::error::IrisError::Anyhow(anyhow::Error::from(e)))?,
             replacement: replacement.to_string(),
         })
     }

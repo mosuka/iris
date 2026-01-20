@@ -133,7 +133,7 @@ pub trait Terms: Send + Sync {
 /// # Example (conceptual - not yet implemented)
 ///
 /// ```ignore
-/// use sarissa::lexical::terms::TermDictionaryAccess;
+/// use iris::lexical::terms::TermDictionaryAccess;
 ///
 /// let reader = index.reader()?;
 /// let terms = reader.terms("content")?;
