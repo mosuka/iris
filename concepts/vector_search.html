@@ -181,7 +181,7 @@
 <p>Vector search (finding “nearest neighbors”) enables semantic retrieval where matches are based on meaning rather than exact keywords. Iris provides a <strong>Unified Vector Engine</strong> that combines this semantic search with traditional lexical (keyword) search capabilities.</p>
 <h2 id="document-structure"><a class="header" href="#document-structure">Document Structure</a></h2>
 <p>With the unified engine, a document can contain both vector fields (for semantic search) and lexical fields (for keyword search/filtering).</p>
-<pre class="mermaid">classDiagram
+<pre><code class="language-mermaid">classDiagram
     class VectorEngine {
         lexical_engine: LexicalEngine
         vector_index: VectorIndex
@@ -215,8 +215,7 @@
 
     VectorDocument *-- Vector
     VectorDocument --&gt; VectorFieldConfig
-</pre>
-
+</code></pre>
 <h3 id="vector"><a class="header" href="#vector">Vector</a></h3>
 <p>A mathematical representation of an object (text, image, audio) in a multi-dimensional space.</p>
 <ul>
@@ -232,7 +231,7 @@
 </ul>
 <h2 id="indexing-process"><a class="header" href="#indexing-process">Indexing Process</a></h2>
 <p>The vector indexing process transforms raw data or pre-computed vectors into efficient, searchable structures.</p>
-<pre class="mermaid">graph TD
+<pre><code class="language-mermaid">graph TD
     subgraph "Vector Indexing Flow"
         Input["Raw Input (Text/Image)"] --&gt; Embedder["Embedding Model"]
         Embedder --&gt;|Vector| Norm["Normalization"]
@@ -257,8 +256,7 @@
             Quant -.-&gt;|Codebook| QMeta[".quant"]
         end
     end
-</pre>
-
+</code></pre>
 <ol>
 <li><strong>Vector Acquisition</strong>: Vectors are either provided directly or generated from text/images using an <code>Embedder</code>.</li>
 <li><strong>Processing</strong>:
@@ -347,7 +345,7 @@
 </div>
 <h2 id="search-process"><a class="header" href="#search-process">Search Process</a></h2>
 <p>Finding the nearest neighbors involves navigating the index structure to minimize distance calculations.</p>
-<pre class="mermaid">graph TD
+<pre><code class="language-mermaid">graph TD
     subgraph "Vector Search Flow"
         Query["Query Vector"] --&gt; Quant["Quantization (Encoding)"]
         
@@ -362,8 +360,7 @@
         ResBuffer --&gt;|Re-ranking| Refine["Precision Scoring (Raw Vectors)"]
         Refine --&gt; Final["Sorted Hits"]
     end
-</pre>
-
+</code></pre>
 <ol>
 <li><strong>Preparation</strong>: The query vector is normalized and/or quantized to match the index format.</li>
 <li><strong>Navigation</strong>:
@@ -398,7 +395,7 @@
 </li>
 </ol>
 <h2 id="search-process-for-hybrid-queries"><a class="header" href="#search-process-for-hybrid-queries">Search Process for Hybrid Queries</a></h2>
-<pre class="mermaid">graph TD
+<pre><code class="language-mermaid">graph TD
     Query["Search Request"] --&gt; Engine["VectorEngine"]
     Engine --&gt;|Text Query| LexSearch["Lexical Component"]
     Engine --&gt;|Vector Query| VecSearch["Vector Component"]
@@ -411,8 +408,7 @@
     
     Fusion --&gt; Combine["Score Combination"]
     Combine --&gt; TopDocs["Final Top Results"]
-</pre>
-
+</code></pre>
 <h2 id="code-examples"><a class="header" href="#code-examples">Code Examples</a></h2>
 <h3 id="1-configuring-vectorengine"><a class="header" href="#1-configuring-vectorengine">1. Configuring VectorEngine</a></h3>
 <p>Example of creating an engine with an embedder and field configurations.</p>
@@ -598,6 +594,8 @@ async fn hybrid_search(engine: &amp;VectorEngine, query_vector: Vec&lt;f32&gt;) 
         <script src="../book-a0b12cfe.js"></script>
 
         <!-- Custom JS scripts -->
+        <script src="../mermaid-9a6dd17b.min.js"></script>
+        <script src="../mermaid-init-ddddd38b.js"></script>
 
 
 

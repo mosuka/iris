@@ -269,7 +269,7 @@
 <li><strong>Snapshots</strong>: Periodically, the in-memory state of the registry and documents is serialized to disk (<code>document_snapshot.bin</code>). This speeds up recovery by avoiding full WAL replay.</li>
 <li><strong>Commit</strong>: Calling <code>commit()</code> forces a flush of all in-memory buffers to persistent storage and rotates the logs.</li>
 </ul>
-<pre class="mermaid">graph TD
+<pre><code class="language-mermaid">graph TD
     User[User Update] --&gt;|1. Write| WAL[Write-Ahead Log]
     User --&gt;|2. Update| Mem[In-Memory Index]
     
@@ -281,8 +281,7 @@
     Mem --&gt;|Commit/Flush| Snapshot
     WAL --&gt;|Recovery| Mem
     Snapshot --&gt;|Recovery| Mem
-</pre>
-
+</code></pre>
 
                     </main>
 
@@ -335,6 +334,8 @@
         <script src="book-a0b12cfe.js"></script>
 
         <!-- Custom JS scripts -->
+        <script src="mermaid-9a6dd17b.min.js"></script>
+        <script src="mermaid-init-ddddd38b.js"></script>
 
 
 
