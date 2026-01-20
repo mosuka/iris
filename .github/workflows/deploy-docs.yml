@@ -20,6 +20,12 @@ jobs:
         with:
           mdbook-version: 'latest'
 
+      - name: Install mdbook-mermaid
+        run: |
+          mkdir mdbook-mermaid
+          curl -L https://github.com/badboy/mdbook-mermaid/releases/download/v0.12.6/mdbook-mermaid-v0.12.6-x86_64-unknown-linux-gnu.tar.gz | tar -xz -C mdbook-mermaid
+          echo "$PWD/mdbook-mermaid" >> $GITHUB_PATH
+
       - name: Build Book (English)
         run: mdbook build docs
 
