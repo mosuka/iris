@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-1ee5b2c1.js";
+            window.path_to_searchindex_js = "../searchindex-997feb9e.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-9d358a08.js"></script>
@@ -185,7 +185,7 @@
 <h2 id="document-structure"><a class="header" href="#document-structure">Document Structure</a></h2>
 <p>In Iris, a <strong>Document</strong> is the fundamental unit of indexing. It follows a <strong>schema-less</strong> design, allowing fields to be added dynamically without defining a schema upfront.</p>
 <p>Each <code>Document</code> consists of multiple <code>Fields</code> stored in a Map where the key is the field name. Each <code>Field</code> has a <strong>Value</strong> and <strong>Options</strong> defining how it should be indexed.</p>
-<pre><code class="language-mermaid">classDiagram
+<pre class="mermaid">classDiagram
     class Document {
         fields: Map&lt;String, Field&gt;
     }
@@ -255,7 +255,8 @@
     Document *-- Field
     Field --&gt; FieldValue
     Field --&gt; FieldOption
-</code></pre>
+</pre>
+
 <h3 id="document"><a class="header" href="#document">Document</a></h3>
 <p>The fundamental unit of indexing in Iris.</p>
 <ul>
@@ -320,7 +321,7 @@
 </ul>
 <h2 id="indexing-process"><a class="header" href="#indexing-process">Indexing Process</a></h2>
 <p>The lexical indexing process translates documents into inverted indexes and BKD trees.</p>
-<pre><code class="language-mermaid">graph TD
+<pre class="mermaid">graph TD
     subgraph "Indexing Flow"
         Input["Raw Data"] --&gt; DocBuilder["Document Construction"]
         
@@ -354,7 +355,8 @@
             InvBuffer -.-&gt;|Stats| Meta[".meta / .fstats"]
         end
     end
-</code></pre>
+</pre>
+
 <ol>
 <li><strong>Document Processing</strong>:
 <ul>
@@ -436,7 +438,7 @@ In the unified architecture, this engine operates as a <strong>sub-component</st
 </div>
 <h2 id="search-process"><a class="header" href="#search-process">Search Process</a></h2>
 <p>The search process involves structure-aware traversal and weighted scoring.</p>
-<pre><code class="language-mermaid">graph TD
+<pre class="mermaid">graph TD
     subgraph "Search Flow"
         UserQuery["User Query"] --&gt; Parser
         
@@ -460,7 +462,8 @@ In the unified architecture, this engine operates as a <strong>sub-component</st
         
         Fetcher --&gt; Result["Search Results"]
     end
-</code></pre>
+</pre>
+
 <ol>
 <li><strong>Query Parsing</strong>: Translates a human-friendly string or DSL into a structured <code>Query</code> tree.</li>
 <li><strong>Weight Creation</strong>: Precomputes global statistics (like IDF) to prepare for execution across multiple segments.</li>

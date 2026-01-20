@@ -36,7 +36,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-1ee5b2c1.js";
+            window.path_to_searchindex_js = "searchindex-997feb9e.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-9d358a08.js"></script>
@@ -210,7 +210,112 @@ iris = "0.1.0"
 iris = { version = "0.1.0", features = ["embeddings-openai"] }
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div>
-<h1 id="core-concepts-2"><a href="#core-concepts-2" class="header">Core Concepts</a></h1>
+<h1 id="core-concepts"><a class="header" href="#core-concepts">Core Concepts</a></h1>
+<p>This section details the internal architecture and design philosophy of IRiS, based on its current Rust implementation.</p>
+<h2 id="unified-vector-engine-architecture"><a class="header" href="#unified-vector-engine-architecture">Unified Vector Engine Architecture</a></h2>
+<p>At the heart of IRiS is the <code>VectorEngine</code> (<code>src/vector/engine.rs</code>), which acts as the unified coordinator for all search operations. Unlike traditional systems that treat vector search and keyword search as separate silos, IRiS integrates them into a single cohesive system.</p>
+<h3 id="key-components"><a class="header" href="#key-components">Key Components</a></h3>
+<ol>
+<li>
+<p><strong>VectorEngine</strong>:</p>
+<ul>
+<li><strong>Responsibility</strong>: Manages the lifecycle of documents, handles persistence (WAL &amp; Snapshots), and coordinates search queries.</li>
+<li><strong>Unified Indexing</strong>: When a document is indexed, <code>VectorEngine</code> splits it into:
+<ul>
+<li><strong>Vector Data</strong>: Stored in field-specific indices (HNSW, Flat, IVF).</li>
+<li><strong>Lexical Data</strong>: Stored in a managed <code>LexicalEngine</code> instance (<code>metadata_index</code>).</li>
+</ul>
+</li>
+<li><strong>Implicit Schema</strong>: By default, fields are registered dynamically upon insertion (<code>implicit_schema: true</code>), allowing for a schemaless-like experience while maintaining strict typing internally.</li>
+</ul>
+</li>
+<li>
+<p><strong>LexicalEngine</strong> (<code>src/lexical/engine.rs</code>):</p>
+<ul>
+<li><strong>Role</strong>: Serves as an internal component of <code>VectorEngine</code> to handle:
+<ul>
+<li><strong>Inverted Indices</strong>: For <code>Term</code>, <code>Phrase</code>, and <code>Boolean</code> queries.</li>
+<li><strong>ID Mapping</strong>: Maps external string IDs (e.g., “product-123”) to internal 64-bit integer IDs (<code>u64</code>).</li>
+<li><strong>Metadata Storage</strong>: Stores non-vector document fields (JSON-like metadata).</li>
+</ul>
+</li>
+<li><strong>Design</strong>: Uses a “Near Real-Time” (NRT) architecture with a <code>writer_cache</code> for uncommitted changes and a <code>searcher_cache</code> for committed views.</li>
+</ul>
+</li>
+<li>
+<p><strong>Storage Abstraction</strong> (<code>src/storage.rs</code>):</p>
+<ul>
+<li>All components interact with data through the <code>Storage</code> trait, enabling seamless switching between backends:
+<ul>
+<li><code>MemoryStorage</code>: Pure in-memory usage (great for testing/embedded).</li>
+<li><code>FileStorage</code>: Standard disk-based persistence.</li>
+<li><code>MmapStorage</code>: Memory-mapped files for high-performance large datasets.</li>
+</ul>
+</li>
+</ul>
+</li>
+</ol>
+<h2 id="data-model"><a class="header" href="#data-model">Data Model</a></h2>
+<p>IRiS uses a flexible data model centered around the <code>DocumentVector</code> structure.</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub struct DocumentVector {
+    /// Vector fields (e.g., "embedding", "image_vec")
+    pub fields: HashMap&lt;String, StoredVector&gt;,
+    /// Metadata fields (e.g., "title", "category", "_id")
+    pub metadata: HashMap&lt;String, String&gt;,
+}
+<span class="boring">}</span></code></pre>
+<ul>
+<li><strong>External ID (<code>_id</code>)</strong>: Every document has a unique string ID. Internally, this is mapped to a dense <code>u64</code> ID for performance.</li>
+<li><strong>Vector Fields</strong>: Store high-dimensional vectors. Supported formats include:
+<ul>
+<li><strong>Flat</strong>: Brute-force exact search.</li>
+<li><strong>HNSW</strong>: Hierarchical Navigable Small World graphs for approximate nearest neighbor search.</li>
+<li><strong>IVF</strong>: Inverted File Index for quantized search.</li>
+</ul>
+</li>
+<li><strong>Payloads</strong>: You can index raw text or images. The engine uses configured <code>Embedder</code>s (e.g., CLIP, BERT) to convert these payloads into vectors on the fly.</li>
+</ul>
+<h2 id="hybrid-search--fusion"><a class="header" href="#hybrid-search--fusion">Hybrid Search &amp; Fusion</a></h2>
+<p>One of IRiS’s core strengths is its ability to perform <strong>Hybrid Search</strong>—combining semantic similarity (Vector) with keyword relevance (Lexical).</p>
+<h3 id="search-flow"><a class="header" href="#search-flow">Search Flow</a></h3>
+<ol>
+<li><strong>Request</strong>: The user sends a <code>VectorSearchRequest</code> containing both a query vector and a lexical query (e.g., “find red shoes” + <code>category:"sale"</code>).</li>
+<li><strong>Parallel Execution</strong>:
+<ul>
+<li>The <strong>Vector Searcher</strong> scans the HNSW index to find nearest neighbors.</li>
+<li>The <strong>Lexical Searcher</strong> scans the Inverted Index to find matching terms.</li>
+</ul>
+</li>
+<li><strong>Fusion</strong>: The results are merged using a configurable strategy (<code>FusionConfig</code>):
+<ul>
+<li><strong>RRF (Reciprocal Rank Fusion)</strong>: Ranks documents based on their positional rank in each result set. Robust and parameter-free.</li>
+<li><strong>Weighted Sum</strong>: Linearly combines normalized scores (<code>alpha * vector_score + beta * lexical_score</code>).</li>
+</ul>
+</li>
+</ol>
+<h2 id="persistence--durability"><a class="header" href="#persistence--durability">Persistence &amp; durability</a></h2>
+<p>IRiS ensures data safety through a combination of <strong>Write-Ahead Logging (WAL)</strong> and <strong>Snapshots</strong>.</p>
+<ul>
+<li><strong>WAL (<code>src/vector/index/wal.rs</code>)</strong>: Every write operation (Upsert/Delete) is appended to a log file immediately. This ensures that even if the process crashes, recent changes can be replayed on startup.</li>
+<li><strong>Snapshots</strong>: Periodically, the in-memory state of the registry and documents is serialized to disk (<code>document_snapshot.bin</code>). This speeds up recovery by avoiding full WAL replay.</li>
+<li><strong>Commit</strong>: Calling <code>commit()</code> forces a flush of all in-memory buffers to persistent storage and rotates the logs.</li>
+</ul>
+<pre class="mermaid">graph TD
+    User[User Update] --&gt;|1. Write| WAL[Write-Ahead Log]
+    User --&gt;|2. Update| Mem[In-Memory Index]
+    
+    subgraph "Persistence"
+        WAL
+        Snapshot[Snapshot File]
+    end
+    
+    Mem --&gt;|Commit/Flush| Snapshot
+    WAL --&gt;|Recovery| Mem
+    Snapshot --&gt;|Recovery| Mem
+</pre>
+
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="architecture"><a class="header" href="#architecture">Architecture</a></h1>
 <p>Iris is built on a unified modular architecture where the <strong>Vector Engine</strong> serves as the core orchestrator.</p>
@@ -228,7 +333,7 @@ iris = { version = "0.1.0", features = ["embeddings-openai"] }
 <li><strong>Analyzers</strong>: Tokenization and normalization pipeline.</li>
 <li><strong>Query Parser</strong>: Supports boolean, phrase, and structured queries.</li>
 </ul>
-<pre><code class="language-mermaid">graph TD
+<pre class="mermaid">graph TD
     subgraph "Application Layer"
         User[User / App]
         Req[VectorSearchRequest]
@@ -269,7 +374,8 @@ iris = { version = "0.1.0", features = ["embeddings-openai"] }
     Lexical --&gt;|Hits| Fusion
     
     Fusion --&gt;|Unified Results| User
-</code></pre>
+</pre>
+
 <h2 id="storage-layer"><a class="header" href="#storage-layer">Storage Layer</a></h2>
 <p>All engines abstract their storage through a <code>Storage</code> trait, allowing seamless switching between:</p>
 <ul>
@@ -286,7 +392,7 @@ iris = { version = "0.1.0", features = ["embeddings-openai"] }
 <h2 id="document-structure"><a class="header" href="#document-structure">Document Structure</a></h2>
 <p>In Iris, a <strong>Document</strong> is the fundamental unit of indexing. It follows a <strong>schema-less</strong> design, allowing fields to be added dynamically without defining a schema upfront.</p>
 <p>Each <code>Document</code> consists of multiple <code>Fields</code> stored in a Map where the key is the field name. Each <code>Field</code> has a <strong>Value</strong> and <strong>Options</strong> defining how it should be indexed.</p>
-<pre><code class="language-mermaid">classDiagram
+<pre class="mermaid">classDiagram
     class Document {
         fields: Map&lt;String, Field&gt;
     }
@@ -356,7 +462,8 @@ iris = { version = "0.1.0", features = ["embeddings-openai"] }
     Document *-- Field
     Field --&gt; FieldValue
     Field --&gt; FieldOption
-</code></pre>
+</pre>
+
 <h3 id="document"><a class="header" href="#document">Document</a></h3>
 <p>The fundamental unit of indexing in Iris.</p>
 <ul>
@@ -421,7 +528,7 @@ iris = { version = "0.1.0", features = ["embeddings-openai"] }
 </ul>
 <h2 id="indexing-process"><a class="header" href="#indexing-process">Indexing Process</a></h2>
 <p>The lexical indexing process translates documents into inverted indexes and BKD trees.</p>
-<pre><code class="language-mermaid">graph TD
+<pre class="mermaid">graph TD
     subgraph "Indexing Flow"
         Input["Raw Data"] --&gt; DocBuilder["Document Construction"]
         
@@ -455,7 +562,8 @@ iris = { version = "0.1.0", features = ["embeddings-openai"] }
             InvBuffer -.-&gt;|Stats| Meta[".meta / .fstats"]
         end
     end
-</code></pre>
+</pre>
+
 <ol>
 <li><strong>Document Processing</strong>:
 <ul>
@@ -495,7 +603,7 @@ iris = { version = "0.1.0", features = ["embeddings-openai"] }
 <li><strong>KeywordAnalyzer</strong>: Treats the entire input as a single token.</li>
 <li><strong>PipelineAnalyzer</strong>: A flexible builder for creating custom analysis pipelines.</li>
 </ul>
-<h2 id="core-concepts"><a class="header" href="#core-concepts">Core Concepts</a></h2>
+<h2 id="core-concepts-1"><a class="header" href="#core-concepts-1">Core Concepts</a></h2>
 <h3 id="inverted-index"><a class="header" href="#inverted-index">Inverted Index</a></h3>
 <p>The inverted index is the fundamental structure for full-text search. While a traditional database maps documents to their terms, an inverted index maps <strong>terms to the list of documents</strong> containing them.</p>
 <ul>
@@ -537,7 +645,7 @@ In the unified architecture, this engine operates as a <strong>sub-component</st
 </div>
 <h2 id="search-process"><a class="header" href="#search-process">Search Process</a></h2>
 <p>The search process involves structure-aware traversal and weighted scoring.</p>
-<pre><code class="language-mermaid">graph TD
+<pre class="mermaid">graph TD
     subgraph "Search Flow"
         UserQuery["User Query"] --&gt; Parser
         
@@ -561,7 +669,8 @@ In the unified architecture, this engine operates as a <strong>sub-component</st
         
         Fetcher --&gt; Result["Search Results"]
     end
-</code></pre>
+</pre>
+
 <ol>
 <li><strong>Query Parsing</strong>: Translates a human-friendly string or DSL into a structured <code>Query</code> tree.</li>
 <li><strong>Weight Creation</strong>: Precomputes global statistics (like IDF) to prepare for execution across multiple segments.</li>
@@ -672,7 +781,7 @@ fn setup_japanese_engine() -&gt; iris::error::Result&lt;LexicalEngine&gt; {
 <p>Vector search (finding “nearest neighbors”) enables semantic retrieval where matches are based on meaning rather than exact keywords. Iris provides a <strong>Unified Vector Engine</strong> that combines this semantic search with traditional lexical (keyword) search capabilities.</p>
 <h2 id="document-structure-1"><a class="header" href="#document-structure-1">Document Structure</a></h2>
 <p>With the unified engine, a document can contain both vector fields (for semantic search) and lexical fields (for keyword search/filtering).</p>
-<pre><code class="language-mermaid">classDiagram
+<pre class="mermaid">classDiagram
     class VectorEngine {
         lexical_engine: LexicalEngine
         vector_index: VectorIndex
@@ -706,7 +815,8 @@ fn setup_japanese_engine() -&gt; iris::error::Result&lt;LexicalEngine&gt; {
 
     VectorDocument *-- Vector
     VectorDocument --&gt; VectorFieldConfig
-</code></pre>
+</pre>
+
 <h3 id="vector"><a class="header" href="#vector">Vector</a></h3>
 <p>A mathematical representation of an object (text, image, audio) in a multi-dimensional space.</p>
 <ul>
@@ -722,7 +832,7 @@ fn setup_japanese_engine() -&gt; iris::error::Result&lt;LexicalEngine&gt; {
 </ul>
 <h2 id="indexing-process-1"><a class="header" href="#indexing-process-1">Indexing Process</a></h2>
 <p>The vector indexing process transforms raw data or pre-computed vectors into efficient, searchable structures.</p>
-<pre><code class="language-mermaid">graph TD
+<pre class="mermaid">graph TD
     subgraph "Vector Indexing Flow"
         Input["Raw Input (Text/Image)"] --&gt; Embedder["Embedding Model"]
         Embedder --&gt;|Vector| Norm["Normalization"]
@@ -747,7 +857,8 @@ fn setup_japanese_engine() -&gt; iris::error::Result&lt;LexicalEngine&gt; {
             Quant -.-&gt;|Codebook| QMeta[".quant"]
         end
     end
-</code></pre>
+</pre>
+
 <ol>
 <li><strong>Vector Acquisition</strong>: Vectors are either provided directly or generated from text/images using an <code>Embedder</code>.</li>
 <li><strong>Processing</strong>:
@@ -764,7 +875,7 @@ fn setup_japanese_engine() -&gt; iris::error::Result&lt;LexicalEngine&gt; {
 </li>
 <li><strong>Segment Flushing</strong>: Serializes the in-memory structures into immutable files on disk.</li>
 </ol>
-<h2 id="core-concepts-1"><a class="header" href="#core-concepts-1">Core Concepts</a></h2>
+<h2 id="core-concepts-2"><a class="header" href="#core-concepts-2">Core Concepts</a></h2>
 <h3 id="approximate-nearest-neighbor-ann"><a class="header" href="#approximate-nearest-neighbor-ann">Approximate Nearest Neighbor (ANN)</a></h3>
 <p>In large-scale vector search, calculating exact distances to every vector is too slow. ANN algorithms provide a high-speed search with a small, controllable loss in accuracy (Recall).</p>
 <h3 id="index-types"><a class="header" href="#index-types">Index Types</a></h3>
@@ -836,7 +947,7 @@ fn setup_japanese_engine() -&gt; iris::error::Result&lt;LexicalEngine&gt; {
 </div>
 <h2 id="search-process-1"><a class="header" href="#search-process-1">Search Process</a></h2>
 <p>Finding the nearest neighbors involves navigating the index structure to minimize distance calculations.</p>
-<pre><code class="language-mermaid">graph TD
+<pre class="mermaid">graph TD
     subgraph "Vector Search Flow"
         Query["Query Vector"] --&gt; Quant["Quantization (Encoding)"]
         
@@ -851,7 +962,8 @@ fn setup_japanese_engine() -&gt; iris::error::Result&lt;LexicalEngine&gt; {
         ResBuffer --&gt;|Re-ranking| Refine["Precision Scoring (Raw Vectors)"]
         Refine --&gt; Final["Sorted Hits"]
     end
-</code></pre>
+</pre>
+
 <ol>
 <li><strong>Preparation</strong>: The query vector is normalized and/or quantized to match the index format.</li>
 <li><strong>Navigation</strong>:
@@ -886,7 +998,7 @@ fn setup_japanese_engine() -&gt; iris::error::Result&lt;LexicalEngine&gt; {
 </li>
 </ol>
 <h2 id="search-process-for-hybrid-queries"><a class="header" href="#search-process-for-hybrid-queries">Search Process for Hybrid Queries</a></h2>
-<pre><code class="language-mermaid">graph TD
+<pre class="mermaid">graph TD
     Query["Search Request"] --&gt; Engine["VectorEngine"]
     Engine --&gt;|Text Query| LexSearch["Lexical Component"]
     Engine --&gt;|Vector Query| VecSearch["Vector Component"]
@@ -899,7 +1011,8 @@ fn setup_japanese_engine() -&gt; iris::error::Result&lt;LexicalEngine&gt; {
     
     Fusion --&gt; Combine["Score Combination"]
     Combine --&gt; TopDocs["Final Top Results"]
-</code></pre>
+</pre>
+
 <h2 id="code-examples-1"><a class="header" href="#code-examples-1">Code Examples</a></h2>
 <h3 id="1-configuring-vectorengine"><a class="header" href="#1-configuring-vectorengine">1. Configuring VectorEngine</a></h3>
 <p>Example of creating an engine with an embedder and field configurations.</p>

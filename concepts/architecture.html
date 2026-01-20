@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-1ee5b2c1.js";
+            window.path_to_searchindex_js = "../searchindex-997feb9e.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-9d358a08.js"></script>
@@ -193,7 +193,7 @@
 <li><strong>Analyzers</strong>: Tokenization and normalization pipeline.</li>
 <li><strong>Query Parser</strong>: Supports boolean, phrase, and structured queries.</li>
 </ul>
-<pre><code class="language-mermaid">graph TD
+<pre class="mermaid">graph TD
     subgraph "Application Layer"
         User[User / App]
         Req[VectorSearchRequest]
@@ -234,7 +234,8 @@
     Lexical --&gt;|Hits| Fusion
     
     Fusion --&gt;|Unified Results| User
-</code></pre>
+</pre>
+
 <h2 id="storage-layer"><a class="header" href="#storage-layer">Storage Layer</a></h2>
 <p>All engines abstract their storage through a <code>Storage</code> trait, allowing seamless switching between:</p>
 <ul>
