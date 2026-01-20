@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Vector Search - Sarissa Documentation</title>
+        <title>Vector Search - Iris Documentation</title>
 
 
         <!-- Custom HTML head -->
@@ -138,13 +138,13 @@
                         </button>
                     </div>
 
-                    <h1 class="menu-title">Sarissa Documentation</h1>
+                    <h1 class="menu-title">Iris Documentation</h1>
 
                     <div class="right-buttons">
                         <a href="../print.html" title="Print this book" aria-label="Print this book">
                             <i id="print-button" class="fa fa-print"></i>
                         </a>
-                        <a href="https://github.com/mosuka/sarissa" title="Git repository" aria-label="Git repository">
+                        <a href="https://github.com/mosuka/iris" title="Git repository" aria-label="Git repository">
                             <i id="git-repository-button" class="fa fa-github"></i>
                         </a>
 
@@ -178,21 +178,358 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="vector-search"><a class="header" href="#vector-search">Vector Search</a></h1>
-<p>Vector search (finding "nearest neighbors") allows for semantic retrieval where matches are based on meaning rather than exact keywords.</p>
-<h2 id="hnsw-hierarchical-navigable-small-world"><a class="header" href="#hnsw-hierarchical-navigable-small-world">HNSW (Hierarchical Navigable Small World)</a></h2>
-<p>Sarissa primarily uses HNSW for fast approximate nearest neighbor search. It builds a multi-layered graph structure to navigate the vector space efficiently.</p>
-<h2 id="payloads"><a class="header" href="#payloads">Payloads</a></h2>
-<p>Vectors are stored as <strong>Payloads</strong>.</p>
+                        <h1 id="unified-vector-search"><a class="header" href="#unified-vector-search">Unified Vector Search</a></h1>
+<p>Vector search (finding "nearest neighbors") enables semantic retrieval where matches are based on meaning rather than exact keywords. Iris provides a <strong>Unified Vector Engine</strong> that combines this semantic search with traditional lexical (keyword) search capabilities.</p>
+<h2 id="document-structure"><a class="header" href="#document-structure">Document Structure</a></h2>
+<p>With the unified engine, a document can contain both vector fields (for semantic search) and lexical fields (for keyword search/filtering).</p>
+<pre class="mermaid">classDiagram
+    class VectorEngine {
+        lexical_engine: LexicalEngine
+        vector_index: VectorIndex
+    }
+
+    class HybridDocument {
+        &lt;&lt;Concept&gt;&gt;
+        vectors: Map&lt;String, Vector&gt;
+        lexical_fields: Map&lt;String, Field&gt;
+        metadata: Map&lt;String, String&gt;
+    }
+
+    class Vector {
+        data: Vec&lt;f32&gt;
+        dimension: usize
+    }
+
+    class VectorFieldConfig {
+        dimension: usize
+        distance_metric: DistanceMetric
+        index_type: VectorIndexType
+        quantization: QuantizationMethod
+    }
+
+    class DistanceMetric {
+        &lt;&lt;enumeration&gt;&gt;
+        Cosine
+        L2 (Euclidean)
+        DotProduct
+    }
+
+    VectorDocument *-- Vector
+    VectorDocument --&gt; VectorFieldConfig
+</pre>
+<h3 id="vector"><a class="header" href="#vector">Vector</a></h3>
+<p>A mathematical representation of an object (text, image, audio) in a multi-dimensional space.</p>
 <ul>
-<li><strong>Vector Source</strong>: You can provide pre-computed <code>Vec&lt;f32&gt;</code>.</li>
-<li><strong>Text Source</strong>: You can provide raw text, and if an embedder is configured, Sarissa will compute the vector for you.</li>
+<li><strong>Dimension</strong>: The number of elements in the vector (e.g., 384, 768, 1536).</li>
+<li><strong>Normalization</strong>: Vectors can be normalized (e.g., to unit length) to optimize distance calculations.</li>
 </ul>
-<h2 id="distance-metrics"><a class="header" href="#distance-metrics">Distance Metrics</a></h2>
+<h3 id="vector-field-configuration"><a class="header" href="#vector-field-configuration">Vector Field Configuration</a></h3>
+<p>Defines how vectors in a specific field are indexed and queried.</p>
 <ul>
-<li><strong>Cosine</strong>: Measures the angle between vectors (normalized dot product). Good for semantic text similarity.</li>
-<li><strong>L2 (Euclidean)</strong>: Measures the straight-line distance.</li>
-<li><strong>DotProduct</strong>: Optimized for normalized vectors.</li>
+<li><strong>Distance Metric</strong>: The formula used to calculate "similarity" between vectors.</li>
+<li><strong>Index Type</strong>: The algorithm used for storage and retrieval (HNSW, IVF, Flat).</li>
+<li><strong>Quantization</strong>: Compression techniques to reduce memory usage.</li>
+</ul>
+<h2 id="indexing-process"><a class="header" href="#indexing-process">Indexing Process</a></h2>
+<p>The vector indexing process transforms raw data or pre-computed vectors into efficient, searchable structures.</p>
+<pre class="mermaid">graph TD
+    subgraph &quot;Vector Indexing Flow&quot;
+        Input[&quot;Raw Input (Text/Image)&quot;] --&gt; Embedder[&quot;Embedding Model&quot;]
+        Embedder --&gt;|Vector| Norm[&quot;Normalization&quot;]
+        PreComp[&quot;Pre-computed Vector&quot;] --&gt; Norm
+        
+        subgraph &quot;VectorEngine&quot;
+            Norm --&gt; Quant[&quot;Quantizer (PQ/SQ)&quot;]
+            Quant --&gt;|Quantized| Buffer[&quot;In-memory Buffer&quot;]
+            Norm --&gt;|Raw| Buffer
+            
+            subgraph &quot;Index Building&quot;
+                Buffer --&gt;|HNSW| GraphBuilder[&quot;Graph Builder&quot;]
+                Buffer --&gt;|IVF| Clustering[&quot;K-Means Clustering&quot;]
+                Buffer --&gt;|Flat| ArrayBuilder[&quot;Linear Array Builder&quot;]
+            end
+        end
+        
+        subgraph &quot;Segment Flushing&quot;
+            GraphBuilder --&gt;|Write| HNSWFiles[&quot;.hnsw / .vecs&quot;]
+            Clustering --&gt;|Write| IVFFiles[&quot;.ivf / .vecs&quot;]
+            ArrayBuilder --&gt;|Write| FlatFiles[&quot;.vecs&quot;]
+            Quant -.-&gt;|Codebook| QMeta[&quot;.quant&quot;]
+        end
+    end
+</pre>
+<ol>
+<li><strong>Vector Acquisition</strong>: Vectors are either provided directly or generated from text/images using an <code>Embedder</code>.</li>
+<li><strong>Processing</strong>:
+<ul>
+<li><strong>Normalization</strong>: Adjusting vectors to a consistent scale (e.g., unit norm for Cosine similarity).</li>
+<li><strong>Quantization</strong>: Optional compression (e.g., Product Quantization) to reduce the memory footprint.</li>
+</ul>
+</li>
+<li><strong>Index Construction</strong>:
+<ul>
+<li><strong>HNSW</strong>: Builds a hierarchical graph structure for sub-linear search time.</li>
+<li><strong>IVF</strong>: Clusters vectors into partitions to restrict the search space.</li>
+</ul>
+</li>
+<li><strong>Segment Flushing</strong>: Serializes the in-memory structures into immutable files on disk.</li>
+</ol>
+<h2 id="core-concepts"><a class="header" href="#core-concepts">Core Concepts</a></h2>
+<h3 id="approximate-nearest-neighbor-ann"><a class="header" href="#approximate-nearest-neighbor-ann">Approximate Nearest Neighbor (ANN)</a></h3>
+<p>In large-scale vector search, calculating exact distances to every vector is too slow. ANN algorithms provide a high-speed search with a small, controllable loss in accuracy (Recall).</p>
+<h3 id="index-types"><a class="header" href="#index-types">Index Types</a></h3>
+<h4 id="flat-index-exact-search"><a class="header" href="#flat-index-exact-search">Flat Index (Exact Search)</a></h4>
+<p>Stores all vectors directly in an array and calculates distances between the query and every vector during search.</p>
+<ul>
+<li><strong>Implementation</strong>: <code>FlatIndexWriter</code>, <code>FlatVectorIndexReader</code></li>
+<li><strong>Characteristics</strong>: 100% precision (Exact Search), but search speed decreases linearly with data volume.</li>
+<li><strong>Use Cases</strong>: Small datasets or as a baseline for ANN precision.</li>
+</ul>
+<h4 id="hnsw-hierarchical-navigable-small-world"><a class="header" href="#hnsw-hierarchical-navigable-small-world">HNSW (Hierarchical Navigable Small World)</a></h4>
+<p>Iris's primary ANN algorithm. It constructs a multi-layered graph where the top layers are sparse (long-distance "express" links) and bottom layers are dense (short-distance local links).</p>
+<ul>
+<li><strong>Efficiency</strong>: Search time is logarithmic $O(\log N)$.</li>
+<li><strong>Implementation</strong>: <code>HnswIndexWriter</code>, <code>HnswIndexReader</code></li>
+<li><strong>Parameters</strong>: <code>m</code> (links per node) and <code>ef_construction</code> control the trade-off between index quality and build speed.</li>
+</ul>
+<h4 id="ivf-inverted-file-index"><a class="header" href="#ivf-inverted-file-index">IVF (Inverted File Index)</a></h4>
+<p>Clusters vectors into $K$ Voronoi cells. During search, only the nearest <code>n_probe</code> cells are scanned.</p>
+<ul>
+<li><strong>Centroids</strong>: Calculated during a <code>Training</code> phase using K-Means.</li>
+<li><strong>Implementation</strong>: <code>IvfIndexWriter</code>, <code>IvfIndexReader</code></li>
+<li><strong>Use Case</strong>: Efficient for extremely large datasets where HNSW memory overhead becomes prohibitive. Works best when combined with PQ quantization.</li>
+</ul>
+<h3 id="distance-metrics"><a class="header" href="#distance-metrics">Distance Metrics</a></h3>
+<p>Iris leverages Rust's SIMD (Single Instruction Multiple Data) instructions to maximize performance for distance calculations.</p>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Metric</th><th style="text-align: left">Description</th><th style="text-align: left">Rust Implementation Class</th><th style="text-align: left">Features</th></tr></thead><tbody>
+<tr><td style="text-align: left"><strong>Cosine</strong></td><td style="text-align: left">Measures the angle between vectors.</td><td style="text-align: left"><code>DistanceMetric::Cosine</code></td><td style="text-align: left">Ideal for semantic text similarity.</td></tr>
+<tr><td style="text-align: left"><strong>Euclidean</strong></td><td style="text-align: left">Measures straight-line distance.</td><td style="text-align: left"><code>DistanceMetric::Euclidean</code></td><td style="text-align: left">Suitable for image retrieval and physical proximity.</td></tr>
+<tr><td style="text-align: left"><strong>DotProduct</strong></td><td style="text-align: left">Calculates the dot product.</td><td style="text-align: left"><code>DistanceMetric::DotProduct</code></td><td style="text-align: left">Extremely fast for pre-normalized vectors.</td></tr>
+</tbody></table>
+</div>
+<h3 id="quantization"><a class="header" href="#quantization">Quantization</a></h3>
+<p>To reduce memory usage and improve search speed, Iris supports several quantization methods:</p>
+<ul>
+<li><strong>Scalar 8-bit (SQ8)</strong>: Maps 32-bit floating-points to 8-bit integers (4x compression).</li>
+<li><strong>Product Quantization (PQ)</strong>: Decomposes vectors into sub-vectors and performs clustering (16x-64x compression).</li>
+</ul>
+<h2 id="engine-architecture"><a class="header" href="#engine-architecture">Engine Architecture</a></h2>
+<h3 id="vector-engine-vectorengine"><a class="header" href="#vector-engine-vectorengine">Vector Engine (<code>VectorEngine</code>)</a></h3>
+<p>The high-level orchestrator that manages multiple vector fields, handles persistence via WAL (Write-Ahead Log), and coordinates aggregated searches across fields.</p>
+<h3 id="index-components"><a class="header" href="#index-components">Index Components</a></h3>
+<ul>
+<li><strong>VectorField</strong>: Abstracts individual field implementations (e.g., <code>InMemoryVectorField</code>, <code>SegmentedVectorField</code>).</li>
+<li><strong>Index Writers/Readers</strong>: Specific implementations for each algorithm (e.g., <code>HnswIndexWriter</code>, <code>FlatVectorIndexReader</code>, <code>IvfIndexReader</code>).</li>
+<li><strong>VectorEngineSearcher</strong>: Integrates results from multiple fields based on specified score modes (WeightedSum, MaxSim).</li>
+</ul>
+<h2 id="index-segment-files"><a class="header" href="#index-segment-files">Index Segment Files</a></h2>
+<p>A vector segment consists of several specialized files:</p>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Extension</th><th style="text-align: left">Component</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>.hnsw</code></td><td style="text-align: left">HNSW Graph</td><td style="text-align: left">Adjacency lists for hierarchical navigation.</td></tr>
+<tr><td style="text-align: left"><code>.vecs</code></td><td style="text-align: left">Raw Vectors</td><td style="text-align: left">Stored raw floating-point vectors (f32).</td></tr>
+<tr><td style="text-align: left"><code>.quant</code></td><td style="text-align: left">Codebook</td><td style="text-align: left">Trained centroids and parameters for quantization.</td></tr>
+<tr><td style="text-align: left"><code>.idx</code></td><td style="text-align: left">Quantized IDs</td><td style="text-align: left">Compressed vector representations.</td></tr>
+<tr><td style="text-align: left"><code>.meta</code></td><td style="text-align: left">Metadata</td><td style="text-align: left">Segment statistics, dimension, and configuration.</td></tr>
+</tbody></table>
+</div>
+<h2 id="search-process"><a class="header" href="#search-process">Search Process</a></h2>
+<p>Finding the nearest neighbors involves navigating the index structure to minimize distance calculations.</p>
+<pre class="mermaid">graph TD
+    subgraph &quot;Vector Search Flow&quot;
+        Query[&quot;Query Vector&quot;] --&gt; Quant[&quot;Quantization (Encoding)&quot;]
+        
+        subgraph &quot;Segment Search&quot;
+            Quant --&gt;|HNSW| HNSWNav[&quot;Graph Navigation&quot;]
+            Quant --&gt;|IVF| CentroidScan[&quot;Nearest Centroid Probe&quot;]
+            
+            HNSWNav --&gt;|Top-K| ResBuffer[&quot;Candidate Buffer&quot;]
+            CentroidScan --&gt;|Top-K| ResBuffer
+        end
+        
+        ResBuffer --&gt;|Re-ranking| Refine[&quot;Precision Scoring (Raw Vectors)&quot;]
+        Refine --&gt; Final[&quot;Sorted Hits&quot;]
+    end
+</pre>
+<ol>
+<li><strong>Preparation</strong>: The query vector is normalized and/or quantized to match the index format.</li>
+<li><strong>Navigation</strong>:
+<ul>
+<li>In <strong>HNSW</strong>, the search starts at the top layer and descends toward the target vector through graph neighbors.</li>
+<li>In <strong>IVF</strong>, the nearest cluster centroids are identified, and search is restricted to those cells.</li>
+</ul>
+</li>
+<li><strong>Refinement</strong>: (Optional) If quantization was used, raw vectors may be accessed to re-rank the top candidates for higher precision.</li>
+</ol>
+<h2 id="query-types"><a class="header" href="#query-types">Query Types</a></h2>
+<h3 id="k-nn-search-k-nearest-neighbors"><a class="header" href="#k-nn-search-k-nearest-neighbors">K-NN Search (K-Nearest Neighbors)</a></h3>
+<p>The basic vector search query.</p>
+<ul>
+<li><strong>Parameters</strong>: <code>K</code> (the number of neighbors to return).</li>
+<li><strong>Recall vs. Speed</strong>: Adjusted via search parameters like <code>ef_search</code> for HNSW.</li>
+</ul>
+<h3 id="filtered-vector-search"><a class="header" href="#filtered-vector-search">Filtered Vector Search</a></h3>
+<p>Combines vector search with boolean filters. Iris supports pre-filtering using metadata filters (backed by LexicalEngine) to restrict the search space to documents matching specific metadata criteria.</p>
+<h3 id="hybrid-search"><a class="header" href="#hybrid-search">Hybrid Search</a></h3>
+<p>Leverages both Lexical and Vector engines simultaneously. Results are combined using algorithms like <strong>Reciprocal Rank Fusion (RRF)</strong> to produce a single, high-quality ranked list.</p>
+<h4 id="fusion-strategies"><a class="header" href="#fusion-strategies">Fusion Strategies</a></h4>
+<p>Results from the vector and lexical searches are combined using fusion strategies.</p>
+<ol>
+<li>
+<p><strong>Weighted Sum</strong>: Scores are normalized and combined using linear weights.
+<code>FinalScore = (LexicalScore * alpha) + (VectorScore * beta)</code></p>
+</li>
+<li>
+<p><strong>RRF (Reciprocal Rank Fusion)</strong>: Calculates scores based on rank position, robust to different score distributions.
+<code>Score = Σ_i (1 / (k + rank_i))</code></p>
+</li>
+</ol>
+<h2 id="search-process-for-hybrid-queries"><a class="header" href="#search-process-for-hybrid-queries">Search Process for Hybrid Queries</a></h2>
+<pre class="mermaid">graph TD
+    Query[&quot;Search Request&quot;] --&gt; Engine[&quot;VectorEngine&quot;]
+    Engine --&gt;|Text Query| LexSearch[&quot;Lexical Component&quot;]
+    Engine --&gt;|Vector Query| VecSearch[&quot;Vector Component&quot;]
+    
+    LexSearch --&gt; LexHits[&quot;Lexical Hits&quot;]
+    VecSearch --&gt; VecHits[&quot;Vector Hits&quot;]
+    
+    LexHits --&gt; Fusion[&quot;Result Fusion&quot;]
+    VecHits --&gt; Fusion
+    
+    Fusion --&gt; Combine[&quot;Score Combination&quot;]
+    Combine --&gt; TopDocs[&quot;Final Top Results&quot;]
+</pre>
+<h2 id="code-examples"><a class="header" href="#code-examples">Code Examples</a></h2>
+<h3 id="1-configuring-vectorengine"><a class="header" href="#1-configuring-vectorengine">1. Configuring VectorEngine</a></h3>
+<p>Example of creating an engine with an embedder and field configurations.</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use std::sync::Arc;
+use iris::vector::engine::VectorEngine;
+use iris::vector::engine::config::{VectorIndexConfig, VectorFieldConfig, VectorIndexKind};
+use iris::vector::core::distance::DistanceMetric;
+use iris::embedding::precomputed::PrecomputedEmbedder;
+use iris::storage::memory::{MemoryStorage, MemoryStorageConfig};
+
+fn setup_engine() -&gt; iris::error::Result&lt;VectorEngine&gt; {
+    let storage = Arc::new(MemoryStorage::new(MemoryStorageConfig::default()));
+    
+    // Create configuration
+    let config = VectorIndexConfig::builder()
+        .add_field("title_embedding", 384)? // 384-dimensional field
+        .add_field("body_embedding", 384)?
+        .default_distance(DistanceMetric::Cosine)
+        .build()?;
+
+    let engine = VectorEngine::new(storage, config)?;
+    Ok(engine)
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="2-adding-documents"><a class="header" href="#2-adding-documents">2. Adding Documents</a></h3>
+<p>Example of indexing a document with vector data.</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use iris::vector::core::document::{DocumentVector, StoredVector};
+
+fn add_document(engine: &amp;VectorEngine) -&gt; iris::error::Result&lt;()&gt; {
+    let mut doc = DocumentVector::new();
+    
+    // Create vector data
+    let vector_data = Arc::from(vec![0.1; 384]);
+    doc.set_field("title_embedding", StoredVector::new(vector_data));
+    
+    // Add metadata (available for filtering)
+    doc.metadata.insert("category".to_string(), "technology".to_string());
+
+    // Add document with specific ID
+    engine.upsert_vectors(1, doc)?;
+    engine.commit()?; // Persist data
+    
+    Ok(())
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="3-executing-vector-search"><a class="header" href="#3-executing-vector-search">3. Executing Vector Search</a></h3>
+<p>Example of performing a search using <code>VectorSearchRequest</code>.</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use iris::vector::engine::request::{VectorSearchRequest, QueryVector};
+use iris::vector::core::document::StoredVector;
+
+fn search(engine: &amp;VectorEngine) -&gt; iris::error::Result&lt;()&gt; {
+    // Prepare query vector
+    let query_data = Arc::from(vec![0.1; 384]);
+    let query_vector = QueryVector {
+        vector: StoredVector::new(query_data),
+        weight: 1.0,
+        fields: None,
+    };
+
+    let request = VectorSearchRequest {
+        query_vectors: vec![query_vector],
+        limit: 10,
+        min_score: 0.7,
+        ..Default::default()
+    };
+
+    let results = engine.search(request)?;
+    for hit in results.hits {
+        println!("Doc ID: {}, Score: {}", hit.doc_id, hit.score);
+    }
+    
+    Ok(())
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="4-filtered-search"><a class="header" href="#4-filtered-search">4. Filtered Search</a></h3>
+<p>Example of a search restricted to a specific category.</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use iris::vector::engine::filter::{VectorFilter, FilterCondition};
+
+fn filtered_search(engine: &amp;VectorEngine) -&gt; iris::error::Result&lt;()&gt; {
+    let mut filter = VectorFilter::default();
+    filter.document.equals.insert("category".to_string(), "technology".to_string());
+
+    let request = VectorSearchRequest {
+        query_vectors: vec![/* query vector */],
+        filter: Some(filter),
+        limit: 5,
+        ..Default::default()
+    };
+
+    let results = engine.search(request)?;
+    Ok(())
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="5-hybrid-search"><a class="header" href="#5-hybrid-search">5. Hybrid Search</a></h3>
+<p>Example of combining vector and keyword search.</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use iris::vector::engine::query::{VectorSearchRequest, HybridSearchQuery};
+
+async fn hybrid_search(engine: &amp;VectorEngine, query_vector: Vec&lt;f32&gt;) -&gt; iris::error::Result&lt;()&gt; {
+    // Define Hybrid Query
+    let request = VectorSearchRequest::builder()
+        .vector(query_vector.into())
+        .hybrid_query(HybridSearchQuery {
+            keyword_query: "fast rust search".to_string(),
+            keyword_weight: 0.5,
+            vector_weight: 0.5,
+            top_k: 10,
+        })
+        .build();
+
+    let results = engine.search(request).await?;
+    
+    for res in results.hits {
+        println!("Doc ID: {}, Score: {}", res.id, res.score);
+    }
+    Ok(())
+}
+<span class="boring">}</span></code></pre></pre>
+<h2 id="future-outlook"><a class="header" href="#future-outlook">Future Outlook</a></h2>
+<ul>
+<li><strong>Full Implementation of Product Quantization (PQ)</strong>: Optimizing PQ clustering, currently a placeholder.</li>
+<li><strong>GPU Acceleration</strong>: Offloading distance calculations to GPUs, in addition to model inference.</li>
+<li><strong>Disk-ANN Support</strong>: Mechanisms to efficiently search large indexes stored on SSDs when they exceed memory capacity.</li>
 </ul>
 
                     </main>
@@ -203,7 +540,7 @@
                                 <i class="fa fa-angle-left"></i>
                             </a>
 
-                            <a rel="next prefetch" href="../concepts/hybrid_search.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="../advanced.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <i class="fa fa-angle-right"></i>
                             </a>
 
@@ -217,7 +554,7 @@
                         <i class="fa fa-angle-left"></i>
                     </a>
 
-                    <a rel="next prefetch" href="../concepts/hybrid_search.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="../advanced.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <i class="fa fa-angle-right"></i>
                     </a>
             </nav>

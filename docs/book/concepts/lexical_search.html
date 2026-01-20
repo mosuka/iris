@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Lexical Search - Sarissa Documentation</title>
+        <title>Lexical Search - Iris Documentation</title>
 
 
         <!-- Custom HTML head -->
@@ -138,13 +138,13 @@
                         </button>
                     </div>
 
-                    <h1 class="menu-title">Sarissa Documentation</h1>
+                    <h1 class="menu-title">Iris Documentation</h1>
 
                     <div class="right-buttons">
                         <a href="../print.html" title="Print this book" aria-label="Print this book">
                             <i id="print-button" class="fa fa-print"></i>
                         </a>
-                        <a href="https://github.com/mosuka/sarissa" title="Git repository" aria-label="Git repository">
+                        <a href="https://github.com/mosuka/iris" title="Git repository" aria-label="Git repository">
                             <i id="git-repository-button" class="fa fa-github"></i>
                         </a>
 
@@ -180,21 +180,386 @@
                     <main>
                         <h1 id="lexical-search"><a class="header" href="#lexical-search">Lexical Search</a></h1>
 <p>Lexical search matches documents based on exact or approximate keyword matches. It is the traditional "search engine" functionality found in Lucene or Elasticsearch.</p>
-<h2 id="key-components"><a class="header" href="#key-components">Key Components</a></h2>
-<h3 id="analyzers"><a class="header" href="#analyzers">Analyzers</a></h3>
-<p>Text analysis is the process of converting raw text into tokens.</p>
+<blockquote>
+<p><strong>Note</strong>: In the unified Iris architecture, Lexical Search is typically handled by the <code>VectorEngine</code>, which orchestrates both lexical and vector components concurrently. <code>LexicalEngine</code> can still be used as a standalone engine for pure keyword search scenarios.</p>
+</blockquote>
+<h2 id="document-structure"><a class="header" href="#document-structure">Document Structure</a></h2>
+<p>In Iris, a <strong>Document</strong> is the fundamental unit of indexing. It follows a <strong>schema-less</strong> design, allowing fields to be added dynamically without defining a schema upfront.</p>
+<p>Each <code>Document</code> consists of multiple <code>Fields</code> stored in a Map where the key is the field name. Each <code>Field</code> has a <strong>Value</strong> and <strong>Options</strong> defining how it should be indexed.</p>
+<pre class="mermaid">classDiagram
+    class Document {
+        fields: Map&lt;String, Field&gt;
+    }
+
+    class Field {
+        value: FieldValue
+        option: FieldOption
+    }
+
+    class FieldValue {
+        Text
+        Integer
+        Float
+        Boolean
+        DateTime
+        Geo
+        Blob
+        Null
+    }
+
+    class FieldOption {
+        &lt;&lt;enumeration&gt;&gt;
+        Text(TextOption)
+        Integer(IntegerOption)
+        Float(FloatOption)
+        Boolean(BooleanOption)
+        DateTime(DateTimeOption)
+        Geo(GeoOption)
+        Blob(BlobOption)
+    }
+
+    class TextOption {
+        indexed: bool
+        stored: bool
+        term_vectors: bool
+    }
+
+    class IntegerOption {
+        indexed: bool
+        stored: bool
+    }
+
+    class FloatOption {
+        indexed: bool
+        stored: bool
+    }
+
+    class BooleanOption {
+        indexed: bool
+        stored: bool
+    }
+
+    class DateTimeOption {
+        indexed: bool
+        stored: bool
+    }
+
+    class GeoOption {
+        indexed: bool
+        stored: bool
+    }
+
+    class BlobOption {
+        stored: bool
+    }
+
+    Document *-- Field
+    Field --&gt; FieldValue
+    Field --&gt; FieldOption
+</pre>
+<h3 id="document"><a class="header" href="#document">Document</a></h3>
+<p>The fundamental unit of indexing in Iris.</p>
 <ul>
-<li><strong>StandardAnalyzer</strong>: Tokenizes by whitespace/punctuation, lowercases, removes stop words.</li>
-<li><strong>KeywordAnalyzer</strong>: Treats the entire field as a single token (useful for IDs or tags).</li>
-<li><strong>LinderaAnalyzer</strong>: Japanese morphological analysis.</li>
+<li><strong>Schema-less</strong>: Fields can be added dynamically without a predefined schema.</li>
+<li><strong>Map Structure</strong>: Fields are stored in a <code>HashMap</code> where the key is the field name (String).</li>
+<li><strong>Flexible</strong>: A single document can contain a mix of different field types (Text, Integer, Blob, etc.).</li>
 </ul>
-<h3 id="query-types"><a class="header" href="#query-types">Query Types</a></h3>
+<h3 id="field"><a class="header" href="#field">Field</a></h3>
+<p>A container representing a single data point within a document.</p>
 <ul>
-<li><strong>TermQuery</strong>: Exact match for a single term.</li>
-<li><strong>PhraseQuery</strong>: Matches a sequence of terms in order.</li>
-<li><strong>BooleanQuery</strong>: Combines queries with AND, OR, NOT logic.</li>
-<li><strong>FuzzyQuery</strong>: Matches terms within a Levenshtein distance.</li>
-<li><strong>RangeQuery</strong>: Matches values within a numeric or string range.</li>
+<li><strong>Value</strong>: The actual data content (e.g., "Hello World", 123, true). Defined by <code>FieldValue</code>.</li>
+<li><strong>Option</strong>: Configuration for how this data should be handled (e.g., indexed, stored). Defined by <code>FieldOption</code>.</li>
+</ul>
+<h3 id="field-values"><a class="header" href="#field-values">Field Values</a></h3>
+<ul>
+<li><strong>Text</strong>: UTF-8 string. Typically analyzed and indexed for full-text search.</li>
+<li><strong>Integer / Float</strong>: Numeric values. Used for range queries (BKD Tree) and sorting.</li>
+<li><strong>Boolean</strong>: True/False values.</li>
+<li><strong>DateTime</strong>: UTC timestamps.</li>
+<li><strong>Geo</strong>: Latitude/Longitude coordinates. Indexed in a 2D BKD tree for efficient spatial queries (distance and bounding box) and stored for precise calculations.</li>
+<li><strong>Blob</strong>: Raw byte data with MIME type. Used for storing binary content (images, etc.) or vector source data. <strong>Stored only</strong>, never indexed by the lexical engine.</li>
+</ul>
+<h3 id="field-options"><a class="header" href="#field-options">Field Options</a></h3>
+<p>Configuration for the field defining how it should be indexed and stored.</p>
+<ul>
+<li><strong>TextOption</strong>:
+<ul>
+<li><code>indexed</code>: If true, the text is analyzed and added to the inverted index (searchable).</li>
+<li><code>stored</code>: If true, the original text is stored in the doc store (retrievable).</li>
+<li><code>term_vectors</code>: If true, stores term positions and offsets (needed for highlighting and "More Like This").</li>
+</ul>
+</li>
+<li><strong>IntegerOption / FloatOption</strong>:
+<ul>
+<li><code>indexed</code>: If true, the value is added to the BKD tree (range searchable).</li>
+<li><code>stored</code>: If true, the original value is stored.</li>
+</ul>
+</li>
+<li><strong>BooleanOption</strong>:
+<ul>
+<li><code>indexed</code>: If true, the value is indexed.</li>
+<li><code>stored</code>: If true, the original value is stored.</li>
+</ul>
+</li>
+<li><strong>DateTimeOption</strong>:
+<ul>
+<li><code>indexed</code>: If true, the timestamp is added to the BKD tree (range searchable).</li>
+<li><code>stored</code>: If true, the original timestamp is stored.</li>
+</ul>
+</li>
+<li><strong>GeoOption</strong>:
+<ul>
+<li><code>indexed</code>: If true, the coordinates are added to the 2D BKD tree (efficient spatial search).</li>
+<li><code>stored</code>: If true, the original coordinates are stored.</li>
+</ul>
+</li>
+<li><strong>BlobOption</strong>:
+<ul>
+<li><code>stored</code>: If true, the binary data is stored. <strong>Note</strong>: Blobs cannot be indexed by the lexical engine.</li>
+</ul>
+</li>
+</ul>
+<h2 id="indexing-process"><a class="header" href="#indexing-process">Indexing Process</a></h2>
+<p>The lexical indexing process translates documents into inverted indexes and BKD trees.</p>
+<pre class="mermaid">graph TD
+    subgraph &quot;Indexing Flow&quot;
+        Input[&quot;Raw Data&quot;] --&gt; DocBuilder[&quot;Document Construction&quot;]
+        
+        subgraph &quot;Processing (InvertedIndexWriter)&quot;
+            DocBuilder --&gt;|Text| CharFilter[&quot;Char Filter&quot;]
+            DocBuilder --&gt;|Numeric/Date/Geo| Normalizer[&quot;String Normalizer&quot;]
+            DocBuilder --&gt;|Numeric/Date/Geo| PtExt[&quot;Point Extractor&quot;]
+            DocBuilder --&gt;|Stored Field| StoreProc[&quot;Field Values Collector&quot;]
+            DocBuilder --&gt;|All Fields| LenTracker[&quot;Field Length Tracker&quot;]
+            DocBuilder --&gt;|Doc Values| DVTracker[&quot;Doc Values Collector&quot;]
+            
+            subgraph &quot;Analysis Chain&quot;
+                CharFilter --&gt; Tokenizer[&quot;Tokenizer&quot;]
+                Tokenizer --&gt; TokenFilter[&quot;Token Filter&quot;]
+            end
+        end
+        
+        subgraph &quot;In-Memory Buffering&quot;
+            TokenFilter --&gt;|Terms| InvBuffer[&quot;Term Posting Index&quot;]
+            Normalizer --&gt;|Terms| InvBuffer
+            PtExt --&gt;|Points| BkdBuffer[&quot;Point Values Buffer&quot;]
+            StoreProc --&gt;|Data| DocsBuffer[&quot;Stored Docs Buffer&quot;]
+        end
+        
+        subgraph &quot;Segment Flushing (Disk)&quot;
+            InvBuffer --&gt;|Write| Postings[&quot;.dict / .post&quot;]
+            BkdBuffer --&gt;|Sort &amp; Write| BKD[&quot;.bkd&quot;]
+            DocsBuffer --&gt;|Write| DOCS[&quot;.docs&quot;]
+            DVTracker --&gt;|Write| DV[&quot;.dv&quot;]
+            LenTracker --&gt;|Write| LENS[&quot;.lens&quot;]
+            InvBuffer -.-&gt;|Stats| Meta[&quot;.meta / .fstats&quot;]
+        end
+    end
+</pre>
+<ol>
+<li><strong>Document Processing</strong>:
+<ul>
+<li><strong>Analysis &amp; Normalization</strong>: Text is processed through the Analysis Chain (<code>Char Filter</code>, <code>Tokenizer</code>, <code>Token Filter</code>). Non-text fields are handled by the <code>String Normalizer</code>.</li>
+<li><strong>Point Extraction</strong>: Multidimensional values (Numeric, Date, and Geo) are extracted by the <code>Point Extractor</code> for spatial indexing (BKD Tree).</li>
+<li><strong>Tracking &amp; Collection</strong>: <code>Field Length Tracker</code> and <code>Doc Values Collector</code> gather metadata and columnar data.</li>
+</ul>
+</li>
+<li><strong>In-Memory Buffering</strong>:
+<ul>
+<li>Terms are added to the <code>Term Posting Index</code>.</li>
+<li>Extracted points and stored fields are staged in the <code>Point Values Buffer</code> and <code>Stored Docs Buffer</code>.</li>
+</ul>
+</li>
+<li><strong>Segment Flushing</strong>:
+<ul>
+<li>Buffered data is periodically sorted and serialized into immutable <strong>Segment</strong> files on disk.</li>
+</ul>
+</li>
+<li><strong>Merging</strong>:
+<ul>
+<li>A background process automatically merges smaller segments into larger ones to optimize read performance and reclaim space from deleted documents.</li>
+</ul>
+</li>
+</ol>
+<h3 id="analyzers"><a class="header" href="#analyzers">Analyzers</a></h3>
+<p>Text analysis is the process of converting raw text into tokens. An Analyzer is typically composed of a pipeline:</p>
+<ol>
+<li><strong>Char Filters</strong>: Transform the raw character stream (e.g., removing HTML tags).</li>
+<li><strong>Tokenizer</strong>: Splits the character stream into a token stream (e.g., splitting by whitespace).</li>
+<li><strong>Token Filters</strong>: Modify the token stream (e.g., lowercasing, stemming, removing stop words).</li>
+</ol>
+<p>Iris provides several built-in analyzers:</p>
+<ul>
+<li><strong>StandardAnalyzer</strong>: Good default for most European languages.</li>
+<li><strong>JapaneseAnalyzer</strong>: Optimized for Japanese text using Lindera (morphological analysis).</li>
+<li><strong>KeywordAnalyzer</strong>: Treats the entire input as a single token.</li>
+<li><strong>PipelineAnalyzer</strong>: A flexible builder for creating custom analysis pipelines.</li>
+</ul>
+<h2 id="core-concepts"><a class="header" href="#core-concepts">Core Concepts</a></h2>
+<h3 id="inverted-index"><a class="header" href="#inverted-index">Inverted Index</a></h3>
+<p>The inverted index is the fundamental structure for full-text search. While a traditional database maps documents to their terms, an inverted index maps <strong>terms to the list of documents</strong> containing them.</p>
+<ul>
+<li><strong>Term Dictionary</strong>: A sorted repository of all unique terms across the index.</li>
+<li><strong>Postings Lists</strong>: For each term, a list of document IDs (postings) where the term appears, along with frequency and position data for scoring.</li>
+</ul>
+<h3 id="bkd-tree"><a class="header" href="#bkd-tree">BKD Tree</a></h3>
+<p>For non-textual data like numbers, dates, and geographic coordinates, Iris uses a <strong>BKD Tree</strong>. It is a multi-dimensional tree structure optimized for block-based storage on disk.
+Unlike an inverted index, a BKD tree is designed for <strong>range search</strong> and <strong>spatial search</strong>. It effectively partitions the data space into hierarchical blocks, allowing the search engine to skip large portions of irrelevant data.</p>
+<h3 id="simd-optimization"><a class="header" href="#simd-optimization">SIMD Optimization</a></h3>
+<p>Iris uses SIMD-accelerated batch scoring for high-throughput ranking. The BM25 scoring algorithm is optimized to process multiple documents simultaneously, leveraging modern CPU instructions to provide a several-fold increase in performance compared to scalar processing.</p>
+<h2 id="engine-architecture"><a class="header" href="#engine-architecture">Engine Architecture</a></h2>
+<h3 id="lexical-engine-lexicalengine"><a class="header" href="#lexical-engine-lexicalengine">Lexical Engine (<code>LexicalEngine</code>)</a></h3>
+<p>The engine that manages indexing and searching for text data. It coordinates between <code>InvertedIndexWriter</code> and <code>InvertedIndexSearcher</code>.
+In the unified architecture, this engine operates as a <strong>sub-component</strong> managed by the <code>VectorEngine</code>, handling the inverted index portions of hybrid documents. It handles manifest persistence and consistent ID mapping when run in standalone mode.</p>
+<h3 id="index-components"><a class="header" href="#index-components">Index Components</a></h3>
+<ul>
+<li><strong>InvertedIndexWriter</strong>: The primary interface for adding documents. It orchestrates analysis, point extraction, and buffering.</li>
+<li><strong>Segment Manager</strong>: Controls the lifecycle and visibility of segments, maintaining the manifest and tracking deletions.</li>
+<li><strong>In-Memory Buffering</strong>: High-performance mapping of terms and staged BKD/Stored data before merging into disk segments.</li>
+</ul>
+<h2 id="index-segment-files"><a class="header" href="#index-segment-files">Index Segment Files</a></h2>
+<p>A single segment is composed of several specialized files:</p>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Extension</th><th style="text-align: left">Component</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>.dict</code></td><td style="text-align: left">Term Dictionary</td><td style="text-align: left">Maps terms to their locations in the postings list.</td></tr>
+<tr><td style="text-align: left"><code>.post</code></td><td style="text-align: left">Postings Lists</td><td style="text-align: left">Stores document IDs, frequencies, and positions for each term.</td></tr>
+<tr><td style="text-align: left"><code>.bkd</code></td><td style="text-align: left">BKD Tree</td><td style="text-align: left">Provides multidimensional indexing for numeric and geospatial fields.</td></tr>
+<tr><td style="text-align: left"><code>.docs</code></td><td style="text-align: left">Document Store</td><td style="text-align: left">Stores the original (stored) field values in a compressed format.</td></tr>
+<tr><td style="text-align: left"><code>.dv</code></td><td style="text-align: left">Doc Values</td><td style="text-align: left">Columnar storage for fast sorting and aggregations.</td></tr>
+<tr><td style="text-align: left"><code>.meta</code></td><td style="text-align: left">Segment Metadata</td><td style="text-align: left">Statistics, document count, and configuration.</td></tr>
+<tr><td style="text-align: left"><code>.lens</code></td><td style="text-align: left">Field Lengths</td><td style="text-align: left">Token counts per field per document (used for scoring).</td></tr>
+</tbody></table>
+</div>
+<h2 id="search-process"><a class="header" href="#search-process">Search Process</a></h2>
+<p>The search process involves structure-aware traversal and weighted scoring.</p>
+<pre class="mermaid">graph TD
+    subgraph &quot;Search Flow&quot;
+        UserQuery[&quot;User Query&quot;] --&gt; Parser
+        
+        subgraph &quot;Searcher&quot;
+            Parser[&quot;Query Parser&quot;] --&gt; QueryObj[&quot;Query&quot;]
+            QueryObj --&gt; WeightObj[&quot;Weight&quot;]
+            WeightObj --&gt; MatcherObj[&quot;Matcher&quot;]
+            WeightObj --&gt; ScorerObj[&quot;Scorer&quot;]
+            
+            subgraph &quot;Index Access&quot;
+                MatcherObj -.-&gt;|Look up| II[&quot;Inverted Index&quot;]
+                MatcherObj -.-&gt;|Range Scan| BKD[&quot;BKD Tree&quot;]
+            end
+            
+            MatcherObj --&gt;|Doc IDs| CollectorObj[&quot;Collector&quot;]
+            ScorerObj --&gt;|Scores| CollectorObj
+            CollectorObj -.-&gt;|Sort by Field| DV[&quot;Doc Values&quot;]
+            CollectorObj --&gt;|Top Doc IDs| Fetcher[&quot;Fetcher&quot;]
+            Fetcher -.-&gt;|Retrieve Fields| Docs
+        end
+        
+        Fetcher --&gt; Result[&quot;Search Results&quot;]
+    end
+</pre>
+<ol>
+<li><strong>Query Parsing</strong>: Translates a human-friendly string or DSL into a structured <code>Query</code> tree.</li>
+<li><strong>Weight Creation</strong>: Precomputes global statistics (like IDF) to prepare for execution across multiple segments.</li>
+<li><strong>Matching &amp; Scoring</strong>:
+<ul>
+<li><strong>Matcher</strong>: Navigates the Term Dictionary or BKD Tree to identify document IDs.</li>
+<li><strong>Scorer</strong>: Computes the relevance score (BM25) using precomputed weights and segment-local frequencies.</li>
+</ul>
+</li>
+<li><strong>Collection &amp; Fetching</strong>: Aggregates top results into a sorted list and retrieves original field data for the final response.</li>
+</ol>
+<h2 id="query-types"><a class="header" href="#query-types">Query Types</a></h2>
+<p>Iris supports a wide range of queries for different information needs.</p>
+<ul>
+<li><strong>Term Query</strong>: Match a single analyzed term exactly.</li>
+<li><strong>Boolean Query</strong>: Logical combinations (<code>MUST</code>, <code>SHOULD</code>, <code>MUST_NOT</code>).</li>
+<li><strong>Approximate Queries</strong>: <code>Fuzzy</code>, <code>Prefix</code>, <code>Wildcard</code>, and <code>Regexp</code> queries.</li>
+<li><strong>Phrase Query</strong>: Matches terms in a specific order with optional "slop".</li>
+<li><strong>Numeric Range Query</strong>: High-performance range search using the BKD tree.</li>
+<li><strong>Geospatial Queries</strong>: Distance-based or bounding-box search for geographic points.</li>
+</ul>
+<h2 id="scoring-bm25"><a class="header" href="#scoring-bm25">Scoring (BM25)</a></h2>
+<p>Iris uses <strong>Okapi BM25</strong> as its default scoring function. It improves results by prioritizing rare terms and normalizing for document length, ensuring that matches in shorter, focused documents are ranked appropriately.</p>
+<h2 id="code-examples"><a class="header" href="#code-examples">Code Examples</a></h2>
+<h3 id="1-configuring-lexicalengine"><a class="header" href="#1-configuring-lexicalengine">1. Configuring LexicalEngine</a></h3>
+<p>Setting up a schema-less engine with a default analyzer.</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use std::sync::Arc;
+use iris::lexical::engine::LexicalEngine;
+use iris::lexical::engine::config::LexicalIndexConfig;
+use iris::storage::memory::{MemoryStorage, MemoryStorageConfig};
+
+fn setup_engine() -&gt; iris::error::Result&lt;LexicalEngine&gt; {
+    let storage = Arc::new(MemoryStorage::new(MemoryStorageConfig::default()));
+    
+    // Default configuration uses StandardAnalyzer
+    let config = LexicalIndexConfig::default();
+    let engine = LexicalEngine::new(storage, config)?;
+    Ok(engine)
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="2-adding-documents"><a class="header" href="#2-adding-documents">2. Adding Documents</a></h3>
+<p>Creating and indexing documents with various field types.</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use iris::lexical::core::document::Document;
+use iris::lexical::core::field::TextOption;
+
+fn add_documents(engine: &amp;LexicalEngine) -&gt; iris::error::Result&lt;()&gt; {
+    let doc = Document::builder()
+        .add_text("title", "Iris Search", TextOption::default())
+        .add_text("content", "Fast and semantic search engine in Rust", TextOption::default())
+        .add_integer("price", 100)
+        .build();
+
+    engine.add_document(doc)?;
+    engine.commit()?; // Flush and commit to make searchable
+    Ok(())
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="3-searching-via-dsl"><a class="header" href="#3-searching-via-dsl">3. Searching via DSL</a></h3>
+<p>Executing a simple search using the query string parser.</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use iris::lexical::search::searcher::LexicalSearchRequest;
+
+fn search(engine: &amp;LexicalEngine) -&gt; iris::error::Result&lt;()&gt; {
+    // Search for matches in the default fields
+    let request = LexicalSearchRequest::new("content:rust")
+        .max_docs(10);
+
+    let results = engine.search(request)?;
+    for hit in results.hits {
+        println!("Doc ID: {}, Score: {}", hit.doc_id, hit.score);
+    }
+    Ok(())
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="4-custom-analyzer-setup"><a class="header" href="#4-custom-analyzer-setup">4. Custom Analyzer Setup</a></h3>
+<p>Configuring a Japanese analyzer for specific fields.</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use iris::analysis::analyzer::japanese::JapaneseAnalyzer;
+use iris::lexical::engine::config::LexicalIndexConfig;
+
+fn setup_japanese_engine() -&gt; iris::error::Result&lt;LexicalEngine&gt; {
+    let storage = Arc::new(MemoryStorage::new(MemoryStorageConfig::default()));
+    
+    // Configure default analyzer to Japanese
+    let analyzer = Arc::new(JapaneseAnalyzer::default());
+    let config = LexicalIndexConfig::builder()
+        .analyzer(analyzer)
+        .build();
+
+    LexicalEngine::new(storage, config)
+}
+<span class="boring">}</span></code></pre></pre>
+<h2 id="future-outlook"><a class="header" href="#future-outlook">Future Outlook</a></h2>
+<ul>
+<li><strong>Advanced Scoring Functions</strong>: Support for BM25F and custom script-based scoring.</li>
+<li><strong>Improved NRT (Near-Real-Time)</strong>: Faster segment flushing and background merging optimizations.</li>
+<li><strong>Multilingual Support</strong>: Integration with more language-specific tokenizers and dictionaries.</li>
+<li><strong>Tiered Storage</strong>: Support for moving older segments to slower/cheaper storage automatically.</li>
 </ul>
 
                     </main>

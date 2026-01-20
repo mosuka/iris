@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Architecture - Sarissa Documentation</title>
+        <title>Architecture - Iris Documentation</title>
 
 
         <!-- Custom HTML head -->
@@ -138,13 +138,13 @@
                         </button>
                     </div>
 
-                    <h1 class="menu-title">Sarissa Documentation</h1>
+                    <h1 class="menu-title">Iris Documentation</h1>
 
                     <div class="right-buttons">
                         <a href="../print.html" title="Print this book" aria-label="Print this book">
                             <i id="print-button" class="fa fa-print"></i>
                         </a>
-                        <a href="https://github.com/mosuka/sarissa" title="Git repository" aria-label="Git repository">
+                        <a href="https://github.com/mosuka/iris" title="Git repository" aria-label="Git repository">
                             <i id="git-repository-button" class="fa fa-github"></i>
                         </a>
 
@@ -179,28 +179,70 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="architecture"><a class="header" href="#architecture">Architecture</a></h1>
-<p>Sarissa is built on a modular architecture composed of three main engines.</p>
-<h2 id="1-lexical-engine"><a class="header" href="#1-lexical-engine">1. Lexical Engine</a></h2>
-<p>Handles keyword-based full-text search.</p>
+<p>Iris is built on a unified modular architecture where the <strong>Vector Engine</strong> serves as the core orchestrator.</p>
+<h2 id="1-vector-engine-unified"><a class="header" href="#1-vector-engine-unified">1. Vector Engine (Unified)</a></h2>
+<p>The primary engine associated with the library. It unifies vector similarity search with full-text search capabilities.</p>
+<ul>
+<li><strong>Orchestration</strong>: Manages both HNSW (vector) and Inverted Indices (lexical).</li>
+<li><strong>Hybrid Search</strong>: Performs unified queries combining vector similarity and keyword relevance.</li>
+<li><strong>ID Management</strong>: Manages external ID to internal integer ID mapping.</li>
+</ul>
+<h2 id="2-lexical-engine-component"><a class="header" href="#2-lexical-engine-component">2. Lexical Engine (Component)</a></h2>
+<p>Now operates as a component managed by the Vector Engine, rather than a standalone top-level engine in typical usage.</p>
 <ul>
 <li><strong>Inverted Index</strong>: Standard posting lists for term lookups.</li>
 <li><strong>Analyzers</strong>: Tokenization and normalization pipeline.</li>
 <li><strong>Query Parser</strong>: Supports boolean, phrase, and structured queries.</li>
 </ul>
-<h2 id="2-vector-engine"><a class="header" href="#2-vector-engine">2. Vector Engine</a></h2>
-<p>Handles semantic search using dense vectors.</p>
+<pre class="mermaid">graph TD
+    subgraph &quot;Application Layer&quot;
+        User[User / App]
+        Req[VectorSearchRequest]
+    end
+
+    subgraph &quot;Iris Vector Engine&quot;
+        VE[VectorEngine]
+        
+        subgraph &quot;Components&quot;
+            HNSW[HNSW Index]
+            Lexical[LexicalEngine]
+            WAL[Write-Ahead Log]
+        end
+        
+        Fusion[Result Fusion]
+    end
+
+    subgraph &quot;Storage Layer&quot;
+        FS[FileStorage / Mmap]
+    end
+
+    %% Flows
+    User --&gt;|insert/search| VE
+    VE --&gt; HNSW
+    VE --&gt; Lexical
+    VE --&gt; WAL
+
+    Lexical --&gt; FS
+    HNSW --&gt; FS
+    WAL --&gt; FS
+    
+    %% Search Flow
+    Req --&gt; VE
+    VE --&gt;|Vector Query| HNSW
+    VE --&gt;|Keyword Query| Lexical
+    
+    HNSW --&gt;|Hits| Fusion
+    Lexical --&gt;|Hits| Fusion
+    
+    Fusion --&gt;|Unified Results| User
+</pre>
+<h2 id="storage-layer"><a class="header" href="#storage-layer">Storage Layer</a></h2>
+<p>All engines abstract their storage through a <code>Storage</code> trait, allowing seamless switching between:</p>
 <ul>
-<li><strong>HNSW / IVF</strong>: Pluggable vector indexing algorithms.</li>
-<li><strong>Embeddings</strong>: Optional integration with models to convert text/images to vectors.</li>
+<li><strong>Memory</strong>: For testing and ephemeral data.</li>
+<li><strong>File</strong>: For persistent on-disk storage.</li>
+<li><strong>Mmap</strong>: For high-performance memory-mapped file access.</li>
 </ul>
-<h2 id="3-hybrid-engine"><a class="header" href="#3-hybrid-engine">3. Hybrid Engine</a></h2>
-<p>The unifying layer that coordinates Lexical and Vector engines.</p>
-<ul>
-<li><strong>ID Management</strong>: Synchronizes Document IDs across both sub-engines.</li>
-<li><strong>Result Merging</strong>: Combines search results using algorithms like RRF (Reciprocal Rank Fusion) or Weighted Sum.</li>
-<li><strong>Manifest</strong>: Persists global state like the next available Document ID.</li>
-</ul>
-<p><img src="https://placehold.co/600x400?text=Sarissa+Architecture" alt="Architecture Diagram" /></p>
 
                     </main>
 

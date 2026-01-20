@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Sarissa Documentation</title>
+        <title>Iris Documentation</title>
         <meta name="robots" content="noindex">
 
 
@@ -139,13 +139,13 @@
                         </button>
                     </div>
 
-                    <h1 class="menu-title">Sarissa Documentation</h1>
+                    <h1 class="menu-title">Iris Documentation</h1>
 
                     <div class="right-buttons">
                         <a href="print.html" title="Print this book" aria-label="Print this book">
                             <i id="print-button" class="fa fa-print"></i>
                         </a>
-                        <a href="https://github.com/mosuka/sarissa" title="Git repository" aria-label="Git repository">
+                        <a href="https://github.com/mosuka/iris" title="Git repository" aria-label="Git repository">
                             <i id="git-repository-button" class="fa fa-github"></i>
                         </a>
 
@@ -180,7 +180,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="introduction"><a class="header" href="#introduction">Introduction</a></h1>
-<p>Sarissa is a fast, featureful full-text search library for Rust, inspired by Whoosh.</p>
+<p>Iris is a fast, featureful full-text search library for Rust, inspired by Whoosh.</p>
 <h2 id="features"><a class="header" href="#features">Features</a></h2>
 <ul>
 <li><strong>Pure Rust</strong>: Single binary, easy deployment, high performance.</li>
@@ -190,14 +190,14 @@
 <li><strong>Pluggable Storage</strong>: Abstract storage interface supporting memory mapping and file-based storage.</li>
 </ul>
 <h2 id="philosophy"><a class="header" href="#philosophy">Philosophy</a></h2>
-<p>Sarissa aims to provide a "batteries-included" search experience that is easy to get started with but powerful enough for production use cases requiring customizability. It decouples the complexity of inverted indexes and HNSW graphs behind a clean, high-level API.</p>
+<p>Iris aims to provide a "batteries-included" search experience that is easy to get started with but powerful enough for production use cases requiring customizability. It decouples the complexity of inverted indexes and HNSW graphs behind a clean, high-level API.</p>
 <div style="break-before: page; page-break-before: always;"></div><div style="break-before: page; page-break-before: always;"></div><h1 id="installation"><a class="header" href="#installation">Installation</a></h1>
-<p>Add sarissa to your <code>Cargo.toml</code>:</p>
+<p>Add iris to your <code>Cargo.toml</code>:</p>
 <pre><code class="language-toml">[dependencies]
-sarissa = "0.1.0"
+iris = "0.1.0"
 </code></pre>
 <h2 id="feature-flags"><a class="header" href="#feature-flags">Feature Flags</a></h2>
-<p>Sarissa provides several feature flags to enable optional functionalities, particularly for embedding generation:</p>
+<p>Iris provides several feature flags to enable optional functionalities, particularly for embedding generation:</p>
 <ul>
 <li><code>embeddings-candle</code>: Enables Hugging Face Candle integration for running models locally.</li>
 <li><code>embeddings-openai</code>: Enables OpenAI API integration.</li>
@@ -205,190 +205,960 @@ sarissa = "0.1.0"
 <li><code>embeddings-all</code>: Enables all embedding features.</li>
 </ul>
 <pre><code class="language-toml"># Example: interacting with OpenAI
-sarissa = { version = "0.1.0", features = ["embeddings-openai"] }
+iris = { version = "0.1.0", features = ["embeddings-openai"] }
 </code></pre>
-<div style="break-before: page; page-break-before: always;"></div><h1 id="basic-usage"><a class="header" href="#basic-usage">Basic Usage</a></h1>
-<p>This guide demonstrates how to perform a <strong>Hybrid Search</strong>, which combines keywords and vectors.</p>
-<pre><pre class="playground"><code class="language-rust">use std::sync::Arc;
-use sarissa::hybrid::engine::HybridEngine;
-use sarissa::hybrid::search::searcher::{HybridSearchRequest, HybridSearchParams};
-use sarissa::hybrid::core::document::HybridDocument;
-use sarissa::lexical::core::document::Document as LexicalDocument;
-use sarissa::lexical::core::field::{Field, FieldValue, TextOption};
-use sarissa::lexical::engine::LexicalEngine;
-use sarissa::lexical::engine::config::LexicalIndexConfig;
-use sarissa::lexical::index::config::InvertedIndexConfig;
-use sarissa::vector::engine::VectorEngine;
-use sarissa::vector::engine::config::VectorEngineConfig;
-use sarissa::vector::index::config::HnswIndexConfig;
-use sarissa::storage::file::FileStorageConfig;
-use sarissa::storage::{StorageConfig, StorageFactory};
-use sarissa::analysis::analyzer::standard::StandardAnalyzer;
-use sarissa::analysis::analyzer::per_field::PerFieldAnalyzer;
-use sarissa::vector::core::document::{DocumentPayload, Payload, PayloadSource};
-
-#[tokio::main]
-async fn main() -&gt; sarissa::error::Result&lt;()&gt; {
-    // 1. Setup Storage
-    let storage_path = "tmp/sarissa_index";
-    std::fs::create_dir_all(storage_path)?;
-    let storage_config = StorageConfig::File(FileStorageConfig::new(storage_path));
-    let storage = StorageFactory::create(storage_config.clone())?;
-
-    // 2. Setup Analyzers (Lexical)
-    let analyzer = Arc::new(PerFieldAnalyzer::new(Arc::new(StandardAnalyzer::new()?)));
-    let lexical_config = LexicalIndexConfig::Inverted(InvertedIndexConfig {
-        analyzer,
-        ..Default::default()
-    });
-    let lexical_engine = LexicalEngine::new(storage.clone(), lexical_config)?;
-
-    // 3. Setup Vector Engine (Semantic)
-    let vector_config = VectorEngineConfig {
-        index_config: HnswIndexConfig {
-             dimension: 3, // Example dimension
-             ..Default::default() 
-        },
-        ..Default::default()
-    };
-    let vector_engine = VectorEngine::new(storage.clone(), vector_config)?;
-
-    // 4. Create Hybrid Engine
-    let mut hybrid_engine = HybridEngine::new(storage, lexical_engine, vector_engine)?;
-
-    // 5. Index a Document
-    let mut lex_doc = LexicalDocument::new();
-    lex_doc.add_text("title", "Rust Programming", TextOption::default());
+<div style="break-before: page; page-break-before: always;"></div><h1 id="core-concepts"><a class="header" href="#core-concepts">Core Concepts</a></h1>
+<p>This section details the internal architecture and design philosophy of IRiS, based on its current Rust implementation.</p>
+<h2 id="unified-vector-engine-architecture"><a class="header" href="#unified-vector-engine-architecture">Unified Vector Engine Architecture</a></h2>
+<p>At the heart of IRiS is the <code>VectorEngine</code> (<code>src/vector/engine.rs</code>), which acts as the unified coordinator for all search operations. Unlike traditional systems that treat vector search and keyword search as separate silos, IRiS integrates them into a single cohesive system.</p>
+<h3 id="key-components"><a class="header" href="#key-components">Key Components</a></h3>
+<ol>
+<li>
+<p><strong>VectorEngine</strong>:</p>
+<ul>
+<li><strong>Responsibility</strong>: Manages the lifecycle of documents, handles persistence (WAL &amp; Snapshots), and coordinates search queries.</li>
+<li><strong>Unified Indexing</strong>: When a document is indexed, <code>VectorEngine</code> splits it into:
+<ul>
+<li><strong>Vector Data</strong>: Stored in field-specific indices (HNSW, Flat, IVF).</li>
+<li><strong>Lexical Data</strong>: Stored in a managed <code>LexicalEngine</code> instance (<code>metadata_index</code>).</li>
+</ul>
+</li>
+<li><strong>Implicit Schema</strong>: By default, fields are registered dynamically upon insertion (<code>implicit_schema: true</code>), allowing for a schemaless-like experience while maintaining strict typing internally.</li>
+</ul>
+</li>
+<li>
+<p><strong>LexicalEngine</strong> (<code>src/lexical/engine.rs</code>):</p>
+<ul>
+<li><strong>Role</strong>: Serves as an internal component of <code>VectorEngine</code> to handle:
+<ul>
+<li><strong>Inverted Indices</strong>: For <code>Term</code>, <code>Phrase</code>, and <code>Boolean</code> queries.</li>
+<li><strong>ID Mapping</strong>: Maps external string IDs (e.g., "product-123") to internal 64-bit integer IDs (<code>u64</code>).</li>
+<li><strong>Metadata Storage</strong>: Stores non-vector document fields (JSON-like metadata).</li>
+</ul>
+</li>
+<li><strong>Design</strong>: Uses a "Near Real-Time" (NRT) architecture with a <code>writer_cache</code> for uncommitted changes and a <code>searcher_cache</code> for committed views.</li>
+</ul>
+</li>
+<li>
+<p><strong>Storage Abstraction</strong> (<code>src/storage.rs</code>):</p>
+<ul>
+<li>All components interact with data through the <code>Storage</code> trait, enabling seamless switching between backends:
+<ul>
+<li><code>MemoryStorage</code>: Pure in-memory usage (great for testing/embedded).</li>
+<li><code>FileStorage</code>: Standard disk-based persistence.</li>
+<li><code>MmapStorage</code>: Memory-mapped files for high-performance large datasets.</li>
+</ul>
+</li>
+</ul>
+</li>
+</ol>
+<h2 id="data-model"><a class="header" href="#data-model">Data Model</a></h2>
+<p>IRiS uses a flexible data model centered around the <code>DocumentVector</code> structure.</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub struct DocumentVector {
+    /// Vector fields (e.g., "embedding", "image_vec")
+    pub fields: HashMap&lt;String, StoredVector&gt;,
+    /// Metadata fields (e.g., "title", "category", "_id")
+    pub metadata: HashMap&lt;String, String&gt;,
+}
+<span class="boring">}</span></code></pre></pre>
+<ul>
+<li><strong>External ID (<code>_id</code>)</strong>: Every document has a unique string ID. Internally, this is mapped to a dense <code>u64</code> ID for performance.</li>
+<li><strong>Vector Fields</strong>: Store high-dimensional vectors. Supported formats include:
+<ul>
+<li><strong>Flat</strong>: Brute-force exact search.</li>
+<li><strong>HNSW</strong>: Hierarchical Navigable Small World graphs for approximate nearest neighbor search.</li>
+<li><strong>IVF</strong>: Inverted File Index for quantized search.</li>
+</ul>
+</li>
+<li><strong>Payloads</strong>: You can index raw text or images. The engine uses configured <code>Embedder</code>s (e.g., CLIP, BERT) to convert these payloads into vectors on the fly.</li>
+</ul>
+<h2 id="hybrid-search--fusion"><a class="header" href="#hybrid-search--fusion">Hybrid Search &amp; Fusion</a></h2>
+<p>One of IRiS's core strengths is its ability to perform <strong>Hybrid Search</strong>—combining semantic similarity (Vector) with keyword relevance (Lexical).</p>
+<h3 id="search-flow"><a class="header" href="#search-flow">Search Flow</a></h3>
+<ol>
+<li><strong>Request</strong>: The user sends a <code>VectorSearchRequest</code> containing both a query vector and a lexical query (e.g., "find red shoes" + <code>category:"sale"</code>).</li>
+<li><strong>Parallel Execution</strong>:
+<ul>
+<li>The <strong>Vector Searcher</strong> scans the HNSW index to find nearest neighbors.</li>
+<li>The <strong>Lexical Searcher</strong> scans the Inverted Index to find matching terms.</li>
+</ul>
+</li>
+<li><strong>Fusion</strong>: The results are merged using a configurable strategy (<code>FusionConfig</code>):
+<ul>
+<li><strong>RRF (Reciprocal Rank Fusion)</strong>: Ranks documents based on their positional rank in each result set. Robust and parameter-free.</li>
+<li><strong>Weighted Sum</strong>: Linearly combines normalized scores (<code>alpha * vector_score + beta * lexical_score</code>).</li>
+</ul>
+</li>
+</ol>
+<h2 id="persistence--durability"><a class="header" href="#persistence--durability">Persistence &amp; durability</a></h2>
+<p>IRiS ensures data safety through a combination of <strong>Write-Ahead Logging (WAL)</strong> and <strong>Snapshots</strong>.</p>
+<ul>
+<li><strong>WAL (<code>src/vector/index/wal.rs</code>)</strong>: Every write operation (Upsert/Delete) is appended to a log file immediately. This ensures that even if the process crashes, recent changes can be replayed on startup.</li>
+<li><strong>Snapshots</strong>: Periodically, the in-memory state of the registry and documents is serialized to disk (<code>document_snapshot.bin</code>). This speeds up recovery by avoiding full WAL replay.</li>
+<li><strong>Commit</strong>: Calling <code>commit()</code> forces a flush of all in-memory buffers to persistent storage and rotates the logs.</li>
+</ul>
+<pre class="mermaid">graph TD
+    User[User Update] --&gt;|1. Write| WAL[Write-Ahead Log]
+    User --&gt;|2. Update| Mem[In-Memory Index]
     
-    let mut vec_payload = DocumentPayload::new();
-    // Using pre-computed vector for simplicity
-    vec_payload.set_field("vector_field", Payload::vector(Arc::new([0.1, 0.2, 0.3])));
-
-    let doc = HybridDocument {
-        lexical_doc: Some(lex_doc),
-        vector_payload: Some(vec_payload),
-    };
-
-    let doc_id = hybrid_engine.index_document("unique_id_1", doc).await?;
-    hybrid_engine.commit()?;
-
-    // 6. Search
-    let params = HybridSearchParams {
-        keyword_weight: 0.5,
-        vector_weight: 0.5,
-        top_k: 10,
-        ..Default::default()
-    };
-
-    let request = HybridSearchRequest::new()
-        .with_text("Rust") // Lexical Query
-        .with_vector("vector_field", &amp;[0.1, 0.2, 0.3]) // Vector Query
-        .with_params(params);
-
-    let results = hybrid_engine.search(request).await?;
+    subgraph &quot;Persistence&quot;
+        WAL
+        Snapshot[Snapshot File]
+    end
     
-    println!("Found {} hits", results.results.len());
-    Ok(())
-}</code></pre></pre>
-<div style="break-before: page; page-break-before: always;"></div><div style="break-before: page; page-break-before: always;"></div><h1 id="architecture"><a class="header" href="#architecture">Architecture</a></h1>
-<p>Sarissa is built on a modular architecture composed of three main engines.</p>
-<h2 id="1-lexical-engine"><a class="header" href="#1-lexical-engine">1. Lexical Engine</a></h2>
-<p>Handles keyword-based full-text search.</p>
+    Mem --&gt;|Commit/Flush| Snapshot
+    WAL --&gt;|Recovery| Mem
+    Snapshot --&gt;|Recovery| Mem
+</pre>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="architecture"><a class="header" href="#architecture">Architecture</a></h1>
+<p>Iris is built on a unified modular architecture where the <strong>Vector Engine</strong> serves as the core orchestrator.</p>
+<h2 id="1-vector-engine-unified"><a class="header" href="#1-vector-engine-unified">1. Vector Engine (Unified)</a></h2>
+<p>The primary engine associated with the library. It unifies vector similarity search with full-text search capabilities.</p>
+<ul>
+<li><strong>Orchestration</strong>: Manages both HNSW (vector) and Inverted Indices (lexical).</li>
+<li><strong>Hybrid Search</strong>: Performs unified queries combining vector similarity and keyword relevance.</li>
+<li><strong>ID Management</strong>: Manages external ID to internal integer ID mapping.</li>
+</ul>
+<h2 id="2-lexical-engine-component"><a class="header" href="#2-lexical-engine-component">2. Lexical Engine (Component)</a></h2>
+<p>Now operates as a component managed by the Vector Engine, rather than a standalone top-level engine in typical usage.</p>
 <ul>
 <li><strong>Inverted Index</strong>: Standard posting lists for term lookups.</li>
 <li><strong>Analyzers</strong>: Tokenization and normalization pipeline.</li>
 <li><strong>Query Parser</strong>: Supports boolean, phrase, and structured queries.</li>
 </ul>
-<h2 id="2-vector-engine"><a class="header" href="#2-vector-engine">2. Vector Engine</a></h2>
-<p>Handles semantic search using dense vectors.</p>
+<pre class="mermaid">graph TD
+    subgraph &quot;Application Layer&quot;
+        User[User / App]
+        Req[VectorSearchRequest]
+    end
+
+    subgraph &quot;Iris Vector Engine&quot;
+        VE[VectorEngine]
+        
+        subgraph &quot;Components&quot;
+            HNSW[HNSW Index]
+            Lexical[LexicalEngine]
+            WAL[Write-Ahead Log]
+        end
+        
+        Fusion[Result Fusion]
+    end
+
+    subgraph &quot;Storage Layer&quot;
+        FS[FileStorage / Mmap]
+    end
+
+    %% Flows
+    User --&gt;|insert/search| VE
+    VE --&gt; HNSW
+    VE --&gt; Lexical
+    VE --&gt; WAL
+
+    Lexical --&gt; FS
+    HNSW --&gt; FS
+    WAL --&gt; FS
+    
+    %% Search Flow
+    Req --&gt; VE
+    VE --&gt;|Vector Query| HNSW
+    VE --&gt;|Keyword Query| Lexical
+    
+    HNSW --&gt;|Hits| Fusion
+    Lexical --&gt;|Hits| Fusion
+    
+    Fusion --&gt;|Unified Results| User
+</pre>
+<h2 id="storage-layer"><a class="header" href="#storage-layer">Storage Layer</a></h2>
+<p>All engines abstract their storage through a <code>Storage</code> trait, allowing seamless switching between:</p>
 <ul>
-<li><strong>HNSW / IVF</strong>: Pluggable vector indexing algorithms.</li>
-<li><strong>Embeddings</strong>: Optional integration with models to convert text/images to vectors.</li>
+<li><strong>Memory</strong>: For testing and ephemeral data.</li>
+<li><strong>File</strong>: For persistent on-disk storage.</li>
+<li><strong>Mmap</strong>: For high-performance memory-mapped file access.</li>
 </ul>
-<h2 id="3-hybrid-engine"><a class="header" href="#3-hybrid-engine">3. Hybrid Engine</a></h2>
-<p>The unifying layer that coordinates Lexical and Vector engines.</p>
-<ul>
-<li><strong>ID Management</strong>: Synchronizes Document IDs across both sub-engines.</li>
-<li><strong>Result Merging</strong>: Combines search results using algorithms like RRF (Reciprocal Rank Fusion) or Weighted Sum.</li>
-<li><strong>Manifest</strong>: Persists global state like the next available Document ID.</li>
-</ul>
-<p><img src="https://placehold.co/600x400?text=Sarissa+Architecture" alt="Architecture Diagram" /></p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="lexical-search"><a class="header" href="#lexical-search">Lexical Search</a></h1>
 <p>Lexical search matches documents based on exact or approximate keyword matches. It is the traditional "search engine" functionality found in Lucene or Elasticsearch.</p>
-<h2 id="key-components"><a class="header" href="#key-components">Key Components</a></h2>
-<h3 id="analyzers"><a class="header" href="#analyzers">Analyzers</a></h3>
-<p>Text analysis is the process of converting raw text into tokens.</p>
+<blockquote>
+<p><strong>Note</strong>: In the unified Iris architecture, Lexical Search is typically handled by the <code>VectorEngine</code>, which orchestrates both lexical and vector components concurrently. <code>LexicalEngine</code> can still be used as a standalone engine for pure keyword search scenarios.</p>
+</blockquote>
+<h2 id="document-structure"><a class="header" href="#document-structure">Document Structure</a></h2>
+<p>In Iris, a <strong>Document</strong> is the fundamental unit of indexing. It follows a <strong>schema-less</strong> design, allowing fields to be added dynamically without defining a schema upfront.</p>
+<p>Each <code>Document</code> consists of multiple <code>Fields</code> stored in a Map where the key is the field name. Each <code>Field</code> has a <strong>Value</strong> and <strong>Options</strong> defining how it should be indexed.</p>
+<pre class="mermaid">classDiagram
+    class Document {
+        fields: Map&lt;String, Field&gt;
+    }
+
+    class Field {
+        value: FieldValue
+        option: FieldOption
+    }
+
+    class FieldValue {
+        Text
+        Integer
+        Float
+        Boolean
+        DateTime
+        Geo
+        Blob
+        Null
+    }
+
+    class FieldOption {
+        &lt;&lt;enumeration&gt;&gt;
+        Text(TextOption)
+        Integer(IntegerOption)
+        Float(FloatOption)
+        Boolean(BooleanOption)
+        DateTime(DateTimeOption)
+        Geo(GeoOption)
+        Blob(BlobOption)
+    }
+
+    class TextOption {
+        indexed: bool
+        stored: bool
+        term_vectors: bool
+    }
+
+    class IntegerOption {
+        indexed: bool
+        stored: bool
+    }
+
+    class FloatOption {
+        indexed: bool
+        stored: bool
+    }
+
+    class BooleanOption {
+        indexed: bool
+        stored: bool
+    }
+
+    class DateTimeOption {
+        indexed: bool
+        stored: bool
+    }
+
+    class GeoOption {
+        indexed: bool
+        stored: bool
+    }
+
+    class BlobOption {
+        stored: bool
+    }
+
+    Document *-- Field
+    Field --&gt; FieldValue
+    Field --&gt; FieldOption
+</pre>
+<h3 id="document"><a class="header" href="#document">Document</a></h3>
+<p>The fundamental unit of indexing in Iris.</p>
 <ul>
-<li><strong>StandardAnalyzer</strong>: Tokenizes by whitespace/punctuation, lowercases, removes stop words.</li>
-<li><strong>KeywordAnalyzer</strong>: Treats the entire field as a single token (useful for IDs or tags).</li>
-<li><strong>LinderaAnalyzer</strong>: Japanese morphological analysis.</li>
+<li><strong>Schema-less</strong>: Fields can be added dynamically without a predefined schema.</li>
+<li><strong>Map Structure</strong>: Fields are stored in a <code>HashMap</code> where the key is the field name (String).</li>
+<li><strong>Flexible</strong>: A single document can contain a mix of different field types (Text, Integer, Blob, etc.).</li>
 </ul>
-<h3 id="query-types"><a class="header" href="#query-types">Query Types</a></h3>
+<h3 id="field"><a class="header" href="#field">Field</a></h3>
+<p>A container representing a single data point within a document.</p>
 <ul>
-<li><strong>TermQuery</strong>: Exact match for a single term.</li>
-<li><strong>PhraseQuery</strong>: Matches a sequence of terms in order.</li>
-<li><strong>BooleanQuery</strong>: Combines queries with AND, OR, NOT logic.</li>
-<li><strong>FuzzyQuery</strong>: Matches terms within a Levenshtein distance.</li>
-<li><strong>RangeQuery</strong>: Matches values within a numeric or string range.</li>
+<li><strong>Value</strong>: The actual data content (e.g., "Hello World", 123, true). Defined by <code>FieldValue</code>.</li>
+<li><strong>Option</strong>: Configuration for how this data should be handled (e.g., indexed, stored). Defined by <code>FieldOption</code>.</li>
 </ul>
-<div style="break-before: page; page-break-before: always;"></div><h1 id="vector-search"><a class="header" href="#vector-search">Vector Search</a></h1>
-<p>Vector search (finding "nearest neighbors") allows for semantic retrieval where matches are based on meaning rather than exact keywords.</p>
-<h2 id="hnsw-hierarchical-navigable-small-world"><a class="header" href="#hnsw-hierarchical-navigable-small-world">HNSW (Hierarchical Navigable Small World)</a></h2>
-<p>Sarissa primarily uses HNSW for fast approximate nearest neighbor search. It builds a multi-layered graph structure to navigate the vector space efficiently.</p>
-<h2 id="payloads"><a class="header" href="#payloads">Payloads</a></h2>
-<p>Vectors are stored as <strong>Payloads</strong>.</p>
+<h3 id="field-values"><a class="header" href="#field-values">Field Values</a></h3>
 <ul>
-<li><strong>Vector Source</strong>: You can provide pre-computed <code>Vec&lt;f32&gt;</code>.</li>
-<li><strong>Text Source</strong>: You can provide raw text, and if an embedder is configured, Sarissa will compute the vector for you.</li>
+<li><strong>Text</strong>: UTF-8 string. Typically analyzed and indexed for full-text search.</li>
+<li><strong>Integer / Float</strong>: Numeric values. Used for range queries (BKD Tree) and sorting.</li>
+<li><strong>Boolean</strong>: True/False values.</li>
+<li><strong>DateTime</strong>: UTC timestamps.</li>
+<li><strong>Geo</strong>: Latitude/Longitude coordinates. Indexed in a 2D BKD tree for efficient spatial queries (distance and bounding box) and stored for precise calculations.</li>
+<li><strong>Blob</strong>: Raw byte data with MIME type. Used for storing binary content (images, etc.) or vector source data. <strong>Stored only</strong>, never indexed by the lexical engine.</li>
 </ul>
-<h2 id="distance-metrics"><a class="header" href="#distance-metrics">Distance Metrics</a></h2>
+<h3 id="field-options"><a class="header" href="#field-options">Field Options</a></h3>
+<p>Configuration for the field defining how it should be indexed and stored.</p>
 <ul>
-<li><strong>Cosine</strong>: Measures the angle between vectors (normalized dot product). Good for semantic text similarity.</li>
-<li><strong>L2 (Euclidean)</strong>: Measures the straight-line distance.</li>
-<li><strong>DotProduct</strong>: Optimized for normalized vectors.</li>
-</ul>
-<div style="break-before: page; page-break-before: always;"></div><h1 id="hybrid-search"><a class="header" href="#hybrid-search">Hybrid Search</a></h1>
-<p>Hybrid search combines the precision of Lexical Search (keyword matching) with the semantic understanding of Vector Search.</p>
-<h2 id="fusion-strategies"><a class="header" href="#fusion-strategies">Fusion Strategies</a></h2>
-<h3 id="1-weighted-sum"><a class="header" href="#1-weighted-sum">1. Weighted Sum</a></h3>
-<p>Scores from both engines are normalized and combined linearly.
-<code>FinalScore = (LexicalScore * alpha) + (VectorScore * beta)</code></p>
-<h3 id="2-rrf-reciprocal-rank-fusion"><a class="header" href="#2-rrf-reciprocal-rank-fusion">2. RRF (Reciprocal Rank Fusion)</a></h3>
-<p>Relies on the <strong>rank</strong> of documents in each result set rather than their absolute scores. This is robust when score distributions vary wildly between engines.
-<code>Score = 1 / (k + Rank_lexical) + 1 / (k + Rank_vector)</code></p>
-<h3 id="3-harmonic-mean"><a class="header" href="#3-harmonic-mean">3. Harmonic Mean</a></h3>
-<p>Combines scores using the harmonic mean formula, penalizing documents that only perform well in one engine.</p>
-<div style="break-before: page; page-break-before: always;"></div><div style="break-before: page; page-break-before: always;"></div><h1 id="id-management"><a class="header" href="#id-management">ID Management</a></h1>
-<p>Sarissa employs a robust tiered ID management strategy to handle document stability and retrieval efficiency.</p>
-<h2 id="1-internal-id-u64"><a class="header" href="#1-internal-id-u64">1. Internal ID (u64)</a></h2>
+<li><strong>TextOption</strong>:
 <ul>
-<li>An auto-incrementing integer assigned internally by Sarissa.</li>
-<li>Used as the primary key in forward and backward indexes.</li>
-<li>Efficient for bitmap operations.</li>
-<li><strong>NOT</strong> guaranteed to be stable across deletions and compactions (if ID reuse is enabled in future versions).</li>
+<li><code>indexed</code>: If true, the text is analyzed and added to the inverted index (searchable).</li>
+<li><code>stored</code>: If true, the original text is stored in the doc store (retrievable).</li>
+<li><code>term_vectors</code>: If true, stores term positions and offsets (needed for highlighting and "More Like This").</li>
 </ul>
-<h2 id="2-external-id-string"><a class="header" href="#2-external-id-string">2. External ID (String)</a></h2>
+</li>
+<li><strong>IntegerOption / FloatOption</strong>:
 <ul>
-<li>Application-level identifier (e.g., UUID, URL, primary key).</li>
-<li>Stored as a reserved field <code>_id</code> in the Lexical Index.</li>
-<li><code>HybridEngine</code> maintains a mapping between External and Internal IDs.</li>
+<li><code>indexed</code>: If true, the value is added to the BKD tree (range searchable).</li>
+<li><code>stored</code>: If true, the original value is stored.</li>
 </ul>
-<h2 id="upsert-logic"><a class="header" href="#upsert-logic">Upsert Logic</a></h2>
-<p>When using <code>index_document(external_id, doc)</code>:</p>
+</li>
+<li><strong>BooleanOption</strong>:
+<ul>
+<li><code>indexed</code>: If true, the value is indexed.</li>
+<li><code>stored</code>: If true, the original value is stored.</li>
+</ul>
+</li>
+<li><strong>DateTimeOption</strong>:
+<ul>
+<li><code>indexed</code>: If true, the timestamp is added to the BKD tree (range searchable).</li>
+<li><code>stored</code>: If true, the original timestamp is stored.</li>
+</ul>
+</li>
+<li><strong>GeoOption</strong>:
+<ul>
+<li><code>indexed</code>: If true, the coordinates are added to the 2D BKD tree (efficient spatial search).</li>
+<li><code>stored</code>: If true, the original coordinates are stored.</li>
+</ul>
+</li>
+<li><strong>BlobOption</strong>:
+<ul>
+<li><code>stored</code>: If true, the binary data is stored. <strong>Note</strong>: Blobs cannot be indexed by the lexical engine.</li>
+</ul>
+</li>
+</ul>
+<h2 id="indexing-process"><a class="header" href="#indexing-process">Indexing Process</a></h2>
+<p>The lexical indexing process translates documents into inverted indexes and BKD trees.</p>
+<pre class="mermaid">graph TD
+    subgraph &quot;Indexing Flow&quot;
+        Input[&quot;Raw Data&quot;] --&gt; DocBuilder[&quot;Document Construction&quot;]
+        
+        subgraph &quot;Processing (InvertedIndexWriter)&quot;
+            DocBuilder --&gt;|Text| CharFilter[&quot;Char Filter&quot;]
+            DocBuilder --&gt;|Numeric/Date/Geo| Normalizer[&quot;String Normalizer&quot;]
+            DocBuilder --&gt;|Numeric/Date/Geo| PtExt[&quot;Point Extractor&quot;]
+            DocBuilder --&gt;|Stored Field| StoreProc[&quot;Field Values Collector&quot;]
+            DocBuilder --&gt;|All Fields| LenTracker[&quot;Field Length Tracker&quot;]
+            DocBuilder --&gt;|Doc Values| DVTracker[&quot;Doc Values Collector&quot;]
+            
+            subgraph &quot;Analysis Chain&quot;
+                CharFilter --&gt; Tokenizer[&quot;Tokenizer&quot;]
+                Tokenizer --&gt; TokenFilter[&quot;Token Filter&quot;]
+            end
+        end
+        
+        subgraph &quot;In-Memory Buffering&quot;
+            TokenFilter --&gt;|Terms| InvBuffer[&quot;Term Posting Index&quot;]
+            Normalizer --&gt;|Terms| InvBuffer
+            PtExt --&gt;|Points| BkdBuffer[&quot;Point Values Buffer&quot;]
+            StoreProc --&gt;|Data| DocsBuffer[&quot;Stored Docs Buffer&quot;]
+        end
+        
+        subgraph &quot;Segment Flushing (Disk)&quot;
+            InvBuffer --&gt;|Write| Postings[&quot;.dict / .post&quot;]
+            BkdBuffer --&gt;|Sort &amp; Write| BKD[&quot;.bkd&quot;]
+            DocsBuffer --&gt;|Write| DOCS[&quot;.docs&quot;]
+            DVTracker --&gt;|Write| DV[&quot;.dv&quot;]
+            LenTracker --&gt;|Write| LENS[&quot;.lens&quot;]
+            InvBuffer -.-&gt;|Stats| Meta[&quot;.meta / .fstats&quot;]
+        end
+    end
+</pre>
 <ol>
-<li>Sarissa checks if <code>external_id</code> already exists in the index.</li>
-<li>If found, the old internal ID is marked for deletion.</li>
-<li>A new internal ID is generated for the new document version.</li>
-<li>The document is indexed with the new ID.</li>
+<li><strong>Document Processing</strong>:
+<ul>
+<li><strong>Analysis &amp; Normalization</strong>: Text is processed through the Analysis Chain (<code>Char Filter</code>, <code>Tokenizer</code>, <code>Token Filter</code>). Non-text fields are handled by the <code>String Normalizer</code>.</li>
+<li><strong>Point Extraction</strong>: Multidimensional values (Numeric, Date, and Geo) are extracted by the <code>Point Extractor</code> for spatial indexing (BKD Tree).</li>
+<li><strong>Tracking &amp; Collection</strong>: <code>Field Length Tracker</code> and <code>Doc Values Collector</code> gather metadata and columnar data.</li>
+</ul>
+</li>
+<li><strong>In-Memory Buffering</strong>:
+<ul>
+<li>Terms are added to the <code>Term Posting Index</code>.</li>
+<li>Extracted points and stored fields are staged in the <code>Point Values Buffer</code> and <code>Stored Docs Buffer</code>.</li>
+</ul>
+</li>
+<li><strong>Segment Flushing</strong>:
+<ul>
+<li>Buffered data is periodically sorted and serialized into immutable <strong>Segment</strong> files on disk.</li>
+</ul>
+</li>
+<li><strong>Merging</strong>:
+<ul>
+<li>A background process automatically merges smaller segments into larger ones to optimize read performance and reclaim space from deleted documents.</li>
+</ul>
+</li>
 </ol>
-<p>This "Delete-then-Insert" pattern ensures atomic-like updates.</p>
+<h3 id="analyzers"><a class="header" href="#analyzers">Analyzers</a></h3>
+<p>Text analysis is the process of converting raw text into tokens. An Analyzer is typically composed of a pipeline:</p>
+<ol>
+<li><strong>Char Filters</strong>: Transform the raw character stream (e.g., removing HTML tags).</li>
+<li><strong>Tokenizer</strong>: Splits the character stream into a token stream (e.g., splitting by whitespace).</li>
+<li><strong>Token Filters</strong>: Modify the token stream (e.g., lowercasing, stemming, removing stop words).</li>
+</ol>
+<p>Iris provides several built-in analyzers:</p>
+<ul>
+<li><strong>StandardAnalyzer</strong>: Good default for most European languages.</li>
+<li><strong>JapaneseAnalyzer</strong>: Optimized for Japanese text using Lindera (morphological analysis).</li>
+<li><strong>KeywordAnalyzer</strong>: Treats the entire input as a single token.</li>
+<li><strong>PipelineAnalyzer</strong>: A flexible builder for creating custom analysis pipelines.</li>
+</ul>
+<h2 id="core-concepts-1"><a class="header" href="#core-concepts-1">Core Concepts</a></h2>
+<h3 id="inverted-index"><a class="header" href="#inverted-index">Inverted Index</a></h3>
+<p>The inverted index is the fundamental structure for full-text search. While a traditional database maps documents to their terms, an inverted index maps <strong>terms to the list of documents</strong> containing them.</p>
+<ul>
+<li><strong>Term Dictionary</strong>: A sorted repository of all unique terms across the index.</li>
+<li><strong>Postings Lists</strong>: For each term, a list of document IDs (postings) where the term appears, along with frequency and position data for scoring.</li>
+</ul>
+<h3 id="bkd-tree"><a class="header" href="#bkd-tree">BKD Tree</a></h3>
+<p>For non-textual data like numbers, dates, and geographic coordinates, Iris uses a <strong>BKD Tree</strong>. It is a multi-dimensional tree structure optimized for block-based storage on disk.
+Unlike an inverted index, a BKD tree is designed for <strong>range search</strong> and <strong>spatial search</strong>. It effectively partitions the data space into hierarchical blocks, allowing the search engine to skip large portions of irrelevant data.</p>
+<h3 id="simd-optimization"><a class="header" href="#simd-optimization">SIMD Optimization</a></h3>
+<p>Iris uses SIMD-accelerated batch scoring for high-throughput ranking. The BM25 scoring algorithm is optimized to process multiple documents simultaneously, leveraging modern CPU instructions to provide a several-fold increase in performance compared to scalar processing.</p>
+<h2 id="engine-architecture"><a class="header" href="#engine-architecture">Engine Architecture</a></h2>
+<h3 id="lexical-engine-lexicalengine"><a class="header" href="#lexical-engine-lexicalengine">Lexical Engine (<code>LexicalEngine</code>)</a></h3>
+<p>The engine that manages indexing and searching for text data. It coordinates between <code>InvertedIndexWriter</code> and <code>InvertedIndexSearcher</code>.
+In the unified architecture, this engine operates as a <strong>sub-component</strong> managed by the <code>VectorEngine</code>, handling the inverted index portions of hybrid documents. It handles manifest persistence and consistent ID mapping when run in standalone mode.</p>
+<h3 id="index-components"><a class="header" href="#index-components">Index Components</a></h3>
+<ul>
+<li><strong>InvertedIndexWriter</strong>: The primary interface for adding documents. It orchestrates analysis, point extraction, and buffering.</li>
+<li><strong>Segment Manager</strong>: Controls the lifecycle and visibility of segments, maintaining the manifest and tracking deletions.</li>
+<li><strong>In-Memory Buffering</strong>: High-performance mapping of terms and staged BKD/Stored data before merging into disk segments.</li>
+</ul>
+<h2 id="index-segment-files"><a class="header" href="#index-segment-files">Index Segment Files</a></h2>
+<p>A single segment is composed of several specialized files:</p>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Extension</th><th style="text-align: left">Component</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>.dict</code></td><td style="text-align: left">Term Dictionary</td><td style="text-align: left">Maps terms to their locations in the postings list.</td></tr>
+<tr><td style="text-align: left"><code>.post</code></td><td style="text-align: left">Postings Lists</td><td style="text-align: left">Stores document IDs, frequencies, and positions for each term.</td></tr>
+<tr><td style="text-align: left"><code>.bkd</code></td><td style="text-align: left">BKD Tree</td><td style="text-align: left">Provides multidimensional indexing for numeric and geospatial fields.</td></tr>
+<tr><td style="text-align: left"><code>.docs</code></td><td style="text-align: left">Document Store</td><td style="text-align: left">Stores the original (stored) field values in a compressed format.</td></tr>
+<tr><td style="text-align: left"><code>.dv</code></td><td style="text-align: left">Doc Values</td><td style="text-align: left">Columnar storage for fast sorting and aggregations.</td></tr>
+<tr><td style="text-align: left"><code>.meta</code></td><td style="text-align: left">Segment Metadata</td><td style="text-align: left">Statistics, document count, and configuration.</td></tr>
+<tr><td style="text-align: left"><code>.lens</code></td><td style="text-align: left">Field Lengths</td><td style="text-align: left">Token counts per field per document (used for scoring).</td></tr>
+</tbody></table>
+</div>
+<h2 id="search-process"><a class="header" href="#search-process">Search Process</a></h2>
+<p>The search process involves structure-aware traversal and weighted scoring.</p>
+<pre class="mermaid">graph TD
+    subgraph &quot;Search Flow&quot;
+        UserQuery[&quot;User Query&quot;] --&gt; Parser
+        
+        subgraph &quot;Searcher&quot;
+            Parser[&quot;Query Parser&quot;] --&gt; QueryObj[&quot;Query&quot;]
+            QueryObj --&gt; WeightObj[&quot;Weight&quot;]
+            WeightObj --&gt; MatcherObj[&quot;Matcher&quot;]
+            WeightObj --&gt; ScorerObj[&quot;Scorer&quot;]
+            
+            subgraph &quot;Index Access&quot;
+                MatcherObj -.-&gt;|Look up| II[&quot;Inverted Index&quot;]
+                MatcherObj -.-&gt;|Range Scan| BKD[&quot;BKD Tree&quot;]
+            end
+            
+            MatcherObj --&gt;|Doc IDs| CollectorObj[&quot;Collector&quot;]
+            ScorerObj --&gt;|Scores| CollectorObj
+            CollectorObj -.-&gt;|Sort by Field| DV[&quot;Doc Values&quot;]
+            CollectorObj --&gt;|Top Doc IDs| Fetcher[&quot;Fetcher&quot;]
+            Fetcher -.-&gt;|Retrieve Fields| Docs
+        end
+        
+        Fetcher --&gt; Result[&quot;Search Results&quot;]
+    end
+</pre>
+<ol>
+<li><strong>Query Parsing</strong>: Translates a human-friendly string or DSL into a structured <code>Query</code> tree.</li>
+<li><strong>Weight Creation</strong>: Precomputes global statistics (like IDF) to prepare for execution across multiple segments.</li>
+<li><strong>Matching &amp; Scoring</strong>:
+<ul>
+<li><strong>Matcher</strong>: Navigates the Term Dictionary or BKD Tree to identify document IDs.</li>
+<li><strong>Scorer</strong>: Computes the relevance score (BM25) using precomputed weights and segment-local frequencies.</li>
+</ul>
+</li>
+<li><strong>Collection &amp; Fetching</strong>: Aggregates top results into a sorted list and retrieves original field data for the final response.</li>
+</ol>
+<h2 id="query-types"><a class="header" href="#query-types">Query Types</a></h2>
+<p>Iris supports a wide range of queries for different information needs.</p>
+<ul>
+<li><strong>Term Query</strong>: Match a single analyzed term exactly.</li>
+<li><strong>Boolean Query</strong>: Logical combinations (<code>MUST</code>, <code>SHOULD</code>, <code>MUST_NOT</code>).</li>
+<li><strong>Approximate Queries</strong>: <code>Fuzzy</code>, <code>Prefix</code>, <code>Wildcard</code>, and <code>Regexp</code> queries.</li>
+<li><strong>Phrase Query</strong>: Matches terms in a specific order with optional "slop".</li>
+<li><strong>Numeric Range Query</strong>: High-performance range search using the BKD tree.</li>
+<li><strong>Geospatial Queries</strong>: Distance-based or bounding-box search for geographic points.</li>
+</ul>
+<h2 id="scoring-bm25"><a class="header" href="#scoring-bm25">Scoring (BM25)</a></h2>
+<p>Iris uses <strong>Okapi BM25</strong> as its default scoring function. It improves results by prioritizing rare terms and normalizing for document length, ensuring that matches in shorter, focused documents are ranked appropriately.</p>
+<h2 id="code-examples"><a class="header" href="#code-examples">Code Examples</a></h2>
+<h3 id="1-configuring-lexicalengine"><a class="header" href="#1-configuring-lexicalengine">1. Configuring LexicalEngine</a></h3>
+<p>Setting up a schema-less engine with a default analyzer.</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use std::sync::Arc;
+use iris::lexical::engine::LexicalEngine;
+use iris::lexical::engine::config::LexicalIndexConfig;
+use iris::storage::memory::{MemoryStorage, MemoryStorageConfig};
+
+fn setup_engine() -&gt; iris::error::Result&lt;LexicalEngine&gt; {
+    let storage = Arc::new(MemoryStorage::new(MemoryStorageConfig::default()));
+    
+    // Default configuration uses StandardAnalyzer
+    let config = LexicalIndexConfig::default();
+    let engine = LexicalEngine::new(storage, config)?;
+    Ok(engine)
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="2-adding-documents"><a class="header" href="#2-adding-documents">2. Adding Documents</a></h3>
+<p>Creating and indexing documents with various field types.</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use iris::lexical::core::document::Document;
+use iris::lexical::core::field::TextOption;
+
+fn add_documents(engine: &amp;LexicalEngine) -&gt; iris::error::Result&lt;()&gt; {
+    let doc = Document::builder()
+        .add_text("title", "Iris Search", TextOption::default())
+        .add_text("content", "Fast and semantic search engine in Rust", TextOption::default())
+        .add_integer("price", 100)
+        .build();
+
+    engine.add_document(doc)?;
+    engine.commit()?; // Flush and commit to make searchable
+    Ok(())
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="3-searching-via-dsl"><a class="header" href="#3-searching-via-dsl">3. Searching via DSL</a></h3>
+<p>Executing a simple search using the query string parser.</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use iris::lexical::search::searcher::LexicalSearchRequest;
+
+fn search(engine: &amp;LexicalEngine) -&gt; iris::error::Result&lt;()&gt; {
+    // Search for matches in the default fields
+    let request = LexicalSearchRequest::new("content:rust")
+        .max_docs(10);
+
+    let results = engine.search(request)?;
+    for hit in results.hits {
+        println!("Doc ID: {}, Score: {}", hit.doc_id, hit.score);
+    }
+    Ok(())
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="4-custom-analyzer-setup"><a class="header" href="#4-custom-analyzer-setup">4. Custom Analyzer Setup</a></h3>
+<p>Configuring a Japanese analyzer for specific fields.</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use iris::analysis::analyzer::japanese::JapaneseAnalyzer;
+use iris::lexical::engine::config::LexicalIndexConfig;
+
+fn setup_japanese_engine() -&gt; iris::error::Result&lt;LexicalEngine&gt; {
+    let storage = Arc::new(MemoryStorage::new(MemoryStorageConfig::default()));
+    
+    // Configure default analyzer to Japanese
+    let analyzer = Arc::new(JapaneseAnalyzer::default());
+    let config = LexicalIndexConfig::builder()
+        .analyzer(analyzer)
+        .build();
+
+    LexicalEngine::new(storage, config)
+}
+<span class="boring">}</span></code></pre></pre>
+<h2 id="future-outlook"><a class="header" href="#future-outlook">Future Outlook</a></h2>
+<ul>
+<li><strong>Advanced Scoring Functions</strong>: Support for BM25F and custom script-based scoring.</li>
+<li><strong>Improved NRT (Near-Real-Time)</strong>: Faster segment flushing and background merging optimizations.</li>
+<li><strong>Multilingual Support</strong>: Integration with more language-specific tokenizers and dictionaries.</li>
+<li><strong>Tiered Storage</strong>: Support for moving older segments to slower/cheaper storage automatically.</li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="unified-vector-search"><a class="header" href="#unified-vector-search">Unified Vector Search</a></h1>
+<p>Vector search (finding "nearest neighbors") enables semantic retrieval where matches are based on meaning rather than exact keywords. Iris provides a <strong>Unified Vector Engine</strong> that combines this semantic search with traditional lexical (keyword) search capabilities.</p>
+<h2 id="document-structure-1"><a class="header" href="#document-structure-1">Document Structure</a></h2>
+<p>With the unified engine, a document can contain both vector fields (for semantic search) and lexical fields (for keyword search/filtering).</p>
+<pre class="mermaid">classDiagram
+    class VectorEngine {
+        lexical_engine: LexicalEngine
+        vector_index: VectorIndex
+    }
+
+    class HybridDocument {
+        &lt;&lt;Concept&gt;&gt;
+        vectors: Map&lt;String, Vector&gt;
+        lexical_fields: Map&lt;String, Field&gt;
+        metadata: Map&lt;String, String&gt;
+    }
+
+    class Vector {
+        data: Vec&lt;f32&gt;
+        dimension: usize
+    }
+
+    class VectorFieldConfig {
+        dimension: usize
+        distance_metric: DistanceMetric
+        index_type: VectorIndexType
+        quantization: QuantizationMethod
+    }
+
+    class DistanceMetric {
+        &lt;&lt;enumeration&gt;&gt;
+        Cosine
+        L2 (Euclidean)
+        DotProduct
+    }
+
+    VectorDocument *-- Vector
+    VectorDocument --&gt; VectorFieldConfig
+</pre>
+<h3 id="vector"><a class="header" href="#vector">Vector</a></h3>
+<p>A mathematical representation of an object (text, image, audio) in a multi-dimensional space.</p>
+<ul>
+<li><strong>Dimension</strong>: The number of elements in the vector (e.g., 384, 768, 1536).</li>
+<li><strong>Normalization</strong>: Vectors can be normalized (e.g., to unit length) to optimize distance calculations.</li>
+</ul>
+<h3 id="vector-field-configuration"><a class="header" href="#vector-field-configuration">Vector Field Configuration</a></h3>
+<p>Defines how vectors in a specific field are indexed and queried.</p>
+<ul>
+<li><strong>Distance Metric</strong>: The formula used to calculate "similarity" between vectors.</li>
+<li><strong>Index Type</strong>: The algorithm used for storage and retrieval (HNSW, IVF, Flat).</li>
+<li><strong>Quantization</strong>: Compression techniques to reduce memory usage.</li>
+</ul>
+<h2 id="indexing-process-1"><a class="header" href="#indexing-process-1">Indexing Process</a></h2>
+<p>The vector indexing process transforms raw data or pre-computed vectors into efficient, searchable structures.</p>
+<pre class="mermaid">graph TD
+    subgraph &quot;Vector Indexing Flow&quot;
+        Input[&quot;Raw Input (Text/Image)&quot;] --&gt; Embedder[&quot;Embedding Model&quot;]
+        Embedder --&gt;|Vector| Norm[&quot;Normalization&quot;]
+        PreComp[&quot;Pre-computed Vector&quot;] --&gt; Norm
+        
+        subgraph &quot;VectorEngine&quot;
+            Norm --&gt; Quant[&quot;Quantizer (PQ/SQ)&quot;]
+            Quant --&gt;|Quantized| Buffer[&quot;In-memory Buffer&quot;]
+            Norm --&gt;|Raw| Buffer
+            
+            subgraph &quot;Index Building&quot;
+                Buffer --&gt;|HNSW| GraphBuilder[&quot;Graph Builder&quot;]
+                Buffer --&gt;|IVF| Clustering[&quot;K-Means Clustering&quot;]
+                Buffer --&gt;|Flat| ArrayBuilder[&quot;Linear Array Builder&quot;]
+            end
+        end
+        
+        subgraph &quot;Segment Flushing&quot;
+            GraphBuilder --&gt;|Write| HNSWFiles[&quot;.hnsw / .vecs&quot;]
+            Clustering --&gt;|Write| IVFFiles[&quot;.ivf / .vecs&quot;]
+            ArrayBuilder --&gt;|Write| FlatFiles[&quot;.vecs&quot;]
+            Quant -.-&gt;|Codebook| QMeta[&quot;.quant&quot;]
+        end
+    end
+</pre>
+<ol>
+<li><strong>Vector Acquisition</strong>: Vectors are either provided directly or generated from text/images using an <code>Embedder</code>.</li>
+<li><strong>Processing</strong>:
+<ul>
+<li><strong>Normalization</strong>: Adjusting vectors to a consistent scale (e.g., unit norm for Cosine similarity).</li>
+<li><strong>Quantization</strong>: Optional compression (e.g., Product Quantization) to reduce the memory footprint.</li>
+</ul>
+</li>
+<li><strong>Index Construction</strong>:
+<ul>
+<li><strong>HNSW</strong>: Builds a hierarchical graph structure for sub-linear search time.</li>
+<li><strong>IVF</strong>: Clusters vectors into partitions to restrict the search space.</li>
+</ul>
+</li>
+<li><strong>Segment Flushing</strong>: Serializes the in-memory structures into immutable files on disk.</li>
+</ol>
+<h2 id="core-concepts-2"><a class="header" href="#core-concepts-2">Core Concepts</a></h2>
+<h3 id="approximate-nearest-neighbor-ann"><a class="header" href="#approximate-nearest-neighbor-ann">Approximate Nearest Neighbor (ANN)</a></h3>
+<p>In large-scale vector search, calculating exact distances to every vector is too slow. ANN algorithms provide a high-speed search with a small, controllable loss in accuracy (Recall).</p>
+<h3 id="index-types"><a class="header" href="#index-types">Index Types</a></h3>
+<h4 id="flat-index-exact-search"><a class="header" href="#flat-index-exact-search">Flat Index (Exact Search)</a></h4>
+<p>Stores all vectors directly in an array and calculates distances between the query and every vector during search.</p>
+<ul>
+<li><strong>Implementation</strong>: <code>FlatIndexWriter</code>, <code>FlatVectorIndexReader</code></li>
+<li><strong>Characteristics</strong>: 100% precision (Exact Search), but search speed decreases linearly with data volume.</li>
+<li><strong>Use Cases</strong>: Small datasets or as a baseline for ANN precision.</li>
+</ul>
+<h4 id="hnsw-hierarchical-navigable-small-world"><a class="header" href="#hnsw-hierarchical-navigable-small-world">HNSW (Hierarchical Navigable Small World)</a></h4>
+<p>Iris's primary ANN algorithm. It constructs a multi-layered graph where the top layers are sparse (long-distance "express" links) and bottom layers are dense (short-distance local links).</p>
+<ul>
+<li><strong>Efficiency</strong>: Search time is logarithmic $O(\log N)$.</li>
+<li><strong>Implementation</strong>: <code>HnswIndexWriter</code>, <code>HnswIndexReader</code></li>
+<li><strong>Parameters</strong>: <code>m</code> (links per node) and <code>ef_construction</code> control the trade-off between index quality and build speed.</li>
+</ul>
+<h4 id="ivf-inverted-file-index"><a class="header" href="#ivf-inverted-file-index">IVF (Inverted File Index)</a></h4>
+<p>Clusters vectors into $K$ Voronoi cells. During search, only the nearest <code>n_probe</code> cells are scanned.</p>
+<ul>
+<li><strong>Centroids</strong>: Calculated during a <code>Training</code> phase using K-Means.</li>
+<li><strong>Implementation</strong>: <code>IvfIndexWriter</code>, <code>IvfIndexReader</code></li>
+<li><strong>Use Case</strong>: Efficient for extremely large datasets where HNSW memory overhead becomes prohibitive. Works best when combined with PQ quantization.</li>
+</ul>
+<h3 id="distance-metrics"><a class="header" href="#distance-metrics">Distance Metrics</a></h3>
+<p>Iris leverages Rust's SIMD (Single Instruction Multiple Data) instructions to maximize performance for distance calculations.</p>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Metric</th><th style="text-align: left">Description</th><th style="text-align: left">Rust Implementation Class</th><th style="text-align: left">Features</th></tr></thead><tbody>
+<tr><td style="text-align: left"><strong>Cosine</strong></td><td style="text-align: left">Measures the angle between vectors.</td><td style="text-align: left"><code>DistanceMetric::Cosine</code></td><td style="text-align: left">Ideal for semantic text similarity.</td></tr>
+<tr><td style="text-align: left"><strong>Euclidean</strong></td><td style="text-align: left">Measures straight-line distance.</td><td style="text-align: left"><code>DistanceMetric::Euclidean</code></td><td style="text-align: left">Suitable for image retrieval and physical proximity.</td></tr>
+<tr><td style="text-align: left"><strong>DotProduct</strong></td><td style="text-align: left">Calculates the dot product.</td><td style="text-align: left"><code>DistanceMetric::DotProduct</code></td><td style="text-align: left">Extremely fast for pre-normalized vectors.</td></tr>
+</tbody></table>
+</div>
+<h3 id="quantization"><a class="header" href="#quantization">Quantization</a></h3>
+<p>To reduce memory usage and improve search speed, Iris supports several quantization methods:</p>
+<ul>
+<li><strong>Scalar 8-bit (SQ8)</strong>: Maps 32-bit floating-points to 8-bit integers (4x compression).</li>
+<li><strong>Product Quantization (PQ)</strong>: Decomposes vectors into sub-vectors and performs clustering (16x-64x compression).</li>
+</ul>
+<h2 id="engine-architecture-1"><a class="header" href="#engine-architecture-1">Engine Architecture</a></h2>
+<h3 id="vector-engine-vectorengine"><a class="header" href="#vector-engine-vectorengine">Vector Engine (<code>VectorEngine</code>)</a></h3>
+<p>The high-level orchestrator that manages multiple vector fields, handles persistence via WAL (Write-Ahead Log), and coordinates aggregated searches across fields.</p>
+<h3 id="index-components-1"><a class="header" href="#index-components-1">Index Components</a></h3>
+<ul>
+<li><strong>VectorField</strong>: Abstracts individual field implementations (e.g., <code>InMemoryVectorField</code>, <code>SegmentedVectorField</code>).</li>
+<li><strong>Index Writers/Readers</strong>: Specific implementations for each algorithm (e.g., <code>HnswIndexWriter</code>, <code>FlatVectorIndexReader</code>, <code>IvfIndexReader</code>).</li>
+<li><strong>VectorEngineSearcher</strong>: Integrates results from multiple fields based on specified score modes (WeightedSum, MaxSim).</li>
+</ul>
+<h2 id="index-segment-files-1"><a class="header" href="#index-segment-files-1">Index Segment Files</a></h2>
+<p>A vector segment consists of several specialized files:</p>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Extension</th><th style="text-align: left">Component</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>.hnsw</code></td><td style="text-align: left">HNSW Graph</td><td style="text-align: left">Adjacency lists for hierarchical navigation.</td></tr>
+<tr><td style="text-align: left"><code>.vecs</code></td><td style="text-align: left">Raw Vectors</td><td style="text-align: left">Stored raw floating-point vectors (f32).</td></tr>
+<tr><td style="text-align: left"><code>.quant</code></td><td style="text-align: left">Codebook</td><td style="text-align: left">Trained centroids and parameters for quantization.</td></tr>
+<tr><td style="text-align: left"><code>.idx</code></td><td style="text-align: left">Quantized IDs</td><td style="text-align: left">Compressed vector representations.</td></tr>
+<tr><td style="text-align: left"><code>.meta</code></td><td style="text-align: left">Metadata</td><td style="text-align: left">Segment statistics, dimension, and configuration.</td></tr>
+</tbody></table>
+</div>
+<h2 id="search-process-1"><a class="header" href="#search-process-1">Search Process</a></h2>
+<p>Finding the nearest neighbors involves navigating the index structure to minimize distance calculations.</p>
+<pre class="mermaid">graph TD
+    subgraph &quot;Vector Search Flow&quot;
+        Query[&quot;Query Vector&quot;] --&gt; Quant[&quot;Quantization (Encoding)&quot;]
+        
+        subgraph &quot;Segment Search&quot;
+            Quant --&gt;|HNSW| HNSWNav[&quot;Graph Navigation&quot;]
+            Quant --&gt;|IVF| CentroidScan[&quot;Nearest Centroid Probe&quot;]
+            
+            HNSWNav --&gt;|Top-K| ResBuffer[&quot;Candidate Buffer&quot;]
+            CentroidScan --&gt;|Top-K| ResBuffer
+        end
+        
+        ResBuffer --&gt;|Re-ranking| Refine[&quot;Precision Scoring (Raw Vectors)&quot;]
+        Refine --&gt; Final[&quot;Sorted Hits&quot;]
+    end
+</pre>
+<ol>
+<li><strong>Preparation</strong>: The query vector is normalized and/or quantized to match the index format.</li>
+<li><strong>Navigation</strong>:
+<ul>
+<li>In <strong>HNSW</strong>, the search starts at the top layer and descends toward the target vector through graph neighbors.</li>
+<li>In <strong>IVF</strong>, the nearest cluster centroids are identified, and search is restricted to those cells.</li>
+</ul>
+</li>
+<li><strong>Refinement</strong>: (Optional) If quantization was used, raw vectors may be accessed to re-rank the top candidates for higher precision.</li>
+</ol>
+<h2 id="query-types-1"><a class="header" href="#query-types-1">Query Types</a></h2>
+<h3 id="k-nn-search-k-nearest-neighbors"><a class="header" href="#k-nn-search-k-nearest-neighbors">K-NN Search (K-Nearest Neighbors)</a></h3>
+<p>The basic vector search query.</p>
+<ul>
+<li><strong>Parameters</strong>: <code>K</code> (the number of neighbors to return).</li>
+<li><strong>Recall vs. Speed</strong>: Adjusted via search parameters like <code>ef_search</code> for HNSW.</li>
+</ul>
+<h3 id="filtered-vector-search"><a class="header" href="#filtered-vector-search">Filtered Vector Search</a></h3>
+<p>Combines vector search with boolean filters. Iris supports pre-filtering using metadata filters (backed by LexicalEngine) to restrict the search space to documents matching specific metadata criteria.</p>
+<h3 id="hybrid-search"><a class="header" href="#hybrid-search">Hybrid Search</a></h3>
+<p>Leverages both Lexical and Vector engines simultaneously. Results are combined using algorithms like <strong>Reciprocal Rank Fusion (RRF)</strong> to produce a single, high-quality ranked list.</p>
+<h4 id="fusion-strategies"><a class="header" href="#fusion-strategies">Fusion Strategies</a></h4>
+<p>Results from the vector and lexical searches are combined using fusion strategies.</p>
+<ol>
+<li>
+<p><strong>Weighted Sum</strong>: Scores are normalized and combined using linear weights.
+<code>FinalScore = (LexicalScore * alpha) + (VectorScore * beta)</code></p>
+</li>
+<li>
+<p><strong>RRF (Reciprocal Rank Fusion)</strong>: Calculates scores based on rank position, robust to different score distributions.
+<code>Score = Σ_i (1 / (k + rank_i))</code></p>
+</li>
+</ol>
+<h2 id="search-process-for-hybrid-queries"><a class="header" href="#search-process-for-hybrid-queries">Search Process for Hybrid Queries</a></h2>
+<pre class="mermaid">graph TD
+    Query[&quot;Search Request&quot;] --&gt; Engine[&quot;VectorEngine&quot;]
+    Engine --&gt;|Text Query| LexSearch[&quot;Lexical Component&quot;]
+    Engine --&gt;|Vector Query| VecSearch[&quot;Vector Component&quot;]
+    
+    LexSearch --&gt; LexHits[&quot;Lexical Hits&quot;]
+    VecSearch --&gt; VecHits[&quot;Vector Hits&quot;]
+    
+    LexHits --&gt; Fusion[&quot;Result Fusion&quot;]
+    VecHits --&gt; Fusion
+    
+    Fusion --&gt; Combine[&quot;Score Combination&quot;]
+    Combine --&gt; TopDocs[&quot;Final Top Results&quot;]
+</pre>
+<h2 id="code-examples-1"><a class="header" href="#code-examples-1">Code Examples</a></h2>
+<h3 id="1-configuring-vectorengine"><a class="header" href="#1-configuring-vectorengine">1. Configuring VectorEngine</a></h3>
+<p>Example of creating an engine with an embedder and field configurations.</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use std::sync::Arc;
+use iris::vector::engine::VectorEngine;
+use iris::vector::engine::config::{VectorIndexConfig, VectorFieldConfig, VectorIndexKind};
+use iris::vector::core::distance::DistanceMetric;
+use iris::embedding::precomputed::PrecomputedEmbedder;
+use iris::storage::memory::{MemoryStorage, MemoryStorageConfig};
+
+fn setup_engine() -&gt; iris::error::Result&lt;VectorEngine&gt; {
+    let storage = Arc::new(MemoryStorage::new(MemoryStorageConfig::default()));
+    
+    // Create configuration
+    let config = VectorIndexConfig::builder()
+        .add_field("title_embedding", 384)? // 384-dimensional field
+        .add_field("body_embedding", 384)?
+        .default_distance(DistanceMetric::Cosine)
+        .build()?;
+
+    let engine = VectorEngine::new(storage, config)?;
+    Ok(engine)
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="2-adding-documents-1"><a class="header" href="#2-adding-documents-1">2. Adding Documents</a></h3>
+<p>Example of indexing a document with vector data.</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use iris::vector::core::document::{DocumentVector, StoredVector};
+
+fn add_document(engine: &amp;VectorEngine) -&gt; iris::error::Result&lt;()&gt; {
+    let mut doc = DocumentVector::new();
+    
+    // Create vector data
+    let vector_data = Arc::from(vec![0.1; 384]);
+    doc.set_field("title_embedding", StoredVector::new(vector_data));
+    
+    // Add metadata (available for filtering)
+    doc.metadata.insert("category".to_string(), "technology".to_string());
+
+    // Add document with specific ID
+    engine.upsert_vectors(1, doc)?;
+    engine.commit()?; // Persist data
+    
+    Ok(())
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="3-executing-vector-search"><a class="header" href="#3-executing-vector-search">3. Executing Vector Search</a></h3>
+<p>Example of performing a search using <code>VectorSearchRequest</code>.</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use iris::vector::engine::request::{VectorSearchRequest, QueryVector};
+use iris::vector::core::document::StoredVector;
+
+fn search(engine: &amp;VectorEngine) -&gt; iris::error::Result&lt;()&gt; {
+    // Prepare query vector
+    let query_data = Arc::from(vec![0.1; 384]);
+    let query_vector = QueryVector {
+        vector: StoredVector::new(query_data),
+        weight: 1.0,
+        fields: None,
+    };
+
+    let request = VectorSearchRequest {
+        query_vectors: vec![query_vector],
+        limit: 10,
+        min_score: 0.7,
+        ..Default::default()
+    };
+
+    let results = engine.search(request)?;
+    for hit in results.hits {
+        println!("Doc ID: {}, Score: {}", hit.doc_id, hit.score);
+    }
+    
+    Ok(())
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="4-filtered-search"><a class="header" href="#4-filtered-search">4. Filtered Search</a></h3>
+<p>Example of a search restricted to a specific category.</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use iris::vector::engine::filter::{VectorFilter, FilterCondition};
+
+fn filtered_search(engine: &amp;VectorEngine) -&gt; iris::error::Result&lt;()&gt; {
+    let mut filter = VectorFilter::default();
+    filter.document.equals.insert("category".to_string(), "technology".to_string());
+
+    let request = VectorSearchRequest {
+        query_vectors: vec![/* query vector */],
+        filter: Some(filter),
+        limit: 5,
+        ..Default::default()
+    };
+
+    let results = engine.search(request)?;
+    Ok(())
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="5-hybrid-search"><a class="header" href="#5-hybrid-search">5. Hybrid Search</a></h3>
+<p>Example of combining vector and keyword search.</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use iris::vector::engine::query::{VectorSearchRequest, HybridSearchQuery};
+
+async fn hybrid_search(engine: &amp;VectorEngine, query_vector: Vec&lt;f32&gt;) -&gt; iris::error::Result&lt;()&gt; {
+    // Define Hybrid Query
+    let request = VectorSearchRequest::builder()
+        .vector(query_vector.into())
+        .hybrid_query(HybridSearchQuery {
+            keyword_query: "fast rust search".to_string(),
+            keyword_weight: 0.5,
+            vector_weight: 0.5,
+            top_k: 10,
+        })
+        .build();
+
+    let results = engine.search(request).await?;
+    
+    for res in results.hits {
+        println!("Doc ID: {}, Score: {}", res.id, res.score);
+    }
+    Ok(())
+}
+<span class="boring">}</span></code></pre></pre>
+<h2 id="future-outlook-1"><a class="header" href="#future-outlook-1">Future Outlook</a></h2>
+<ul>
+<li><strong>Full Implementation of Product Quantization (PQ)</strong>: Optimizing PQ clustering, currently a placeholder.</li>
+<li><strong>GPU Acceleration</strong>: Offloading distance calculations to GPUs, in addition to model inference.</li>
+<li><strong>Disk-ANN Support</strong>: Mechanisms to efficiently search large indexes stored on SSDs when they exceed memory capacity.</li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div><div style="break-before: page; page-break-before: always;"></div><h1 id="id-management"><a class="header" href="#id-management">ID Management</a></h1>
+<p>Iris uses a dual-tiered ID management strategy to ensure efficient document retrieval, updates, and aggregation in distributed environments.</p>
+<h2 id="1-external-id-string"><a class="header" href="#1-external-id-string">1. External ID (String)</a></h2>
+<p>The External ID is a <strong>logical identifier</strong> used by users and applications to uniquely identify a document.</p>
+<ul>
+<li><strong>Type</strong>: <code>String</code></li>
+<li><strong>Role</strong>: You can use any unique value, such as UUIDs, URLs, or database primary keys.</li>
+<li><strong>Storage</strong>: Persisted transparently as a reserved system field name <code>_id</code> within the Lexical Index.</li>
+<li><strong>Uniqueness</strong>: Expected to be unique across the entire system.</li>
+<li><strong>Updates</strong>: Indexing a document with an existing <code>external_id</code> triggers an automatic "Delete-then-Insert" (Upsert) operation, replacing the old version with the newest.</li>
+</ul>
+<h2 id="2-internal-id-u64--stable-id"><a class="header" href="#2-internal-id-u64--stable-id">2. Internal ID (u64 / Stable ID)</a></h2>
+<p>The Internal ID is a <strong>physical handle</strong> used internally by Iris's engines (Lexical and Vector) for high-performance operations.</p>
+<ul>
+<li><strong>Type</strong>: Unsigned 64-bit Integer (<code>u64</code>)</li>
+<li><strong>Role</strong>: Used for bitmap operations, point references, and routing between distributed nodes.</li>
+<li><strong>Immutability (Stable)</strong>: Once assigned, an Internal ID never changes due to index merges (segment compaction) or restarts. This prevents inconsistencies in deletion logs and caches.</li>
+</ul>
+<h3 id="id-structure-shard-prefixed"><a class="header" href="#id-structure-shard-prefixed">ID Structure (Shard-Prefixed)</a></h3>
+<p>Iris employs a <strong>Shard-Prefixed Stable ID</strong> scheme designed for multi-node distributed environments.</p>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Bit Range</th><th style="text-align: left">Name</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: left"><strong>48-63 bit</strong></td><td style="text-align: left"><strong>Shard ID</strong></td><td style="text-align: left">Prefix identifying the node or partition (up to 65,535 shards).</td></tr>
+<tr><td style="text-align: left"><strong>0-47 bit</strong></td><td style="text-align: left"><strong>Local ID</strong></td><td style="text-align: left">Monotonically increasing document number within a shard (up to ~281 trillion documents).</td></tr>
+</tbody></table>
+</div>
+<h4 id="why-this-structure"><a class="header" href="#why-this-structure">Why this structure?</a></h4>
+<ol>
+<li><strong>Zero-Cost Aggregation</strong>: Since <code>u64</code> IDs are globally unique, the aggregator can perform fast sorting and deduplication without worrying about ID collisions between nodes.</li>
+<li><strong>Fast Routing</strong>: The aggregator can immediately identify the physical node responsible for a document just by looking at the upper bits, avoiding expensive hash lookups.</li>
+<li><strong>High-Performance Fetching</strong>: Internal IDs map directly to physical data structures. This allows Iris to skip the "External-to-Internal ID" conversion step during retrieval, achieving <strong>O(1)</strong> access speed.</li>
+</ol>
+<h2 id="id-lifecycle"><a class="header" href="#id-lifecycle">ID Lifecycle</a></h2>
+<ol>
+<li><strong>Registration (<code>index_document</code>)</strong>: User provides a document with an External ID.</li>
+<li><strong>ID Assignment</strong>: The <code>HybridEngine</code> combines the current <code>shard_id</code> with a new Local ID to issue a Shard-Prefixed Internal ID.</li>
+<li><strong>Mapping</strong>: The engine maintains the relationship between the External ID and the new Internal ID.</li>
+<li><strong>Search</strong>: Search results return the <code>u64</code> Internal ID for efficiency.</li>
+<li><strong>Retrieval/Deletion</strong>: While the user-facing API accepts External IDs for convenience, the engine internally converts them to Internal IDs for near-instant processing.</li>
+</ol>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="persistence--wal"><a class="header" href="#persistence--wal">Persistence &amp; WAL</a></h1>
-<p>To ensure data durability and fast recovery, Sarissa implements a <strong>Write-Ahead Log (WAL)</strong> system.</p>
+<p>To ensure data durability and fast recovery, Iris implements a <strong>Write-Ahead Log (WAL)</strong> system.</p>
 <h2 id="write-ahead-log-wal"><a class="header" href="#write-ahead-log-wal">Write-Ahead Log (WAL)</a></h2>
 <ul>
 <li>All incoming write operations (Add, Delete) are immediately appended to a disk-based log file.</li>
 <li>This happens <strong>before</strong> memory structures (like HNSW graph or Inverted Index) are updated.</li>
-<li>In case of a crash, Sarissa replays the WAL on startup to restore the in-memory state.</li>
+<li>In case of a crash, Iris replays the WAL on startup to restore the in-memory state.</li>
 </ul>
 <h2 id="segments"><a class="header" href="#segments">Segments</a></h2>
 <p>Indexes can be split into segments (though currently, the implementation focuses on a global segment model with potential for expansion).</p>

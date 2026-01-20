@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Persistence &amp; WAL - Sarissa Documentation</title>
+        <title>Persistence &amp; WAL - Iris Documentation</title>
 
 
         <!-- Custom HTML head -->
@@ -138,13 +138,13 @@
                         </button>
                     </div>
 
-                    <h1 class="menu-title">Sarissa Documentation</h1>
+                    <h1 class="menu-title">Iris Documentation</h1>
 
                     <div class="right-buttons">
                         <a href="../print.html" title="Print this book" aria-label="Print this book">
                             <i id="print-button" class="fa fa-print"></i>
                         </a>
-                        <a href="https://github.com/mosuka/sarissa" title="Git repository" aria-label="Git repository">
+                        <a href="https://github.com/mosuka/iris" title="Git repository" aria-label="Git repository">
                             <i id="git-repository-button" class="fa fa-github"></i>
                         </a>
 
@@ -179,12 +179,12 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="persistence--wal"><a class="header" href="#persistence--wal">Persistence &amp; WAL</a></h1>
-<p>To ensure data durability and fast recovery, Sarissa implements a <strong>Write-Ahead Log (WAL)</strong> system.</p>
+<p>To ensure data durability and fast recovery, Iris implements a <strong>Write-Ahead Log (WAL)</strong> system.</p>
 <h2 id="write-ahead-log-wal"><a class="header" href="#write-ahead-log-wal">Write-Ahead Log (WAL)</a></h2>
 <ul>
 <li>All incoming write operations (Add, Delete) are immediately appended to a disk-based log file.</li>
 <li>This happens <strong>before</strong> memory structures (like HNSW graph or Inverted Index) are updated.</li>
-<li>In case of a crash, Sarissa replays the WAL on startup to restore the in-memory state.</li>
+<li>In case of a crash, Iris replays the WAL on startup to restore the in-memory state.</li>
 </ul>
 <h2 id="segments"><a class="header" href="#segments">Segments</a></h2>
 <p>Indexes can be split into segments (though currently, the implementation focuses on a global segment model with potential for expansion).</p>
