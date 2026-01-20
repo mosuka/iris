@@ -3,7 +3,6 @@
 - [Introduction](README.md)
 - [Getting Started](getting_started.md)
   - [Installation](getting_started/installation.md)
-  - [Basic Usage](getting_started/basic_usage.md)
 - [Core Concepts](concepts.md)
   - [Architecture](concepts/architecture.md)
   - [Lexical Search](concepts/lexical_search.md)
