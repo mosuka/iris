@@ -1,10 +1,10 @@
 [book]
-authors = ["Mosuka"]
+authors = ["Minoru Osuka"]
 language = "en"
 multilingual = false
 src = "src"
 title = "Iris Documentation"
 
 [output.html]
-git-repository-url = "https://github.com/mosuka/sarissa"
+git-repository-url = "https://github.com/mosuka/iris"
 site-url = "/iris/"
