@@ -21,10 +21,6 @@ jobs:
         with:
           mdbook-version: 'latest'
 
-      - name: Install mdbook-mermaid
-        run: |
-          cargo install mdbook-mermaid
-          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
       - name: Build Book (English)
         run: mdbook build docs

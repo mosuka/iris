@@ -8,6 +8,4 @@ title = "Iris Documentation"
 git-repository-url = "https://github.com/mosuka/iris"
 site-url = "/iris/"
 
-[preprocessor.mermaid]
-command = "mdbook-mermaid"
-
+additional-js = ["mermaid.min.js", "mermaid-init.js"]
