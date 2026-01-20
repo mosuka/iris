@@ -2,7 +2,10 @@
 
 Lexical search matches documents based on exact or approximate keyword matches. It is the traditional "search engine" functionality found in Lucene or Elasticsearch.
 
+> **Note**: In the unified Sarissa architecture, Lexical Search is typically handled by the `VectorEngine`, which orchestrates both lexical and vector components concurrently. `LexicalEngine` can still be used as a standalone engine for pure keyword search scenarios.
+
 ## Document Structure
+
 In Sarissa, a **Document** is the fundamental unit of indexing. It follows a **schema-less** design, allowing fields to be added dynamically without defining a schema upfront.
 
 Each `Document` consists of multiple `Fields` stored in a Map where the key is the field name. Each `Field` has a **Value** and **Options** defining how it should be indexed.
@@ -81,17 +84,22 @@ classDiagram
 ```
 
 ### Document
+
 The fundamental unit of indexing in Sarissa.
+
 - **Schema-less**: Fields can be added dynamically without a predefined schema.
 - **Map Structure**: Fields are stored in a `HashMap` where the key is the field name (String).
 - **Flexible**: A single document can contain a mix of different field types (Text, Integer, Blob, etc.).
 
 ### Field
+
 A container representing a single data point within a document.
+
 - **Value**: The actual data content (e.g., "Hello World", 123, true). Defined by `FieldValue`.
 - **Option**: Configuration for how this data should be handled (e.g., indexed, stored). Defined by `FieldOption`.
 
 ### Field Values
+
 - **Text**: UTF-8 string. Typically analyzed and indexed for full-text search.
 - **Integer / Float**: Numeric values. Used for range queries (BKD Tree) and sorting.
 - **Boolean**: True/False values.
@@ -100,28 +108,30 @@ A container representing a single data point within a document.
 - **Blob**: Raw byte data with MIME type. Used for storing binary content (images, etc.) or vector source data. **Stored only**, never indexed by the lexical engine.
 
 ### Field Options
+
 Configuration for the field defining how it should be indexed and stored.
 
 - **TextOption**:
-    - `indexed`: If true, the text is analyzed and added to the inverted index (searchable).
-    - `stored`: If true, the original text is stored in the doc store (retrievable).
-    - `term_vectors`: If true, stores term positions and offsets (needed for highlighting and "More Like This").
+  - `indexed`: If true, the text is analyzed and added to the inverted index (searchable).
+  - `stored`: If true, the original text is stored in the doc store (retrievable).
+  - `term_vectors`: If true, stores term positions and offsets (needed for highlighting and "More Like This").
 - **IntegerOption / FloatOption**:
-    - `indexed`: If true, the value is added to the BKD tree (range searchable).
-    - `stored`: If true, the original value is stored.
+  - `indexed`: If true, the value is added to the BKD tree (range searchable).
+  - `stored`: If true, the original value is stored.
 - **BooleanOption**:
-    - `indexed`: If true, the value is indexed.
-    - `stored`: If true, the original value is stored.
+  - `indexed`: If true, the value is indexed.
+  - `stored`: If true, the original value is stored.
 - **DateTimeOption**:
-    - `indexed`: If true, the timestamp is added to the BKD tree (range searchable).
-    - `stored`: If true, the original timestamp is stored.
+  - `indexed`: If true, the timestamp is added to the BKD tree (range searchable).
+  - `stored`: If true, the original timestamp is stored.
 - **GeoOption**:
-    - `indexed`: If true, the coordinates are added to the 2D BKD tree (efficient spatial search).
-    - `stored`: If true, the original coordinates are stored.
+  - `indexed`: If true, the coordinates are added to the 2D BKD tree (efficient spatial search).
+  - `stored`: If true, the original coordinates are stored.
 - **BlobOption**:
-    - `stored`: If true, the binary data is stored. **Note**: Blobs cannot be indexed by the lexical engine.
+  - `stored`: If true, the binary data is stored. **Note**: Blobs cannot be indexed by the lexical engine.
 
 ## Indexing Process
+
 The lexical indexing process translates documents into inverted indexes and BKD trees.
 
 ```mermaid
@@ -174,6 +184,7 @@ graph TD
    - A background process automatically merges smaller segments into larger ones to optimize read performance and reclaim space from deleted documents.
 
 ### Analyzers
+
 Text analysis is the process of converting raw text into tokens. An Analyzer is typically composed of a pipeline:
 
 1. **Char Filters**: Transform the raw character stream (e.g., removing HTML tags).
@@ -181,6 +192,7 @@ Text analysis is the process of converting raw text into tokens. An Analyzer is 
 3. **Token Filters**: Modify the token stream (e.g., lowercasing, stemming, removing stop words).
 
 Sarissa provides several built-in analyzers:
+
 - **StandardAnalyzer**: Good default for most European languages.
 - **JapaneseAnalyzer**: Optimized for Japanese text using Lindera (morphological analysis).
 - **KeywordAnalyzer**: Treats the entire input as a single token.
@@ -189,28 +201,36 @@ Sarissa provides several built-in analyzers:
 ## Core Concepts
 
 ### Inverted Index
+
 The inverted index is the fundamental structure for full-text search. While a traditional database maps documents to their terms, an inverted index maps **terms to the list of documents** containing them.
+
 - **Term Dictionary**: A sorted repository of all unique terms across the index.
 - **Postings Lists**: For each term, a list of document IDs (postings) where the term appears, along with frequency and position data for scoring.
 
 ### BKD Tree
+
 For non-textual data like numbers, dates, and geographic coordinates, Sarissa uses a **BKD Tree**. It is a multi-dimensional tree structure optimized for block-based storage on disk.
 Unlike an inverted index, a BKD tree is designed for **range search** and **spatial search**. It effectively partitions the data space into hierarchical blocks, allowing the search engine to skip large portions of irrelevant data.
 
 ### SIMD Optimization
+
 Sarissa uses SIMD-accelerated batch scoring for high-throughput ranking. The BM25 scoring algorithm is optimized to process multiple documents simultaneously, leveraging modern CPU instructions to provide a several-fold increase in performance compared to scalar processing.
 
 ## Engine Architecture
 
 ### Lexical Engine (`LexicalEngine`)
-The high-level orchestrator that manages indexing and searching. It coordinates between `InvertedIndexWriter` and `InvertedIndexSearcher`, providing a unified interface for document updates and retrieval with automatic caching and NRT (Near-Real-Time) capabilities.
+
+The engine that manages indexing and searching for text data. It coordinates between `InvertedIndexWriter` and `InvertedIndexSearcher`.
+In the unified architecture, this engine operates as a **sub-component** managed by the `VectorEngine`, handling the inverted index portions of hybrid documents. It handles manifest persistence and consistent ID mapping when run in standalone mode.
 
 ### Index Components
+
 - **InvertedIndexWriter**: The primary interface for adding documents. It orchestrates analysis, point extraction, and buffering.
 - **Segment Manager**: Controls the lifecycle and visibility of segments, maintaining the manifest and tracking deletions.
 - **In-Memory Buffering**: High-performance mapping of terms and staged BKD/Stored data before merging into disk segments.
 
 ## Index Segment Files
+
 A single segment is composed of several specialized files:
 
 | Extension | Component | Description |
@@ -224,6 +244,7 @@ A single segment is composed of several specialized files:
 | `.lens` | Field Lengths | Token counts per field per document (used for scoring). |
 
 ## Search Process
+
 The search process involves structure-aware traversal and weighted scoring.
 
 ```mermaid
@@ -261,6 +282,7 @@ graph TD
 4. **Collection & Fetching**: Aggregates top results into a sorted list and retrieves original field data for the final response.
 
 ## Query Types
+
 Sarissa supports a wide range of queries for different information needs.
 
 - **Term Query**: Match a single analyzed term exactly.
@@ -271,11 +293,13 @@ Sarissa supports a wide range of queries for different information needs.
 - **Geospatial Queries**: Distance-based or bounding-box search for geographic points.
 
 ## Scoring (BM25)
+
 Sarissa uses **Okapi BM25** as its default scoring function. It improves results by prioritizing rare terms and normalizing for document length, ensuring that matches in shorter, focused documents are ranked appropriately.
 
 ## Code Examples
 
 ### 1. Configuring LexicalEngine
+
 Setting up a schema-less engine with a default analyzer.
 
 ```rust
@@ -295,6 +319,7 @@ fn setup_engine() -> sarissa::error::Result<LexicalEngine> {
 ```
 
 ### 2. Adding Documents
+
 Creating and indexing documents with various field types.
 
 ```rust
@@ -315,6 +340,7 @@ fn add_documents(engine: &LexicalEngine) -> sarissa::error::Result<()> {
 ```
 
 ### 3. Searching via DSL
+
 Executing a simple search using the query string parser.
 
 ```rust
@@ -334,6 +360,7 @@ fn search(engine: &LexicalEngine) -> sarissa::error::Result<()> {
 ```
 
 ### 4. Custom Analyzer Setup
+
 Configuring a Japanese analyzer for specific fields.
 
 ```rust
