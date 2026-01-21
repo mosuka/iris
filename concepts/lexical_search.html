@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-48a9c6d1.js";
+            window.path_to_searchindex_js = "../searchindex-4f826ee3.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-9d358a08.js"></script>
@@ -185,76 +185,26 @@
 <h2 id="document-structure"><a class="header" href="#document-structure">Document Structure</a></h2>
 <p>In Iris, a <strong>Document</strong> is the fundamental unit of indexing. It follows a <strong>schema-less</strong> design, allowing fields to be added dynamically without defining a schema upfront.</p>
 <p>Each <code>Document</code> consists of multiple <code>Fields</code> stored in a Map where the key is the field name. Each <code>Field</code> has a <strong>Value</strong> and <strong>Options</strong> defining how it should be indexed.</p>
-<pre><code class="language-mermaid">classDiagram
-    class Document {
-        fields: Map&lt;String, Field&gt;
-    }
+<pre><code class="language-mermaid">flowchart LR
+    IntID1("Internal ID&lt;br&gt;1") --&gt; Document_Container
 
-    class Field {
-        value: FieldValue
-        option: FieldOption
-    }
+    subgraph Document_Container [Document]
+        direction TB
+        
+        ExtID1["Field (External ID)&lt;br&gt;Name: '_id'&lt;br&gt;Value: 'product_123'"]
+        F11["Field&lt;br&gt;Name: 'title'&lt;br&gt;Value: 'Apple'"]
+        F12["Field&lt;br&gt;Name: 'price'&lt;br&gt;Value: 100"]
+    end
+    
+    IntID2("Internal ID&lt;br&gt;2") --&gt; Document_Container2
 
-    class FieldValue {
-        Text
-        Integer
-        Float
-        Boolean
-        DateTime
-        Geo
-        Blob
-        Null
-    }
-
-    class FieldOption {
-        &lt;&lt;enumeration&gt;&gt;
-        Text(TextOption)
-        Integer(IntegerOption)
-        Float(FloatOption)
-        Boolean(BooleanOption)
-        DateTime(DateTimeOption)
-        Geo(GeoOption)
-        Blob(BlobOption)
-    }
-
-    class TextOption {
-        indexed: bool
-        stored: bool
-        term_vectors: bool
-    }
-
-    class IntegerOption {
-        indexed: bool
-        stored: bool
-    }
-
-    class FloatOption {
-        indexed: bool
-        stored: bool
-    }
-
-    class BooleanOption {
-        indexed: bool
-        stored: bool
-    }
-
-    class DateTimeOption {
-        indexed: bool
-        stored: bool
-    }
-
-    class GeoOption {
-        indexed: bool
-        stored: bool
-    }
-
-    class BlobOption {
-        stored: bool
-    }
-
-    Document *-- Field
-    Field --&gt; FieldValue
-    Field --&gt; FieldOption
+    subgraph Document_Container2 [Document]
+        direction TB
+        
+        ExtID2["Field (External ID)&lt;br&gt;Name: '_id'&lt;br&gt;Value: 'product_456'"]
+        F21["Field&lt;br&gt;Name: 'title'&lt;br&gt;Value: 'Orange'"]
+        F22["Field&lt;br&gt;Name: 'price'&lt;br&gt;Value: 100"]
+    end
 </code></pre>
 <h3 id="document"><a class="header" href="#document">Document</a></h3>
 <p>The fundamental unit of indexing in Iris.</p>
