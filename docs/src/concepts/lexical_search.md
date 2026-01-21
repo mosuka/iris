@@ -11,76 +11,26 @@ In Iris, a **Document** is the fundamental unit of indexing. It follows a **sche
 Each `Document` consists of multiple `Fields` stored in a Map where the key is the field name. Each `Field` has a **Value** and **Options** defining how it should be indexed.
 
 ```mermaid
-classDiagram
-    class Document {
-        fields: Map<String, Field>
-    }
+flowchart LR
+    IntID1("Internal ID<br>1") --> Document_Container
 
-    class Field {
-        value: FieldValue
-        option: FieldOption
-    }
+    subgraph Document_Container [Document]
+        direction TB
+        
+        ExtID1["Field (External ID)<br>Name: '_id'<br>Value: 'product_123'"]
+        F11["Field<br>Name: 'title'<br>Value: 'Apple'"]
+        F12["Field<br>Name: 'price'<br>Value: 100"]
+    end
+    
+    IntID2("Internal ID<br>2") --> Document_Container2
 
-    class FieldValue {
-        Text
-        Integer
-        Float
-        Boolean
-        DateTime
-        Geo
-        Blob
-        Null
-    }
-
-    class FieldOption {
-        <<enumeration>>
-        Text(TextOption)
-        Integer(IntegerOption)
-        Float(FloatOption)
-        Boolean(BooleanOption)
-        DateTime(DateTimeOption)
-        Geo(GeoOption)
-        Blob(BlobOption)
-    }
-
-    class TextOption {
-        indexed: bool
-        stored: bool
-        term_vectors: bool
-    }
-
-    class IntegerOption {
-        indexed: bool
-        stored: bool
-    }
-
-    class FloatOption {
-        indexed: bool
-        stored: bool
-    }
-
-    class BooleanOption {
-        indexed: bool
-        stored: bool
-    }
-
-    class DateTimeOption {
-        indexed: bool
-        stored: bool
-    }
-
-    class GeoOption {
-        indexed: bool
-        stored: bool
-    }
-
-    class BlobOption {
-        stored: bool
-    }
-
-    Document *-- Field
-    Field --> FieldValue
-    Field --> FieldOption
+    subgraph Document_Container2 [Document]
+        direction TB
+        
+        ExtID2["Field (External ID)<br>Name: '_id'<br>Value: 'product_456'"]
+        F21["Field<br>Name: 'title'<br>Value: 'Orange'"]
+        F22["Field<br>Name: 'price'<br>Value: 100"]
+    end
 ```
 
 ### Document
