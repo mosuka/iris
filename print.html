@@ -36,7 +36,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-4f826ee3.js";
+            window.path_to_searchindex_js = "searchindex-14459b15.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-9d358a08.js"></script>
@@ -467,9 +467,9 @@ iris = { version = "0.1.0", features = ["embeddings-openai"] }
     subgraph Document_Container [Document]
         direction TB
         
-        ExtID1["Field (External ID)&lt;br&gt;Name: '_id'&lt;br&gt;Value: 'product_123'"]
-        F11["Field&lt;br&gt;Name: 'title'&lt;br&gt;Value: 'Apple'"]
-        F12["Field&lt;br&gt;Name: 'price'&lt;br&gt;Value: 100"]
+        ExtID1["Field (External ID)&lt;br&gt;Name: '_id'&lt;br&gt;Value: 'product_123'&lt;br&gt;Type: Text"]
+        F11["Field&lt;br&gt;Name: 'title'&lt;br&gt;Value: 'Apple'&lt;br&gt;Type: Text"]
+        F12["Field&lt;br&gt;Name: 'price'&lt;br&gt;Value: 10.00&lt;br&gt;Type: Float"]
     end
     
     IntID2("Internal ID&lt;br&gt;2") --&gt; Document_Container2
@@ -477,9 +477,9 @@ iris = { version = "0.1.0", features = ["embeddings-openai"] }
     subgraph Document_Container2 [Document]
         direction TB
         
-        ExtID2["Field (External ID)&lt;br&gt;Name: '_id'&lt;br&gt;Value: 'product_456'"]
-        F21["Field&lt;br&gt;Name: 'title'&lt;br&gt;Value: 'Orange'"]
-        F22["Field&lt;br&gt;Name: 'price'&lt;br&gt;Value: 100"]
+        ExtID2["Field (External ID)&lt;br&gt;Name: '_id'&lt;br&gt;Value: 'product_456'&lt;br&gt;Type: Text"]
+        F21["Field&lt;br&gt;Name: 'title'&lt;br&gt;Value: 'Orange'&lt;br&gt;Type: Text"]
+        F22["Field&lt;br&gt;Name: 'price'&lt;br&gt;Value: 11.00&lt;br&gt;Type: Float"]
     end
 </code></pre>
 <h3 id="document"><a class="header" href="#document">Document</a></h3>
@@ -797,40 +797,40 @@ fn setup_japanese_engine() -&gt; iris::error::Result&lt;LexicalEngine&gt; {
 <p>Vector search (finding “nearest neighbors”) enables semantic retrieval where matches are based on meaning rather than exact keywords. Iris provides a <strong>Unified Vector Engine</strong> that combines this semantic search with traditional lexical (keyword) search capabilities.</p>
 <h2 id="document-structure-1"><a class="header" href="#document-structure-1">Document Structure</a></h2>
 <p>With the unified engine, a document can contain both vector fields (for semantic search) and lexical fields (for keyword search/filtering).</p>
-<pre><code class="language-mermaid">classDiagram
-    class VectorEngine {
-        lexical_engine: LexicalEngine
-        vector_index: VectorIndex
-    }
+<pre><code class="language-mermaid">flowchart LR
+    IntID1("Internal ID&lt;br&gt;1") --&gt; DocContainer1_Vec
+    IntID1 --&gt; DocContainer1_Lex
 
-    class HybridDocument {
-        &lt;&lt;Concept&gt;&gt;
-        vectors: Map&lt;String, Vector&gt;
-        lexical_fields: Map&lt;String, Field&gt;
-        metadata: Map&lt;String, String&gt;
-    }
+    subgraph DocContainer1_Vec [Vector Document]
+        direction TB
+        F11["Vector Field&lt;br&gt;Name: 'image_vec'&lt;br&gt;Value: [0.12, 0.05, ...]&lt;br&gt;Type: HNSW"]
+        F12["Metadata&lt;br&gt;Name: '_id'&lt;br&gt;Value: 'img_001'"]
+        F13["Metadata&lt;br&gt;Name: '_mime_type'&lt;br&gt;Value: 'image/jpeg'"]
+    end
 
-    class Vector {
-        data: Vec&lt;f32&gt;
-        dimension: usize
-    }
+    subgraph DocContainer1_Lex [Lexical Document]
+        direction TB
+        ExtID1_Lex["Lexical Field (External ID)&lt;br&gt;Name: '_id'&lt;br&gt;Value: 'img_001'&lt;br&gt;Type: Text"]
+        L11["Lexical Field&lt;br&gt;Name: 'description'&lt;br&gt;Value: 'A cute cat'&lt;br&gt;Type: Text"]
+        L12["Lexical Field&lt;br&gt;Name: 'like'&lt;br&gt;Value: 53&lt;br&gt;Type: Integer"]
+    end
 
-    class VectorFieldConfig {
-        dimension: usize
-        distance_metric: DistanceMetric
-        index_type: VectorIndexType
-        quantization: QuantizationMethod
-    }
+    IntID2("Internal ID&lt;br&gt;2") --&gt; DocContainer2_Vec
+    IntID2 --&gt; DocContainer2_Lex
 
-    class DistanceMetric {
-        &lt;&lt;enumeration&gt;&gt;
-        Cosine
-        L2 (Euclidean)
-        DotProduct
-    }
+    subgraph DocContainer2_Vec [Vector Document]
+        direction TB
+        F21["Vector Field&lt;br&gt;Name: 'image_vec'&lt;br&gt;Value: [0.88, 0.91, ...]&lt;br&gt;Type: HNSW"]
+        F22["Metadata&lt;br&gt;Name: '_id'&lt;br&gt;Value: 'img_002'"]
+        F23["Metadata&lt;br&gt;Name: '_mime_type'&lt;br&gt;Value: 'image/jpeg'"]
+    end
 
-    VectorDocument *-- Vector
-    VectorDocument --&gt; VectorFieldConfig
+    subgraph DocContainer2_Lex [Lexical Document]
+        direction TB
+        ExtID2_Lex["Lexical Field (External ID)&lt;br&gt;Name: '_id'&lt;br&gt;Value: 'img_002'&lt;br&gt;Type: Text"]
+        L21["Lexical Field&lt;br&gt;Name: 'description'&lt;br&gt;Value: 'A loyal dog'&lt;br&gt;Type: Text"]
+        L22["Lexical Field&lt;br&gt;Name: 'like'&lt;br&gt;Value: 42&lt;br&gt;Type: Integer"]
+    end
 </code></pre>
 <h3 id="vector"><a class="header" href="#vector">Vector</a></h3>
 <p>A mathematical representation of an object (text, image, audio) in a multi-dimensional space.</p>
