@@ -7,40 +7,40 @@ Vector search (finding "nearest neighbors") enables semantic retrieval where mat
 With the unified engine, a document can contain both vector fields (for semantic search) and lexical fields (for keyword search/filtering).
 
 ```mermaid
-classDiagram
-    class VectorEngine {
-        lexical_engine: LexicalEngine
-        vector_index: VectorIndex
-    }
+flowchart LR
+    IntID1("Internal ID<br>1") --> DocContainer1_Vec
+    IntID1 --> DocContainer1_Lex
 
-    class HybridDocument {
-        <<Concept>>
-        vectors: Map<String, Vector>
-        lexical_fields: Map<String, Field>
-        metadata: Map<String, String>
-    }
+    subgraph DocContainer1_Vec [Vector Document]
+        direction TB
+        F11["Vector Field<br>Name: 'image_vec'<br>Value: [0.12, 0.05, ...]<br>Type: HNSW"]
+        F12["Metadata<br>Name: '_id'<br>Value: 'img_001'"]
+        F13["Metadata<br>Name: '_mime_type'<br>Value: 'image/jpeg'"]
+    end
 
-    class Vector {
-        data: Vec<f32>
-        dimension: usize
-    }
+    subgraph DocContainer1_Lex [Lexical Document]
+        direction TB
+        ExtID1_Lex["Lexical Field (External ID)<br>Name: '_id'<br>Value: 'img_001'<br>Type: Text"]
+        L11["Lexical Field<br>Name: 'description'<br>Value: 'A cute cat'<br>Type: Text"]
+        L12["Lexical Field<br>Name: 'like'<br>Value: 53<br>Type: Integer"]
+    end
 
-    class VectorFieldConfig {
-        dimension: usize
-        distance_metric: DistanceMetric
-        index_type: VectorIndexType
-        quantization: QuantizationMethod
-    }
+    IntID2("Internal ID<br>2") --> DocContainer2_Vec
+    IntID2 --> DocContainer2_Lex
 
-    class DistanceMetric {
-        <<enumeration>>
-        Cosine
-        L2 (Euclidean)
-        DotProduct
-    }
+    subgraph DocContainer2_Vec [Vector Document]
+        direction TB
+        F21["Vector Field<br>Name: 'image_vec'<br>Value: [0.88, 0.91, ...]<br>Type: HNSW"]
+        F22["Metadata<br>Name: '_id'<br>Value: 'img_002'"]
+        F23["Metadata<br>Name: '_mime_type'<br>Value: 'image/jpeg'"]
+    end
 
-    VectorDocument *-- Vector
-    VectorDocument --> VectorFieldConfig
+    subgraph DocContainer2_Lex [Lexical Document]
+        direction TB
+        ExtID2_Lex["Lexical Field (External ID)<br>Name: '_id'<br>Value: 'img_002'<br>Type: Text"]
+        L21["Lexical Field<br>Name: 'description'<br>Value: 'A loyal dog'<br>Type: Text"]
+        L22["Lexical Field<br>Name: 'like'<br>Value: 42<br>Type: Integer"]
+    end
 ```
 
 ### Vector

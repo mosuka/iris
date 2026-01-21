@@ -17,9 +17,9 @@ flowchart LR
     subgraph Document_Container [Document]
         direction TB
         
-        ExtID1["Field (External ID)<br>Name: '_id'<br>Value: 'product_123'"]
-        F11["Field<br>Name: 'title'<br>Value: 'Apple'"]
-        F12["Field<br>Name: 'price'<br>Value: 100"]
+        ExtID1["Field (External ID)<br>Name: '_id'<br>Value: 'product_123'<br>Type: Text"]
+        F11["Field<br>Name: 'title'<br>Value: 'Apple'<br>Type: Text"]
+        F12["Field<br>Name: 'price'<br>Value: 10.00<br>Type: Float"]
     end
     
     IntID2("Internal ID<br>2") --> Document_Container2
@@ -27,9 +27,9 @@ flowchart LR
     subgraph Document_Container2 [Document]
         direction TB
         
-        ExtID2["Field (External ID)<br>Name: '_id'<br>Value: 'product_456'"]
-        F21["Field<br>Name: 'title'<br>Value: 'Orange'"]
-        F22["Field<br>Name: 'price'<br>Value: 100"]
+        ExtID2["Field (External ID)<br>Name: '_id'<br>Value: 'product_456'<br>Type: Text"]
+        F21["Field<br>Name: 'title'<br>Value: 'Orange'<br>Type: Text"]
+        F22["Field<br>Name: 'price'<br>Value: 11.00<br>Type: Float"]
     end
 ```
 
