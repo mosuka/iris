@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use iris::embedding::embedder::{EmbedInput, EmbedInputType, Embedder};
-use iris::error::{Result, IrisError};
+use iris::error::{IrisError, Result};
 use iris::lexical::engine::config::LexicalIndexConfig;
 use iris::storage::memory::{MemoryStorage, MemoryStorageConfig};
 use iris::vector::core::distance::DistanceMetric;
@@ -91,19 +91,13 @@ async fn test_vector_segment_integration() {
 
     for (i, vec_data) in vectors.iter().enumerate() {
         let doc_id = (i as u64) + 1;
-        let payload = DocumentPayload {
-            metadata: std::collections::HashMap::new(),
-            fields: vec![(
-                "vector_field".to_string(),
-                Payload {
-                    source: PayloadSource::Vector {
-                        data: vec_data.clone().into(),
-                    },
-                },
-            )]
-            .into_iter()
-            .collect(),
-        };
+        let mut payload = DocumentPayload::new();
+        payload.add_payload_vector(
+            "vector_field",
+            Payload::new(PayloadSource::Vector {
+                data: vec_data.clone().into(),
+            }),
+        );
 
         // Use upsert_payloads.
         engine.upsert_payloads(doc_id, payload).unwrap();

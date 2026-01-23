@@ -80,6 +80,15 @@ fn main() -> Result<()> {
         .embedder_arc(embedder_arc)
         .field("title_vector", field_config.clone())
         .field("body_vector", field_config)
+        .field(
+            "category",
+            VectorFieldConfig {
+                vector: None,
+                lexical: Some(iris::lexical::core::field::FieldOption::Text(
+                    iris::lexical::core::field::TextOption::default(),
+                )),
+            },
+        )
         .build()?;
 
     // 4. Create Engine
@@ -116,6 +125,10 @@ fn main() -> Result<()> {
         let mut doc = DocumentPayload::new();
         // Use set_text to provide the raw text content for embedding
         doc.set_text("title_vector", data.title);
+
+        // Add metadata to vectors using the new set_metadata API
+        doc.set_metadata("category", data._category);
+
         doc.set_text("body_vector", data.body);
 
         let doc_id = engine.add_payloads(doc)?;
@@ -153,6 +166,36 @@ fn main() -> Result<()> {
 
     println!("Found {} hits:", results_2.hits.len());
     for (i, hit) in results_2.hits.iter().enumerate() {
+        println!("{}. Doc ID: {}, Score: {:.4}", i + 1, hit.doc_id, hit.score);
+    }
+
+    // Demo 3: Advanced Filtering with Vector Metadata
+    // Search for "engine" in 'body_vector' but restrict to category="EDUCATION"
+    println!("\n--- Search 3: 'engine' in 'body_vector' with category='EDUCATION' filter ---");
+
+    use iris::vector::engine::filter::VectorFilter;
+    use iris::vector::engine::request::{LexicalQuery, TermQueryOptions};
+
+    // Vector metadata is indexed alongside document metadata.
+    // Here we use the advanced filter to target the "category" field which we set earlier.
+    // Note: We use lowercase "education" because the default analyzer lowercases tokens,
+    // and TermQuery performs an exact match against the indexed tokens.
+    let filter = VectorFilter::Advanced(LexicalQuery::Term(TermQueryOptions {
+        field: "category".to_string(),
+        term: "education".to_string(),
+        boost: 1.0,
+    }));
+
+    let request_3 = VectorSearchRequestBuilder::new()
+        .add_text("body_vector", "engine")
+        .filter(filter)
+        .limit(3)
+        .build();
+
+    let results_3 = engine.search(request_3)?;
+
+    println!("Found {} hits (should be 1):", results_3.hits.len());
+    for (i, hit) in results_3.hits.iter().enumerate() {
         println!("{}. Doc ID: {}, Score: {:.4}", i + 1, hit.doc_id, hit.score);
     }
 

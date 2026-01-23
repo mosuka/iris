@@ -132,7 +132,7 @@ pub struct StoredVector {
     pub data: Arc<[f32]>,
     pub weight: f32,
     #[serde(default)]
-    pub attributes: HashMap<String, String>,
+    pub attributes: HashMap<String, crate::lexical::core::field::Field>,
 }
 
 impl StoredVector {
@@ -157,10 +157,22 @@ impl StoredVector {
 impl From<Vector> for StoredVector {
     fn from(vector: Vector) -> Self {
         let data: Arc<[f32]> = vector.data.into();
+        let mut attributes = HashMap::new();
+        // Convert legacy string metadata to Text fields with default options
+        for (k, v) in vector.metadata {
+            use crate::lexical::core::field::{Field, FieldOption, FieldValue, TextOption};
+            attributes.insert(
+                k,
+                Field::new(
+                    FieldValue::Text(v),
+                    FieldOption::Text(TextOption::default()),
+                ),
+            );
+        }
         Self {
             data,
             weight: 1.0,
-            attributes: vector.metadata,
+            attributes,
         }
     }
 }
@@ -168,10 +180,21 @@ impl From<Vector> for StoredVector {
 impl From<&Vector> for StoredVector {
     fn from(vector: &Vector) -> Self {
         let data: Arc<[f32]> = vector.data.clone().into();
+        let mut attributes = HashMap::new();
+        for (k, v) in &vector.metadata {
+            use crate::lexical::core::field::{Field, FieldOption, FieldValue, TextOption};
+            attributes.insert(
+                k.clone(),
+                Field::new(
+                    FieldValue::Text(v.clone()),
+                    FieldOption::Text(TextOption::default()),
+                ),
+            );
+        }
         Self {
             data,
             weight: 1.0,
-            attributes: vector.metadata.clone(),
+            attributes,
         }
     }
 }
@@ -190,7 +213,13 @@ impl From<&StoredVector> for Vector {
 
 impl StoredVector {
     pub fn to_vector(&self) -> Vector {
-        let mut metadata = self.attributes.clone();
+        let mut metadata = HashMap::new();
+        // Flatten attributes to string metadata where possible
+        for (k, v) in &self.attributes {
+            if let Some(text) = v.value.as_text() {
+                metadata.insert(k.clone(), text.to_string());
+            }
+        }
         enrich_metadata(&mut metadata, self.weight);
         Vector {
             data: self.data.as_ref().to_vec(),
@@ -202,12 +231,20 @@ impl StoredVector {
         let StoredVector {
             data,
             weight,
-            mut attributes,
+            attributes,
         } = self;
-        enrich_metadata(&mut attributes, weight);
+
+        let mut metadata = HashMap::new();
+        for (k, v) in attributes {
+            if let Some(text) = v.value.as_text() {
+                metadata.insert(k, text.to_string());
+            }
+        }
+
+        enrich_metadata(&mut metadata, weight);
         Vector {
             data: data.as_ref().to_vec(),
-            metadata: attributes,
+            metadata,
         }
     }
 }
@@ -248,6 +285,8 @@ where
     Ok(buffer.into())
 }
 
+use crate::lexical::core::field::FieldValue;
+
 /// Document with embedded vectors for each field.
 ///
 /// Each field maps to exactly one `StoredVector`. This is the flattened model
@@ -259,7 +298,7 @@ pub struct DocumentVector {
     pub fields: HashMap<String, StoredVector>,
     /// Document-level metadata.
     #[serde(default)]
-    pub metadata: HashMap<String, String>,
+    pub(crate) metadata: HashMap<String, crate::lexical::core::field::Field>,
 }
 
 /// Document input model capturing raw payloads before embedding.
@@ -272,7 +311,7 @@ pub struct DocumentPayload {
     /// Fields to embed, each containing a single payload.
     pub fields: HashMap<String, Payload>,
     /// Document-level metadata (e.g., author, source, parent_doc_id).
-    pub metadata: HashMap<String, String>,
+    pub(crate) metadata: HashMap<String, crate::lexical::core::field::Field>,
 }
 
 impl DocumentPayload {
@@ -297,8 +336,30 @@ impl DocumentPayload {
     }
 
     /// Sets metadata for the document.
-    pub fn set_metadata(&mut self, key: impl Into<String>, value: impl Into<String>) {
-        self.metadata.insert(key.into(), value.into());
+    pub fn set_metadata(&mut self, key: impl Into<String>, value: impl Into<FieldValue>) {
+        use crate::lexical::core::field::{Field, FieldOption};
+        let val = value.into();
+        let opt = FieldOption::from_field_value(&val);
+        self.metadata.insert(key.into(), Field::new(val, opt));
+    }
+
+    /// Set a full metadata field including options.
+    pub fn set_metadata_field(
+        &mut self,
+        key: impl Into<String>,
+        field: crate::lexical::core::field::Field,
+    ) {
+        self.metadata.insert(key.into(), field);
+    }
+
+    /// Get the full metadata map.
+    pub fn metadata(&self) -> &HashMap<String, crate::lexical::core::field::Field> {
+        &self.metadata
+    }
+
+    /// Get a metadata field.
+    pub fn get_metadata(&self, key: &str) -> Option<&crate::lexical::core::field::Field> {
+        self.metadata.get(key)
     }
 }
 
@@ -316,9 +377,31 @@ impl DocumentVector {
         self.fields.insert(name.into(), vector);
     }
 
-    /// Sets metadata for the document.
-    pub fn set_metadata(&mut self, key: impl Into<String>, value: impl Into<String>) {
-        self.metadata.insert(key.into(), value.into());
+    /// Sets metadata for the document with default options inferred from value.
+    pub fn set_metadata(&mut self, key: impl Into<String>, value: impl Into<FieldValue>) {
+        use crate::lexical::core::field::{Field, FieldOption};
+        let val = value.into();
+        let opt = FieldOption::from_field_value(&val);
+        self.metadata.insert(key.into(), Field::new(val, opt));
+    }
+
+    /// Set a full metadata field including options.
+    pub fn set_metadata_field(
+        &mut self,
+        key: impl Into<String>,
+        field: crate::lexical::core::field::Field,
+    ) {
+        self.metadata.insert(key.into(), field);
+    }
+
+    /// Get the full metadata map.
+    pub fn metadata(&self) -> &HashMap<String, crate::lexical::core::field::Field> {
+        &self.metadata
+    }
+
+    /// Get a metadata field.
+    pub fn get_metadata(&self, key: &str) -> Option<&crate::lexical::core::field::Field> {
+        self.metadata.get(key)
     }
 }
 
@@ -328,10 +411,20 @@ mod tests {
 
     #[test]
     fn stored_vector_conversion_enriches_metadata() {
+        use crate::lexical::core::field::{Field, FieldOption, FieldValue, TextOption};
+        let mut attributes = HashMap::new();
+        attributes.insert(
+            String::from("chunk"),
+            Field::new(
+                FieldValue::Text(String::from("a")),
+                FieldOption::Text(TextOption::default()),
+            ),
+        );
+
         let stored = StoredVector {
             data: Arc::<[f32]>::from([1.0_f32, 2.0_f32]),
             weight: 2.5,
-            attributes: HashMap::from([(String::from("chunk"), String::from("a"))]),
+            attributes,
         };
 
         let vector = stored.to_vector();

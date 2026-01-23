@@ -114,14 +114,14 @@ fn test_hybrid_search_unification() -> std::result::Result<(), Box<dyn std::erro
     // Index Doc 1: "apple"
     let mut payload1 = DocumentPayload::new();
     payload1.set_field("title", Payload::text("apple"));
-    payload1.metadata.insert("_id".to_string(), "1".to_string());
+    payload1.set_metadata("_id", "1");
 
     engine.index_payload_chunk(payload1)?;
 
     // Index Doc 2: "banana"
     let mut payload2 = DocumentPayload::new();
     payload2.set_field("title", Payload::text("banana"));
-    payload2.metadata.insert("_id".to_string(), "2".to_string());
+    payload2.set_metadata("_id", "2");
 
     engine.index_payload_chunk(payload2)?;
 

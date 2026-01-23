@@ -7,7 +7,7 @@ use iris::analysis::analyzer::keyword::KeywordAnalyzer;
 use iris::embedding::embedder::{EmbedInput, EmbedInputType, Embedder};
 use iris::embedding::per_field::PerFieldEmbedder;
 use iris::embedding::precomputed::PrecomputedEmbedder;
-use iris::error::{Result, IrisError};
+use iris::error::{IrisError, Result};
 use iris::lexical::engine::config::LexicalIndexConfig;
 use iris::storage::Storage;
 use iris::storage::memory::MemoryStorage;
@@ -272,13 +272,16 @@ fn sample_documents() -> Vec<(u64, DocumentVector)> {
                 })
                 .collect();
 
-            (
-                legacy.doc_id,
-                DocumentVector {
-                    fields: converted_fields,
-                    metadata: legacy.metadata,
-                },
-            )
+            (legacy.doc_id, {
+                let mut doc = DocumentVector::new();
+                for (field_name, field_vec) in converted_fields {
+                    doc.set_field(field_name, field_vec);
+                }
+                for (k, v) in legacy.metadata {
+                    doc.set_metadata(k, v);
+                }
+                doc
+            })
         })
         .collect()
 }

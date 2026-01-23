@@ -209,6 +209,7 @@ pub enum NumericType {
 #[derive(
     Debug, Clone, PartialEq, Serialize, Deserialize, Archive, RkyvSerialize, RkyvDeserialize,
 )]
+#[serde(untagged)]
 pub enum FieldValue {
     /// Text value
     Text(String),
@@ -226,6 +227,48 @@ pub enum FieldValue {
     Blob(String, Vec<u8>),
     /// Null value
     Null,
+}
+
+impl From<String> for FieldValue {
+    fn from(s: String) -> Self {
+        FieldValue::Text(s)
+    }
+}
+
+impl From<&str> for FieldValue {
+    fn from(s: &str) -> Self {
+        FieldValue::Text(s.to_string())
+    }
+}
+
+impl From<i64> for FieldValue {
+    fn from(i: i64) -> Self {
+        FieldValue::Integer(i)
+    }
+}
+
+impl From<f64> for FieldValue {
+    fn from(f: f64) -> Self {
+        FieldValue::Float(f)
+    }
+}
+
+impl From<bool> for FieldValue {
+    fn from(b: bool) -> Self {
+        FieldValue::Boolean(b)
+    }
+}
+
+impl From<chrono::DateTime<chrono::Utc>> for FieldValue {
+    fn from(dt: chrono::DateTime<chrono::Utc>) -> Self {
+        FieldValue::DateTime(dt)
+    }
+}
+
+impl From<GeoPoint> for FieldValue {
+    fn from(point: GeoPoint) -> Self {
+        FieldValue::Geo(point)
+    }
 }
 
 impl FieldValue {

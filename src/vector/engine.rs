@@ -32,15 +32,14 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::lexical::engine::LexicalEngine;
-use crate::lexical::index::inverted::query::boolean::BooleanQuery;
-use crate::lexical::index::inverted::query::{Query, term::TermQuery};
-use crate::lexical::search::searcher::LexicalSearchRequest;
+// use crate::lexical::index::inverted::query::{Query, term::TermQuery}; // Unused
+// use crate::lexical::search::searcher::LexicalSearchRequest; // Unused
 
 use parking_lot::{Mutex, RwLock};
 
 use crate::embedding::embedder::{EmbedInput, Embedder};
 use crate::embedding::per_field::PerFieldEmbedder;
-use crate::error::{Result, IrisError};
+use crate::error::{IrisError, Result};
 use crate::maintenance::deletion::DeletionManager;
 use crate::storage::Storage;
 use crate::storage::prefixed::PrefixedStorage;
@@ -391,9 +390,14 @@ impl VectorEngine {
 
                 // Store original text if lexical indexing is enabled
                 if field_config.lexical.is_some() {
-                    stored
-                        .attributes
-                        .insert("__iris_lexical_source".to_string(), text_value);
+                    use crate::lexical::core::field::{Field, FieldOption, FieldValue, TextOption};
+                    stored.attributes.insert(
+                        "__iris_lexical_source".to_string(),
+                        Field::new(
+                            FieldValue::Text(text_value),
+                            FieldOption::Text(TextOption::default()),
+                        ),
+                    );
                 }
                 Ok(stored)
             }
@@ -881,7 +885,17 @@ impl VectorEngine {
                             doc_id: legacy.doc_id,
                             document: DocumentVector {
                                 fields,
-                                metadata: legacy.metadata,
+                                metadata: legacy
+                                    .metadata
+                                    .into_iter()
+                                    .map(|(k, v)| {
+                                        let val = crate::lexical::core::field::FieldValue::Text(v);
+                                        let opt = crate::lexical::core::field::FieldOption::Text(
+                                            crate::lexical::core::field::TextOption::default(),
+                                        );
+                                        (k, crate::lexical::core::field::Field::new(val, opt))
+                                    })
+                                    .collect(),
                             },
                         }
                     })
@@ -1101,6 +1115,10 @@ impl VectorEngine {
 
     /// Upsert a document    // Internal helper for upserting/indexing
     fn upsert_document_internal(&self, document: DocumentVector) -> Result<u64> {
+        eprintln!(
+            "DEBUG: upsert_document_internal metadata keys: {:?}",
+            document.metadata.keys()
+        );
         self.check_closed()?;
         self.validate_document_fields(&document)?;
 
@@ -1108,68 +1126,190 @@ impl VectorEngine {
         let external_id = document
             .metadata
             .get("_id")
-            .cloned()
+            .and_then(|v| v.value.as_text())
+            .map(|s| s.to_string())
             .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
 
         // 2. Index metadata (Lexical Engine handles ID assignment)
         // We construct a Lexical Document for the metadata
         let mut lex_doc_builder = crate::lexical::core::document::Document::builder();
-        use crate::lexical::core::field::TextOption;
+
+        use crate::lexical::core::field::{FieldOption, FieldValue};
 
         let field_configs = self.field_configs.read();
+        eprintln!("DEBUG: field_configs keys: {:?}", field_configs.keys());
 
         // Iterate over all known fields (from config) to check for lexical options
         for (field_name, config) in field_configs.iter() {
             if let Some(lexical_opt) = &config.lexical {
                 // Check if value exists in metadata (explicit metadata)
-                if let Some(metadata_val) = document.metadata.get(field_name) {
-                    // Parse metadata_val based on lexical option type?
-                    // For now, assume TextOption logic (strings) or implement type parsing
-                    // The simple path: all metadata is string -> TextOption
-                    // But config might specify IntegerOption. We should try to parse.
-                    // IMPORTANT: Current LexicalBuilder.add_text expects String.
-                    // We only support Text for now from metadata.
-                    if let crate::lexical::core::field::FieldOption::Text(text_opt) = lexical_opt {
-                        lex_doc_builder =
-                            lex_doc_builder.add_text(field_name, metadata_val, text_opt.clone());
+                // Check if value exists in metadata (explicit metadata)
+                if let Some(metadata_field) = document.metadata.get(field_name) {
+                    let metadata_val = &metadata_field.value;
+                    eprintln!("DEBUG: Configured metadata field '{}' found", field_name);
+                    match (lexical_opt, metadata_val) {
+                        (FieldOption::Text(opt), FieldValue::Text(s)) => {
+                            lex_doc_builder = lex_doc_builder.add_text(field_name, s, opt.clone());
+                        }
+                        (FieldOption::Integer(opt), FieldValue::Integer(i)) => {
+                            lex_doc_builder =
+                                lex_doc_builder.add_integer(field_name, *i, opt.clone());
+                        }
+                        // Handle Text -> Integer conversion
+                        (FieldOption::Integer(opt), FieldValue::Text(s)) => {
+                            if let Ok(i) = s.parse::<i64>() {
+                                lex_doc_builder =
+                                    lex_doc_builder.add_integer(field_name, i, opt.clone());
+                            }
+                        }
+                        (FieldOption::Float(opt), FieldValue::Float(f)) => {
+                            lex_doc_builder =
+                                lex_doc_builder.add_float(field_name, *f, opt.clone());
+                        }
+                        // Handle Text -> Float conversion
+                        (FieldOption::Float(opt), FieldValue::Text(s)) => {
+                            if let Ok(f) = s.parse::<f64>() {
+                                lex_doc_builder =
+                                    lex_doc_builder.add_float(field_name, f, opt.clone());
+                            }
+                        }
+                        (FieldOption::Boolean(opt), FieldValue::Boolean(b)) => {
+                            lex_doc_builder =
+                                lex_doc_builder.add_boolean(field_name, *b, opt.clone());
+                        }
+                        // Handle Text -> Boolean conversion
+                        (FieldOption::Boolean(opt), FieldValue::Text(s)) => {
+                            if let Ok(b) = s.parse::<bool>() {
+                                lex_doc_builder =
+                                    lex_doc_builder.add_boolean(field_name, b, opt.clone());
+                            }
+                        }
+                        (FieldOption::DateTime(opt), FieldValue::DateTime(dt)) => {
+                            lex_doc_builder =
+                                lex_doc_builder.add_datetime(field_name, *dt, opt.clone());
+                        }
+                        // Fallback: exact match required for other types or implement more conversions
+                        _ => {
+                            // Type mismatch that we don't handle implicitly.
+                            // Warning/Debug log?
+                            println!(
+                                "DEBUG: Type mismatch for field {}: expected {:?} but got {:?}",
+                                field_name, lexical_opt, metadata_val
+                            );
+                        }
                     }
                 }
                 // Check if value exists in vector fields (embedded text source)
                 else if let Some(stored_vec) = document.fields.get(field_name)
-                    && let Some(original_text) =
+                    && let Some(original_text_field) =
                         stored_vec.attributes.get("__iris_lexical_source")
-                    {
-                        println!(
-                            "DEBUG: indexing field {} lexical source: {}",
-                            field_name, original_text
-                        );
-                        if let crate::lexical::core::field::FieldOption::Text(text_opt) =
-                            lexical_opt
-                        {
-                            lex_doc_builder = lex_doc_builder.add_text(
-                                field_name,
-                                original_text,
-                                text_opt.clone(),
-                            );
-                        }
+                    && let Some(original_text) = original_text_field.value.as_text()
+                {
+                    // Vector source text is always Text
+                    if let FieldOption::Text(text_opt) = lexical_opt {
+                        lex_doc_builder =
+                            lex_doc_builder.add_text(field_name, original_text, text_opt.clone());
                     }
+                }
             }
         }
 
         // Also add any metadata fields that are NOT in the config but present in document.metadata?
         // Current behavior (implicit dynamic fields) added ANY non-id metadata.
         // If we want to maintain dynamic metadata behavior:
-        for (k, v) in &document.metadata {
+        for (k, field) in &document.metadata {
             if k != "_id" && !field_configs.contains_key(k) {
+                let v = &field.value;
                 // Heuristic: only add if we have some policy? Or always as default text?
                 // Let's keep existing behavior: treat as Default Text.
-                lex_doc_builder = lex_doc_builder.add_text(k, v, TextOption::default());
+                eprintln!(
+                    "DEBUG: Dynamic metadata indexing: key='{}', value='{:?}'",
+                    k, v
+                );
+                // add_field expects FieldValue logic inside? No, add_field takes key, value with default options.
+                // We better use add_field_with_options if available or rely on builder methods.
+                // But DocumentBuilder doesn't have a generic "add_field_from_struct".
+                // We can use the Field structure we already have!
+                // Wait, DocumentBuilder::add_field is a helper for value only.
+                // We should expose a way to add a full Field object.
+
+                // For now, construct manually or use helpers
+                match v {
+                    FieldValue::Text(s) => {
+                        lex_doc_builder = lex_doc_builder.add_text(
+                            k,
+                            s,
+                            crate::lexical::core::field::TextOption::default(),
+                        )
+                    }
+                    FieldValue::Integer(i) => {
+                        lex_doc_builder = lex_doc_builder.add_integer(
+                            k,
+                            *i,
+                            crate::lexical::core::field::IntegerOption::default(),
+                        )
+                    }
+                    _ => {
+                        // Fallback for other types if builder supports generic FieldValue handling
+                        // Actually let's use the field.option if it matches the value type
+                        // This uses the explicit option from DocumentVector!
+                        match (&field.value, &field.option) {
+                            (FieldValue::Text(s), FieldOption::Text(opt)) => {
+                                lex_doc_builder = lex_doc_builder.add_text(k, s, opt.clone())
+                            }
+                            (FieldValue::Integer(i), FieldOption::Integer(opt)) => {
+                                lex_doc_builder = lex_doc_builder.add_integer(k, *i, opt.clone())
+                            }
+                            (FieldValue::Float(f), FieldOption::Float(opt)) => {
+                                lex_doc_builder = lex_doc_builder.add_float(k, *f, opt.clone())
+                            }
+                            (FieldValue::Boolean(b), FieldOption::Boolean(opt)) => {
+                                lex_doc_builder = lex_doc_builder.add_boolean(k, *b, opt.clone())
+                            }
+                            // ... handle others
+                            _ => lex_doc_builder = lex_doc_builder.add_field(k, v.clone()), // Fallback
+                        }
+                    }
+                }
+            }
+        }
+
+        // Index vector-specific metadata with scoped key: vec_{field_name}.{key}
+        for (field_name, stored_vec) in &document.fields {
+            for (meta_key, meta_field) in &stored_vec.attributes {
+                let scoped_key = format!("vec_{}.{}", field_name, meta_key);
+                // StoredVector attributes is now Field.
+                // Use the option from the field if possible, or default to Text if simple kv required.
+                // For now, respect the option stored in the field.
+                match (&meta_field.value, &meta_field.option) {
+                    (FieldValue::Text(s), FieldOption::Text(opt)) => {
+                        lex_doc_builder = lex_doc_builder.add_text(scoped_key, s, opt.clone())
+                    }
+                    (FieldValue::Integer(i), FieldOption::Integer(opt)) => {
+                        lex_doc_builder = lex_doc_builder.add_integer(scoped_key, *i, opt.clone())
+                    }
+                    _ => {
+                        // Fallback
+                        if let Some(s) = meta_field.value.as_text() {
+                            lex_doc_builder = lex_doc_builder.add_text(
+                                scoped_key,
+                                s,
+                                crate::lexical::core::field::TextOption::default(),
+                            );
+                        }
+                    }
+                }
             }
         }
 
         // Ensure _id is handled (usually implicit in LexicalEngine logic, but let's leave it to index_document)
 
         let lex_doc = lex_doc_builder.build();
+        eprintln!(
+            "DEBUG: Built lexical document with {} fields: {:?}",
+            lex_doc.len(),
+            lex_doc.field_names()
+        );
 
         // Index into LexicalEngine (handles ID assignment/deduplication)
         // index_document attempts to FIND existing ID first (Overwrite behavior)
@@ -1203,12 +1343,15 @@ impl VectorEngine {
         let external_id = document
             .metadata
             .get("_id")
-            .cloned()
+            .and_then(|v| v.value.as_text())
+            .map(|s| s.to_string())
             .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
 
         // 2. Index metadata
         let mut lex_doc_builder = crate::lexical::core::document::Document::builder();
+
         use crate::lexical::core::field::TextOption;
+        use crate::lexical::core::field::{FieldOption, FieldValue};
 
         // Add _id field explicitly (LexicalEngine::add_document doesn't do it automatically like index_document)
         lex_doc_builder = lex_doc_builder.add_text("_id", &external_id, TextOption::default());
@@ -1219,33 +1362,131 @@ impl VectorEngine {
         for (field_name, config) in field_configs.iter() {
             if let Some(lexical_opt) = &config.lexical {
                 // Check if value exists in metadata (explicit metadata)
-                if let Some(metadata_val) = document.metadata.get(field_name) {
-                    if let crate::lexical::core::field::FieldOption::Text(text_opt) = lexical_opt {
-                        lex_doc_builder =
-                            lex_doc_builder.add_text(field_name, metadata_val, text_opt.clone());
+                if let Some(metadata_field) = document.metadata.get(field_name) {
+                    let metadata_val = &metadata_field.value;
+                    match (lexical_opt, metadata_val) {
+                        (FieldOption::Text(opt), FieldValue::Text(s)) => {
+                            lex_doc_builder = lex_doc_builder.add_text(field_name, s, opt.clone());
+                        }
+                        (FieldOption::Integer(opt), FieldValue::Integer(i)) => {
+                            lex_doc_builder =
+                                lex_doc_builder.add_integer(field_name, *i, opt.clone());
+                        }
+                        (FieldOption::Integer(opt), FieldValue::Text(s)) => {
+                            if let Ok(i) = s.parse::<i64>() {
+                                lex_doc_builder =
+                                    lex_doc_builder.add_integer(field_name, i, opt.clone());
+                            }
+                        }
+                        (FieldOption::Float(opt), FieldValue::Float(f)) => {
+                            lex_doc_builder =
+                                lex_doc_builder.add_float(field_name, *f, opt.clone());
+                        }
+                        (FieldOption::Float(opt), FieldValue::Text(s)) => {
+                            if let Ok(f) = s.parse::<f64>() {
+                                lex_doc_builder =
+                                    lex_doc_builder.add_float(field_name, f, opt.clone());
+                            }
+                        }
+                        (FieldOption::Boolean(opt), FieldValue::Boolean(b)) => {
+                            lex_doc_builder =
+                                lex_doc_builder.add_boolean(field_name, *b, opt.clone());
+                        }
+                        (FieldOption::Boolean(opt), FieldValue::Text(s)) => {
+                            if let Ok(b) = s.parse::<bool>() {
+                                lex_doc_builder =
+                                    lex_doc_builder.add_boolean(field_name, b, opt.clone());
+                            }
+                        }
+                        (FieldOption::DateTime(opt), FieldValue::DateTime(dt)) => {
+                            lex_doc_builder =
+                                lex_doc_builder.add_datetime(field_name, *dt, opt.clone());
+                        }
+                        _ => {
+                            // Type mismatch
+                        }
                     }
                 }
                 // Check if value exists in vector fields (embedded text source)
                 else if let Some(stored_vec) = document.fields.get(field_name)
-                    && let Some(original_text) =
+                    && let Some(original_text_field) =
                         stored_vec.attributes.get("__iris_lexical_source")
-                        && let crate::lexical::core::field::FieldOption::Text(text_opt) =
-                            lexical_opt
-                        {
-                            lex_doc_builder = lex_doc_builder.add_text(
-                                field_name,
-                                original_text,
-                                text_opt.clone(),
-                            );
-                        }
+                    && let Some(original_text) = original_text_field.value.as_text()
+                    && let FieldOption::Text(text_opt) = lexical_opt
+                {
+                    lex_doc_builder =
+                        lex_doc_builder.add_text(field_name, original_text, text_opt.clone());
+                }
             }
         }
 
-        for (k, v) in &document.metadata {
+        for (k, field) in &document.metadata {
             if k != "_id" && !field_configs.contains_key(k) {
-                lex_doc_builder = lex_doc_builder.add_text(k, v, TextOption::default());
+                let v = &field.value;
+                eprintln!("DEBUG: Indexing doc metadata key='{}', value='{:?}'", k, v);
+                // Heuristic: only add if we have some policy? Or always as default text?
+                match v {
+                    FieldValue::Text(s) => {
+                        lex_doc_builder = lex_doc_builder.add_text(
+                            k,
+                            s,
+                            crate::lexical::core::field::TextOption::default(),
+                        )
+                    }
+                    FieldValue::Integer(i) => {
+                        lex_doc_builder = lex_doc_builder.add_integer(
+                            k,
+                            *i,
+                            crate::lexical::core::field::IntegerOption::default(),
+                        )
+                    }
+                    _ => {
+                        // Fallback using field's option
+                        match (&field.value, &field.option) {
+                            (FieldValue::Text(s), FieldOption::Text(opt)) => {
+                                lex_doc_builder = lex_doc_builder.add_text(k, s, opt.clone())
+                            }
+                            (FieldValue::Integer(i), FieldOption::Integer(opt)) => {
+                                lex_doc_builder = lex_doc_builder.add_integer(k, *i, opt.clone())
+                            }
+                            (FieldValue::Float(f), FieldOption::Float(opt)) => {
+                                lex_doc_builder = lex_doc_builder.add_float(k, *f, opt.clone())
+                            }
+                            (FieldValue::Boolean(b), FieldOption::Boolean(opt)) => {
+                                lex_doc_builder = lex_doc_builder.add_boolean(k, *b, opt.clone())
+                            }
+                            _ => lex_doc_builder = lex_doc_builder.add_field(k, v.clone()),
+                        }
+                    }
+                }
             }
         }
+
+        // Index vector-specific metadata with scoped key: vec_{field_name}.{key}
+        for (field_name, stored_vec) in &document.fields {
+            for (meta_key, meta_field) in &stored_vec.attributes {
+                let scoped_key = format!("vec_{}.{}", field_name, meta_key);
+                // StoredVector attributes is now Field.
+                match (&meta_field.value, &meta_field.option) {
+                    (FieldValue::Text(s), FieldOption::Text(opt)) => {
+                        lex_doc_builder = lex_doc_builder.add_text(scoped_key, s, opt.clone())
+                    }
+                    (FieldValue::Integer(i), FieldOption::Integer(opt)) => {
+                        lex_doc_builder = lex_doc_builder.add_integer(scoped_key, *i, opt.clone())
+                    }
+                    _ => {
+                        if let Some(s) = meta_field.value.as_text() {
+                            lex_doc_builder = lex_doc_builder.add_text(
+                                scoped_key,
+                                s,
+                                crate::lexical::core::field::TextOption::default(),
+                            );
+                        }
+                    }
+                }
+            }
+        }
+
         let lex_doc = lex_doc_builder.build();
 
         // Index into LexicalEngine using add_document (Always Append)
@@ -1307,16 +1548,27 @@ impl VectorEngine {
 
     /// Add or update vectors for an external ID.
     pub fn index_vectors(&self, external_id: &str, mut doc: DocumentVector) -> Result<u64> {
-        doc.metadata
-            .insert("_id".to_string(), external_id.to_string());
+        use crate::lexical::core::field::{Field, FieldOption, FieldValue, TextOption};
+        doc.metadata.insert(
+            "_id".to_string(),
+            Field::new(
+                FieldValue::Text(external_id.to_string()),
+                FieldOption::Text(TextOption::default()),
+            ),
+        );
         self.upsert_document_internal(doc)
     }
 
     /// Add or update payloads for an external ID.
     pub fn index_payloads(&self, external_id: &str, mut payload: DocumentPayload) -> Result<u64> {
-        payload
-            .metadata
-            .insert("_id".to_string(), external_id.to_string());
+        use crate::lexical::core::field::{Field, FieldOption, FieldValue, TextOption};
+        payload.metadata.insert(
+            "_id".to_string(),
+            Field::new(
+                FieldValue::Text(external_id.to_string()),
+                FieldOption::Text(TextOption::default()),
+            ),
+        );
         self.upsert_document_payload(payload)
     }
 
@@ -1433,7 +1685,7 @@ impl VectorEngine {
 
         self.delete_fields_for_doc(doc_id, doc)?;
 
-        if let Some(ext_id) = doc.metadata.get("_id") {
+        if let Some(ext_id) = doc.metadata.get("_id").and_then(|v| v.value.as_text()) {
             self.metadata_index.delete_document_by_id(ext_id)?;
         }
         drop(documents);
@@ -1695,34 +1947,103 @@ impl VectorEngineSearcher {
             return Ok(None);
         };
 
-        // Convert VectorFilter to Lexical BooleanQuery
-        let mut boolean_query = BooleanQuery::new();
-        let mut has_clauses = false;
+        use crate::lexical::index::inverted::query::Query;
+        use crate::lexical::index::inverted::query::boolean::BooleanQuery;
+        use crate::lexical::index::inverted::query::term::TermQuery;
+        use crate::lexical::search::searcher::LexicalSearchRequest;
+        use crate::vector::engine::request::LexicalQuery;
 
-        // 1. Document Level Metadata (Main use case)
-        for (key, value) in &filter.document.equals {
-            let term_query = TermQuery::new(key, value);
-            boolean_query.add_must(Box::new(term_query));
-            has_clauses = true;
-        }
+        let query: Box<dyn Query> = match filter {
+            crate::vector::engine::filter::VectorFilter::Simple { document, .. } => {
+                if document.equals.is_empty() {
+                    return Ok(None);
+                }
+                let mut boolean_query = BooleanQuery::new();
+                use crate::lexical::core::field::FieldValue;
+                for (key, value) in &document.equals {
+                    let term_string = match value {
+                        FieldValue::Text(s) => s.clone(),
+                        FieldValue::Integer(i) => i.to_string(),
+                        FieldValue::Float(f) => f.to_string(),
+                        FieldValue::Boolean(b) => b.to_string(),
+                        FieldValue::DateTime(dt) => dt.to_rfc3339(),
+                        _ => continue,
+                    };
+                    boolean_query.add_must(Box::new(TermQuery::new(key, term_string)));
+                }
+                Box::new(boolean_query)
+            }
+            crate::vector::engine::filter::VectorFilter::Advanced(lex_query) => {
+                eprintln!("DEBUG: Processing Advanced filter: {:?}", lex_query);
+                match lex_query {
+                    LexicalQuery::MatchAll => return Ok(None),
+                    LexicalQuery::Term(opt) => {
+                        Box::new(TermQuery::new(&opt.field, &opt.term).with_boost(opt.boost))
+                    }
+                    LexicalQuery::Boolean(_opt) => {
+                        fn convert(q: &LexicalQuery) -> Result<Box<dyn Query>> {
+                            match q {
+                                LexicalQuery::MatchAll => Ok(Box::new(BooleanQuery::new())),
+                                LexicalQuery::Term(opt) => Ok(Box::new(
+                                    TermQuery::new(&opt.field, &opt.term).with_boost(opt.boost),
+                                )),
+                                LexicalQuery::Match(opt) => Ok(Box::new(
+                                    TermQuery::new(&opt.field, &opt.query).with_boost(opt.boost),
+                                )),
+                                LexicalQuery::Boolean(opt) => {
+                                    let mut bq = BooleanQuery::new();
+                                    bq.set_boost(opt.boost);
+                                    for sq in &opt.must {
+                                        bq.add_must(convert(sq)?);
+                                    }
+                                    for sq in &opt.must_not {
+                                        bq.add_must_not(convert(sq)?);
+                                    }
+                                    for sq in &opt.should {
+                                        bq.add_should(convert(sq)?);
+                                    }
+                                    Ok(Box::new(bq))
+                                }
+                            }
+                        }
+                        convert(lex_query)?
+                    }
+                    LexicalQuery::Match(opt) => {
+                        Box::new(TermQuery::new(&opt.field, &opt.query).with_boost(opt.boost))
+                    }
+                }
+            }
+        };
 
-        // 2. Field Level Metadata (Currently treated same as doc metadata or ignored if field scoping not supported in Lexical yet)
-        // For now, let's treat them as global metadata constraints for simplicity, or we can prefix keys?
-        // Implementation plan focused on document metadata. Ignoring field-specific metadata filter for now if not critical.
-        // If we want to support it, we'd need to index field metadata as `field_name.key`.
-        // Let's stick to document metadata for the integration step.
-
-        if !has_clauses {
-            return Ok(None);
-        }
-
-        let lexical_request = LexicalSearchRequest::new(Box::new(boolean_query) as Box<dyn Query>)
-            .load_documents(false); // Only need IDs
-
-        // Execute search
+        let lexical_request = LexicalSearchRequest::new(query).load_documents(false);
         let results = self.metadata_index.search(lexical_request)?;
+        eprintln!("DEBUG: Filter matched {} docs", results.hits.len());
 
-        // Collect Doc IDs
+        // DEBUG: Search ALL docs to see what's in 'category' field
+        // MatchAll is equivalent to empty BooleanQuery in this implementation logic usually
+        let debug_query: Box<dyn crate::lexical::index::inverted::query::Query> =
+            Box::new(crate::lexical::index::inverted::query::boolean::BooleanQuery::new());
+        let debug_req = LexicalSearchRequest::new(debug_query)
+            .load_documents(true)
+            .max_docs(10);
+        if let Ok(res) = self.metadata_index.search(debug_req) {
+            eprintln!("DEBUG: Total docs in index: {}", res.total_hits);
+            for hit in res.hits {
+                if let Some(doc) = hit.document {
+                    eprintln!(
+                        "DEBUG: Doc {} has keys: {:?}",
+                        hit.doc_id,
+                        doc.field_names()
+                    );
+                    if let Some(f) = doc.get_field("category") {
+                        eprintln!("DEBUG: Doc {} category: {:?}", hit.doc_id, f.value);
+                    } else {
+                        eprintln!("DEBUG: Doc {} category field MISSING", hit.doc_id);
+                    }
+                }
+            }
+        }
+
         let allowed_ids: HashSet<u64> = results.hits.into_iter().map(|hit| hit.doc_id).collect();
         Ok(Some(allowed_ids))
     }
@@ -1776,9 +2097,10 @@ impl VectorEngineSearcher {
             }
 
             if let Some(allowed) = allowed_ids
-                && !allowed.contains(&hit.doc_id) {
-                    continue;
-                }
+                && !allowed.contains(&hit.doc_id)
+            {
+                continue;
+            }
 
             let weighted_score = hit.score * field_weight;
             let entry = doc_hits.entry(hit.doc_id).or_insert_with(|| VectorHit {
@@ -2049,9 +2371,9 @@ impl crate::vector::search::searcher::VectorSearcher for VectorEngineSearcher {
             let fields = self.fields.read();
 
             for field_name in target_fields {
-                let field = fields.get(&field_name).ok_or_else(|| {
-                    IrisError::not_found(format!("vector field '{field_name}'"))
-                })?;
+                let field = fields
+                    .get(&field_name)
+                    .ok_or_else(|| IrisError::not_found(format!("vector field '{field_name}'")))?;
                 let matching_vectors =
                     self.query_vectors_for_field(&field_name, field.field.config(), request);
                 if matching_vectors.is_empty() {
@@ -2261,7 +2583,14 @@ mod tests {
             "body",
             StoredVector::new(Arc::<[f32]>::from([0.5, 0.5, 0.0])),
         );
-        doc.metadata.insert("_id".to_string(), "42".to_string());
+        use crate::lexical::core::field::{Field, FieldOption, FieldValue, TextOption};
+        doc.metadata.insert(
+            "_id".to_string(),
+            Field::new(
+                FieldValue::Text("42".to_string()),
+                FieldOption::Text(TextOption::default()),
+            ),
+        );
 
         // Use index_vectors to get the assigned ID (Lexical integration)
         let doc_id = engine.index_vectors("42", doc).expect("upsert");
@@ -2355,20 +2684,16 @@ mod tests {
             "body",
             StoredVector::new(Arc::<[f32]>::from([1.0, 0.0, 0.0])),
         );
-        doc1.metadata
-            .insert("category".to_string(), "sports".to_string());
-        doc1.metadata
-            .insert("tag".to_string(), "super cool".to_string());
+        doc1.set_metadata("category", "sports");
+        doc1.set_metadata("tag", "super cool");
 
         let mut doc2 = DocumentVector::new();
         doc2.set_field(
             "body",
             StoredVector::new(Arc::<[f32]>::from([0.0, 1.0, 0.0])),
         );
-        doc2.metadata
-            .insert("category".to_string(), "news".to_string());
-        doc2.metadata
-            .insert("tag".to_string(), "bad cool".to_string());
+        doc2.set_metadata("category", "news");
+        doc2.set_metadata("tag", "bad cool");
 
         engine.index_vectors("doc1", doc1).expect("upsert doc1");
         engine.index_vectors("doc2", doc2).expect("upsert doc2");
@@ -2377,10 +2702,11 @@ mod tests {
         // 1. Exact match on single term
         let mut request = sample_query(5);
         let mut filter = VectorFilter::default();
-        filter
-            .document
-            .equals
-            .insert("category".to_string(), "sports".to_string());
+        if let VectorFilter::Simple { document, .. } = &mut filter {
+            document
+                .equals
+                .insert("category".to_string(), "sports".into());
+        }
         request.filter = Some(filter);
 
         let results = engine.search(request).expect("search sports");
@@ -2391,10 +2717,11 @@ mod tests {
         // 2. Exact match on multi-term (testing behavior)
         let mut request = sample_query(5);
         let mut filter = VectorFilter::default();
-        filter
-            .document
-            .equals
-            .insert("tag".to_string(), "super cool".to_string());
+        if let VectorFilter::Simple { document, .. } = &mut filter {
+            document
+                .equals
+                .insert("tag".to_string(), "super cool".into());
+        }
         request.filter = Some(filter);
 
         let results = engine.search(request).expect("search super cool");
@@ -2404,13 +2731,83 @@ mod tests {
         // 3. Partial match (testing if tokenized)
         let mut request = sample_query(5);
         let mut filter = VectorFilter::default();
-        filter
-            .document
-            .equals
-            .insert("tag".to_string(), "super".to_string());
+        if let VectorFilter::Simple { document, .. } = &mut filter {
+            document.equals.insert("tag".to_string(), "super".into());
+        }
         request.filter = Some(filter);
 
         let results = engine.search(request).expect("search super");
         println!("Multi-term token 'super' hits: {}", results.hits.len());
+    }
+
+    #[test]
+    fn engine_vector_metadata_and_advanced_filtering() {
+        let config = sample_config();
+        let storage: Arc<dyn Storage> =
+            Arc::new(MemoryStorage::new(MemoryStorageConfig::default()));
+        let engine = create_engine(config, storage);
+
+        use crate::vector::engine::request::{LexicalQuery, TermQueryOptions};
+
+        // Doc 1: "body" vector has metadata resolution=1080
+        let mut doc1 = DocumentVector::new();
+        let mut vec1 = StoredVector::new(Arc::<[f32]>::from([1.0, 0.0, 0.0]));
+        use crate::lexical::core::field::{Field, FieldOption, FieldValue, TextOption};
+        vec1.attributes.insert(
+            "resolution".to_string(),
+            Field::new(
+                FieldValue::Text("1080".to_string()),
+                FieldOption::Text(TextOption::default()),
+            ),
+        );
+        doc1.set_field("body", vec1);
+        doc1.set_metadata("id", "d1");
+
+        // Doc 2: "body" vector has metadata resolution=4k
+        let mut doc2 = DocumentVector::new();
+        let mut vec2 = StoredVector::new(Arc::<[f32]>::from([0.0, 1.0, 0.0]));
+        vec2.attributes.insert(
+            "resolution".to_string(),
+            Field::new(
+                FieldValue::Text("4k".to_string()),
+                FieldOption::Text(TextOption::default()),
+            ),
+        );
+        doc2.set_field("body", vec2);
+        doc2.set_metadata("id", "d2");
+
+        engine.index_vectors("d1", doc1).expect("upsert d1");
+        engine.index_vectors("d2", doc2).expect("upsert d2");
+        engine.commit().expect("commit");
+
+        // Test 1: Advanced Filter for vec_body.resolution = 1080
+        let mut request = sample_query(5);
+
+        let term_query = LexicalQuery::Term(TermQueryOptions {
+            field: "vec_body.resolution".to_string(),
+            term: "1080".to_string(),
+            boost: 1.0,
+        });
+
+        request.filter = Some(VectorFilter::Advanced(term_query));
+
+        // Should catch Doc 1
+        let results = engine.search(request).expect("search 1080");
+        assert_eq!(results.hits.len(), 1);
+        assert_eq!(results.hits[0].doc_id, 0); // d1 is id 0
+
+        // Test 2: Advanced Filter for vec_body.resolution = 4k
+        let mut request = sample_query(5);
+        let term_query = LexicalQuery::Term(TermQueryOptions {
+            field: "vec_body.resolution".to_string(),
+            term: "4k".to_string(),
+            boost: 1.0,
+        });
+        request.filter = Some(VectorFilter::Advanced(term_query));
+
+        // Should catch Doc 2
+        let results = engine.search(request).expect("search 4k");
+        assert_eq!(results.hits.len(), 1);
+        assert_eq!(results.hits[0].doc_id, 1); // d2 is id 1
     }
 }
