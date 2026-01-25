@@ -6,11 +6,10 @@
 use std::sync::Arc;
 
 use iris::analysis::analyzer::standard::StandardAnalyzer;
+use iris::data::{DataValue, Document};
 use iris::error::Result;
-use iris::lexical::core::document::Document;
-use iris::lexical::core::field::TextOption;
-use iris::lexical::engine::LexicalEngine;
-use iris::lexical::engine::config::LexicalIndexConfig;
+use iris::lexical::store::LexicalStore;
+use iris::lexical::store::config::LexicalIndexConfig;
 use iris::lexical::index::config::InvertedIndexConfig;
 use iris::lexical::index::inverted::query::span::{SpanQueryBuilder, SpanQueryWrapper};
 use iris::lexical::index::inverted::query::{LexicalSearchResults, Query};
@@ -35,22 +34,19 @@ fn main() -> Result<()> {
     });
 
     // 3. Create Engine
-    let engine = LexicalEngine::new(storage, index_config)?;
+    let engine = LexicalStore::new(storage, index_config)?;
 
     // 4. Add Documents
     let documents = vec![
-        Document::builder()
-            .add_text("title", "The quick brown fox", TextOption::default())
-            .add_text("body", "Jumped over the lazy dog", TextOption::default())
-            .build(),
-        Document::builder()
-            .add_text("title", " The quick red fox", TextOption::default())
-            .add_text("body", "Jumped over the lazy cat", TextOption::default())
-            .build(),
-        Document::builder()
-            .add_text("title", "The lazy brown dog", TextOption::default())
-            .add_text("body", "Jumped over the quick fox", TextOption::default())
-            .build(),
+        Document::new()
+            .with_field("title", DataValue::Text("The quick brown fox".into()))
+            .with_field("body", DataValue::Text("Jumped over the lazy dog".into())),
+        Document::new()
+            .with_field("title", DataValue::Text(" The quick red fox".into()))
+            .with_field("body", DataValue::Text("Jumped over the lazy cat".into())),
+        Document::new()
+            .with_field("title", DataValue::Text("The lazy brown dog".into()))
+            .with_field("body", DataValue::Text("Jumped over the quick fox".into())),
     ];
 
     println!("Indexing {} documents...", documents.len());
@@ -183,7 +179,9 @@ fn print_results(results: &LexicalSearchResults) {
     for (i, hit) in results.hits.iter().enumerate() {
         println!("{}. Doc ID: {}, Score: {:.4}", i + 1, hit.doc_id, hit.score);
         if let Some(doc) = &hit.document {
-            if let Some(title) = doc.get_field("title").and_then(|f| f.value.as_text()) {
+            if let Some(field) = doc.get_field("title")
+                && let DataValue::Text(title) = field
+            {
                 println!("   Title: {}", title);
             }
         }

@@ -208,9 +208,9 @@ impl FacetCollector {
         // Try to get the stored document
         match reader.document(doc_id) {
             Ok(Some(document)) => {
-                if let Some(field_value) = document.get_field(field_name) {
-                    match &field_value.value {
-                        FieldValue::Text(value) => {
+                if let Some(val) = document.get(field_name) {
+                    match val {
+                        crate::data::DataValue::Text(value) => {
                             // Check if this is a hierarchical facet (contains delimiter)
                             if value.contains('/') {
                                 facet_paths.push(FacetPath::from_delimited(
@@ -225,19 +225,19 @@ impl FacetCollector {
                                 ));
                             }
                         }
-                        FieldValue::Integer(value) => {
+                        crate::data::DataValue::Int64(value) => {
                             facet_paths.push(FacetPath::from_value(
                                 field_name.to_string(),
                                 value.to_string(),
                             ));
                         }
-                        FieldValue::Float(value) => {
+                        crate::data::DataValue::Float64(value) => {
                             facet_paths.push(FacetPath::from_value(
                                 field_name.to_string(),
                                 value.to_string(),
                             ));
                         }
-                        FieldValue::Boolean(value) => {
+                        crate::data::DataValue::Bool(value) => {
                             facet_paths.push(FacetPath::from_value(
                                 field_name.to_string(),
                                 value.to_string(),
@@ -247,7 +247,7 @@ impl FacetCollector {
                             // Other field types can be converted to string for faceting
                             facet_paths.push(FacetPath::from_value(
                                 field_name.to_string(),
-                                format!("{field_value:?}"),
+                                format!("{val:?}"),
                             ));
                         }
                     }
@@ -757,11 +757,11 @@ impl GroupedSearchEngine {
         match reader.document(doc_id) {
             Ok(Some(document)) => {
                 if let Some(field_value) = document.get_field(&self.group_config.group_field) {
-                    match &field_value.value {
-                        FieldValue::Text(value) => Ok(value.clone()),
-                        FieldValue::Integer(value) => Ok(value.to_string()),
-                        FieldValue::Float(value) => Ok(value.to_string()),
-                        FieldValue::Boolean(value) => Ok(value.to_string()),
+                    match field_value {
+                        FieldValue::Text(value) | FieldValue::String(value) => Ok(value.clone()),
+                        FieldValue::Int64(value) => Ok(value.to_string()),
+                        FieldValue::Float64(value) => Ok(value.to_string()),
+                        FieldValue::Bool(value) => Ok(value.to_string()),
                         _ => Ok(format!("{field_value:?}")),
                     }
                 } else {
@@ -785,12 +785,12 @@ impl GroupedSearchEngine {
 
         match reader.document(doc_id) {
             Ok(Some(document)) => {
-                for (field_name, field_value) in document.fields() {
-                    let value_str = match &field_value.value {
-                        FieldValue::Text(value) => value.clone(),
-                        FieldValue::Integer(value) => value.to_string(),
-                        FieldValue::Float(value) => value.to_string(),
-                        FieldValue::Boolean(value) => value.to_string(),
+                for (field_name, field_value) in &document.fields {
+                    let value_str = match field_value {
+                        crate::data::DataValue::Text(value) => value.clone(),
+                        crate::data::DataValue::Int64(value) => value.to_string(),
+                        crate::data::DataValue::Float64(value) => value.to_string(),
+                        crate::data::DataValue::Bool(value) => value.to_string(),
                         _ => format!("{field_value:?}"),
                     };
                     fields.insert(field_name.clone(), value_str);

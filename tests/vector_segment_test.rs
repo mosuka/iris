@@ -1,13 +1,13 @@
 use async_trait::async_trait;
+use iris::data::{DataValue, Document};
 use iris::embedding::embedder::{EmbedInput, EmbedInputType, Embedder};
-use iris::error::{Result, IrisError};
-use iris::lexical::engine::config::LexicalIndexConfig;
+use iris::error::{IrisError, Result};
+use iris::lexical::store::config::LexicalIndexConfig;
 use iris::storage::memory::{MemoryStorage, MemoryStorageConfig};
 use iris::vector::core::distance::DistanceMetric;
-use iris::vector::core::document::{DocumentPayload, Payload, PayloadSource};
-use iris::vector::core::field::{HnswOption, VectorIndexKind, VectorOption};
+use iris::vector::core::field::{HnswOption, VectorOption};
 use iris::vector::core::vector::Vector;
-use iris::vector::engine::config::{VectorFieldConfig, VectorIndexConfig};
+use iris::vector::store::config::{VectorFieldConfig, VectorIndexConfig};
 use std::any::Any;
 use std::sync::Arc;
 
@@ -64,11 +64,6 @@ async fn test_vector_segment_integration() {
 
     let collection_config = VectorIndexConfig {
         fields: field_configs.clone(),
-        default_index_kind: VectorIndexKind::Hnsw,
-        default_distance: DistanceMetric::Euclidean,
-        default_dimension: Some(4),
-        default_base_weight: 1.0,
-        implicit_schema: false,
         embedder: Arc::new(MockTextEmbedder { dimension: 4 }),
         default_fields: vec!["vector_field".to_string()],
         metadata: std::collections::HashMap::new(),
@@ -79,8 +74,7 @@ async fn test_vector_segment_integration() {
 
     // We construct engine manually to inject storage
     let engine =
-        iris::vector::engine::VectorEngine::new(storage.clone(), collection_config.clone())
-            .unwrap();
+        iris::vector::store::VectorStore::new(storage.clone(), collection_config.clone()).unwrap();
 
     // 2. Insert vectors
     let vectors = vec![
@@ -91,36 +85,23 @@ async fn test_vector_segment_integration() {
 
     for (i, vec_data) in vectors.iter().enumerate() {
         let doc_id = (i as u64) + 1;
-        let payload = DocumentPayload {
-            metadata: std::collections::HashMap::new(),
-            fields: vec![(
-                "vector_field".to_string(),
-                Payload {
-                    source: PayloadSource::Vector {
-                        data: vec_data.clone().into(),
-                    },
-                },
-            )]
-            .into_iter()
-            .collect(),
-        };
+        let doc = Document::builder()
+            .with_field("vector_field", DataValue::Vector(vec_data.clone()))
+            .build();
 
         // Use upsert_payloads.
-        engine.upsert_payloads(doc_id, payload).unwrap();
+        engine.upsert_payloads(doc_id, doc).unwrap();
     }
 
-    // 3. Flush/Persist explicitly if needed?
-    // VectorCollection flushes on upsert.
+    // 3. Flush/Persist explicitly
+    engine.commit().unwrap();
 
-    // 4. Persistence check
-    // We drop collection and recreates it.
     // 4. Persistence check
     // We drop engine and recreates it.
     drop(engine);
 
     let engine_2 =
-        iris::vector::engine::VectorEngine::new(storage.clone(), collection_config.clone())
-            .unwrap();
+        iris::vector::store::VectorStore::new(storage.clone(), collection_config.clone()).unwrap();
 
     // We verify stats.
     // Recovery should load segments.

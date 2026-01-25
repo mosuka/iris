@@ -300,9 +300,11 @@ impl GeoDistanceQuery {
                 // Retrieve GeoPoint for exact distance calculation
                 if let Some(doc) = reader.document(doc_id)?
                     && let Some(field_value) = doc.get_field(&self.field)
-                        && let Some(geo_point) = field_value.value.as_geo() {
-                            candidates.push((doc_id as u32, *geo_point));
-                        }
+                    && let Some((lat, lon)) = field_value.as_geo()
+                {
+                    let geo_point = GeoPoint::new(lat, lon)?;
+                    candidates.push((doc_id as u32, geo_point));
+                }
             }
             return Ok(candidates);
         }
@@ -317,13 +319,14 @@ impl GeoDistanceQuery {
                 // Get the geo field value
                 if let Some(field_value) = doc.get_field(&self.field) {
                     // Extract the GeoPoint from the field value
-                    if let Some(geo_point) = field_value.value.as_geo() {
+                    if let Some((lat, lon)) = field_value.as_geo() {
+                        let geo_point = GeoPoint::new(lat, lon)?;
                         // First check bounding box for efficiency, then exact distance
-                        if bounding_box.contains(geo_point) {
-                            let distance = self.center.distance_to(geo_point);
+                        if bounding_box.contains(&geo_point) {
+                            let distance = self.center.distance_to(&geo_point);
                             // Double-check with exact distance calculation
                             if distance <= self.distance_km {
-                                candidates.push((doc_id as u32, *geo_point));
+                                candidates.push((doc_id as u32, geo_point));
                             }
                         }
                     }
@@ -578,9 +581,11 @@ impl GeoBoundingBoxQuery {
                 // Retrieve GeoPoint for exact check
                 if let Some(doc) = reader.document(doc_id)?
                     && let Some(field_value) = doc.get_field(&self.field)
-                        && let Some(geo_point) = field_value.value.as_geo() {
-                            candidates.push((doc_id as u32, *geo_point));
-                        }
+                    && let Some((lat, lon)) = field_value.as_geo()
+                {
+                    let geo_point = GeoPoint::new(lat, lon)?;
+                    candidates.push((doc_id as u32, geo_point));
+                }
             }
             return Ok(candidates);
         }
@@ -595,10 +600,11 @@ impl GeoBoundingBoxQuery {
                 // Get the geo field value
                 if let Some(field_value) = doc.get_field(&self.field) {
                     // Extract the GeoPoint from the field value
-                    if let Some(geo_point) = field_value.value.as_geo() {
+                    if let Some((lat, lon)) = field_value.as_geo() {
+                        let geo_point = GeoPoint::new(lat, lon)?;
                         // Check if the point is within the bounding box
-                        if self.bounding_box.contains(geo_point) {
-                            candidates.push((doc_id as u32, *geo_point));
+                        if self.bounding_box.contains(&geo_point) {
+                            candidates.push((doc_id as u32, geo_point));
                         }
                     }
                 }

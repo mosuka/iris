@@ -3,13 +3,13 @@ use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 use std::sync::Arc;
 
-use crate::error::{Result, IrisError};
+use crate::error::{IrisError, Result};
 use crate::maintenance::deletion::DeletionBitmap;
 use crate::storage::Storage;
-use crate::vector::core::document::{METADATA_WEIGHT, StoredVector};
 use crate::vector::core::field::VectorOption;
 use crate::vector::core::vector::Vector;
-use crate::vector::engine::config::VectorFieldConfig;
+use crate::vector::core::vector::{METADATA_WEIGHT, StoredVector};
+use crate::vector::store::config::VectorFieldConfig;
 use crate::vector::index::VectorIndexWriter;
 use crate::vector::index::config::HnswIndexConfig;
 use crate::vector::index::field::{
@@ -291,7 +291,7 @@ impl VectorFieldWriter for SegmentedVectorField {
 impl SegmentedVectorField {
     fn search_active_segment(
         &self,
-        query: &Vector,
+        query: &[f32],
         limit: usize,
         weight: f32,
     ) -> Result<Vec<FieldHit>> {
@@ -311,8 +311,8 @@ impl SegmentedVectorField {
         let mut candidates = Vec::with_capacity(vectors.len());
 
         for (doc_id, _field, vector) in vectors {
-            let similarity = distance_metric.similarity(&query.data, &vector.data)?;
-            let distance = distance_metric.distance(&query.data, &vector.data)?;
+            let similarity = distance_metric.similarity(query, &vector.data)?;
+            let distance = distance_metric.distance(query, &vector.data)?;
             candidates.push((*doc_id, similarity, distance, vector.metadata.clone()));
         }
 
@@ -349,7 +349,7 @@ impl SegmentedVectorField {
 
     fn search_managed_segments(
         &self,
-        query: &Vector,
+        query: &[f32],
         limit: usize,
         weight: f32,
     ) -> Result<Vec<FieldHit>> {
@@ -386,7 +386,7 @@ impl SegmentedVectorField {
             };
 
             let request = VectorIndexSearchRequest {
-                query: query.clone(),
+                query: Vector::new(query.to_vec()),
                 params,
                 field_name: Some(self.name.clone()),
             };
@@ -423,12 +423,12 @@ impl VectorFieldReader for SegmentedVectorField {
         let mut merged: HashMap<u64, FieldHit> = HashMap::new();
 
         for query in &request.query_vectors {
-            let effective_weight = query.weight * query.vector.weight;
-            let query_vec = query.vector.to_vector();
+            let effective_weight = query.weight;
+            let query_vec = &query.vector;
 
             // 1. Search Active
             let active_hits =
-                self.search_active_segment(&query_vec, request.limit, effective_weight)?;
+                self.search_active_segment(query_vec, request.limit, effective_weight)?;
             for hit in active_hits {
                 match merged.entry(hit.doc_id) {
                     Entry::Vacant(e) => {
@@ -444,7 +444,7 @@ impl VectorFieldReader for SegmentedVectorField {
 
             // 2. Search Managed
             let managed_hits =
-                self.search_managed_segments(&query_vec, request.limit, effective_weight)?;
+                self.search_managed_segments(query_vec, request.limit, effective_weight)?;
             for hit in managed_hits {
                 match merged.entry(hit.doc_id) {
                     Entry::Vacant(e) => {

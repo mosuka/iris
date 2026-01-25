@@ -9,10 +9,10 @@ use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 
 use crate::error::Result;
-use crate::vector::core::document::StoredVector;
+use crate::vector::core::vector::StoredVector;
 use crate::vector::core::vector::Vector;
-use crate::vector::engine::config::VectorFieldConfig;
-use crate::vector::engine::request::QueryVector;
+use crate::vector::store::config::VectorFieldConfig;
+use crate::vector::store::request::QueryVector;
 use crate::vector::writer::VectorIndexWriter;
 
 // ============================================================================
@@ -79,6 +79,7 @@ pub struct FieldSearchInput {
     pub field: String,
     pub query_vectors: Vec<QueryVector>,
     pub limit: usize,
+    pub allowed_ids: Option<std::collections::HashSet<u64>>,
 }
 
 /// Field-level hits returned by an index.
@@ -132,7 +133,7 @@ impl<W: VectorIndexWriter> LegacyVectorFieldWriter<W> {
     }
 
     fn to_legacy_vector(&self, doc_id: u64, stored: &StoredVector) -> (u64, String, Vector) {
-        let vector = stored.to_vector();
+        let vector = Vector::new(stored.data.to_vec());
         (doc_id, self.field_name.clone(), vector)
     }
 
@@ -280,16 +281,15 @@ impl VectorField for AdapterBackedVectorField {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::vector::core::document::StoredVector;
+    use crate::vector::core::vector::StoredVector;
     use crate::vector::index::config::{FlatIndexConfig, HnswIndexConfig, IvfIndexConfig};
     use crate::vector::index::flat::writer::FlatIndexWriter;
     use crate::vector::index::hnsw::writer::HnswIndexWriter;
     use crate::vector::index::ivf::writer::IvfIndexWriter;
     use crate::vector::writer::VectorIndexWriterConfig;
-    use std::sync::Arc;
 
     fn sample_stored_vector() -> StoredVector {
-        StoredVector::new(Arc::<[f32]>::from([1.0_f32, 0.0_f32]))
+        StoredVector::new(vec![1.0, 0.0])
     }
 
     fn flat_writer() -> FlatIndexWriter {
@@ -353,8 +353,7 @@ mod tests {
     #[test]
     fn adapter_stores_vector_with_correct_doc_id() {
         let adapter = LegacyVectorFieldWriter::new("body", flat_writer());
-        let mut vector = sample_stored_vector();
-        vector.weight = 2.5;
+        let vector = sample_stored_vector();
 
         adapter.add_stored_vector(5, &vector, 1).unwrap();
 

@@ -52,6 +52,7 @@
 //! use iris::analysis::token::TokenStream;
 //! use iris::error::Result;
 //!
+//! #[derive(Debug)]
 //! struct MyAnalyzer;
 //!
 //! impl Analyzer for MyAnalyzer {
@@ -89,7 +90,7 @@ use crate::error::Result;
 /// - [`analyze`](Self::analyze) - Process text into tokens
 /// - [`name`](Self::name) - Get analyzer identifier
 /// - [`as_any`](Self::as_any) - Enable downcasting to concrete types
-pub trait Analyzer: Send + Sync {
+pub trait Analyzer: Send + Sync + std::fmt::Debug {
     /// Analyze the given text and return a stream of tokens.
     ///
     /// This is the main method that performs the complete analysis pipeline,

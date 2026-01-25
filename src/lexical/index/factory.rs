@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use crate::error::Result;
-use crate::lexical::engine::config::LexicalIndexConfig;
+use crate::lexical::store::config::LexicalIndexConfig;
 use crate::lexical::index::LexicalIndex;
 use crate::lexical::index::inverted::InvertedIndex;
 use crate::storage::Storage;
@@ -22,7 +22,7 @@ use crate::storage::Storage;
 /// # Example with StorageFactory
 ///
 /// ```
-/// use iris::lexical::engine::config::LexicalIndexConfig;
+/// use iris::lexical::store::config::LexicalIndexConfig;
 /// use iris::lexical::index::factory::LexicalIndexFactory;
 /// use iris::storage::{StorageFactory, StorageConfig};
 /// use iris::storage::memory::MemoryStorageConfig;
@@ -55,7 +55,7 @@ impl LexicalIndexFactory {
     /// # Example
     ///
     /// ```
-    /// use iris::lexical::engine::config::LexicalIndexConfig;
+    /// use iris::lexical::store::config::LexicalIndexConfig;
     /// use iris::lexical::index::config::InvertedIndexConfig;
     /// use iris::lexical::index::factory::LexicalIndexFactory;
     /// use iris::storage::{StorageFactory, StorageConfig};
@@ -98,7 +98,7 @@ impl LexicalIndexFactory {
     /// # Example
     ///
     /// ```no_run
-    /// use iris::lexical::engine::config::LexicalIndexConfig;
+    /// use iris::lexical::store::config::LexicalIndexConfig;
     /// use iris::lexical::index::config::InvertedIndexConfig;
     /// use iris::lexical::index::factory::LexicalIndexFactory;
     /// use iris::storage::file::{FileStorage, FileStorageConfig};
@@ -141,7 +141,7 @@ impl LexicalIndexFactory {
 mod tests {
     use super::*;
 
-    use crate::lexical::engine::config::LexicalIndexConfig;
+    use crate::lexical::store::config::LexicalIndexConfig;
     use crate::storage::memory::MemoryStorage;
     use crate::storage::memory::MemoryStorageConfig;
 

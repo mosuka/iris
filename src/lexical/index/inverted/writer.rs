@@ -2,7 +2,7 @@
 //!
 //! This module provides the writer for building inverted indexes in schema-less mode.
 
-use crate::lexical::core::field::Field;
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -12,10 +12,11 @@ use crate::analysis::analyzer::analyzer::Analyzer;
 use crate::analysis::analyzer::per_field::PerFieldAnalyzer;
 use crate::analysis::analyzer::standard::StandardAnalyzer;
 use crate::analysis::token::Token;
-use crate::error::{Result, IrisError};
+use crate::error::{IrisError, Result};
 use crate::lexical::core::analyzed::{AnalyzedDocument, AnalyzedTerm};
 use crate::lexical::core::document::Document;
-use crate::lexical::core::field::FieldValue;
+
+use crate::lexical::core::field::FieldOption;
 use crate::lexical::index::inverted::IndexMetadata;
 use crate::lexical::index::inverted::core::posting::{Posting, TermPostingIndex};
 use crate::lexical::index::inverted::segment::SegmentInfo;
@@ -54,6 +55,9 @@ pub struct InvertedIndexWriterConfig {
 
     /// Shard ID for this writer.
     pub shard_id: u16,
+
+    /// Field-specific configurations.
+    pub fields: HashMap<String, FieldOption>,
 }
 
 impl std::fmt::Debug for InvertedIndexWriterConfig {
@@ -79,6 +83,7 @@ impl Default for InvertedIndexWriterConfig {
             optimize_segments: false,
             analyzer: Arc::new(StandardAnalyzer::new().unwrap()),
             shard_id: 0,
+            fields: HashMap::new(),
         }
     }
 }
@@ -131,6 +136,9 @@ pub struct InvertedIndexWriter {
 
     /// Base metadata read at startup.
     base_metadata: IndexMetadata,
+
+    /// Last processed WAL sequence number.
+    last_wal_seq: u64,
 }
 
 impl std::fmt::Debug for InvertedIndexWriter {
@@ -199,6 +207,7 @@ impl InvertedIndexWriter {
                 segments_created: 0,
                 deleted_count: 0,
             },
+            last_wal_seq: base_metadata.last_wal_seq,
             base_metadata,
         })
     }
@@ -340,7 +349,7 @@ impl InvertedIndexWriter {
 
         // 2. TODO: Check persisted segments
         // This requires opening readers for existing segments, which is expensive if done on every write.
-        // For now, we rely on the upper layer (LexicalEngine/HybridEngine) to check committed segments via Readers,
+        // For now, we rely on the upper layer (LexicalStore/HybridEngine) to check committed segments via Readers,
         // and use this method specifically for the "In-Memory / NRT" part of the check.
         // Or we implement a BloomFilter cache for segments here.
 
@@ -371,35 +380,41 @@ impl InvertedIndexWriter {
         let mut stored_fields = AHashMap::new();
         let mut point_values = AHashMap::new();
 
-        // Process each field in the document (schema-less mode)
-        for (field_name, field) in doc.fields() {
-            use crate::lexical::core::field::{FieldOption, FieldValue};
+        // Process each field in the document
+        for (field_name, val) in &doc.fields {
+            use crate::data::DataValue;
 
-            // Check field option to determine indexing and storage behavior
-            let should_index = match &field.option {
-                FieldOption::Text(opt) => opt.indexed,
-                FieldOption::Integer(opt) => opt.indexed,
-                FieldOption::Float(opt) => opt.indexed,
-                FieldOption::Boolean(opt) => opt.indexed,
-                FieldOption::DateTime(opt) => opt.indexed,
-                FieldOption::Geo(opt) => opt.indexed,
-                FieldOption::Blob(_) => false,
+            // 1. Get field option (Schema-aware)
+            // If the field is not in schema, we check if it starts with "_" (internal)
+            // Internal fields are indexed/stored by default unless explicitly disabled?
+            // For now, let's say if NOT in schema, we follow a "relaxed" schema-less mode:
+            // - If config.fields is empty, we index/store everything (backward compat)
+            // - If config.fields is NOT empty, we ONLY index/store what's in schema,
+            //   plus reserved fields like "_id".
+            let option = if let Some(opt) = self.config.fields.get(field_name) {
+                Some(opt)
+            } else if field_name.starts_with('_') || self.config.fields.is_empty() {
+                // If it's an internal field or we are in schema-less mode (empty config)
+                None // Uses default behavior below
+            } else {
+                continue; // Skip fields not in schema
             };
 
-            let should_store = match &field.option {
-                FieldOption::Text(opt) => opt.stored,
-                FieldOption::Integer(opt) => opt.stored,
-                FieldOption::Float(opt) => opt.stored,
-                FieldOption::Boolean(opt) => opt.stored,
-                FieldOption::DateTime(opt) => opt.stored,
-                FieldOption::Geo(opt) => opt.stored,
-                FieldOption::Blob(opt) => opt.stored,
+            let (should_index, should_store) = match option {
+                Some(FieldOption::Text(opt)) => (opt.indexed, opt.stored),
+                Some(FieldOption::Integer(opt)) => (opt.indexed, opt.stored),
+                Some(FieldOption::Float(opt)) => (opt.indexed, opt.stored),
+                Some(FieldOption::Boolean(opt)) => (opt.indexed, opt.stored),
+                Some(FieldOption::DateTime(opt)) => (opt.indexed, opt.stored),
+                Some(FieldOption::Geo(opt)) => (opt.indexed, opt.stored),
+                Some(FieldOption::Blob(opt)) => (false, opt.stored), // Blobs are not lexically indexed
+                None => (true, true), // Internal or schema-less default
             };
 
             // Index the field if enabled
             if should_index {
-                match &field.value {
-                    FieldValue::Text(text) => {
+                match val {
+                    DataValue::Text(text) => {
                         // Use analyzer from config (can be PerFieldAnalyzer for field-specific analysis)
                         let tokens = if let Some(per_field) = self
                             .config
@@ -417,7 +432,7 @@ impl InvertedIndexWriter {
                         field_terms.insert(field_name.clone(), analyzed_terms);
                     }
 
-                    FieldValue::Integer(num) => {
+                    DataValue::Int64(num) => {
                         // Convert integer to text for indexing
                         let text = num.to_string();
 
@@ -431,72 +446,53 @@ impl InvertedIndexWriter {
                         field_terms.insert(field_name.clone(), vec![analyzed_term]);
                         point_values.insert(field_name.clone(), vec![*num as f64]);
                     }
-                    FieldValue::Float(num) => {
-                        // Convert float to text for indexing
-                        let text = num.to_string();
-
-                        let analyzed_term = AnalyzedTerm {
-                            term: text.clone(),
-                            position: 0,
-                            frequency: 1,
-                            offset: (0, text.len()),
-                        };
-
-                        field_terms.insert(field_name.clone(), vec![analyzed_term]);
+                    DataValue::Float64(num) => {
+                        // ...
+                        field_terms.insert(
+                            field_name.clone(),
+                            vec![AnalyzedTerm {
+                                term: num.to_string(),
+                                position: 0,
+                                frequency: 1,
+                                offset: (0, num.to_string().len()),
+                            }],
+                        );
                         point_values.insert(field_name.clone(), vec![*num]);
                     }
-                    FieldValue::Boolean(boolean) => {
-                        // Convert boolean to text
-                        let text = boolean.to_string();
-
-                        let analyzed_term = AnalyzedTerm {
-                            term: text.clone(),
-                            position: 0,
-                            frequency: 1,
-                            offset: (0, text.len()),
-                        };
-
-                        field_terms.insert(field_name.clone(), vec![analyzed_term]);
-                    }
-                    FieldValue::DateTime(dt) => {
-                        // Handle DateTime field
-                        let text = dt.to_rfc3339();
-
-                        let analyzed_term = AnalyzedTerm {
-                            term: text.clone(),
-                            position: 0,
-                            frequency: 1,
-                            offset: (0, text.len()),
-                        };
-
-                        field_terms.insert(field_name.clone(), vec![analyzed_term]);
-                        let ts = dt.timestamp() as f64
-                            + dt.timestamp_subsec_nanos() as f64 / 1_000_000_000.0;
+                    DataValue::DateTime(dt) => {
+                        let ts = dt.timestamp() as f64;
+                        field_terms.insert(
+                            field_name.clone(),
+                            vec![AnalyzedTerm {
+                                term: ts.to_string(),
+                                position: 0,
+                                frequency: 1,
+                                offset: (0, ts.to_string().len()),
+                            }],
+                        );
                         point_values.insert(field_name.clone(), vec![ts]);
                     }
-                    FieldValue::Geo(geo) => {
-                        // Index geo field as "lat,lon" for basic text search
-                        let text = format!("{},{}", geo.lat, geo.lon);
-
-                        let analyzed_term = AnalyzedTerm {
-                            term: text.clone(),
-                            position: 0,
-                            frequency: 1,
-                            offset: (0, text.len()),
-                        };
-
-                        field_terms.insert(field_name.clone(), vec![analyzed_term]);
-                        point_values.insert(field_name.clone(), vec![geo.lat, geo.lon]);
+                    DataValue::Geo(lat, lon) => {
+                        // Geo points are indexed as 2D points in BKD
+                        field_terms.insert(
+                            field_name.clone(),
+                            vec![AnalyzedTerm {
+                                term: format!("{},{}", lat, lon),
+                                position: 0,
+                                frequency: 1,
+                                offset: (0, format!("{},{}", lat, lon).len()),
+                            }],
+                        );
+                        point_values.insert(field_name.clone(), vec![*lat, *lon]);
                     }
-                    FieldValue::Blob(_, _) | FieldValue::Null => {
-                        // These types are not indexed in lexical index
-                    }
+                    // Handle other variants...
+                    _ => {}
                 }
             }
 
             // Store the field if enabled
             if should_store {
-                stored_fields.insert(field_name.clone(), field.value.clone());
+                stored_fields.insert(field_name.clone(), val.clone());
             }
         }
 
@@ -691,39 +687,57 @@ impl InvertedIndexWriter {
 
                 // Write type tag and value
                 match field_value {
-                    FieldValue::Text(text) => {
+                    crate::data::DataValue::Text(text) => {
                         stored_writer.write_u8(0)?; // Type tag for Text
                         stored_writer.write_string(text)?;
                     }
-                    FieldValue::Integer(num) => {
+                    crate::data::DataValue::Int64(num) => {
                         stored_writer.write_u8(1)?; // Type tag for Integer
                         stored_writer.write_u64(*num as u64)?; // Store as u64, preserving bit pattern
                     }
-                    FieldValue::Float(num) => {
+                    crate::data::DataValue::Float64(num) => {
                         stored_writer.write_u8(2)?; // Type tag for Float
                         stored_writer.write_f64(*num)?;
                     }
-                    FieldValue::Boolean(b) => {
+                    crate::data::DataValue::Bool(b) => {
                         stored_writer.write_u8(3)?; // Type tag for Boolean
                         stored_writer.write_u8(if *b { 1 } else { 0 })?;
                     }
-                    FieldValue::DateTime(dt) => {
+                    crate::data::DataValue::DateTime(dt) => {
                         stored_writer.write_u8(5)?; // Type tag for DateTime
                         stored_writer.write_string(&dt.to_rfc3339())?;
                     }
-                    FieldValue::Geo(geo) => {
+                    crate::data::DataValue::Geo(lat, lon) => {
                         stored_writer.write_u8(6)?; // Type tag for Geo
-                        stored_writer.write_f64(geo.lat)?;
-                        stored_writer.write_f64(geo.lon)?;
+                        stored_writer.write_f64(*lat)?;
+                        stored_writer.write_f64(*lon)?;
                     }
-                    FieldValue::Blob(mime, bytes) => {
+                    crate::data::DataValue::Bytes(bytes, mime) => {
                         stored_writer.write_u8(4)?; // Type tag for Blob
-                        stored_writer.write_string(mime)?;
+                        stored_writer.write_string(mime.as_deref().unwrap_or(""))?;
                         stored_writer.write_varint(bytes.len() as u64)?;
                         stored_writer.write_bytes(bytes)?;
                     }
-                    FieldValue::Null => {
+                    crate::data::DataValue::Null => {
                         stored_writer.write_u8(7)?; // Type tag for Null
+                    }
+                    crate::data::DataValue::String(s) => {
+                        stored_writer.write_u8(8)?; // Type tag for String/Keyword
+                        stored_writer.write_string(s)?;
+                    }
+                    crate::data::DataValue::Vector(v) => {
+                        stored_writer.write_u8(9)?; // Type tag for Vector
+                        stored_writer.write_varint(v.len() as u64)?;
+                        for &f in v {
+                            stored_writer.write_f32(f)?;
+                        }
+                    }
+                    crate::data::DataValue::List(l) => {
+                        stored_writer.write_u8(10)?; // Type tag for List
+                        stored_writer.write_varint(l.len() as u64)?;
+                        for s in l {
+                            stored_writer.write_string(s)?;
+                        }
                     }
                 }
             }
@@ -835,7 +849,7 @@ impl InvertedIndexWriter {
         for (_doc_id, analyzed_doc) in &self.buffered_docs {
             let mut doc = Document::new();
             for (field_name, field_value) in &analyzed_doc.stored_fields {
-                doc.add_field(field_name, Field::with_default_option(field_value.clone()));
+                doc = doc.add_field(field_name, field_value.clone());
             }
             documents.push(doc);
         }
@@ -908,9 +922,8 @@ impl InvertedIndexWriter {
 
         // Write as JSON for compatibility with InvertedIndex::load_segments()
         let meta_file = format!("{segment_name}.meta");
-        let json_data = serde_json::to_string_pretty(&info).map_err(|e| {
-            IrisError::index(format!("Failed to serialize segment metadata: {e}"))
-        })?;
+        let json_data = serde_json::to_string_pretty(&info)
+            .map_err(|e| IrisError::index(format!("Failed to serialize segment metadata: {e}")))?;
 
         let mut output = self.storage.create_output(&meta_file)?;
         std::io::Write::write_all(&mut output, json_data.as_bytes())?;
@@ -965,6 +978,7 @@ impl InvertedIndexWriter {
             .unwrap_or_default()
             .as_secs();
         meta.generation += 1; // Increment generation
+        meta.last_wal_seq = self.last_wal_seq;
 
         let metadata_json = serde_json::to_string_pretty(&meta)
             .map_err(|e| IrisError::index(format!("Failed to serialize metadata: {e}")))?;
@@ -1156,9 +1170,8 @@ impl InvertedIndexWriter {
 
         if !meta.has_deletions {
             meta.has_deletions = true;
-            let json = serde_json::to_string_pretty(&meta).map_err(|e| {
-                IrisError::index(format!("Failed to serialize segment meta: {e}"))
-            })?;
+            let json = serde_json::to_string_pretty(&meta)
+                .map_err(|e| IrisError::index(format!("Failed to serialize segment meta: {e}")))?;
             let mut output = self.storage.create_output(&meta_file)?;
             std::io::Write::write_all(&mut output, json.as_bytes())?;
             output.close()?;
@@ -1228,6 +1241,11 @@ impl LexicalIndexWriter for InvertedIndexWriter {
 
     fn is_closed(&self) -> bool {
         InvertedIndexWriter::is_closed(self)
+    }
+
+    fn set_last_wal_seq(&mut self, seq: u64) -> Result<()> {
+        self.last_wal_seq = seq;
+        Ok(())
     }
 
     /// Builds an InvertedIndexReader from the current state of the writer's storage.

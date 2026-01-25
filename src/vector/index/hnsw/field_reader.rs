@@ -7,8 +7,8 @@ use std::cmp::Ordering;
 use std::collections::{HashMap, hash_map::Entry};
 use std::sync::Arc;
 
-use crate::error::{Result, IrisError};
-use crate::vector::core::document::METADATA_WEIGHT;
+use crate::error::{IrisError, Result};
+use crate::vector::core::vector::METADATA_WEIGHT;
 use crate::vector::core::vector::Vector;
 use crate::vector::index::field::{
     FieldHit, FieldSearchInput, FieldSearchResults, VectorFieldReader, VectorFieldStats,
@@ -79,12 +79,15 @@ impl HnswFieldReader {
         limit: usize,
         weight: f32,
         query: &Vector,
+        allowed_ids: Option<&std::collections::HashSet<u64>>,
     ) -> Result<Vec<FieldHit>> {
         // Get vector IDs for this field
         let vector_ids = self.index_reader.vector_ids()?;
         let filtered_ids: Vec<(u64, String)> = vector_ids
             .into_iter()
-            .filter(|(_, f)| f == &self.field_name)
+            .filter(|(id, f)| {
+                f == &self.field_name && allowed_ids.map_or(true, |allowed| allowed.contains(id))
+            })
             .collect();
 
         // Limit candidates based on ef_search
@@ -159,11 +162,13 @@ impl VectorFieldReader for HnswFieldReader {
         // Merge results from all query vectors
         let mut merged: HashMap<u64, FieldHit> = HashMap::new();
         for query in &request.query_vectors {
-            let effective_weight = query.weight * query.vector.weight;
+            let effective_weight = query.weight;
+            let query_vec = Vector::new(query.vector.clone());
             let hits = self.search_single_vector(
                 request.limit,
                 effective_weight,
-                &query.vector.to_vector(),
+                &query_vec,
+                request.allowed_ids.as_ref(),
             )?;
 
             for hit in hits {
@@ -206,10 +211,10 @@ impl VectorFieldReader for HnswFieldReader {
 mod tests {
     use super::*;
     use crate::vector::core::distance::DistanceMetric;
-    use crate::vector::core::document::StoredVector;
+
     use crate::vector::core::vector::Vector;
-    use crate::vector::engine::request::QueryVector;
     use crate::vector::reader::SimpleVectorReader;
+    use crate::vector::store::request::QueryVector;
 
     fn create_test_reader() -> Arc<dyn VectorIndexReader> {
         let vectors = vec![
@@ -221,9 +226,8 @@ mod tests {
     }
 
     fn create_query_vector(data: Vec<f32>) -> QueryVector {
-        let stored = StoredVector::new(data.into());
         QueryVector {
-            vector: stored,
+            vector: data,
             weight: 1.0,
             fields: None,
         }
@@ -239,6 +243,7 @@ mod tests {
             field: "body".to_string(),
             query_vectors: vec![query],
             limit: 10,
+            allowed_ids: None,
         };
 
         let results = reader.search(input).unwrap();
@@ -264,6 +269,7 @@ mod tests {
             field: "wrong_field".to_string(),
             query_vectors: vec![query],
             limit: 10,
+            allowed_ids: None,
         };
 
         let result = reader.search(input);

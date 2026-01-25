@@ -8,11 +8,10 @@ use iris::analysis::analyzer::analyzer::Analyzer;
 use iris::analysis::analyzer::keyword::KeywordAnalyzer;
 use iris::analysis::analyzer::per_field::PerFieldAnalyzer;
 use iris::analysis::analyzer::standard::StandardAnalyzer;
-use iris::lexical::core::document::Document;
-use iris::lexical::core::field::TextOption;
+use iris::data::{DataValue, Document};
 use iris::error::Result;
-use iris::lexical::engine::LexicalEngine;
-use iris::lexical::engine::config::LexicalIndexConfig;
+use iris::lexical::store::LexicalStore;
+use iris::lexical::store::config::LexicalIndexConfig;
 use iris::lexical::index::config::InvertedIndexConfig;
 use iris::lexical::index::inverted::query::Query;
 use iris::lexical::index::inverted::query::wildcard::WildcardQuery;
@@ -40,122 +39,111 @@ fn main() -> Result<()> {
         analyzer: Arc::new(per_field_analyzer.clone()),
         ..InvertedIndexConfig::default()
     });
-    let lexical_engine = LexicalEngine::new(storage, lexical_index_config)?;
+    let lexical_engine = LexicalStore::new(storage, lexical_index_config)?;
 
     // Add documents with various patterns for wildcard matching
     let documents = vec![
-        Document::builder()
-            .add_text(
+        Document::new()
+            .with_field(
                 "title",
-                "JavaScript Tutorial for Beginners",
-                TextOption::default(),
+                DataValue::Text("JavaScript Tutorial for Beginners".into()),
             )
-            .add_text("filename", "javascript_tutorial.pdf", TextOption::default())
-            .add_text(
+            .with_field(
+                "filename",
+                DataValue::Text("javascript_tutorial.pdf".into()),
+            )
+            .with_field(
                 "description",
-                "Complete JavaScript programming guide",
-                TextOption::default(),
+                DataValue::Text("Complete JavaScript programming guide".into()),
             )
-            .add_text("category", "programming", TextOption::default())
-            .add_text("extension", "pdf", TextOption::default())
-            .add_text("id", "file001", TextOption::default())
-            .build(),
-        Document::builder()
-            .add_text(
+            .with_field("category", DataValue::Text("programming".into()))
+            .with_field("extension", DataValue::Text("pdf".into()))
+            .with_field("id", DataValue::Text("file001".into())),
+        Document::new()
+            .with_field(
                 "title",
-                "Python Programming Reference",
-                TextOption::default(),
+                DataValue::Text("Python Programming Reference".into()),
             )
-            .add_text("filename", "python_reference.html", TextOption::default())
-            .add_text(
+            .with_field("filename", DataValue::Text("python_reference.html".into()))
+            .with_field(
                 "description",
-                "Comprehensive Python programming reference",
-                TextOption::default(),
+                DataValue::Text("Comprehensive Python programming reference".into()),
             )
-            .add_text("category", "programming", TextOption::default())
-            .add_text("extension", "html", TextOption::default())
-            .add_text("id", "file002", TextOption::default())
-            .build(),
-        Document::builder()
-            .add_text(
+            .with_field("category", DataValue::Text("programming".into()))
+            .with_field("extension", DataValue::Text("html".into()))
+            .with_field("id", DataValue::Text("file002".into())),
+        Document::new()
+            .with_field(
                 "title",
-                "Machine Learning Algorithms",
-                TextOption::default(),
+                DataValue::Text("Machine Learning Algorithms".into()),
             )
-            .add_text("filename", "ml_algorithms.docx", TextOption::default())
-            .add_text(
+            .with_field("filename", DataValue::Text("ml_algorithms.docx".into()))
+            .with_field(
                 "description",
-                "Understanding machine learning techniques",
-                TextOption::default(),
+                DataValue::Text("Understanding machine learning techniques".into()),
             )
-            .add_text("category", "data-science", TextOption::default())
-            .add_text("extension", "docx", TextOption::default())
-            .add_text("id", "file003", TextOption::default())
-            .build(),
-        Document::builder()
-            .add_text("title", "Database Design Principles", TextOption::default())
-            .add_text("filename", "database_design.pptx", TextOption::default())
-            .add_text(
-                "description",
-                "Principles of good database design",
-                TextOption::default(),
-            )
-            .add_text("category", "database", TextOption::default())
-            .add_text("extension", "pptx", TextOption::default())
-            .add_text("id", "file004", TextOption::default())
-            .build(),
-        Document::builder()
-            .add_text(
+            .with_field("category", DataValue::Text("data-science".into()))
+            .with_field("extension", DataValue::Text("docx".into()))
+            .with_field("id", DataValue::Text("file003".into())),
+        Document::new()
+            .with_field(
                 "title",
-                "Web Development Best Practices",
-                TextOption::default(),
+                DataValue::Text("Database Design Principles".into()),
             )
-            .add_text("filename", "web_dev_practices.txt", TextOption::default())
-            .add_text(
+            .with_field("filename", DataValue::Text("database_design.pptx".into()))
+            .with_field(
                 "description",
-                "Best practices for web development",
-                TextOption::default(),
+                DataValue::Text("Principles of good database design".into()),
             )
-            .add_text("category", "web-development", TextOption::default())
-            .add_text("extension", "txt", TextOption::default())
-            .add_text("id", "file005", TextOption::default())
-            .build(),
-        Document::builder()
-            .add_text("title", "React Component Patterns", TextOption::default())
-            .add_text("filename", "react_patterns.jsx", TextOption::default())
-            .add_text(
+            .with_field("category", DataValue::Text("database".into()))
+            .with_field("extension", DataValue::Text("pptx".into()))
+            .with_field("id", DataValue::Text("file004".into())),
+        Document::new()
+            .with_field(
+                "title",
+                DataValue::Text("Web Development Best Practices".into()),
+            )
+            .with_field("filename", DataValue::Text("web_dev_practices.txt".into()))
+            .with_field(
                 "description",
-                "Common patterns in React component development",
-                TextOption::default(),
+                DataValue::Text("Best practices for web development".into()),
             )
-            .add_text("category", "frontend", TextOption::default())
-            .add_text("extension", "jsx", TextOption::default())
-            .add_text("id", "file006", TextOption::default())
-            .build(),
-        Document::builder()
-            .add_text("title", "API Documentation Template", TextOption::default())
-            .add_text("filename", "api_docs_template.md", TextOption::default())
-            .add_text(
+            .with_field("category", DataValue::Text("web-development".into()))
+            .with_field("extension", DataValue::Text("txt".into()))
+            .with_field("id", DataValue::Text("file005".into())),
+        Document::new()
+            .with_field("title", DataValue::Text("React Component Patterns".into()))
+            .with_field("filename", DataValue::Text("react_patterns.jsx".into()))
+            .with_field(
                 "description",
-                "Template for creating API documentation",
-                TextOption::default(),
+                DataValue::Text("Common patterns in React component development".into()),
             )
-            .add_text("category", "documentation", TextOption::default())
-            .add_text("extension", "md", TextOption::default())
-            .add_text("id", "file007", TextOption::default())
-            .build(),
-        Document::builder()
-            .add_text("title", "Configuration Settings", TextOption::default())
-            .add_text("filename", "app_config.json", TextOption::default())
-            .add_text(
+            .with_field("category", DataValue::Text("frontend".into()))
+            .with_field("extension", DataValue::Text("jsx".into()))
+            .with_field("id", DataValue::Text("file006".into())),
+        Document::new()
+            .with_field(
+                "title",
+                DataValue::Text("API Documentation Template".into()),
+            )
+            .with_field("filename", DataValue::Text("api_docs_template.md".into()))
+            .with_field(
                 "description",
-                "Application configuration file",
-                TextOption::default(),
+                DataValue::Text("Template for creating API documentation".into()),
             )
-            .add_text("category", "configuration", TextOption::default())
-            .add_text("extension", "json", TextOption::default())
-            .add_text("id", "file008", TextOption::default())
-            .build(),
+            .with_field("category", DataValue::Text("documentation".into()))
+            .with_field("extension", DataValue::Text("md".into()))
+            .with_field("id", DataValue::Text("file007".into())),
+        Document::new()
+            .with_field("title", DataValue::Text("Configuration Settings".into()))
+            .with_field("filename", DataValue::Text("app_config.json".into()))
+            .with_field(
+                "description",
+                DataValue::Text("Application configuration file".into()),
+            )
+            .with_field("category", DataValue::Text("configuration".into()))
+            .with_field("extension", DataValue::Text("json".into()))
+            .with_field("id", DataValue::Text("file008".into())),
     ];
 
     println!("Adding {} documents to the index...", documents.len());
@@ -182,8 +170,8 @@ fn main() -> Result<()> {
             hit.doc_id
         );
         if let Some(doc) = &hit.document
-            && let Some(field_value) = doc.get_field("filename")
-            && let Some(filename) = field_value.value.as_text()
+            && let Some(field) = doc.get_field("filename")
+            && let DataValue::Text(filename) = field
         {
             println!("      Filename: {filename}");
         }
@@ -204,8 +192,8 @@ fn main() -> Result<()> {
             hit.doc_id
         );
         if let Some(doc) = &hit.document
-            && let Some(field_value) = doc.get_field("filename")
-            && let Some(filename) = field_value.value.as_text()
+            && let Some(field) = doc.get_field("filename")
+            && let DataValue::Text(filename) = field
         {
             println!("      Filename: {filename}");
         }
@@ -226,8 +214,8 @@ fn main() -> Result<()> {
             hit.doc_id
         );
         if let Some(doc) = &hit.document
-            && let Some(field_value) = doc.get_field("filename")
-            && let Some(filename) = field_value.value.as_text()
+            && let Some(field) = doc.get_field("filename")
+            && let DataValue::Text(filename) = field
         {
             println!("      Filename: {filename}");
         }
@@ -248,8 +236,8 @@ fn main() -> Result<()> {
             hit.doc_id
         );
         if let Some(doc) = &hit.document
-            && let Some(field_value) = doc.get_field("extension")
-            && let Some(ext) = field_value.value.as_text()
+            && let Some(field) = doc.get_field("extension")
+            && let DataValue::Text(ext) = field
         {
             println!("      Extension: {ext}");
         }
@@ -270,8 +258,8 @@ fn main() -> Result<()> {
             hit.doc_id
         );
         if let Some(doc) = &hit.document
-            && let Some(field_value) = doc.get_field("category")
-            && let Some(category) = field_value.value.as_text()
+            && let Some(field) = doc.get_field("category")
+            && let DataValue::Text(category) = field
         {
             println!("      Category: {category}");
         }
@@ -292,8 +280,8 @@ fn main() -> Result<()> {
             hit.doc_id
         );
         if let Some(doc) = &hit.document
-            && let Some(field_value) = doc.get_field("filename")
-            && let Some(filename) = field_value.value.as_text()
+            && let Some(field) = doc.get_field("filename")
+            && let DataValue::Text(filename) = field
         {
             println!("      Filename: {filename}");
         }
@@ -314,8 +302,8 @@ fn main() -> Result<()> {
             hit.doc_id
         );
         if let Some(doc) = &hit.document
-            && let Some(field_value) = doc.get_field("title")
-            && let Some(title) = field_value.value.as_text()
+            && let Some(field) = doc.get_field("title")
+            && let DataValue::Text(title) = field
         {
             println!("      Title: {title}");
         }
@@ -336,8 +324,8 @@ fn main() -> Result<()> {
             hit.doc_id
         );
         if let Some(doc) = &hit.document
-            && let Some(field_value) = doc.get_field("extension")
-            && let Some(ext) = field_value.value.as_text()
+            && let Some(field) = doc.get_field("extension")
+            && let DataValue::Text(ext) = field
         {
             println!("      Extension: {ext}");
         }
@@ -358,8 +346,8 @@ fn main() -> Result<()> {
             hit.doc_id
         );
         if let Some(doc) = &hit.document
-            && let Some(field_value) = doc.get_field("filename")
-            && let Some(filename) = field_value.value.as_text()
+            && let Some(field) = doc.get_field("filename")
+            && let DataValue::Text(filename) = field
         {
             println!("      Filename: {filename}");
         }

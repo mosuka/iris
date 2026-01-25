@@ -8,11 +8,10 @@ use iris::analysis::analyzer::analyzer::Analyzer;
 use iris::analysis::analyzer::keyword::KeywordAnalyzer;
 use iris::analysis::analyzer::per_field::PerFieldAnalyzer;
 use iris::analysis::analyzer::standard::StandardAnalyzer;
-use iris::lexical::core::document::Document;
-use iris::lexical::core::field::TextOption;
+use iris::data::{DataValue, Document};
 use iris::error::Result;
-use iris::lexical::engine::LexicalEngine;
-use iris::lexical::engine::config::LexicalIndexConfig;
+use iris::lexical::store::LexicalStore;
+use iris::lexical::store::config::LexicalIndexConfig;
 use iris::lexical::index::config::InvertedIndexConfig;
 use iris::lexical::index::inverted::query::Query;
 use iris::lexical::index::inverted::query::phrase::PhraseQuery;
@@ -40,45 +39,40 @@ fn main() -> Result<()> {
         analyzer: Arc::new(per_field_analyzer.clone()),
         ..InvertedIndexConfig::default()
     });
-    let lexical_engine = LexicalEngine::new(storage, lexical_index_config)?;
+    let lexical_engine = LexicalStore::new(storage, lexical_index_config)?;
 
     // Add documents with various phrases
     let documents = vec![
-        Document::builder()
-            .add_text("title", "Machine Learning Basics", TextOption::default())
-            .add_text("body", "Machine learning is a powerful tool for data analysis and artificial intelligence applications", TextOption::default())
-            .add_text("author", "Dr. Smith", TextOption::default())
-            .add_text("description", "An introduction to machine learning concepts and algorithms", TextOption::default())
-            .add_text("id", "001", TextOption::default())
-            .build(),
-        Document::builder()
-            .add_text("title", "Deep Learning Networks", TextOption::default())
-            .add_text("body", "Deep learning networks use artificial neural networks with multiple layers for complex pattern recognition", TextOption::default())
-            .add_text("author", "Prof. Johnson", TextOption::default())
-            .add_text("description", "Advanced techniques in deep learning and neural network architectures", TextOption::default())
-            .add_text("id", "002", TextOption::default())
-            .build(),
-        Document::builder()
-            .add_text("title", "Natural Language Processing", TextOption::default())
-            .add_text("body", "Natural language processing combines computational linguistics with machine learning and artificial intelligence", TextOption::default())
-            .add_text("author", "Dr. Wilson", TextOption::default())
-            .add_text("description", "Processing and understanding human language using computational methods", TextOption::default())
-            .add_text("id", "003", TextOption::default())
-            .build(),
-        Document::builder()
-            .add_text("title", "Computer Vision Applications", TextOption::default())
-            .add_text("body", "Computer vision applications include image recognition, object detection, and visual pattern analysis", TextOption::default())
-            .add_text("author", "Prof. Davis", TextOption::default())
-            .add_text("description", "Practical applications of computer vision in various industries", TextOption::default())
-            .add_text("id", "004", TextOption::default())
-            .build(),
-        Document::builder()
-            .add_text("title", "Data Science Fundamentals", TextOption::default())
-            .add_text("body", "Data science combines statistics, programming, and domain expertise to extract insights from data", TextOption::default())
-            .add_text("author", "Dr. Brown", TextOption::default())
-            .add_text("description", "Essential concepts and tools for data science practitioners", TextOption::default())
-            .add_text("id", "005", TextOption::default())
-            .build(),
+        Document::new()
+            .with_field("title", DataValue::Text("Machine Learning Basics".into()))
+            .with_field("body", DataValue::Text("Machine learning is a powerful tool for data analysis and artificial intelligence applications".into()))
+            .with_field("author", DataValue::Text("Dr. Smith".into()))
+            .with_field("description", DataValue::Text("An introduction to machine learning concepts and algorithms".into()))
+            .with_field("id", DataValue::Text("001".into())),
+        Document::new()
+            .with_field("title", DataValue::Text("Deep Learning Networks".into()))
+            .with_field("body", DataValue::Text("Deep learning networks use artificial neural networks with multiple layers for complex pattern recognition".into()))
+            .with_field("author", DataValue::Text("Prof. Johnson".into()))
+            .with_field("description", DataValue::Text("Advanced techniques in deep learning and neural network architectures".into()))
+            .with_field("id", DataValue::Text("002".into())),
+        Document::new()
+            .with_field("title", DataValue::Text("Natural Language Processing".into()))
+            .with_field("body", DataValue::Text("Natural language processing combines computational linguistics with machine learning and artificial intelligence".into()))
+            .with_field("author", DataValue::Text("Dr. Wilson".into()))
+            .with_field("description", DataValue::Text("Processing and understanding human language using computational methods".into()))
+            .with_field("id", DataValue::Text("003".into())),
+        Document::new()
+            .with_field("title", DataValue::Text("Computer Vision Applications".into()))
+            .with_field("body", DataValue::Text("Computer vision applications include image recognition, object detection, and visual pattern analysis".into()))
+            .with_field("author", DataValue::Text("Prof. Davis".into()))
+            .with_field("description", DataValue::Text("Practical applications of computer vision in various industries".into()))
+            .with_field("id", DataValue::Text("004".into())),
+        Document::new()
+            .with_field("title", DataValue::Text("Data Science Fundamentals".into()))
+            .with_field("body", DataValue::Text("Data science combines statistics, programming, and domain expertise to extract insights from data".into()))
+            .with_field("author", DataValue::Text("Dr. Brown".into()))
+            .with_field("description", DataValue::Text("Essential concepts and tools for data science practitioners".into()))
+            .with_field("id", DataValue::Text("005".into())),
     ];
 
     println!("Adding {} documents to the index...", documents.len());
@@ -105,8 +99,8 @@ fn main() -> Result<()> {
             hit.doc_id
         );
         if let Some(doc) = &hit.document
-            && let Some(field_value) = doc.get_field("title")
-            && let Some(title) = field_value.value.as_text()
+            && let Some(field) = doc.get_field("title")
+            && let DataValue::Text(title) = field
         {
             println!("      Title: {title}");
         }
@@ -134,8 +128,8 @@ fn main() -> Result<()> {
             hit.doc_id
         );
         if let Some(doc) = &hit.document
-            && let Some(field_value) = doc.get_field("title")
-            && let Some(title) = field_value.value.as_text()
+            && let Some(field) = doc.get_field("title")
+            && let DataValue::Text(title) = field
         {
             println!("      Title: {title}");
         }
@@ -156,8 +150,8 @@ fn main() -> Result<()> {
             hit.doc_id
         );
         if let Some(doc) = &hit.document
-            && let Some(field_value) = doc.get_field("title")
-            && let Some(title) = field_value.value.as_text()
+            && let Some(field) = doc.get_field("title")
+            && let DataValue::Text(title) = field
         {
             println!("      Title: {title}");
         }
@@ -181,8 +175,8 @@ fn main() -> Result<()> {
             hit.doc_id
         );
         if let Some(doc) = &hit.document
-            && let Some(field_value) = doc.get_field("title")
-            && let Some(title) = field_value.value.as_text()
+            && let Some(field) = doc.get_field("title")
+            && let DataValue::Text(title) = field
         {
             println!("      Title: {title}");
         }
@@ -211,8 +205,8 @@ fn main() -> Result<()> {
             hit.doc_id
         );
         if let Some(doc) = &hit.document
-            && let Some(field_value) = doc.get_field("title")
-            && let Some(title) = field_value.value.as_text()
+            && let Some(field) = doc.get_field("title")
+            && let DataValue::Text(title) = field
         {
             println!("      Title: {title}");
         }
@@ -241,8 +235,8 @@ fn main() -> Result<()> {
             hit.doc_id
         );
         if let Some(doc) = &hit.document
-            && let Some(field_value) = doc.get_field("title")
-            && let Some(title) = field_value.value.as_text()
+            && let Some(field) = doc.get_field("title")
+            && let DataValue::Text(title) = field
         {
             println!("      Title: {title}");
         }

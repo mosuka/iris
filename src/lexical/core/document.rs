@@ -1,760 +1,123 @@
 //! Document structure for schema-less indexing.
 //!
-//! This module provides the [`Document`] structure which represents a single
-//! indexable item with dynamically-typed fields. Documents follow a schema-less
-//! design inspired by Apache Lucene, allowing fields to be added without
-//! predefined schemas.
-//!
-//! # Design Philosophy
-//!
-//! - **Schema-less**: Fields can be added dynamically
-//! - **Flexible types**: Multiple field value types (text, numbers, dates, geo, etc.)
-//! - **Builder pattern**: Fluent API for document construction
-//! - **Analyzer configuration**: Analyzers are configured at the writer level,
-//!   not per-document (following Lucene's design)
-//!
-//! # Examples
-//!
-//! Basic document creation:
-//!
-//! ```
-//! use iris::lexical::core::document::Document;
-//! use iris::lexical::core::field::FieldValue;
-//!
-//! let mut doc = Document::new();
-//! doc.add_field_value("title", FieldValue::Text("Rust Book".to_string()));
-//! doc.add_field_value("year", FieldValue::Integer(2024));
-//!
-//! assert_eq!(doc.len(), 2);
-//! assert!(doc.has_field("title"));
-//! ```
-//!
-//! Using the builder pattern:
-//!
-//! ```
-//! use iris::lexical::core::document::Document;
-//! use iris::lexical::core::field::{TextOption, IntegerOption, FloatOption, BooleanOption};
-//!
-//! let doc = Document::builder()
-//!     .add_text("title", "Rust Programming", TextOption::default())
-//!     .add_text("author", "Jane Doe", TextOption::default())
-//!     .add_integer("year", 2024, IntegerOption::default())
-//!     .add_float("rating", 4.5, FloatOption::default())
-//!     .add_boolean("available", true, BooleanOption::default())
-//!     .build();
-//!
-//! assert_eq!(doc.field_names().len(), 5);
-//! ```
-//!
-//! With geographic data:
-//!
-//! ```
-//! use iris::lexical::core::document::Document;
-//! use iris::lexical::core::field::{TextOption, GeoOption};
-//!
-//! let doc = Document::builder()
-//!     .add_text("name", "Tokyo Tower", TextOption::default())
-//!     .add_geo("location", 35.6762, 139.6503, GeoOption::default())
-//!     .build();
-//!
-//! assert!(doc.has_field("location"));
-//! ```
-
-use std::collections::HashMap;
-
-use serde::{Deserialize, Serialize};
+//! This module adapts the unified [`crate::data::Document`] for Lexical indexing.
 
 use crate::lexical::core::field::{
-    BlobOption, BooleanOption, DateTimeOption, Field, FieldOption, FieldValue, FloatOption,
-    GeoOption, IntegerOption, TextOption,
+    BlobOption, BooleanOption, DateTimeOption, FieldValue, FloatOption, GeoOption, IntegerOption,
+    TextOption,
 };
-use crate::lexical::index::inverted::query::geo::GeoPoint;
 
-/// A document represents a single item to be indexed.
-///
-/// Documents are collections of fields with values and indexing options.
-/// Fields can be added dynamically without a predefined schema, providing
-/// flexibility similar to NoSQL document stores.
-///
-/// # Field Management
-///
-/// - Fields are stored in a `HashMap<String, Field>`
-/// - Each field contains both a value (FieldValue) and indexing options (FieldOption)
-/// - Field names are case-sensitive
-/// - Duplicate field names overwrite previous values
-/// - Fields can be added, removed, and queried at runtime
-///
-/// # Analysis Configuration
-///
-/// Analyzers are configured at the writer level (via `InvertedIndexWriterConfig`),
-/// not per-document, following Lucene's design philosophy. This allows for
-/// consistent analysis across all documents and per-field analyzer configuration.
-///
-/// # Examples
-///
-/// ```no_run
-/// use iris::lexical::core::document::Document;
-/// use iris::lexical::core::field::{Field, FieldValue, FieldOption, TextOption};
-///
-/// let mut doc = Document::new();
-/// doc.add_field("title", Field::new(
-///     FieldValue::Text("Getting Started with Rust".to_string()),
-///     FieldOption::Text(TextOption::default())
-/// ));
-/// doc.add_field("page_count", Field::with_default_option(
-///     FieldValue::Integer(250)
-/// ));
-///
-/// assert_eq!(doc.len(), 2);
-/// assert_eq!(
-///     doc.get_field("title").unwrap().value.as_text().unwrap(),
-///     "Getting Started with Rust"
-/// );
-///
-/// // Remove a field
-/// doc.remove_field("page_count");
-/// assert_eq!(doc.len(), 1);
-/// ```
-#[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct Document {
-    /// The fields in this document (each field has a value and indexing options)
-    fields: HashMap<String, Field>,
-}
-
-impl Document {
-    /// Create a new empty document.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use iris::lexical::core::document::Document;
-    ///
-    /// let doc = Document::new();
-    /// assert_eq!(doc.len(), 0);
-    /// assert!(doc.is_empty());
-    /// ```
-    pub fn new() -> Self {
-        Document {
-            fields: HashMap::new(),
-        }
-    }
-
-    /// Add a field to the document.
-    ///
-    /// If a field with the same name already exists, it will be overwritten.
-    ///
-    /// # Arguments
-    ///
-    /// * `name` - The field name (case-sensitive)
-    /// * `field` - The field containing value and indexing options
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use iris::lexical::core::document::Document;
-    /// use iris::lexical::core::field::{Field, FieldValue};
-    ///
-    /// let mut doc = Document::new();
-    /// doc.add_field("title", Field::with_default_option(FieldValue::Text("Rust".to_string())));
-    /// doc.add_field("year", Field::with_default_option(FieldValue::Integer(2024)));
-    ///
-    /// assert_eq!(doc.len(), 2);
-    /// ```
-    pub fn add_field<S: Into<String>>(&mut self, name: S, field: Field) {
-        self.fields.insert(name.into(), field);
-    }
-
-    /// Add a field value to the document with default indexing options.
-    ///
-    /// This is a convenience method that automatically infers the FieldOption
-    /// from the FieldValue type using default settings.
-    ///
-    /// # Arguments
-    ///
-    /// * `name` - The field name (case-sensitive)
-    /// * `value` - The field value
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use iris::lexical::core::document::Document;
-    /// use iris::lexical::core::field::FieldValue;
-    ///
-    /// let mut doc = Document::new();
-    /// doc.add_field_value("title", FieldValue::Text("Rust".to_string()));
-    /// doc.add_field_value("year", FieldValue::Integer(2024));
-    ///
-    /// assert_eq!(doc.len(), 2);
-    /// ```
-    pub fn add_field_value<S: Into<String>>(&mut self, name: S, value: FieldValue) {
-        let option = FieldOption::from_field_value(&value);
-        self.fields.insert(name.into(), Field::new(value, option));
-    }
-
-    /// Get a field from the document.
-    ///
-    /// Returns `None` if the field doesn't exist.
-    ///
-    /// # Arguments
-    ///
-    /// * `name` - The field name to retrieve
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use iris::lexical::core::document::Document;
-    /// use iris::lexical::core::field::{Field, FieldValue};
-    ///
-    /// let mut doc = Document::new();
-    /// doc.add_field_value("title", FieldValue::Text("Rust".to_string()));
-    ///
-    /// assert_eq!(doc.get_field("title").unwrap().value.as_text(), Some("Rust"));
-    /// assert!(doc.get_field("missing").is_none());
-    /// ```
-    pub fn get_field(&self, name: &str) -> Option<&Field> {
-        self.fields.get(name)
-    }
-
-    /// Check if the document has a field.
-    ///
-    /// # Arguments
-    ///
-    /// * `name` - The field name to check
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use iris::lexical::core::document::Document;
-    /// use iris::lexical::core::field::FieldValue;
-    ///
-    /// let mut doc = Document::new();
-    /// doc.add_field_value("title", FieldValue::Text("Rust".to_string()));
-    ///
-    /// assert!(doc.has_field("title"));
-    /// assert!(!doc.has_field("author"));
-    /// ```
-    pub fn has_field(&self, name: &str) -> bool {
-        self.fields.contains_key(name)
-    }
-
-    /// Remove a field from the document.
-    ///
-    /// Returns the removed field value, or `None` if the field didn't exist.
-    ///
-    /// # Arguments
-    ///
-    /// * `name` - The field name to remove
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use iris::lexical::core::document::Document;
-    /// use iris::lexical::core::field::FieldValue;
-    ///
-    /// let mut doc = Document::new();
-    /// doc.add_field_value("title", FieldValue::Text("Rust".to_string()));
-    /// doc.add_field_value("year", FieldValue::Integer(2024));
-    ///
-    /// let removed = doc.remove_field("year");
-    /// assert!(removed.is_some());
-    /// assert_eq!(doc.len(), 1);
-    /// ```
-    pub fn remove_field(&mut self, name: &str) -> Option<FieldValue> {
-        self.fields.remove(name).map(|field| field.value)
-    }
-
-    /// Get all field names in the document.
-    ///
-    /// The order of field names is not guaranteed.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use iris::lexical::core::document::Document;
-    /// use iris::lexical::core::field::FieldValue;
-    ///
-    /// let mut doc = Document::new();
-    /// doc.add_field_value("title", FieldValue::Text("Rust".to_string()));
-    /// doc.add_field_value("year", FieldValue::Integer(2024));
-    ///
-    /// let names = doc.field_names();
-    /// assert_eq!(names.len(), 2);
-    /// assert!(names.contains(&"title"));
-    /// assert!(names.contains(&"year"));
-    /// ```
-    pub fn field_names(&self) -> Vec<&str> {
-        self.fields.keys().map(|s| s.as_str()).collect()
-    }
-
-    /// Get a reference to all fields.
-    ///
-    /// Returns the underlying HashMap containing all fields.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use iris::lexical::core::document::Document;
-    /// use iris::lexical::core::field::FieldValue;
-    ///
-    /// let mut doc = Document::new();
-    /// doc.add_field_value("title", FieldValue::Text("Rust".to_string()));
-    ///
-    /// let fields = doc.fields();
-    /// assert_eq!(fields.len(), 1);
-    /// assert!(fields.contains_key("title"));
-    /// ```
-    pub fn fields(&self) -> &HashMap<String, Field> {
-        &self.fields
-    }
-
-    /// Get the number of fields in the document.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use iris::lexical::core::document::Document;
-    /// use iris::lexical::core::field::{TextOption, IntegerOption};
-    ///
-    /// let doc = Document::builder()
-    ///     .add_text("title", "Rust", TextOption::default())
-    ///     .add_integer("year", 2024, IntegerOption::default())
-    ///     .build();
-    ///
-    /// assert_eq!(doc.len(), 2);
-    /// ```
-    pub fn len(&self) -> usize {
-        self.fields.len()
-    }
-
-    /// Check if the document has no fields.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use iris::lexical::core::document::Document;
-    /// use iris::lexical::core::field::TextOption;
-    ///
-    /// let doc = Document::new();
-    /// assert!(doc.is_empty());
-    ///
-    /// let doc = Document::builder()
-    ///     .add_text("title", "Rust", TextOption::default())
-    ///     .build();
-    /// assert!(!doc.is_empty());
-    /// ```
-    pub fn is_empty(&self) -> bool {
-        self.fields.is_empty()
-    }
-
-    /// Create a builder for constructing documents.
-    ///
-    /// The builder provides a fluent API for adding fields to documents.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use iris::lexical::core::document::Document;
-    /// use iris::lexical::core::field::{TextOption, IntegerOption};
-    ///
-    /// let doc = Document::builder()
-    ///     .add_text("title", "Rust Programming", TextOption::default())
-    ///     .add_integer("year", 2024, IntegerOption::default())
-    ///     .build();
-    ///
-    /// assert_eq!(doc.len(), 2);
-    /// ```
-    pub fn builder() -> DocumentBuilder {
-        DocumentBuilder::new()
-    }
-}
-
-impl Default for Document {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+// Re-export Unified Document
+pub use crate::data::Document;
 
 /// A builder for constructing documents in a fluent manner.
-///
-/// The `DocumentBuilder` provides a convenient fluent API for creating documents
-/// with multiple fields. It follows the builder pattern, allowing method chaining
-/// for readable document construction.
-///
-/// # Examples
-///
-/// ```
-/// use iris::lexical::core::document::Document;
-/// use iris::lexical::core::field::{TextOption, IntegerOption, FloatOption, BooleanOption};
-///
-/// let doc = Document::builder()
-///     .add_text("title", "Rust Programming", TextOption::default())
-///     .add_text("author", "John Doe", TextOption::default())
-///     .add_integer("year", 2024, IntegerOption::default())
-///     .add_float("price", 49.99, FloatOption::default())
-///     .add_boolean("available", true, BooleanOption::default())
-///     .build();
-///
-/// assert_eq!(doc.len(), 5);
-/// ```
-///
-/// With geographic coordinates:
-///
-/// ```
-/// use iris::lexical::core::document::Document;
-/// use iris::lexical::core::field::{TextOption, GeoOption};
-///
-/// let doc = Document::builder()
-///     .add_text("name", "Tokyo", TextOption::default())
-///     .add_geo("location", 35.6762, 139.6503, GeoOption::default())
-///     .build();
-///
-/// assert!(doc.has_field("location"));
-/// ```
 #[derive(Debug)]
 pub struct DocumentBuilder {
     document: Document,
 }
 
 impl DocumentBuilder {
-    /// Create a new document builder.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use iris::lexical::core::document::DocumentBuilder;
-    ///
-    /// let builder = DocumentBuilder::new();
-    /// let doc = builder.build();
-    /// assert!(doc.is_empty());
-    /// ```
     pub fn new() -> Self {
         DocumentBuilder {
             document: Document::new(),
         }
     }
 
-    /// Add a text field to the document with indexing options.
-    ///
-    /// Text fields are analyzed during indexing using the configured analyzer.
-    /// The TextOption parameter controls how this field is indexed (indexed, stored, term_vectors).
-    ///
-    /// # Arguments
-    ///
-    /// * `name` - The field name
-    /// * `value` - The text content
-    /// * `option` - Indexing options (use `TextOption::default()` for default settings)
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use iris::lexical::core::document::Document;
-    /// use iris::lexical::core::field::TextOption;
-    ///
-    /// let doc = Document::builder()
-    ///     .add_text("title", "Rust Programming", TextOption::default())
-    ///     .add_text("body", "Learn Rust programming language", TextOption {
-    ///         indexed: true,
-    ///         stored: true,
-    ///         term_vectors: true,
-    ///     })
-    ///     .build();
-    ///
-    /// assert!(doc.has_field("title"));
-    /// assert!(doc.has_field("body"));
-    /// ```
+    /// Add a text field. Options are ignored (controlled by Schema/Config).
     pub fn add_text<S: Into<String>, T: Into<String>>(
         mut self,
         name: S,
         value: T,
-        option: TextOption,
+        _option: TextOption,
     ) -> Self {
-        self.document.add_field(
-            name,
-            Field::new(FieldValue::Text(value.into()), FieldOption::Text(option)),
-        );
+        self.document = self
+            .document
+            .with_field(name, crate::data::DataValue::Text(value.into()));
         self
     }
 
-    /// Add an integer field to the document with indexing options.
-    ///
-    /// Integer fields are stored as i64 values.
-    /// The IntegerOption parameter controls how this field is indexed (indexed, stored).
-    ///
-    /// # Arguments
-    ///
-    /// * `name` - The field name
-    /// * `value` - The integer value
-    /// * `option` - Indexing options (use `IntegerOption::default()` for default settings)
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use iris::lexical::core::document::Document;
-    /// use iris::lexical::core::field::{TextOption, IntegerOption};
-    ///
-    /// let doc = Document::builder()
-    ///     .add_text("title", "Book", TextOption::default())
-    ///     .add_integer("year", 2024, IntegerOption::default())
-    ///     .add_integer("pages", 300, IntegerOption::default())
-    ///     .build();
-    ///
-    /// assert_eq!(doc.len(), 3);
-    /// ```
+    /// Add an integer field. Options are ignored.
     pub fn add_integer<S: Into<String>>(
         mut self,
         name: S,
         value: i64,
-        option: IntegerOption,
+        _option: IntegerOption,
     ) -> Self {
-        self.document.add_field(
-            name,
-            Field::new(FieldValue::Integer(value), FieldOption::Integer(option)),
-        );
+        self.document = self
+            .document
+            .with_field(name, crate::data::DataValue::Int64(value));
         self
     }
 
-    /// Add a float field to the document with indexing options.
-    ///
-    /// Float fields are stored as f64 values.
-    /// The FloatOption parameter controls how this field is indexed (indexed, stored).
-    ///
-    /// # Arguments
-    ///
-    /// * `name` - The field name
-    /// * `value` - The floating-point value
-    /// * `option` - Indexing options (use `FloatOption::default()` for default settings)
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use iris::lexical::core::document::Document;
-    /// use iris::lexical::core::field::{TextOption, FloatOption};
-    ///
-    /// let doc = Document::builder()
-    ///     .add_text("product", "Book", TextOption::default())
-    ///     .add_float("price", 39.99, FloatOption::default())
-    ///     .add_float("rating", 4.5, FloatOption::default())
-    ///     .build();
-    ///
-    /// assert_eq!(doc.len(), 3);
-    /// ```
-    pub fn add_float<S: Into<String>>(mut self, name: S, value: f64, option: FloatOption) -> Self {
-        self.document.add_field(
-            name,
-            Field::new(FieldValue::Float(value), FieldOption::Float(option)),
-        );
+    /// Add a float field. Options are ignored.
+    pub fn add_float<S: Into<String>>(mut self, name: S, value: f64, _option: FloatOption) -> Self {
+        self.document = self
+            .document
+            .with_field(name, crate::data::DataValue::Float64(value));
         self
     }
 
-    /// Add a boolean field to the document with indexing options.
-    ///
-    /// The BooleanOption parameter controls how this field is indexed (indexed, stored).
-    ///
-    /// # Arguments
-    ///
-    /// * `name` - The field name
-    /// * `value` - The boolean value
-    /// * `option` - Indexing options (use `BooleanOption::default()` for default settings)
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use iris::lexical::core::document::Document;
-    /// use iris::lexical::core::field::{TextOption, BooleanOption};
-    ///
-    /// let doc = Document::builder()
-    ///     .add_text("product", "Book", TextOption::default())
-    ///     .add_boolean("in_stock", true, BooleanOption::default())
-    ///     .add_boolean("featured", false, BooleanOption::default())
-    ///     .build();
-    ///
-    /// assert_eq!(doc.len(), 3);
-    /// ```
+    /// Add a boolean field. Options are ignored.
     pub fn add_boolean<S: Into<String>>(
         mut self,
         name: S,
         value: bool,
-        option: BooleanOption,
+        _option: BooleanOption,
     ) -> Self {
-        self.document.add_field(
-            name,
-            Field::new(FieldValue::Boolean(value), FieldOption::Boolean(option)),
-        );
+        self.document = self
+            .document
+            .with_field(name, crate::data::DataValue::Bool(value));
         self
     }
 
-    /// Add a datetime field to the document with indexing options.
-    ///
-    /// Datetime fields store UTC timestamps.
-    /// The DateTimeOption parameter controls how this field is indexed (indexed, stored).
-    ///
-    /// # Arguments
-    ///
-    /// * `name` - The field name
-    /// * `value` - The datetime value (UTC)
-    /// * `option` - Indexing options (use `DateTimeOption::default()` for default settings)
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use iris::lexical::core::document::Document;
-    /// use iris::lexical::core::field::{TextOption, DateTimeOption};
-    /// use chrono::Utc;
-    ///
-    /// let doc = Document::builder()
-    ///     .add_text("event", "Conference", TextOption::default())
-    ///     .add_datetime("date", Utc::now(), DateTimeOption::default())
-    ///     .build();
-    ///
-    /// assert_eq!(doc.len(), 2);
-    /// ```
+    /// Add a datetime field. Options are ignored.
     pub fn add_datetime<S: Into<String>>(
         mut self,
         name: S,
         value: chrono::DateTime<chrono::Utc>,
-        option: DateTimeOption,
+        _option: DateTimeOption,
     ) -> Self {
-        self.document.add_field(
-            name,
-            Field::new(FieldValue::DateTime(value), FieldOption::DateTime(option)),
-        );
+        self.document = self
+            .document
+            .with_field(name, crate::data::DataValue::DateTime(value));
         self
     }
 
-    /// Add a geographic coordinate field to the document with indexing options.
-    ///
-    /// Geographic fields store latitude/longitude coordinates as GeoPoint.
-    /// If the coordinates are invalid (lat not in [-90, 90] or lon not in [-180, 180]),
-    /// the field is silently skipped.
-    /// The GeoOption parameter controls how this field is indexed (indexed, stored).
-    ///
-    /// # Arguments
-    ///
-    /// * `name` - The field name
-    /// * `lat` - Latitude (-90 to 90)
-    /// * `lon` - Longitude (-180 to 180)
-    /// * `option` - Indexing options (use `GeoOption::default()` for default settings)
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use iris::lexical::core::document::Document;
-    /// use iris::lexical::core::field::{TextOption, GeoOption};
-    ///
-    /// let doc = Document::builder()
-    ///     .add_text("name", "Tokyo Tower", TextOption::default())
-    ///     .add_geo("location", 35.6762, 139.6503, GeoOption::default())
-    ///     .build();
-    ///
-    /// assert!(doc.has_field("location"));
-    /// ```
+    /// Add a geo field. Options are ignored.
     pub fn add_geo<S: Into<String>>(
         mut self,
         name: S,
         lat: f64,
         lon: f64,
-        option: GeoOption,
+        _option: GeoOption,
     ) -> Self {
-        if let Ok(point) = GeoPoint::new(lat, lon) {
-            self.document.add_field(
-                name,
-                Field::new(FieldValue::Geo(point), FieldOption::Geo(option)),
-            );
-        }
+        self.document = self
+            .document
+            .with_field(name, crate::data::DataValue::Geo(lat, lon));
         self
     }
 
-    /// Add a blob field to the document with indexing options.
-    ///
-    /// Blob fields store raw byte data with a MIME type. They are either stored as binary
-    /// (BinaryOption) or processed as vector sources (VectorOption).
-    ///
-    /// # Arguments
-    ///
-    /// * `name` - The field name
-    /// * `mime_type` - The MIME type of the content (e.g., "text/plain", "image/png")
-    /// * `data` - The raw data
-    /// * `option` - Indexing options (e.g., FieldOption::Binary(...) or FieldOption::Vector(...))
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use iris::lexical::core::document::Document;
-    /// use iris::lexical::core::field::BlobOption;
-    ///
-    /// let doc = Document::builder()
-    ///     .add_blob("image", "image/png", vec![0x89, 0x50], BlobOption::default())
-    ///     .add_blob("desc_vector", "text/plain", "description".as_bytes().to_vec(), BlobOption::default())
-    ///     .build();
-    /// ```
+    /// Add a blob field. Options are ignored.
     pub fn add_blob<S: Into<String>, M: Into<String>>(
         mut self,
         name: S,
         mime_type: M,
         data: Vec<u8>,
-        option: BlobOption,
+        _option: BlobOption,
     ) -> Self {
-        self.document.add_field(
+        self.document = self.document.with_field(
             name,
-            Field::new(
-                FieldValue::Blob(mime_type.into(), data),
-                FieldOption::Blob(option),
-            ),
+            crate::data::DataValue::Bytes(data.into(), Some(mime_type.into())),
         );
         self
     }
 
-    /// Add a field with a generic value.
-    ///
-    /// This is a low-level method that accepts any `FieldValue` directly.
-    /// For most cases, prefer using type-safe methods like `add_text`, `add_integer`, `add_float`, etc.
-    ///
-    /// # Use this method when:
-    ///
-    /// - You already have a `FieldValue` instance
-    /// - You need to dynamically determine the field type at runtime
-    /// - You require low-level API flexibility
-    ///
-    /// # Arguments
-    ///
-    /// * `name` - The field name
-    /// * `value` - The field value
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use iris::lexical::core::document::Document;
-    /// use iris::lexical::core::field::FieldValue;
-    ///
-    /// let value = FieldValue::Text("Dynamic value".to_string());
-    /// let doc = Document::builder()
-    ///     .add_field("dynamic", value)
-    ///     .build();
-    ///
-    /// assert_eq!(doc.len(), 1);
-    /// ```
+    /// Add a generic field value.
     pub fn add_field<S: Into<String>>(mut self, name: S, value: FieldValue) -> Self {
-        self.document.add_field_value(name, value);
+        self.document = self.document.with_field(name, value);
         self
     }
 
-    /// Build the final document.
-    ///
-    /// Consumes the builder and returns the constructed document.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use iris::lexical::core::document::Document;
-    /// use iris::lexical::core::field::{TextOption, IntegerOption};
-    ///
-    /// let doc = Document::builder()
-    ///     .add_text("title", "Rust", TextOption::default())
-    ///     .add_integer("year", 2024, IntegerOption::default())
-    ///     .build();
-    ///
-    /// assert_eq!(doc.len(), 2);
-    /// ```
     pub fn build(self) -> Document {
         self.document
     }

@@ -2,22 +2,22 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tempfile::Builder;
 
-use iris::lexical::engine::config::LexicalIndexConfig;
+use iris::data::{DataValue, Document};
+use iris::lexical::store::config::LexicalIndexConfig;
 use iris::storage::file::FileStorageConfig;
 use iris::storage::{StorageConfig, StorageFactory};
 use iris::vector::core::distance::DistanceMetric;
-use iris::vector::core::document::{DocumentVector, StoredVector};
-use iris::vector::core::field::{FlatOption, HnswOption, VectorIndexKind, VectorOption};
-use iris::vector::engine::VectorEngine;
-use iris::vector::engine::config::{VectorFieldConfig, VectorIndexConfig};
-use iris::vector::engine::request::{VectorScoreMode, VectorSearchRequest};
+use iris::vector::core::field::{FlatOption, HnswOption, VectorOption};
+use iris::vector::store::VectorStore;
+use iris::vector::store::config::{VectorFieldConfig, VectorIndexConfig};
+use iris::vector::store::request::{QueryVector, VectorScoreMode, VectorSearchRequest};
 
 #[test]
 fn test_vacuum_reduces_file_size() {
     let dir = Builder::new().prefix("test_vacuum").tempdir().unwrap();
     let path = dir.path().to_path_buf();
 
-    // 1. Create VectorEngine using FileStorage
+    // 1. Create VectorStore using FileStorage
     let field_config = VectorFieldConfig {
         vector: Some(VectorOption::Flat(FlatOption {
             dimension: 128,
@@ -31,11 +31,6 @@ fn test_vacuum_reduces_file_size() {
         fields: HashMap::from([("vectors".to_string(), field_config)]),
         default_fields: vec!["vectors".to_string()],
         metadata: HashMap::new(),
-        default_distance: DistanceMetric::Cosine,
-        default_dimension: None,
-        default_index_kind: VectorIndexKind::Flat,
-        default_base_weight: 1.0,
-        implicit_schema: false,
         embedder: Arc::new(iris::embedding::precomputed::PrecomputedEmbedder::new()),
         deletion_config: iris::maintenance::deletion::DeletionConfig::default(),
         shard_id: 0,
@@ -46,7 +41,7 @@ fn test_vacuum_reduces_file_size() {
     let storage_config = StorageConfig::File(file_config);
     let storage = StorageFactory::create(storage_config).unwrap();
 
-    let engine = VectorEngine::new(storage, config).unwrap();
+    let engine = VectorStore::new(storage, config).unwrap();
 
     let dim = 128;
     let num_vectors = 200;
@@ -54,9 +49,8 @@ fn test_vacuum_reduces_file_size() {
     // 2. Insert vectors
     println!("Inserting {} vectors...", num_vectors);
     for i in 0..num_vectors {
-        let mut doc_vector = DocumentVector::new();
-        doc_vector.set_field("vectors", StoredVector::new(Arc::from(vec![0.1f32; dim])));
-        engine.upsert_vectors(i, doc_vector).unwrap();
+        let doc = Document::new().with_field("vectors", DataValue::Vector(vec![0.1f32; dim]));
+        engine.upsert_vectors(i, doc).unwrap();
     }
 
     println!("Flushing vectors to disk...");
@@ -113,8 +107,8 @@ fn test_vacuum_reduces_file_size() {
 
     // 5. Verify Search
     let request = VectorSearchRequest {
-        query_vectors: vec![iris::vector::engine::request::QueryVector {
-            vector: StoredVector::new(Arc::from(vec![0.1f32; dim])),
+        query_vectors: vec![QueryVector {
+            vector: vec![0.1f32; dim],
             weight: 1.0,
             fields: None,
         }],
@@ -127,6 +121,7 @@ fn test_vacuum_reduces_file_size() {
         query_payloads: vec![],
         lexical_query: None,
         fusion_config: None,
+        allowed_ids: None,
     };
 
     let searcher = engine.searcher().unwrap();
@@ -149,7 +144,7 @@ fn test_vacuum_reduces_file_size_hnsw() {
     let dir = Builder::new().prefix("test_vacuum_hnsw").tempdir().unwrap();
     let path = dir.path().to_path_buf();
 
-    // 1. Create VectorEngine using HNSW
+    // 1. Create VectorStore using HNSW
     let field_config = VectorFieldConfig {
         vector: Some(VectorOption::Hnsw(HnswOption {
             dimension: 16,
@@ -166,11 +161,6 @@ fn test_vacuum_reduces_file_size_hnsw() {
         fields: HashMap::from([("vectors".to_string(), field_config)]),
         default_fields: vec!["vectors".to_string()],
         metadata: HashMap::new(),
-        default_distance: DistanceMetric::Cosine,
-        default_dimension: None,
-        default_index_kind: VectorIndexKind::Flat,
-        default_base_weight: 1.0,
-        implicit_schema: false,
         embedder: Arc::new(iris::embedding::precomputed::PrecomputedEmbedder::new()),
         deletion_config: iris::maintenance::deletion::DeletionConfig::default(),
         shard_id: 0,
@@ -185,7 +175,7 @@ fn test_vacuum_reduces_file_size_hnsw() {
     let storage_config = StorageConfig::File(file_config);
     let storage = StorageFactory::create(storage_config).unwrap();
 
-    let engine = VectorEngine::new(storage, config).unwrap();
+    let engine = VectorStore::new(storage, config).unwrap();
 
     let dim = 16;
     let num_vectors = 200;
@@ -193,15 +183,14 @@ fn test_vacuum_reduces_file_size_hnsw() {
     // 2. Insert vectors
     println!("Inserting {} vectors...", num_vectors);
     for i in 0..num_vectors {
-        let mut doc_vector = DocumentVector::new();
         // Use random vectors to avoid equidistant pathology
         let mut vec_data = vec![0.0f32; dim];
         for j in 0..dim {
             vec_data[j] = (i + j) as f32 % 500.0 / 500.0; // Deterministic pseudo-random, unique for i < 500
         }
 
-        doc_vector.set_field("vectors", StoredVector::new(Arc::from(vec_data)));
-        engine.upsert_vectors(i as u64, doc_vector).unwrap();
+        let doc = Document::new().with_field("vectors", DataValue::Vector(vec_data));
+        engine.upsert_vectors(i as u64, doc).unwrap();
     }
 
     println!("Flushing vectors to disk...");
@@ -270,8 +259,8 @@ fn test_vacuum_reduces_file_size_hnsw() {
     // If we use MaxSim and min_score 0.0, we match everything.
     // Query vector doesn't matter much if we just want "any 100 items".
     let request = VectorSearchRequest {
-        query_vectors: vec![iris::vector::engine::request::QueryVector {
-            vector: StoredVector::new(Arc::from(vec![0.5f32; dim])), // Generic vector
+        query_vectors: vec![QueryVector {
+            vector: vec![0.5f32; dim], // Generic vector
             weight: 1.0,
             fields: None,
         }],
@@ -284,6 +273,7 @@ fn test_vacuum_reduces_file_size_hnsw() {
         lexical_query: None,
         fusion_config: None,
         query_payloads: vec![],
+        allowed_ids: None,
     };
 
     let searcher = engine.searcher().unwrap();

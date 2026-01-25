@@ -1,8 +1,8 @@
 use iris::storage::memory::{MemoryStorage, MemoryStorageConfig};
 use iris::vector::core::distance::DistanceMetric;
-use iris::vector::core::document::StoredVector;
 use iris::vector::core::field::{HnswOption, VectorOption};
-use iris::vector::engine::config::VectorFieldConfig;
+use iris::vector::core::vector::StoredVector;
+use iris::vector::store::config::VectorFieldConfig;
 use iris::vector::index::field::{VectorFieldReader, VectorFieldWriter};
 use iris::vector::index::hnsw::segment::manager::{SegmentManager, SegmentManagerConfig};
 use iris::vector::index::segmented_field::SegmentedVectorField;

@@ -1,4 +1,4 @@
-//! VectorEngine インメモリフィールド実装
+//! VectorStore インメモリフィールド実装
 //!
 //! このモジュールはインメモリでベクトルを管理するフィールド実装を提供する。
 
@@ -9,10 +9,10 @@ use std::sync::Arc;
 
 use parking_lot::RwLock;
 
-use crate::error::{Result, IrisError};
-use crate::vector::core::document::StoredVector;
+use crate::error::{IrisError, Result};
+use crate::vector::core::vector::StoredVector;
 use crate::vector::core::vector::Vector;
-use crate::vector::engine::config::VectorFieldConfig;
+use crate::vector::store::config::VectorFieldConfig;
 use crate::vector::index::field::{
     FieldHit, FieldSearchInput, FieldSearchResults, VectorField, VectorFieldReader,
     VectorFieldStats, VectorFieldWriter,
@@ -314,26 +314,25 @@ impl VectorFieldReader for InMemoryFieldReader {
         };
 
         for query in &request.query_vectors {
-            let query_vector = query.vector.to_vector();
-            if query_vector.dimension() != dimension {
+            let query_vector_data = &query.vector;
+            if query_vector_data.len() != dimension {
                 return Err(IrisError::invalid_argument(format!(
                     "query vector dimension mismatch for field '{}': expected {}, got {}",
                     self.field_name,
                     dimension,
-                    query_vector.dimension()
+                    query_vector_data.len()
                 )));
             }
-            let effective_weight = query.weight * query.vector.weight;
+            let effective_weight = query.weight;
             if effective_weight == 0.0 {
                 continue;
             }
 
             for (doc_id, entry) in &snapshot {
                 for vector in &entry.vectors {
-                    let similarity =
-                        distance_metric.similarity(&query_vector.data, &vector.data)?;
+                    let similarity = distance_metric.similarity(&query.vector, &vector.data)?;
                     let weighted_score = similarity * effective_weight;
-                    let distance = distance_metric.distance(&query_vector.data, &vector.data)?;
+                    let distance = distance_metric.distance(&query.vector, &vector.data)?;
 
                     match merged.entry(*doc_id) {
                         Entry::Vacant(slot) => {

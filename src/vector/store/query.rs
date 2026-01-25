@@ -2,11 +2,10 @@
 //!
 //! This module provides a fluent API for constructing vector search requests.
 
-use std::sync::Arc;
+use crate::data::DataValue;
 
-use crate::vector::core::document::{Payload, PayloadSource, StoredVector};
-use crate::vector::engine::filter::VectorFilter;
-use crate::vector::engine::request::{
+use crate::vector::store::filter::VectorFilter;
+use crate::vector::store::request::{
     FieldSelector, QueryPayload, QueryVector, VectorScoreMode, VectorSearchRequest,
 };
 
@@ -15,7 +14,7 @@ use crate::vector::engine::request::{
 /// # Example
 ///
 /// ```
-/// use iris::vector::engine::query::VectorSearchRequestBuilder;
+/// use iris::vector::store::query::VectorSearchRequestBuilder;
 ///
 /// let request = VectorSearchRequestBuilder::new()
 ///     .add_vector("content", vec![0.1, 0.2, 0.3])
@@ -38,7 +37,7 @@ impl VectorSearchRequestBuilder {
     /// Add a raw query vector for a specific field.
     pub fn add_vector(mut self, field: impl Into<String>, vector: Vec<f32>) -> Self {
         self.request.query_vectors.push(QueryVector {
-            vector: StoredVector::new(Arc::<[f32]>::from(vector.as_slice())),
+            vector,
             weight: 1.0,
             fields: Some(vec![field.into()]),
         });
@@ -53,7 +52,7 @@ impl VectorSearchRequestBuilder {
         weight: f32,
     ) -> Self {
         self.request.query_vectors.push(QueryVector {
-            vector: StoredVector::new(Arc::<[f32]>::from(vector.as_slice())).with_weight(weight),
+            vector,
             weight,
             fields: Some(vec![field.into()]),
         });
@@ -71,7 +70,18 @@ impl VectorSearchRequestBuilder {
     /// * `payload` - The payload to add
     ///
     /// This is the low-level method used by `add_text`, `add_image`, etc.
-    pub fn add_payload(mut self, field: impl Into<String>, payload: Payload) -> Self {
+    /// Add a payload to be embedded.
+    ///
+    /// This is the unified method for all modalities (text, image, video, etc.).
+    /// The bytes will be processed by the configured embedder.
+    ///
+    /// # Arguments
+    ///
+    /// * `field` - The target field name
+    /// * `payload` - The payload to add
+    ///
+    /// This is the low-level method used by `add_text`, `add_image`, etc.
+    pub fn add_payload(mut self, field: impl Into<String>, payload: DataValue) -> Self {
         self.request
             .query_payloads
             .push(QueryPayload::new(field, payload));
@@ -87,13 +97,13 @@ impl VectorSearchRequestBuilder {
     ) -> Self {
         self.add_payload(
             field,
-            Payload::new(PayloadSource::bytes(bytes.into(), mime.map(|m| m.into()))),
+            DataValue::Bytes(bytes.into(), mime.map(|m| m.into())),
         )
     }
 
     /// Add a text payload to be embedded.
     pub fn add_text(self, field: impl Into<String>, text: impl Into<String>) -> Self {
-        self.add_payload(field, Payload::new(PayloadSource::text(text.into())))
+        self.add_payload(field, DataValue::Text(text.into()))
     }
 
     /// Set the fields to search in.
@@ -108,9 +118,9 @@ impl VectorSearchRequestBuilder {
     pub fn field(mut self, field: impl Into<String>) -> Self {
         let field = field.into();
         if let Some(fields) = &mut self.request.fields {
-            fields.push(crate::vector::engine::request::FieldSelector::Exact(field));
+            fields.push(crate::vector::store::request::FieldSelector::Exact(field));
         } else {
-            self.request.fields = Some(vec![crate::vector::engine::request::FieldSelector::Exact(
+            self.request.fields = Some(vec![crate::vector::store::request::FieldSelector::Exact(
                 field,
             )]);
         }

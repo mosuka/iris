@@ -195,21 +195,21 @@ impl<'a> Collector for TopFieldCollector<'a> {
             // Ascending: compare field values directly
             sorted_docs.sort_by(|a, b| match (&a.field_value, &b.field_value) {
                 (FieldValue::Text(av), FieldValue::Text(bv)) => av.cmp(bv),
-                (FieldValue::Integer(av), FieldValue::Integer(bv)) => av.cmp(bv),
-                (FieldValue::Float(av), FieldValue::Float(bv)) => {
+                (FieldValue::Int64(av), FieldValue::Int64(bv)) => av.cmp(bv),
+                (FieldValue::Float64(av), FieldValue::Float64(bv)) => {
                     av.partial_cmp(bv).unwrap_or(Ordering::Equal)
                 }
-                (FieldValue::Boolean(av), FieldValue::Boolean(bv)) => av.cmp(bv),
+                (FieldValue::Bool(av), FieldValue::Bool(bv)) => av.cmp(bv),
                 (FieldValue::DateTime(av), FieldValue::DateTime(bv)) => av.cmp(bv),
-                (FieldValue::Geo(av), FieldValue::Geo(bv)) => {
-                    let lat_cmp = av.lat.partial_cmp(&bv.lat).unwrap_or(Ordering::Equal);
+                (FieldValue::Geo(alat, alon), FieldValue::Geo(blat, blon)) => {
+                    let lat_cmp = alat.partial_cmp(blat).unwrap_or(Ordering::Equal);
                     if lat_cmp != Ordering::Equal {
                         lat_cmp
                     } else {
-                        av.lon.partial_cmp(&bv.lon).unwrap_or(Ordering::Equal)
+                        alon.partial_cmp(blon).unwrap_or(Ordering::Equal)
                     }
                 }
-                (FieldValue::Blob(_, av), FieldValue::Blob(_, bv)) => av.cmp(bv),
+                (FieldValue::Bytes(av, _), FieldValue::Bytes(bv, _)) => av.cmp(bv),
                 (FieldValue::Null, FieldValue::Null) => Ordering::Equal,
                 (FieldValue::Null, _) => Ordering::Greater,
                 (_, FieldValue::Null) => Ordering::Less,
@@ -219,21 +219,21 @@ impl<'a> Collector for TopFieldCollector<'a> {
             // Descending: reverse comparison
             sorted_docs.sort_by(|a, b| match (&a.field_value, &b.field_value) {
                 (FieldValue::Text(av), FieldValue::Text(bv)) => bv.cmp(av),
-                (FieldValue::Integer(av), FieldValue::Integer(bv)) => bv.cmp(av),
-                (FieldValue::Float(av), FieldValue::Float(bv)) => {
+                (FieldValue::Int64(av), FieldValue::Int64(bv)) => bv.cmp(av),
+                (FieldValue::Float64(av), FieldValue::Float64(bv)) => {
                     bv.partial_cmp(av).unwrap_or(Ordering::Equal)
                 }
-                (FieldValue::Boolean(av), FieldValue::Boolean(bv)) => bv.cmp(av),
+                (FieldValue::Bool(av), FieldValue::Bool(bv)) => bv.cmp(av),
                 (FieldValue::DateTime(av), FieldValue::DateTime(bv)) => bv.cmp(av),
-                (FieldValue::Geo(av), FieldValue::Geo(bv)) => {
-                    let lat_cmp = bv.lat.partial_cmp(&av.lat).unwrap_or(Ordering::Equal);
+                (FieldValue::Geo(alat, alon), FieldValue::Geo(blat, blon)) => {
+                    let lat_cmp = blat.partial_cmp(alat).unwrap_or(Ordering::Equal);
                     if lat_cmp != Ordering::Equal {
                         lat_cmp
                     } else {
-                        bv.lon.partial_cmp(&av.lon).unwrap_or(Ordering::Equal)
+                        blon.partial_cmp(alon).unwrap_or(Ordering::Equal)
                     }
                 }
-                (FieldValue::Blob(_, av), FieldValue::Blob(_, bv)) => bv.cmp(av),
+                (FieldValue::Bytes(av, _), FieldValue::Bytes(bv, _)) => bv.cmp(av),
                 (FieldValue::Null, FieldValue::Null) => Ordering::Equal,
                 (FieldValue::Null, _) => Ordering::Less,
                 (_, FieldValue::Null) => Ordering::Greater,
@@ -300,21 +300,21 @@ impl Ord for FieldScoredDoc {
             // Ascending: reverse comparison for min-heap behavior
             match (&self.field_value, &other.field_value) {
                 (FieldValue::Text(a), FieldValue::Text(b)) => b.cmp(a),
-                (FieldValue::Integer(a), FieldValue::Integer(b)) => b.cmp(a),
-                (FieldValue::Float(a), FieldValue::Float(b)) => {
+                (FieldValue::Int64(a), FieldValue::Int64(b)) => b.cmp(a),
+                (FieldValue::Float64(a), FieldValue::Float64(b)) => {
                     b.partial_cmp(a).unwrap_or(Ordering::Equal)
                 }
-                (FieldValue::Boolean(a), FieldValue::Boolean(b)) => b.cmp(a),
+                (FieldValue::Bool(a), FieldValue::Bool(b)) => b.cmp(a),
                 (FieldValue::DateTime(a), FieldValue::DateTime(b)) => b.cmp(a),
-                (FieldValue::Geo(a), FieldValue::Geo(b)) => {
-                    let lat_cmp = b.lat.partial_cmp(&a.lat).unwrap_or(Ordering::Equal);
+                (FieldValue::Geo(alat, alon), FieldValue::Geo(blat, blon)) => {
+                    let lat_cmp = blat.partial_cmp(alat).unwrap_or(Ordering::Equal);
                     if lat_cmp != Ordering::Equal {
                         lat_cmp
                     } else {
-                        b.lon.partial_cmp(&a.lon).unwrap_or(Ordering::Equal)
+                        blon.partial_cmp(alon).unwrap_or(Ordering::Equal)
                     }
                 }
-                (FieldValue::Blob(_, a), FieldValue::Blob(_, b)) => b.cmp(a),
+                (FieldValue::Bytes(a, _), FieldValue::Bytes(b, _)) => b.cmp(a),
                 (FieldValue::Null, FieldValue::Null) => Ordering::Equal,
                 (FieldValue::Null, _) => Ordering::Greater,
                 (_, FieldValue::Null) => Ordering::Less,
@@ -324,21 +324,21 @@ impl Ord for FieldScoredDoc {
             // Descending: normal comparison for max-heap behavior
             match (&self.field_value, &other.field_value) {
                 (FieldValue::Text(a), FieldValue::Text(b)) => a.cmp(b),
-                (FieldValue::Integer(a), FieldValue::Integer(b)) => a.cmp(b),
-                (FieldValue::Float(a), FieldValue::Float(b)) => {
+                (FieldValue::Int64(a), FieldValue::Int64(b)) => a.cmp(b),
+                (FieldValue::Float64(a), FieldValue::Float64(b)) => {
                     a.partial_cmp(b).unwrap_or(Ordering::Equal)
                 }
-                (FieldValue::Boolean(a), FieldValue::Boolean(b)) => a.cmp(b),
+                (FieldValue::Bool(a), FieldValue::Bool(b)) => a.cmp(b),
                 (FieldValue::DateTime(a), FieldValue::DateTime(b)) => a.cmp(b),
-                (FieldValue::Geo(a), FieldValue::Geo(b)) => {
-                    let lat_cmp = a.lat.partial_cmp(&b.lat).unwrap_or(Ordering::Equal);
+                (FieldValue::Geo(alat, alon), FieldValue::Geo(blat, blon)) => {
+                    let lat_cmp = alat.partial_cmp(blat).unwrap_or(Ordering::Equal);
                     if lat_cmp != Ordering::Equal {
                         lat_cmp
                     } else {
-                        a.lon.partial_cmp(&b.lon).unwrap_or(Ordering::Equal)
+                        alon.partial_cmp(blon).unwrap_or(Ordering::Equal)
                     }
                 }
-                (FieldValue::Blob(_, a), FieldValue::Blob(_, b)) => a.cmp(b),
+                (FieldValue::Bytes(a, _), FieldValue::Bytes(b, _)) => a.cmp(b),
                 (FieldValue::Null, FieldValue::Null) => Ordering::Equal,
                 (FieldValue::Null, _) => Ordering::Less,
                 (_, FieldValue::Null) => Ordering::Greater,

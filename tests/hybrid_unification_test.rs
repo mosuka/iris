@@ -3,19 +3,18 @@ use std::any::Any;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
+use iris::data::{DataValue, Document};
 use iris::embedding::embedder::{EmbedInput, EmbedInputType, Embedder};
 use iris::embedding::per_field::PerFieldEmbedder;
+use iris::engine::Engine;
+use iris::engine::config::{FieldConfig, IndexConfig};
+use iris::engine::search::{FusionAlgorithm, SearchRequestBuilder};
 use iris::error::IrisError;
 use iris::lexical::core::field::{FieldOption, TextOption};
+use iris::lexical::index::inverted::query::term::TermQuery;
 use iris::storage::memory::MemoryStorage;
-use iris::vector::core::document::{DocumentPayload, Payload, StoredVector};
 use iris::vector::core::field::{FlatOption, VectorOption};
-use iris::vector::core::vector::Vector;
-use iris::vector::engine::VectorEngine;
-use iris::vector::engine::config::{VectorFieldConfig, VectorIndexConfig};
-use iris::vector::engine::request::{
-    FusionConfig, LexicalQuery, QueryVector, TermQueryOptions, VectorSearchRequest,
-};
+use iris::vector::store::request::{QueryVector, VectorSearchRequest};
 
 #[derive(Debug, Clone)]
 struct MockEmbedder {
@@ -39,12 +38,15 @@ impl MockEmbedder {
 
 #[async_trait]
 impl Embedder for MockEmbedder {
-    async fn embed(&self, input: &EmbedInput<'_>) -> std::result::Result<Vector, IrisError> {
+    async fn embed(
+        &self,
+        input: &EmbedInput<'_>,
+    ) -> std::result::Result<iris::vector::core::vector::Vector, IrisError> {
         match input {
             EmbedInput::Text(text) => {
                 let map = self.vectors.lock().unwrap();
                 if let Some(vec) = map.get(*text) {
-                    Ok(Vector::new(vec.clone()))
+                    Ok(iris::vector::core::vector::Vector::new(vec.clone()))
                 } else {
                     Err(IrisError::invalid_argument(format!(
                         "MockEmbedder: unknown text '{}'",
@@ -76,9 +78,9 @@ impl Embedder for MockEmbedder {
     }
 }
 
-fn create_hybrid_engine() -> std::result::Result<VectorEngine, Box<dyn std::error::Error>> {
+fn create_hybrid_engine() -> std::result::Result<Engine, Box<dyn std::error::Error>> {
     // Field "title": Lexical + Vector
-    let title_config = VectorFieldConfig {
+    let title_config = FieldConfig {
         vector: Some(VectorOption::Flat(FlatOption {
             dimension: 3,
             ..Default::default()
@@ -88,105 +90,106 @@ fn create_hybrid_engine() -> std::result::Result<VectorEngine, Box<dyn std::erro
 
     // Embedder setup
     let embedder = Arc::new(MockEmbedder::new());
-    embedder.add("apple", vec![1.0, 0.0, 0.0]);
+    embedder.add("apple", vec![0.9, 0.1, 0.0]);
     embedder.add("banana", vec![0.0, 1.0, 0.0]);
 
     // PerFieldEmbedder
     let mut per_field = PerFieldEmbedder::new(embedder.clone());
     per_field.add_embedder("title", embedder.clone());
 
-    let config = VectorIndexConfig::builder()
-        .embedder(per_field) // Pass directly
-        .field("title", title_config)
-        .build()?;
+    let config = IndexConfig::builder()
+        .embedder(Arc::new(per_field))
+        .add_field("title", title_config)
+        .build();
 
     let storage = Arc::new(MemoryStorage::new(Default::default()));
 
-    // new(storage, config)
-    let engine = VectorEngine::new(storage, config)?;
+    let engine = Engine::new(storage, config)?;
     Ok(engine)
 }
 
 #[test]
 fn test_hybrid_search_unification() -> std::result::Result<(), Box<dyn std::error::Error>> {
+    let rt = tokio::runtime::Runtime::new()?;
     let engine = create_hybrid_engine()?;
 
-    // Index Doc 1: "apple"
-    let mut payload1 = DocumentPayload::new();
-    payload1.set_field("title", Payload::text("apple"));
-    payload1.metadata.insert("_id".to_string(), "1".to_string());
+    rt.block_on(async { test_hybrid_search_unification_impl(&engine).await })?;
 
-    engine.index_payload_chunk(payload1)?;
+    drop(engine);
+    Ok(())
+}
+
+async fn test_hybrid_search_unification_impl(
+    engine: &Engine,
+) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    // Index Doc 1: "apple"
+    let payload1 = Document::new()
+        .with_field("title", DataValue::Text("apple".into()))
+        .with_field("_id", DataValue::Text("1".into()));
+
+    engine.index_chunk(payload1)?;
 
     // Index Doc 2: "banana"
-    let mut payload2 = DocumentPayload::new();
-    payload2.set_field("title", Payload::text("banana"));
-    payload2.metadata.insert("_id".to_string(), "2".to_string());
+    let payload2 = Document::new()
+        .with_field("title", DataValue::Text("banana".into()))
+        .with_field("_id", DataValue::Text("2".into()));
 
-    engine.index_payload_chunk(payload2)?;
+    engine.index_chunk(payload2)?;
 
     engine.commit()?;
 
     // Test 1: Vector Search (query closest to apple [0.9, 0.1, 0.0])
-    let query_vector = StoredVector::new(Arc::new([0.9, 0.1, 0.0]));
+    let req_vector = SearchRequestBuilder::new()
+        .with_vector(VectorSearchRequest {
+            query_vectors: vec![QueryVector {
+                vector: vec![0.9, 0.1, 0.0],
+                weight: 1.0,
+                fields: None,
+            }],
+            limit: 10,
+            ..Default::default()
+        })
+        .limit(10)
+        .build();
 
-    let req_vector = VectorSearchRequest {
-        query_vectors: vec![QueryVector {
-            vector: query_vector.clone(),
-            weight: 1.0,
-            fields: None,
-        }],
-        limit: 10,
-        ..Default::default()
-    };
     let res_vector = engine.search(req_vector)?;
-    assert!(
-        !res_vector.hits.is_empty(),
-        "Vector search should return hits"
-    );
-    let top_doc = res_vector.hits[0].doc_id;
+    assert!(!res_vector.is_empty(), "Vector search should return hits");
+    let top_doc = res_vector[0].doc_id;
 
     // Test 2: Lexical Search ("banana")
-    let req_lexical = VectorSearchRequest {
-        lexical_query: Some(LexicalQuery::Term(TermQueryOptions {
-            field: "title".to_string(),
-            term: "banana".to_string(),
-            boost: 1.0,
-        })),
-        limit: 10,
-        ..Default::default()
-    };
+    let req_lexical = SearchRequestBuilder::new()
+        .with_lexical(Box::new(TermQuery::new("title", "banana")))
+        .limit(10)
+        .build();
+
     let res_lexical = engine.search(req_lexical)?;
-    assert!(
-        !res_lexical.hits.is_empty(),
-        "Lexical search should return hits"
-    );
+    assert!(!res_lexical.is_empty(), "Lexical search should return hits");
     assert_ne!(
-        res_lexical.hits[0].doc_id, top_doc,
+        res_lexical[0].doc_id, top_doc,
         "Banana should be different from Apple"
     );
 
     // Test 3: Hybrid Search (RRF)
-    let req_hybrid = VectorSearchRequest {
-        query_vectors: vec![QueryVector {
-            vector: query_vector.clone(),
-            weight: 1.0,
-            fields: None,
-        }],
-        lexical_query: Some(LexicalQuery::Term(TermQueryOptions {
-            field: "title".to_string(),
-            term: "banana".to_string(),
-            boost: 1.0,
-        })),
-        fusion_config: Some(FusionConfig::Rrf { k: 60 }),
-        limit: 10,
-        ..Default::default()
-    };
+    let req_hybrid = SearchRequestBuilder::new()
+        .with_vector(VectorSearchRequest {
+            query_vectors: vec![QueryVector {
+                vector: vec![0.0, 1.0, 0.0],
+                weight: 1.0,
+                fields: None,
+            }],
+            limit: 10,
+            ..Default::default()
+        })
+        .with_lexical(Box::new(TermQuery::new("title", "banana")))
+        .fusion(FusionAlgorithm::RRF { k: 60.0 })
+        .limit(10)
+        .build();
+
     let res_hybrid = engine.search(req_hybrid)?;
-    assert!(!res_hybrid.hits.is_empty());
+    assert!(!res_hybrid.is_empty());
 
     assert_eq!(
-        res_hybrid.hits[0].doc_id, res_lexical.hits[0].doc_id,
+        res_hybrid[0].doc_id, res_lexical[0].doc_id,
         "Banana should win in hybrid search"
     );
 

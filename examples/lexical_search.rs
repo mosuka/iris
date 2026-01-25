@@ -1,32 +1,24 @@
-//! Lexical Search Example - Basic usage guide
+//! Lexical Search Example - Basic usage guide via the unified Engine API.
 //!
 //! This example demonstrates the fundamental steps to use Iris for lexical search:
-//! 1. Setup storage and analyzer (using PerFieldAnalyzer)
-//! 2. Configure the index
+//! 1. Setup storage and configuration
+//! 2. Initialize the Engine
 //! 3. Add documents
-//! 4. Perform a search
+//! 4. Perform a search using the Engine's search API
 
-use std::sync::Arc;
-
-use iris::analysis::analyzer::analyzer::Analyzer;
-use iris::analysis::analyzer::keyword::KeywordAnalyzer;
-use iris::analysis::analyzer::per_field::PerFieldAnalyzer;
-use iris::analysis::analyzer::standard::StandardAnalyzer;
+use iris::data::Document;
+use iris::engine::Engine;
+use iris::engine::config::{FieldConfig, IndexConfig};
+use iris::engine::search::SearchRequestBuilder;
 use iris::error::Result;
-use iris::lexical::core::document::Document;
-use iris::lexical::core::field::TextOption;
-use iris::lexical::engine::LexicalEngine;
-use iris::lexical::engine::config::LexicalIndexConfig;
-use iris::lexical::index::config::InvertedIndexConfig;
-use iris::lexical::index::inverted::query::Query;
+use iris::lexical::core::field::{FieldOption, TextOption};
 use iris::lexical::index::inverted::query::term::TermQuery;
-use iris::lexical::search::searcher::LexicalSearchRequest;
 use iris::storage::file::FileStorageConfig;
 use iris::storage::{StorageConfig, StorageFactory};
 use tempfile::TempDir;
 
 fn main() -> Result<()> {
-    println!("=== Lexical Search Basic Example ===\n");
+    println!("=== Lexical Search Basic Example (Unified Engine) ===\n");
 
     // 1. Setup Storage
     // We use a temporary directory for this example, but in a real app you'd use a persistent path.
@@ -34,115 +26,94 @@ fn main() -> Result<()> {
     let storage_config = StorageConfig::File(FileStorageConfig::new(temp_dir.path()));
     let storage = StorageFactory::create(storage_config)?;
 
-    // 2. Setup Analyzer (PerFieldAnalyzer)
-    // We use PerFieldAnalyzer to apply different analysis strategies to different fields.
-    // - Default: StandardAnalyzer (tokenizes, lowercases, removes stop words)
-    // - "category": KeywordAnalyzer (treats the entire input as a single token, case-sensitive)
-    let default_analyzer = Arc::new(StandardAnalyzer::new()?);
-    let mut analyzer = PerFieldAnalyzer::new(default_analyzer);
+    // 2. Configure Index via Engine
+    // We define our fields and their lexical indexing options.
+    let config = IndexConfig::builder()
+        .add_field(
+            "title",
+            FieldConfig {
+                lexical: Some(FieldOption::Text(TextOption::default())),
+                vector: None,
+            },
+        )
+        .add_field(
+            "body",
+            FieldConfig {
+                lexical: Some(FieldOption::Text(TextOption::default())),
+                vector: None,
+            },
+        )
+        .add_field(
+            "category",
+            FieldConfig {
+                lexical: Some(FieldOption::Text(TextOption::default())),
+                vector: None,
+            },
+        )
+        .build();
 
-    // Add specific analyzer for "category" field
-    analyzer.add_analyzer("category", Arc::new(KeywordAnalyzer::new()));
+    // 3. Create Engine
+    let engine = Engine::new(storage, config)?;
 
-    let analyzer_arc: Arc<dyn Analyzer> = Arc::new(analyzer);
-
-    // 3. Configure Index
-    // We use the Inverted index type for lexical search.
-    let index_config = LexicalIndexConfig::Inverted(InvertedIndexConfig {
-        analyzer: analyzer_arc,
-        ..InvertedIndexConfig::default()
-    });
-
-    // 4. Create Engine
-    let engine = LexicalEngine::new(storage, index_config)?;
-
-    // 5. Add Documents
-    // Let's index a few simple documents with a category.
+    // 4. Add Documents
+    // Let's index a few simple documents.
     let documents = vec![
-        Document::builder()
-            .add_text(
-                "title",
-                "The Rust Programming Language",
-                TextOption::default(),
-            )
-            .add_text(
-                "body",
-                "Rust is fast and memory efficient.",
-                TextOption::default(),
-            )
-            .add_text("category", "TECHNOLOGY", TextOption::default())
-            .build(),
-        Document::builder()
-            .add_text("title", "Learning Search Engines", TextOption::default())
-            .add_text(
-                "body",
-                "Search engines are complex but fascinating.",
-                TextOption::default(),
-            )
-            .add_text("category", "EDUCATION", TextOption::default())
-            .build(),
-        Document::builder()
-            .add_text(
-                "title",
-                "Cooking with Rust (Iron Skillets)",
-                TextOption::default(),
-            )
-            .add_text(
-                "body",
-                "How to season your cast iron skillet.",
-                TextOption::default(),
-            )
-            .add_text("category", "LIFESTYLE", TextOption::default())
-            .build(),
+        Document::new()
+            .with_id("doc1")
+            .with_field("title", "The Rust Programming Language")
+            .with_field("body", "Rust is fast and memory efficient.")
+            .with_field("category", "TECHNOLOGY"),
+        Document::new()
+            .with_id("doc2")
+            .with_field("title", "Learning Search Engines")
+            .with_field("body", "Search engines are complex but fascinating.")
+            .with_field("category", "EDUCATION"),
+        Document::new()
+            .with_id("doc3")
+            .with_field("title", "Cooking with Rust (Iron Skillets)")
+            .with_field("body", "How to season your cast iron skillet.")
+            .with_field("category", "LIFESTYLE"),
     ];
 
     println!("Indexing {} documents...", documents.len());
     for doc in documents {
-        engine.add_document(doc)?;
+        engine.index(doc)?;
     }
-    // Don't forget to commit! Changes are not visible until committed.
+    // Commit changes to make them searchable.
     engine.commit()?;
 
-    // 6. Search
+    // 5. Search
 
-    // Demo 1: Search in 'title' (StandardAnalyzer)
-    println!("\n--- Search 1: 'Rust' in 'title' (Standard Analysis) ---");
-    let query = TermQuery::new("title", "rust"); // Lowercase 'rust' matches because StandardAnalyzer lowercases input
-    let request = LexicalSearchRequest::new(Box::new(query) as Box<dyn Query>).load_documents(true);
+    println!("\n--- Search 1: 'Rust' in 'title' ---");
+    // We construct a Lexical search request using a TermQuery.
+    let request = SearchRequestBuilder::new()
+        .with_lexical(Box::new(TermQuery::new("title", "rust")))
+        .build();
+
     let results = engine.search(request)?;
 
-    println!("Found {} hits:", results.total_hits);
-    for (i, hit) in results.hits.iter().enumerate() {
-        println!("{}. Doc ID: {}, Score: {:.4}", i + 1, hit.doc_id, hit.score);
-        if let Some(doc) = &hit.document {
-            print_doc_summary(doc);
-        }
-    }
-
-    // Demo 2: Search in 'category' (KeywordAnalyzer)
-    println!("\n--- Search 2: 'TECHNOLOGY' in 'category' (Keyword Analysis) ---");
-    // KeywordAnalyzer is case-sensitive and requires exact match.
-    // "TECHNOLOGY" matches "TECHNOLOGY". "technology" would NOT match.
-    let query = TermQuery::new("category", "TECHNOLOGY");
-    let request = LexicalSearchRequest::new(Box::new(query) as Box<dyn Query>).load_documents(true);
-    let results = engine.search(request)?;
-
-    println!("Found {} hits:", results.total_hits);
-    for (i, hit) in results.hits.iter().enumerate() {
-        println!("{}. Doc ID: {}, Score: {:.4}", i + 1, hit.doc_id, hit.score);
-        if let Some(doc) = &hit.document {
-            print_doc_summary(doc);
+    println!("Found {} hits:", results.len());
+    for (i, hit) in results.iter().enumerate() {
+        // We can retrieve the actual document content using engine.get_document()
+        if let Ok(Some(doc)) = engine.get_document(hit.doc_id) {
+            let title = doc
+                .get_field("title")
+                .and_then(|v| v.as_text())
+                .unwrap_or("");
+            let category = doc
+                .get_field("category")
+                .and_then(|v| v.as_text())
+                .unwrap_or("");
+            println!(
+                "{}. ID: {}, Title: '{}', Category: {}, Score: {:.4}",
+                i + 1,
+                doc.id.as_deref().unwrap_or("unknown"),
+                title,
+                category,
+                hit.score
+            );
         }
     }
 
     Ok(())
-}
-
-fn print_doc_summary(doc: &Document) {
-    if let Some(title) = doc.get_field("title").and_then(|f| f.value.as_text()) {
-        println!("   Title: {}", title);
-    }
-    if let Some(category) = doc.get_field("category").and_then(|f| f.value.as_text()) {
-        println!("   Category: {}", category);
-    }
 }

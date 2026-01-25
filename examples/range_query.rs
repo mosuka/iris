@@ -8,11 +8,10 @@ use iris::analysis::analyzer::analyzer::Analyzer;
 use iris::analysis::analyzer::keyword::KeywordAnalyzer;
 use iris::analysis::analyzer::per_field::PerFieldAnalyzer;
 use iris::analysis::analyzer::standard::StandardAnalyzer;
-use iris::lexical::core::document::Document;
-use iris::lexical::core::field::{FloatOption, IntegerOption, TextOption};
+use iris::data::{DataValue, Document};
 use iris::error::Result;
-use iris::lexical::engine::LexicalEngine;
-use iris::lexical::engine::config::LexicalIndexConfig;
+use iris::lexical::store::LexicalStore;
+use iris::lexical::store::config::LexicalIndexConfig;
 use iris::lexical::index::config::InvertedIndexConfig;
 use iris::lexical::index::inverted::query::Query;
 use iris::lexical::index::inverted::query::range::NumericRangeQuery;
@@ -40,88 +39,79 @@ fn main() -> Result<()> {
         analyzer: Arc::new(per_field_analyzer.clone()),
         ..InvertedIndexConfig::default()
     });
-    let lexical_engine = LexicalEngine::new(storage, lexical_index_config)?;
+    let lexical_engine = LexicalStore::new(storage, lexical_index_config)?;
 
-    // Add documents with various numeric values
     let documents = vec![
-        Document::builder()
-            .add_text("title", "Introduction to Algorithms", TextOption::default())
-            .add_text(
-                "description",
-                "Comprehensive guide to algorithms and data structures",
-                TextOption::default(),
+        Document::new()
+            .with_field(
+                "title",
+                DataValue::Text("Introduction to Algorithms".into()),
             )
-            .add_float("price", 89.99, FloatOption::default())
-            .add_float("rating", 4.8, FloatOption::default())
-            .add_integer("year", 2009, IntegerOption::default())
-            .add_integer("pages", 1312, IntegerOption::default())
-            .add_text("id", "book001", TextOption::default())
-            .build(),
-        Document::builder()
-            .add_text("title", "Clean Code", TextOption::default())
-            .add_text(
+            .with_field(
                 "description",
-                "A handbook of agile software craftsmanship",
-                TextOption::default(),
+                DataValue::Text("Comprehensive guide to algorithms and data structures".into()),
             )
-            .add_float("price", 45.50, FloatOption::default())
-            .add_float("rating", 4.6, FloatOption::default())
-            .add_integer("year", 2008, IntegerOption::default())
-            .add_integer("pages", 464, IntegerOption::default())
-            .add_text("id", "book002", TextOption::default())
-            .build(),
-        Document::builder()
-            .add_text("title", "Design Patterns", TextOption::default())
-            .add_text(
+            .with_field("price", DataValue::Float64(89.99))
+            .with_field("rating", DataValue::Float64(4.8))
+            .with_field("year", DataValue::Int64(2009))
+            .with_field("pages", DataValue::Int64(1312))
+            .with_field("id", DataValue::Text("book001".into())),
+        Document::new()
+            .with_field("title", DataValue::Text("Clean Code".into()))
+            .with_field(
                 "description",
-                "Elements of reusable object-oriented software",
-                TextOption::default(),
+                DataValue::Text("A handbook of agile software craftsmanship".into()),
             )
-            .add_float("price", 62.95, FloatOption::default())
-            .add_float("rating", 4.5, FloatOption::default())
-            .add_integer("year", 1994, IntegerOption::default())
-            .add_integer("pages", 395, IntegerOption::default())
-            .add_text("id", "book003", TextOption::default())
-            .build(),
-        Document::builder()
-            .add_text("title", "The Pragmatic Programmer", TextOption::default())
-            .add_text(
+            .with_field("price", DataValue::Float64(45.50))
+            .with_field("rating", DataValue::Float64(4.6))
+            .with_field("year", DataValue::Int64(2008))
+            .with_field("pages", DataValue::Int64(464))
+            .with_field("id", DataValue::Text("book002".into())),
+        Document::new()
+            .with_field("title", DataValue::Text("Design Patterns".into()))
+            .with_field(
                 "description",
-                "Your journey to mastery",
-                TextOption::default(),
+                DataValue::Text("Elements of reusable object-oriented software".into()),
             )
-            .add_float("price", 52.99, FloatOption::default())
-            .add_float("rating", 4.7, FloatOption::default())
-            .add_integer("year", 2019, IntegerOption::default())
-            .add_integer("pages", 352, IntegerOption::default())
-            .add_text("id", "book004", TextOption::default())
-            .build(),
-        Document::builder()
-            .add_text("title", "Refactoring", TextOption::default())
-            .add_text(
+            .with_field("price", DataValue::Float64(62.95))
+            .with_field("rating", DataValue::Float64(4.5))
+            .with_field("year", DataValue::Int64(1994))
+            .with_field("pages", DataValue::Int64(395))
+            .with_field("id", DataValue::Text("book003".into())),
+        Document::new()
+            .with_field("title", DataValue::Text("The Pragmatic Programmer".into()))
+            .with_field(
                 "description",
-                "Improving the design of existing code",
-                TextOption::default(),
+                DataValue::Text("Your journey to mastery".into()),
             )
-            .add_float("price", 58.75, FloatOption::default())
-            .add_float("rating", 4.4, FloatOption::default())
-            .add_integer("year", 2018, IntegerOption::default())
-            .add_integer("pages", 448, IntegerOption::default())
-            .add_text("id", "book005", TextOption::default())
-            .build(),
-        Document::builder()
-            .add_text("title", "Code Complete", TextOption::default())
-            .add_text(
+            .with_field("price", DataValue::Float64(52.99))
+            .with_field("rating", DataValue::Float64(4.7))
+            .with_field("year", DataValue::Int64(2019))
+            .with_field("pages", DataValue::Int64(352))
+            .with_field("id", DataValue::Text("book004".into())),
+        Document::new()
+            .with_field("title", DataValue::Text("Refactoring".into()))
+            .with_field(
                 "description",
-                "A practical handbook of software construction",
-                TextOption::default(),
+                DataValue::Text("Improving the design of existing code".into()),
             )
-            .add_float("price", 73.99, FloatOption::default())
-            .add_float("rating", 4.9, FloatOption::default())
-            .add_integer("year", 2004, IntegerOption::default())
-            .add_integer("pages", 914, IntegerOption::default())
-            .add_text("id", "book006", TextOption::default())
-            .build(),
+            .with_field("price", DataValue::Float64(58.75))
+            .with_field("rating", DataValue::Float64(4.4))
+            .with_field("year", DataValue::Int64(2018))
+            .with_field("pages", DataValue::Int64(448))
+            .with_field("id", DataValue::Text("book005".into())),
+        Document::new()
+            .with_field("title", DataValue::Text("Code Complete".into()))
+            .with_field(
+                "description",
+                DataValue::Text("A practical handbook of software construction".into()),
+            )
+            .with_field("price", DataValue::Float64(73.99))
+            .with_field("rating", DataValue::Float64(4.9))
+            .with_field("year", DataValue::Int64(2004))
+            .with_field("pages", DataValue::Int64(914))
+            .with_field("category", DataValue::Text("software".into()))
+            .with_field("id", DataValue::Text("book006".into())),
     ];
 
     println!("Adding {} documents to the index...", documents.len());
@@ -147,13 +137,13 @@ fn main() -> Result<()> {
             hit.doc_id
         );
         if let Some(doc) = &hit.document {
-            if let Some(field_value) = doc.get_field("title")
-                && let Some(title) = field_value.value.as_text()
+            if let Some(field) = doc.get_field("title")
+                && let DataValue::Text(title) = field
             {
                 println!("      Title: {title}");
             }
             if let Some(field) = doc.get_field("price")
-                && let iris::lexical::core::field::FieldValue::Float(price) = &field.value
+                && let DataValue::Float64(price) = field
             {
                 println!("      Price: ${price:.2}");
             }
@@ -175,13 +165,13 @@ fn main() -> Result<()> {
             hit.doc_id
         );
         if let Some(doc) = &hit.document {
-            if let Some(field_value) = doc.get_field("title")
-                && let Some(title) = field_value.value.as_text()
+            if let Some(field) = doc.get_field("title")
+                && let DataValue::Text(title) = field
             {
                 println!("      Title: {title}");
             }
             if let Some(field) = doc.get_field("rating")
-                && let iris::lexical::core::field::FieldValue::Float(rating) = &field.value
+                && let DataValue::Float64(rating) = field
             {
                 println!("      Rating: {rating:.1}");
             }
@@ -203,13 +193,13 @@ fn main() -> Result<()> {
             hit.doc_id
         );
         if let Some(doc) = &hit.document {
-            if let Some(field_value) = doc.get_field("title")
-                && let Some(title) = field_value.value.as_text()
+            if let Some(field) = doc.get_field("title")
+                && let DataValue::Text(title) = field
             {
                 println!("      Title: {title}");
             }
             if let Some(field) = doc.get_field("year")
-                && let iris::lexical::core::field::FieldValue::Integer(year) = &field.value
+                && let DataValue::Int64(year) = field
             {
                 println!("      Year: {year}");
             }
@@ -231,13 +221,13 @@ fn main() -> Result<()> {
             hit.doc_id
         );
         if let Some(doc) = &hit.document {
-            if let Some(field_value) = doc.get_field("title")
-                && let Some(title) = field_value.value.as_text()
+            if let Some(field) = doc.get_field("title")
+                && let DataValue::Text(title) = field
             {
                 println!("      Title: {title}");
             }
             if let Some(field) = doc.get_field("pages")
-                && let iris::lexical::core::field::FieldValue::Integer(pages) = &field.value
+                && let DataValue::Int64(pages) = field
             {
                 println!("      Pages: {pages}");
             }
@@ -259,13 +249,13 @@ fn main() -> Result<()> {
             hit.doc_id
         );
         if let Some(doc) = &hit.document {
-            if let Some(field_value) = doc.get_field("title")
-                && let Some(title) = field_value.value.as_text()
+            if let Some(field) = doc.get_field("title")
+                && let DataValue::Text(title) = field
             {
                 println!("      Title: {title}");
             }
             if let Some(field) = doc.get_field("year")
-                && let iris::lexical::core::field::FieldValue::Integer(year) = &field.value
+                && let DataValue::Int64(year) = field
             {
                 println!("      Year: {year}");
             }
@@ -287,13 +277,13 @@ fn main() -> Result<()> {
             hit.doc_id
         );
         if let Some(doc) = &hit.document {
-            if let Some(field_value) = doc.get_field("title")
-                && let Some(title) = field_value.value.as_text()
+            if let Some(field) = doc.get_field("title")
+                && let DataValue::Text(title) = field
             {
                 println!("      Title: {title}");
             }
             if let Some(field) = doc.get_field("price")
-                && let iris::lexical::core::field::FieldValue::Float(price) = &field.value
+                && let DataValue::Float64(price) = field
             {
                 println!("      Price: ${price:.2}");
             }
@@ -315,13 +305,13 @@ fn main() -> Result<()> {
             hit.doc_id
         );
         if let Some(doc) = &hit.document {
-            if let Some(field_value) = doc.get_field("title")
-                && let Some(title) = field_value.value.as_text()
+            if let Some(field) = doc.get_field("title")
+                && let DataValue::Text(title) = field
             {
                 println!("      Title: {title}");
             }
             if let Some(field) = doc.get_field("pages")
-                && let iris::lexical::core::field::FieldValue::Integer(pages) = &field.value
+                && let DataValue::Int64(pages) = field
             {
                 println!("      Pages: {pages}");
             }

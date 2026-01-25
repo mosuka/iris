@@ -224,8 +224,8 @@ pub trait VectorSearcher: Send + Sync + std::fmt::Debug {
     /// and aggregates scores according to the specified score mode.
     fn search(
         &self,
-        request: &crate::vector::engine::request::VectorSearchRequest,
-    ) -> crate::error::Result<crate::vector::engine::response::VectorSearchResults>;
+        request: &crate::vector::store::request::VectorSearchRequest,
+    ) -> crate::error::Result<crate::vector::store::response::VectorSearchResults>;
 
     /// Count the number of matching documents for a request.
     ///
@@ -233,6 +233,6 @@ pub trait VectorSearcher: Send + Sync + std::fmt::Debug {
     /// applying the min_score threshold if specified in the request.
     fn count(
         &self,
-        request: &crate::vector::engine::request::VectorSearchRequest,
+        request: &crate::vector::store::request::VectorSearchRequest,
     ) -> crate::error::Result<u64>;
 }

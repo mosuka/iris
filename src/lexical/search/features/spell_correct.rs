@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::error::Result;
-use crate::lexical::engine::LexicalEngine;
+use crate::lexical::store::LexicalStore;
 use crate::lexical::index::inverted::query::LexicalSearchResults;
 use crate::lexical::search::searcher::LexicalSearchRequest;
 use crate::spelling::corrector::{
@@ -90,7 +90,7 @@ impl Default for SpellCorrectedSearchConfig {
 /// A search engine wrapper that provides spell correction capabilities.
 pub struct SpellCorrectedSearchEngine {
     /// The underlying search engine.
-    engine: LexicalEngine,
+    engine: LexicalStore,
     /// The spelling corrector.
     corrector: SpellingCorrector,
     /// Configuration for spell-corrected search.
@@ -101,7 +101,7 @@ pub struct SpellCorrectedSearchEngine {
 
 impl SpellCorrectedSearchEngine {
     /// Create a new spell-corrected search engine.
-    pub fn new(engine: LexicalEngine) -> Self {
+    pub fn new(engine: LexicalStore) -> Self {
         let corrector = SpellingCorrector::new();
         let config = SpellCorrectedSearchConfig::default();
         let did_you_mean = DidYouMean::new(SpellingCorrector::new());
@@ -115,7 +115,7 @@ impl SpellCorrectedSearchEngine {
     }
 
     /// Create a new spell-corrected search engine with custom configuration.
-    pub fn with_config(engine: LexicalEngine, config: SpellCorrectedSearchConfig) -> Self {
+    pub fn with_config(engine: LexicalStore, config: SpellCorrectedSearchConfig) -> Self {
         let mut corrector = SpellingCorrector::new();
         corrector.set_config(config.corrector_config.clone());
         let did_you_mean = DidYouMean::new(SpellingCorrector::new());
@@ -129,12 +129,12 @@ impl SpellCorrectedSearchEngine {
     }
 
     /// Get the underlying search engine.
-    pub fn engine(&self) -> &LexicalEngine {
+    pub fn engine(&self) -> &LexicalStore {
         &self.engine
     }
 
     /// Get mutable access to the underlying search engine.
-    pub fn engine_mut(&mut self) -> &mut LexicalEngine {
+    pub fn engine_mut(&mut self) -> &mut LexicalStore {
         &mut self.engine
     }
 
@@ -398,7 +398,7 @@ impl SpellSearchUtils {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::lexical::engine::config::LexicalIndexConfig;
+    use crate::lexical::store::config::LexicalIndexConfig;
     use crate::storage::file::{FileStorage, FileStorageConfig};
     use std::sync::Arc;
     use tempfile::TempDir;
@@ -411,7 +411,7 @@ mod tests {
         let storage = Arc::new(
             FileStorage::new(temp_dir.path(), FileStorageConfig::new(temp_dir.path())).unwrap(),
         );
-        let engine = LexicalEngine::new(storage, config).unwrap();
+        let engine = LexicalStore::new(storage, config).unwrap();
         let spell_engine = SpellCorrectedSearchEngine::new(engine);
 
         assert!(spell_engine.config.enabled);
@@ -425,7 +425,7 @@ mod tests {
         let storage = Arc::new(
             FileStorage::new(temp_dir.path(), FileStorageConfig::new(temp_dir.path())).unwrap(),
         );
-        let engine = LexicalEngine::new(storage, engine_config).unwrap();
+        let engine = LexicalStore::new(storage, engine_config).unwrap();
 
         let spell_config = SpellCorrectedSearchConfig {
             enabled: false,
@@ -450,7 +450,7 @@ mod tests {
         let storage = Arc::new(
             FileStorage::new(temp_dir.path(), FileStorageConfig::new(temp_dir.path())).unwrap(),
         );
-        let engine = LexicalEngine::new(storage, config).unwrap();
+        let engine = LexicalStore::new(storage, config).unwrap();
         let mut spell_engine = SpellCorrectedSearchEngine::new(engine);
 
         // Test with a query that might have typos
@@ -470,7 +470,7 @@ mod tests {
         let storage = Arc::new(
             FileStorage::new(temp_dir.path(), FileStorageConfig::new(temp_dir.path())).unwrap(),
         );
-        let engine = LexicalEngine::new(storage, config).unwrap();
+        let engine = LexicalStore::new(storage, config).unwrap();
         let spell_engine = SpellCorrectedSearchEngine::new(engine);
 
         // Test with common words
@@ -530,7 +530,7 @@ mod tests {
         let storage = Arc::new(
             FileStorage::new(temp_dir.path(), FileStorageConfig::new(temp_dir.path())).unwrap(),
         );
-        let engine = LexicalEngine::new(storage, config).unwrap();
+        let engine = LexicalStore::new(storage, config).unwrap();
         let spell_engine = SpellCorrectedSearchEngine::new(engine);
 
         let stats = spell_engine.corrector_stats();

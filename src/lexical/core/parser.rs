@@ -161,8 +161,8 @@ impl DocumentParser {
         let mut point_values = AHashMap::new();
 
         // Process each field in the document
-        for (field_name, field) in doc.fields() {
-            match &field.value {
+        for (field_name, field) in &doc.fields {
+            match field.clone() {
                 FieldValue::Text(text) => {
                     // Analyze text field with per-field analyzer
                     let tokens = if let Some(per_field) =
@@ -179,7 +179,7 @@ impl DocumentParser {
                     field_terms.insert(field_name.clone(), analyzed_terms);
                     stored_fields.insert(field_name.clone(), FieldValue::Text(text.to_string()));
                 }
-                FieldValue::Integer(num) => {
+                FieldValue::Int64(num) => {
                     // Convert integer to text for indexing
                     let text = num.to_string();
 
@@ -191,10 +191,10 @@ impl DocumentParser {
                     };
 
                     field_terms.insert(field_name.clone(), vec![analyzed_term]);
-                    stored_fields.insert(field_name.clone(), FieldValue::Integer(*num));
-                    point_values.insert(field_name.clone(), vec![*num as f64]);
+                    stored_fields.insert(field_name.clone(), FieldValue::Int64(num));
+                    point_values.insert(field_name.clone(), vec![num as f64]);
                 }
-                FieldValue::Float(num) => {
+                FieldValue::Float64(num) => {
                     // Convert float to text for indexing
                     let text = num.to_string();
 
@@ -206,10 +206,10 @@ impl DocumentParser {
                     };
 
                     field_terms.insert(field_name.clone(), vec![analyzed_term]);
-                    stored_fields.insert(field_name.clone(), FieldValue::Float(*num));
-                    point_values.insert(field_name.clone(), vec![*num]);
+                    stored_fields.insert(field_name.clone(), FieldValue::Float64(num));
+                    point_values.insert(field_name.clone(), vec![num]);
                 }
-                FieldValue::Boolean(b) => {
+                FieldValue::Bool(b) => {
                     // Convert boolean to text
                     let text = b.to_string();
 
@@ -221,11 +221,14 @@ impl DocumentParser {
                     };
 
                     field_terms.insert(field_name.clone(), vec![analyzed_term]);
-                    stored_fields.insert(field_name.clone(), FieldValue::Boolean(*b));
+                    stored_fields.insert(field_name.clone(), FieldValue::Bool(b));
                 }
-                FieldValue::Blob(_, _) => {
+                FieldValue::Bytes(data, mime) => {
                     // Blob fields are not indexed in lexical engine, only stored
-                    stored_fields.insert(field_name.clone(), field.value.clone());
+                    stored_fields.insert(
+                        field_name.clone(),
+                        FieldValue::Bytes(data.clone(), mime.clone()),
+                    );
                 }
                 FieldValue::DateTime(dt) => {
                     // Convert datetime to RFC3339 string
@@ -239,14 +242,14 @@ impl DocumentParser {
                     };
 
                     field_terms.insert(field_name.clone(), vec![analyzed_term]);
-                    stored_fields.insert(field_name.clone(), FieldValue::DateTime(*dt));
+                    stored_fields.insert(field_name.clone(), FieldValue::DateTime(dt));
                     let ts = dt.timestamp() as f64
                         + dt.timestamp_subsec_nanos() as f64 / 1_000_000_000.0;
                     point_values.insert(field_name.clone(), vec![ts]);
                 }
-                FieldValue::Geo(point) => {
+                FieldValue::Geo(lat, lon) => {
                     // Convert geo point to string representation
-                    let text = format!("{},{}", point.lat, point.lon);
+                    let text = format!("{},{}", lat, lon);
 
                     let analyzed_term = AnalyzedTerm {
                         term: text.clone(),
@@ -256,8 +259,28 @@ impl DocumentParser {
                     };
 
                     field_terms.insert(field_name.clone(), vec![analyzed_term]);
-                    stored_fields.insert(field_name.clone(), FieldValue::Geo(*point));
-                    point_values.insert(field_name.clone(), vec![point.lat, point.lon]);
+                    stored_fields.insert(field_name.clone(), FieldValue::Geo(lat, lon));
+                    point_values.insert(field_name.clone(), vec![lat, lon]);
+                }
+                FieldValue::String(s) => {
+                    // Treat as a single keyword token
+                    let analyzed_term = AnalyzedTerm {
+                        term: s.clone(),
+                        position: 0,
+                        frequency: 1,
+                        offset: (0, s.len()),
+                    };
+                    field_terms.insert(field_name.clone(), vec![analyzed_term]);
+                    stored_fields.insert(field_name.clone(), FieldValue::String(s.clone()));
+                }
+                FieldValue::Vector(v) => {
+                    // Vectors are stored but not indexed in lexical
+                    stored_fields.insert(field_name.clone(), FieldValue::Vector(v.clone()));
+                }
+                FieldValue::List(l) => {
+                    // Lists are stored, maybe indexed as concatenated strings if needed?
+                    // For now, just store.
+                    stored_fields.insert(field_name.clone(), FieldValue::List(l.clone()));
                 }
                 FieldValue::Null => {
                     // Null fields are not indexed, only stored

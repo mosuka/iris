@@ -1,7 +1,7 @@
-//! VectorEngine: High-level vector search engine.
+//! VectorStore: Low-level vector storage and retrieval.
 //!
-//! This module provides a unified interface for vector indexing and search,
-//! analogous to `LexicalEngine` for lexical search.
+//! This module provides a component for managing vector fields and segments.
+//! It does NOT handle document ID mapping or metadata storage.
 //!
 //! # Module Structure
 //!
@@ -31,23 +31,20 @@ use std::io::{Read, Write};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use crate::lexical::engine::LexicalEngine;
-use crate::lexical::index::inverted::query::boolean::BooleanQuery;
-use crate::lexical::index::inverted::query::{Query, term::TermQuery};
-use crate::lexical::search::searcher::LexicalSearchRequest;
+// use crate::lexical::store::LexicalStore; // Removed dependency
+// use crate::lexical::index::inverted::query::{Query, term::TermQuery}; // Unused
+// use crate::lexical::search::searcher::LexicalSearchRequest; // Unused
 
 use parking_lot::{Mutex, RwLock};
 
+use crate::data::DataValue;
 use crate::embedding::embedder::{EmbedInput, Embedder};
 use crate::embedding::per_field::PerFieldEmbedder;
-use crate::error::{Result, IrisError};
+use crate::error::{IrisError, Result};
 use crate::maintenance::deletion::DeletionManager;
 use crate::storage::Storage;
 use crate::storage::prefixed::PrefixedStorage;
-use crate::vector::core::document::{
-    DocumentPayload, DocumentVector, Payload, PayloadSource, StoredVector,
-};
-use crate::vector::core::vector::Vector;
+use crate::vector::core::vector::{StoredVector, Vector};
 use crate::vector::index::config::{FlatIndexConfig, HnswIndexConfig, IvfIndexConfig};
 use crate::vector::index::field::{
     AdapterBackedVectorField, FieldHit, FieldSearchInput, LegacyVectorFieldWriter, VectorField,
@@ -78,56 +75,42 @@ use self::snapshot::{
     DOCUMENT_SNAPSHOT_FILE, DOCUMENT_SNAPSHOT_TEMP_FILE, DocumentSnapshot, FIELD_INDEX_BASENAME,
     REGISTRY_NAMESPACE, SnapshotDocument,
 };
-use crate::vector::core::field::{
-    FlatOption, HnswOption, IvfOption, VectorIndexKind, VectorOption,
-};
-use crate::vector::engine::config::{VectorFieldConfig, VectorIndexConfig};
-use crate::vector::index::wal::{WalEntry, WalManager};
+use crate::vector::core::field::VectorOption;
+use crate::vector::store::config::{VectorFieldConfig, VectorIndexConfig}; // Updated import path
 
-/// A high-level vector search engine that provides both indexing and searching.
-///
-/// The `VectorEngine` provides a simplified, unified interface for all vector operations,
-/// managing multiple vector fields, persistence, and search.
-pub struct VectorEngine {
+/// A vector storage component.
+pub struct VectorStore {
     config: Arc<VectorIndexConfig>,
     field_configs: Arc<RwLock<HashMap<String, VectorFieldConfig>>>,
     fields: Arc<RwLock<HashMap<String, FieldHandle>>>,
-    metadata_index: Arc<LexicalEngine>,
     embedder_registry: Arc<VectorEmbedderRegistry>,
     embedder_executor: Mutex<Option<Arc<EmbedderExecutor>>>,
-    wal: Arc<WalManager>,
     /// Manager for logical deletions.
     deletion_manager: Arc<DeletionManager>,
     storage: Arc<dyn Storage>,
-    documents: Arc<RwLock<HashMap<u64, DocumentVector>>>,
+    // documents: Arc<RwLock<HashMap<u64, crate::data::Document>>>, // Store might not need to cache full documents if LexicalStore does?
+    // Actually VectorStore usually needs to return vector data or payloads?
+    // Let's keep it for now but remove IDs management logic.
+    documents: Arc<RwLock<HashMap<u64, crate::data::Document>>>,
+    next_doc_id: AtomicU64,
     snapshot_wal_seq: AtomicU64,
-    // next_doc_id: AtomicU64, // REMOVED: Managed by LexicalEngine
     closed: AtomicU64, // 0 = open, 1 = closed
 }
 
-impl fmt::Debug for VectorEngine {
+impl fmt::Debug for VectorStore {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("VectorEngine")
+        f.debug_struct("VectorStore")
             .field("config", &self.config)
             .field("field_count", &self.fields.read().len())
             .finish()
     }
 }
 
-impl VectorEngine {
-    /// Create a new vector engine with the given storage and configuration.
+impl VectorStore {
+    /// Create a new vector store with the given storage and configuration.
     pub fn new(storage: Arc<dyn Storage>, config: VectorIndexConfig) -> Result<Self> {
         let embedder_registry = Arc::new(VectorEmbedderRegistry::new());
         let field_configs = Arc::new(RwLock::new(config.fields.clone()));
-
-        // Initialize Metadata Index (LexicalEngine)
-        // We use a sub-storage for metadata to keep it isolated
-        // let metadata_storage = storage.sub_storage("metadata")?; // sub_storage trait method not available
-        let metadata_storage = Arc::new(PrefixedStorage::new("metadata", storage.clone()));
-        let metadata_index = Arc::new(LexicalEngine::new(
-            metadata_storage,
-            config.metadata_config.clone(),
-        )?);
 
         // Store the embedder from config before moving config into Arc
         let config_embedder = config.embedder.clone();
@@ -135,35 +118,32 @@ impl VectorEngine {
 
         let deletion_manager = Arc::new(DeletionManager::new(deletion_config, storage.clone())?);
 
-        let mut engine = Self {
+        let mut store = Self {
             config: Arc::new(config),
             field_configs: field_configs.clone(),
             fields: Arc::new(RwLock::new(HashMap::new())),
-            metadata_index,
             embedder_registry,
             embedder_executor: Mutex::new(None),
-            wal: Arc::new(WalManager::new(storage.clone(), "vector_engine.wal")?),
             deletion_manager,
             storage,
             documents: Arc::new(RwLock::new(HashMap::new())),
+            next_doc_id: AtomicU64::new(0),
             snapshot_wal_seq: AtomicU64::new(0),
-            // next_doc_id: AtomicU64::new(0),
             closed: AtomicU64::new(0),
         };
-        // Ensure global deletion bitmap is initialized
-        let shard_id = engine.config.shard_id;
-        engine.deletion_manager.initialize_segment(
+
+        let shard_id = store.config.shard_id;
+        store.deletion_manager.initialize_segment(
             "global",
             crate::util::id::create_doc_id(shard_id, 0),
             crate::util::id::create_doc_id(shard_id, crate::util::id::MAX_LOCAL_ID),
         )?;
 
-        engine.load_persisted_state()?;
+        store.load_persisted_state()?; // Needs adjustment to not use metadata index
 
-        // Register embedder instances from the config (after fields are instantiated)
-        engine.register_embedder_from_config(config_embedder)?;
+        store.register_embedder_from_config(config_embedder)?;
 
-        Ok(engine)
+        Ok(store)
     }
 
     /// Register embedder instances from the Embedder trait object.
@@ -218,7 +198,7 @@ impl VectorEngine {
 
     fn check_closed(&self) -> Result<()> {
         if self.closed.load(Ordering::Relaxed) == 1 {
-            return Err(IrisError::index("VectorEngine is closed"));
+            return Err(IrisError::index("VectorStore is closed"));
         }
         Ok(())
     }
@@ -226,124 +206,40 @@ impl VectorEngine {
     fn embed_document_payload_internal(
         &self,
         _doc_id: u64,
-        payload: DocumentPayload,
-    ) -> Result<DocumentVector> {
-        // Ensure fields are registered (implicit schema generation if enabled)
-        for (field_name, field_payload) in payload.fields.iter() {
-            self.ensure_field_for_payload(field_name, field_payload)?;
-        }
+        payload: crate::data::Document,
+    ) -> Result<crate::data::Document> {
+        // (Schema validation or implicit registration logic removed or relaxed to allow metadata)
 
-        let mut document = DocumentVector::new();
-        document.metadata = payload.metadata;
+        let mut document = crate::data::Document::new();
+        // Copy original fields
+        document.fields = payload.fields.clone();
 
-        for (field_name, field_payload) in payload.fields.into_iter() {
-            let vector = self.embed_payload(&field_name, field_payload)?;
-            document.fields.insert(field_name, vector);
+        for (field_name, field_val) in payload.fields.into_iter() {
+            // If it's a Text/String or Bytes field and needs embedding, we do it.
+            if matches!(
+                field_val,
+                crate::data::DataValue::Text(_)
+                    | crate::data::DataValue::String(_)
+                    | crate::data::DataValue::Bytes(_, _)
+            ) {
+                if let Ok(stored_vec) = self.embed_payload(&field_name, field_val) {
+                    document.fields.insert(
+                        field_name,
+                        crate::data::DataValue::Vector(stored_vec.data.clone()),
+                    );
+                }
+            }
         }
 
         Ok(document)
     }
 
-    fn ensure_field_for_payload(&self, field_name: &str, payload: &Payload) -> Result<()> {
-        // Fast path: already registered
-        if self.fields.read().contains_key(field_name) {
-            return Ok(());
-        }
-
-        if !self.config.implicit_schema {
-            return Err(IrisError::invalid_argument(format!(
-                "vector field '{field_name}' is not registered"
-            )));
-        }
-
-        let field_config = self.build_field_config_for_payload(field_name, payload)?;
-
-        // Persist in config cache
-        self.field_configs
-            .write()
-            .insert(field_name.to_string(), field_config.clone());
-
-        // Build field runtime
-        let field = self.create_vector_field(field_name.to_string(), field_config)?;
-        self.register_field_impl(field)?;
-
-        // Register embedder for this field
-        self.register_embedder_for_field(field_name, self.config.embedder.clone())?;
-
-        // Persist manifest to record new field configuration
-        self.persist_manifest()?;
-        Ok(())
-    }
-
-    fn build_field_config_for_payload(
+    /// Embeds a single `DataValue` into a `StoredVector`.
+    fn embed_payload(
         &self,
         field_name: &str,
-        payload: &Payload,
-    ) -> Result<VectorFieldConfig> {
-        let dimension = match &payload.source {
-            PayloadSource::Text { .. } | PayloadSource::Bytes { .. } => {
-                self.config.default_dimension.ok_or_else(|| {
-                    IrisError::invalid_config(
-                        "implicit schema requires default_dimension to be set",
-                    )
-                })?
-            }
-            PayloadSource::Vector { data } => data.len(),
-        };
-
-        if dimension == 0 {
-            return Err(IrisError::invalid_config(format!(
-                "cannot register field '{field_name}' with zero dimension"
-            )));
-        }
-
-        let vector_option = match self.config.default_index_kind {
-            VectorIndexKind::Flat => VectorOption::Flat(FlatOption {
-                dimension,
-                distance: self.config.default_distance,
-                base_weight: self.config.default_base_weight,
-                quantizer: None,
-            }),
-            VectorIndexKind::Hnsw => VectorOption::Hnsw(HnswOption {
-                dimension,
-                distance: self.config.default_distance,
-                base_weight: self.config.default_base_weight,
-                quantizer: None,
-                ..Default::default()
-            }),
-            VectorIndexKind::Ivf => VectorOption::Ivf(IvfOption {
-                dimension,
-                distance: self.config.default_distance,
-                base_weight: self.config.default_base_weight,
-                quantizer: None,
-                ..Default::default()
-            }),
-        };
-
-        Ok(VectorFieldConfig {
-            vector: Some(vector_option),
-            lexical: None,
-        })
-    }
-
-    fn register_embedder_for_field(
-        &self,
-        field_name: &str,
-        embedder: Arc<dyn Embedder>,
-    ) -> Result<()> {
-        if let Some(per_field) = embedder.as_any().downcast_ref::<PerFieldEmbedder>() {
-            let field_embedder = per_field.get_embedder(field_name).clone();
-            self.embedder_registry
-                .register(field_name.to_string(), field_embedder);
-        } else {
-            self.embedder_registry
-                .register(field_name.to_string(), embedder);
-        }
-        Ok(())
-    }
-
-    /// Embeds a single `Payload` into a `StoredVector`.
-    fn embed_payload(&self, field_name: &str, payload: Payload) -> Result<StoredVector> {
+        value: crate::data::DataValue,
+    ) -> Result<StoredVector> {
         let fields = self.fields.read();
         let handle = fields.get(field_name).ok_or_else(|| {
             IrisError::invalid_argument(format!("vector field '{field_name}' is not registered"))
@@ -357,14 +253,12 @@ impl VectorEngine {
             None => {
                 // If not configured for vector indexing, return empty vector
                 // This allows the field to be used for lexical indexing without storing vectors
-                return Ok(StoredVector::new(Arc::from([])));
+                return Ok(StoredVector::new(Vec::new()));
             }
         };
 
-        let Payload { source } = payload;
-
-        match source {
-            PayloadSource::Text { value } => {
+        match value {
+            crate::data::DataValue::Text(text_value) => {
                 let executor = self.ensure_embedder_executor()?;
                 let embedder = self.embedder_registry.resolve(field_name)?;
 
@@ -376,7 +270,6 @@ impl VectorEngine {
                 }
 
                 let embedder_name_owned = field_name.to_string();
-                let text_value = value;
                 let text_for_embed = text_value.clone();
                 let vector = executor
                     .run(async move { embedder.embed(&EmbedInput::Text(&text_for_embed)).await })?;
@@ -391,13 +284,19 @@ impl VectorEngine {
 
                 // Store original text if lexical indexing is enabled
                 if field_config.lexical.is_some() {
-                    stored
-                        .attributes
-                        .insert("__iris_lexical_source".to_string(), text_value);
+                    use crate::data::DataValue;
+                    use crate::lexical::core::field::{Field, FieldOption, TextOption};
+                    stored.attributes.insert(
+                        "__iris_lexical_source".to_string(),
+                        Field::new(
+                            DataValue::Text(text_value),
+                            FieldOption::Text(TextOption::default()),
+                        ),
+                    );
                 }
                 Ok(stored)
             }
-            PayloadSource::Bytes { bytes, mime } => {
+            crate::data::DataValue::Bytes(bytes, mime) => {
                 let executor = self.ensure_embedder_executor()?;
                 let embedder = self.embedder_registry.resolve(field_name)?;
 
@@ -416,17 +315,17 @@ impl VectorEngine {
                         .embed(&EmbedInput::Bytes(&payload_bytes, mime_hint.as_deref()))
                         .await
                 })?;
-                vector.validate_dimension(dimension)?;
-                if !vector.is_valid() {
+                let vector_obj = Vector::new(vector.data); // data is Vec<f32>
+                if !vector_obj.is_valid() {
                     return Err(IrisError::InvalidOperation(format!(
                         "embedder '{}' produced invalid values for field '{}': {:?}",
-                        embedder_name_owned, field_name, vector
+                        embedder_name_owned, field_name, vector_obj
                     )));
                 }
-                let stored: StoredVector = vector.into();
+                let stored: StoredVector = vector_obj.into();
                 Ok(stored)
             }
-            PayloadSource::Vector { data } => {
+            crate::data::DataValue::Vector(data) => {
                 let vector = Vector::new(data.to_vec());
                 vector.validate_dimension(dimension)?;
                 if !vector.is_valid() {
@@ -438,6 +337,9 @@ impl VectorEngine {
                 let stored: StoredVector = vector.into();
                 Ok(stored)
             }
+            _ => Err(IrisError::invalid_argument(
+                "unsupported field value for embedding",
+            )),
         }
     }
 
@@ -745,19 +647,11 @@ impl VectorEngine {
         format!("vector_fields/{sanitized}")
     }
 
-    fn validate_document_fields(&self, document: &DocumentVector) -> Result<()> {
-        let fields = self.fields.read();
-        for field_name in document.fields.keys() {
-            if !fields.contains_key(field_name) {
-                return Err(IrisError::invalid_argument(format!(
-                    "vector field '{field_name}' is not registered"
-                )));
-            }
-        }
+    fn validate_document_fields(&self, _document: &crate::data::Document) -> Result<()> {
+        // Relaxed: allow metadata fields that are not registered as vector fields.
         Ok(())
     }
 
-    /*
     fn bump_next_doc_id(&self, doc_id: u64) {
         let _ = self
             .next_doc_id
@@ -774,9 +668,8 @@ impl VectorEngine {
         let max_id = self.documents.read().keys().copied().max().unwrap_or(0);
         self.bump_next_doc_id(max_id);
     }
-    */
 
-    fn delete_fields_for_doc(&self, doc_id: u64, doc: &DocumentVector) -> Result<()> {
+    fn delete_fields_for_doc(&self, doc_id: u64, doc: &crate::data::Document) -> Result<()> {
         let fields = self.fields.read();
         for field_name in doc.fields.keys() {
             let field = fields.get(field_name).ok_or_else(|| {
@@ -798,32 +691,71 @@ impl VectorEngine {
         &self,
         doc_id: u64,
         version: u64,
-        fields_data: &HashMap<String, StoredVector>,
+        fields_data: &HashMap<String, DataValue>,
     ) -> Result<()> {
         let fields = self.fields.read();
-        for (field_name, stored_vector) in fields_data {
-            let field = fields.get(field_name).ok_or_else(|| {
-                IrisError::not_found(format!("vector field '{field_name}' is not registered"))
-            })?;
-            field
-                .runtime
-                .writer()
-                .add_stored_vector(doc_id, stored_vector, version)?;
+        for (field_name, val) in fields_data {
+            if let Some(stored_vector) = val.as_vector_ref() {
+                let field = fields.get(field_name).ok_or_else(|| {
+                    IrisError::not_found(format!("vector field '{field_name}' is not registered"))
+                })?;
+                // Convert Vec<f32> to StoredVector
+                let sv = StoredVector::new(stored_vector.clone());
+                field
+                    .runtime
+                    .writer()
+                    .add_stored_vector(doc_id, &sv, version)?;
+            }
         }
         Ok(())
     }
 
     fn load_persisted_state(&mut self) -> Result<()> {
         let storage = self.registry_storage();
-        // Registry snapshot loading is replaced by LexicalEngine persistence.
-        // LexicalEngine handles its own persistence automatically.
+        // Registry snapshot loading is replaced by LexicalStore persistence.
+        // LexicalStore handles its own persistence automatically.
 
         self.load_document_snapshot(storage.clone())?;
         self.load_collection_manifest(storage.clone())?;
         // Instantiate fields after manifest load so that persisted implicit fields are registered
         self.instantiate_configured_fields()?;
-        self.replay_wal_into_fields()?;
-        // self.recompute_next_doc_id(); // Removed
+
+        // Populate fields from loaded documents (restore in-memory state)
+        // Only for fields that don't handle their own persistence (e.g. Flat/InMemory)
+        {
+            let configs = self.field_configs.read();
+            let hydration_needed: std::collections::HashSet<String> = configs
+                .iter()
+                .filter(|(_, cfg)| {
+                    matches!(
+                        cfg.vector,
+                        Some(crate::vector::core::field::VectorOption::Flat(_))
+                    )
+                })
+                .map(|(k, _)| k.clone())
+                .collect();
+            drop(configs); // Drop lock
+
+            if !hydration_needed.is_empty() {
+                let documents = self.documents.read();
+                for (doc_id, doc) in documents.iter() {
+                    let mut vector_fields = HashMap::new();
+                    for (name, val) in &doc.fields {
+                        if hydration_needed.contains(name) {
+                            if let crate::data::DataValue::Vector(_) = val {
+                                vector_fields.insert(name.clone(), val.clone());
+                            }
+                        }
+                    }
+                    if !vector_fields.is_empty() {
+                        // We treat snapshot loading as version 0 updates
+                        self.apply_field_updates(*doc_id, 0, &vector_fields)?;
+                    }
+                }
+            }
+        }
+
+        self.recompute_next_doc_id();
         self.persist_manifest()
     }
 
@@ -876,12 +808,20 @@ impl VectorEngine {
                             .filter_map(|(name, fv)| {
                                 fv.vectors.into_iter().next().map(|v| (name, v))
                             })
-                            .collect();
+                            .collect::<Vec<(String, StoredVector)>>();
                         SnapshotDocument {
                             doc_id: legacy.doc_id,
-                            document: DocumentVector {
-                                fields,
-                                metadata: legacy.metadata,
+                            document: {
+                                let mut doc = crate::data::Document::new();
+                                for (k, v) in fields {
+                                    let vec_data: Vec<f32> = v.data.iter().copied().collect();
+                                    doc =
+                                        doc.with_field(k, crate::data::DataValue::Vector(vec_data));
+                                }
+                                for (k, v) in legacy.metadata {
+                                    doc = doc.with_field(k, crate::data::DataValue::Text(v));
+                                }
+                                doc
                             },
                         }
                     })
@@ -945,100 +885,6 @@ impl VectorEngine {
         Ok(())
     }
 
-    fn replay_wal_into_fields(&self) -> Result<()> {
-        let mut documents = self.documents.read().clone();
-        self.apply_documents_to_fields(&documents)?;
-
-        // Read records (this also updates internal next_seq based on finding)
-        let mut records = self.wal.read_all()?;
-
-        let mut applied_seq = self.snapshot_wal_seq.load(Ordering::SeqCst);
-        let start_seq = applied_seq.saturating_add(1);
-
-        // Ensure WAL manager knows about the sequence number from snapshot
-        let current_wal_seq = self.wal.last_seq();
-        if applied_seq > current_wal_seq {
-            self.wal.set_next_seq(applied_seq + 1);
-        }
-
-        if records.is_empty() {
-            // If WAL is empty but we have documents, ensure they are in sync?
-            // Assuming snapshot is source of truth if WAL is empty.
-            *self.documents.write() = documents;
-            return Ok(());
-        }
-
-        records.sort_by(|a, b| a.seq.cmp(&b.seq));
-        for record in records.into_iter() {
-            if record.seq < start_seq {
-                continue;
-            }
-            applied_seq = record.seq;
-            match record.entry {
-                WalEntry::Upsert { doc_id, document } => {
-                    // logic..
-                    if document.fields.is_empty() {
-                        documents.remove(&doc_id);
-                        continue;
-                    }
-                    // Version management using WAL seq
-                    let version = record.seq;
-                    self.apply_field_updates(doc_id, version, &document.fields)?;
-
-                    documents.insert(doc_id, document);
-                }
-                WalEntry::Delete { doc_id } => {
-                    // We assume Lexical is already in sync or we don't need to sync it here for fields (as fields don't store metadata)
-                    // But we DO need to delete from fields.
-                    // To delete from fields, we need version? delete_document takes version.
-                    let version = record.seq;
-
-                    // Re-implement delete_fields_for_entry logic without registry
-                    // We can just iterate configured fields or iterate based on what we know about the doc?
-                    // NOTE: delete_fields_for_entry iterated `entry.fields`.
-                    // But `entry` came from `registry`. We don't have it.
-                    // However, we have `documents` map which has the previous state of the document!
-                    // documents.get(&doc_id).
-                    if let Some(doc) = documents.get(&doc_id) {
-                        // We can delete fields based on the document we are about to remove.
-                        let fields_guard = self.fields.read();
-                        for field_name in doc.fields.keys() {
-                            if let Some(field) = fields_guard.get(field_name) {
-                                field.runtime.writer().delete_document(doc_id, version)?;
-                            }
-                        }
-                    } else {
-                        // If not in documents map, maybe it was never there or already deleted.
-                        // We can iterate ALL fields to sure-kill? Expensive.
-                        // Or just ignore if we assume documents map is accurate.
-                        // Warning: if partial state, we might miss deletion.
-                        // Let's rely on documents map.
-                    }
-
-                    documents.remove(&doc_id);
-                }
-            }
-        }
-
-        if applied_seq > self.snapshot_wal_seq.load(Ordering::SeqCst) {
-            self.snapshot_wal_seq.store(applied_seq, Ordering::SeqCst);
-        }
-
-        *self.documents.write() = documents;
-        Ok(())
-    }
-
-    fn apply_documents_to_fields(&self, documents: &HashMap<u64, DocumentVector>) -> Result<()> {
-        for (doc_id, document) in documents.iter() {
-            if document.fields.is_empty() {
-                continue;
-            }
-            // For initial load, version 0 is fine/accepted behavior as we are rebuilding state
-            self.apply_field_updates(*doc_id, 0, &document.fields)?;
-        }
-        Ok(())
-    }
-
     pub fn flush_vectors(&self) -> Result<()> {
         let fields = self.fields.read();
         for field_entry in fields.values() {
@@ -1051,7 +897,7 @@ impl VectorEngine {
         // Registry is removed, Lexical persists itself on commit (called in commit method)
         // self.persist_registry_snapshot()?;
         self.persist_document_snapshot()?;
-        // WAL is self-persisting
+        // WAL is self-persisting (but no longer used internally)
         self.persist_manifest()
     }
 
@@ -1069,7 +915,7 @@ impl VectorEngine {
             .collect();
         drop(guard);
         let snapshot = DocumentSnapshot {
-            last_wal_seq: self.wal.last_seq(),
+            last_wal_seq: self.snapshot_wal_seq.load(Ordering::SeqCst),
             documents,
         };
         let serialized = serde_json::to_vec(&snapshot)?;
@@ -1092,7 +938,7 @@ impl VectorEngine {
         let manifest = CollectionManifest {
             version: COLLECTION_MANIFEST_VERSION,
             snapshot_wal_seq: self.snapshot_wal_seq.load(Ordering::SeqCst),
-            wal_last_seq: self.wal.last_seq(),
+            wal_last_seq: self.snapshot_wal_seq.load(Ordering::SeqCst),
             field_configs: self.field_configs.read().clone(),
         };
         let serialized = serde_json::to_vec(&manifest)?;
@@ -1100,171 +946,13 @@ impl VectorEngine {
     }
 
     /// Upsert a document    // Internal helper for upserting/indexing
-    fn upsert_document_internal(&self, document: DocumentVector) -> Result<u64> {
-        self.check_closed()?;
-        self.validate_document_fields(&document)?;
-
-        // 1. Extract or generate ID
-        let external_id = document
-            .metadata
-            .get("_id")
-            .cloned()
-            .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
-
-        // 2. Index metadata (Lexical Engine handles ID assignment)
-        // We construct a Lexical Document for the metadata
-        let mut lex_doc_builder = crate::lexical::core::document::Document::builder();
-        use crate::lexical::core::field::TextOption;
-
-        let field_configs = self.field_configs.read();
-
-        // Iterate over all known fields (from config) to check for lexical options
-        for (field_name, config) in field_configs.iter() {
-            if let Some(lexical_opt) = &config.lexical {
-                // Check if value exists in metadata (explicit metadata)
-                if let Some(metadata_val) = document.metadata.get(field_name) {
-                    // Parse metadata_val based on lexical option type?
-                    // For now, assume TextOption logic (strings) or implement type parsing
-                    // The simple path: all metadata is string -> TextOption
-                    // But config might specify IntegerOption. We should try to parse.
-                    // IMPORTANT: Current LexicalBuilder.add_text expects String.
-                    // We only support Text for now from metadata.
-                    if let crate::lexical::core::field::FieldOption::Text(text_opt) = lexical_opt {
-                        lex_doc_builder =
-                            lex_doc_builder.add_text(field_name, metadata_val, text_opt.clone());
-                    }
-                }
-                // Check if value exists in vector fields (embedded text source)
-                else if let Some(stored_vec) = document.fields.get(field_name)
-                    && let Some(original_text) =
-                        stored_vec.attributes.get("__iris_lexical_source")
-                    {
-                        println!(
-                            "DEBUG: indexing field {} lexical source: {}",
-                            field_name, original_text
-                        );
-                        if let crate::lexical::core::field::FieldOption::Text(text_opt) =
-                            lexical_opt
-                        {
-                            lex_doc_builder = lex_doc_builder.add_text(
-                                field_name,
-                                original_text,
-                                text_opt.clone(),
-                            );
-                        }
-                    }
-            }
-        }
-
-        // Also add any metadata fields that are NOT in the config but present in document.metadata?
-        // Current behavior (implicit dynamic fields) added ANY non-id metadata.
-        // If we want to maintain dynamic metadata behavior:
-        for (k, v) in &document.metadata {
-            if k != "_id" && !field_configs.contains_key(k) {
-                // Heuristic: only add if we have some policy? Or always as default text?
-                // Let's keep existing behavior: treat as Default Text.
-                lex_doc_builder = lex_doc_builder.add_text(k, v, TextOption::default());
-            }
-        }
-
-        // Ensure _id is handled (usually implicit in LexicalEngine logic, but let's leave it to index_document)
-
-        let lex_doc = lex_doc_builder.build();
-
-        // Index into LexicalEngine (handles ID assignment/deduplication)
-        // index_document attempts to FIND existing ID first (Overwrite behavior)
-        let doc_id = self.metadata_index.index_document(&external_id, lex_doc)?;
-
-        // 3. Write to WAL
-        // Serialize the document for WAL
-        // Note: We persist the FULL document including vectors and metadata
-        self.wal.append(&WalEntry::Upsert {
-            doc_id,
-            document: document.clone(),
-        })?;
-
-        // 4. Update In-Memory Structures
-        // Update document store
-        self.documents.write().insert(doc_id, document.clone());
-
-        // Update Field Writers
-        // Using version 0 (sequence from WAL/snapshot handling happens elsewhere or 0 during upsert if not tracked tightly here)
-        self.apply_field_updates(doc_id, 0, &document.fields)?;
-
+    fn upsert_document_payload(&self, payload: crate::data::Document) -> Result<u64> {
+        let doc = self.embed_document_payload_internal(0, payload)?;
+        let doc_id = self.next_doc_id.fetch_add(1, Ordering::SeqCst);
+        self.upsert_vectors(doc_id, doc)?;
         Ok(doc_id)
     }
 
-    // Internal helper for indexing as chunk (always append)
-    fn upsert_document_internal_chunk(&self, document: DocumentVector) -> Result<u64> {
-        self.check_closed()?;
-        self.validate_document_fields(&document)?;
-
-        // 1. Extract or generate ID
-        let external_id = document
-            .metadata
-            .get("_id")
-            .cloned()
-            .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
-
-        // 2. Index metadata
-        let mut lex_doc_builder = crate::lexical::core::document::Document::builder();
-        use crate::lexical::core::field::TextOption;
-
-        // Add _id field explicitly (LexicalEngine::add_document doesn't do it automatically like index_document)
-        lex_doc_builder = lex_doc_builder.add_text("_id", &external_id, TextOption::default());
-
-        let field_configs = self.field_configs.read();
-
-        // Iterate over all known fields (from config) to check for lexical options
-        for (field_name, config) in field_configs.iter() {
-            if let Some(lexical_opt) = &config.lexical {
-                // Check if value exists in metadata (explicit metadata)
-                if let Some(metadata_val) = document.metadata.get(field_name) {
-                    if let crate::lexical::core::field::FieldOption::Text(text_opt) = lexical_opt {
-                        lex_doc_builder =
-                            lex_doc_builder.add_text(field_name, metadata_val, text_opt.clone());
-                    }
-                }
-                // Check if value exists in vector fields (embedded text source)
-                else if let Some(stored_vec) = document.fields.get(field_name)
-                    && let Some(original_text) =
-                        stored_vec.attributes.get("__iris_lexical_source")
-                        && let crate::lexical::core::field::FieldOption::Text(text_opt) =
-                            lexical_opt
-                        {
-                            lex_doc_builder = lex_doc_builder.add_text(
-                                field_name,
-                                original_text,
-                                text_opt.clone(),
-                            );
-                        }
-            }
-        }
-
-        for (k, v) in &document.metadata {
-            if k != "_id" && !field_configs.contains_key(k) {
-                lex_doc_builder = lex_doc_builder.add_text(k, v, TextOption::default());
-            }
-        }
-        let lex_doc = lex_doc_builder.build();
-
-        // Index into LexicalEngine using add_document (Always Append)
-        let doc_id = self.metadata_index.add_document(lex_doc)?;
-
-        // 3. Write to WAL
-        self.wal.append(&WalEntry::Upsert {
-            doc_id,
-            document: document.clone(),
-        })?;
-
-        // 4. Update In-Memory Structures
-        self.documents.write().insert(doc_id, document.clone());
-
-        // Update Field Writers
-        self.apply_field_updates(doc_id, 0, &document.fields)?;
-
-        Ok(doc_id)
-    }
     fn write_atomic(&self, storage: Arc<dyn Storage>, name: &str, bytes: &[u8]) -> Result<()> {
         let tmp_name = format!("{name}.tmp");
         let mut output = storage.create_output(&tmp_name)?;
@@ -1294,42 +982,50 @@ impl VectorEngine {
     /// Add a document to the collection.
     ///
     /// Returns the assigned document ID.
-    pub fn add_vectors(&self, doc: DocumentVector) -> Result<u64> {
-        self.upsert_document_internal(doc)
+    pub fn add_document(&self, doc: crate::data::Document) -> Result<u64> {
+        self.check_closed()?;
+        let doc_id = self.next_doc_id.fetch_add(1, Ordering::SeqCst);
+        self.upsert_vectors(doc_id, doc)?;
+        Ok(doc_id)
+    }
+
+    /// Add multiple documents with automatically assigned doc_ids.
+    pub fn add_documents(
+        &self,
+        docs: impl IntoIterator<Item = crate::data::Document>,
+    ) -> Result<Vec<u64>> {
+        docs.into_iter().map(|doc| self.add_document(doc)).collect()
     }
 
     /// Add a document from payload (will be embedded if configured).
     ///
     /// Returns the assigned document ID.
-    pub fn add_payloads(&self, payload: DocumentPayload) -> Result<u64> {
+    pub fn add_payloads(&self, payload: crate::data::Document) -> Result<u64> {
         self.upsert_document_payload(payload)
     }
 
-    /// Add or update vectors for an external ID.
-    pub fn index_vectors(&self, external_id: &str, mut doc: DocumentVector) -> Result<u64> {
-        doc.metadata
-            .insert("_id".to_string(), external_id.to_string());
-        self.upsert_document_internal(doc)
-    }
-
-    /// Add or update payloads for an external ID.
-    pub fn index_payloads(&self, external_id: &str, mut payload: DocumentPayload) -> Result<u64> {
-        payload
-            .metadata
-            .insert("_id".to_string(), external_id.to_string());
-        self.upsert_document_payload(payload)
+    /// Add or update a document for an external ID.
+    pub fn index_document(&self, external_id: &str, mut doc: crate::data::Document) -> Result<u64> {
+        self.check_closed()?;
+        doc.fields.insert(
+            "_id".to_string(),
+            crate::data::DataValue::Text(external_id.to_string()),
+        );
+        let doc_id = self.next_doc_id.fetch_add(1, Ordering::SeqCst);
+        self.upsert_vectors(doc_id, doc)?;
+        Ok(doc_id)
     }
 
     /// Add multiple vectors with automatically assigned doc_ids.
     pub fn add_vectors_batch(
         &self,
-        docs: impl IntoIterator<Item = DocumentVector>,
+        docs: impl IntoIterator<Item = crate::data::Document>,
     ) -> Result<Vec<u64>> {
-        docs.into_iter().map(|doc| self.add_vectors(doc)).collect()
+        docs.into_iter().map(|doc| self.add_document(doc)).collect()
     }
 
     /// Index multiple payloads with automatically assigned doc_ids.
-    pub fn index_payloads_batch(&self, payloads: Vec<DocumentPayload>) -> Result<Vec<u64>> {
+    pub fn index_payloads_batch(&self, payloads: Vec<crate::data::Document>) -> Result<Vec<u64>> {
         let mut doc_ids = Vec::with_capacity(payloads.len());
         for payload in payloads {
             // Note: calling add_payloads (which calls upsert_document_payload).
@@ -1342,18 +1038,16 @@ impl VectorEngine {
 
     /// Index a single document payload as a new chunk, sharing the same external ID.
     /// This bypasses the overwrite check and always appends.
-    pub fn index_payload_chunk(&self, payload: DocumentPayload) -> Result<u64> {
+    pub fn index_payload_chunk(&self, payload: crate::data::Document) -> Result<u64> {
         self.check_closed()?;
-
-        // Embed payload into vector document
-        // We use a dummy ID (0) here because the real ID is assigned by LexicalEngine later
-        let document = self.embed_document_payload_internal(0, payload)?;
-        let doc_id = self.upsert_document_internal_chunk(document)?;
+        // Generate internal ID
+        let doc_id = self.next_doc_id.fetch_add(1, Ordering::SeqCst);
+        self.upsert_vectors(doc_id, payload)?;
         Ok(doc_id)
     }
 
     /// Index multiple document payloads as chunks.
-    pub fn index_payloads_chunk(&self, payloads: Vec<DocumentPayload>) -> Result<Vec<u64>> {
+    pub fn index_payloads_chunk(&self, payloads: Vec<crate::data::Document>) -> Result<Vec<u64>> {
         let mut doc_ids = Vec::with_capacity(payloads.len());
         for payload in payloads {
             let doc_id = self.index_payload_chunk(payload)?;
@@ -1362,65 +1056,45 @@ impl VectorEngine {
         Ok(doc_ids)
     }
 
-    /// Upsert a document with a specific document ID.
-    /// Note: This method is now legacy/unsafe as IDs are managed by LexicalEngine.
-    /// It should only be used if you know the ID is valid and aligned with Lexical.
-    pub fn upsert_vectors(&self, _doc_id: u64, doc: DocumentVector) -> Result<()> {
-        // Warning: ignoring doc_id request and letting internal logic assign/check ID based on metadata
-        self.upsert_document_internal(doc)?;
+    // Internal helper for indexing
+    fn upsert_document_with_id(&self, doc_id: u64, document: crate::data::Document) -> Result<()> {
+        self.check_closed()?;
+        self.validate_document_fields(&document)?;
+
+        // 1. Extract Vectors
+        let mut vector_fields = HashMap::new();
+        for (name, val) in &document.fields {
+            if let crate::data::DataValue::Vector(_) = val {
+                vector_fields.insert(name.clone(), val.clone());
+            }
+        }
+
+        // 2. Update In-Memory Structures
+        // Update document store
+        self.documents.write().insert(doc_id, document.clone());
+
+        // Update Field Writers
+        self.apply_field_updates(doc_id, 0, &vector_fields)?;
+
         Ok(())
     }
 
+    /// Upsert a document with a specific document ID.
+    pub fn upsert_vectors(&self, doc_id: u64, doc: crate::data::Document) -> Result<()> {
+        // Embed first
+        let embedded_doc = self.embed_document_payload_internal(doc_id, doc)?;
+        self.upsert_document_with_id(doc_id, embedded_doc)
+    }
+
     /// Upsert a document from payload (will be embedded if configured).
-    pub fn upsert_payloads(&self, _doc_id: u64, payload: DocumentPayload) -> Result<()> {
+    pub fn upsert_payloads(&self, _doc_id: u64, payload: crate::data::Document) -> Result<()> {
         self.upsert_document_payload(payload)?;
         Ok(())
     }
 
-    /// Upsert a document from payload (internal helper).
-    fn upsert_document_payload(&self, payload: DocumentPayload) -> Result<u64> {
-        // Embed without ID (using 0 as placeholder if needed by embedder API, but we use internal call)
-        let document = self.embed_document_payload_internal(0, payload)?;
-        self.upsert_document_internal(document)
-    }
-
     /// Get a document by its internal ID.
-    pub fn get_document(&self, doc_id: u64) -> Result<Option<DocumentVector>> {
+    pub fn get_document(&self, doc_id: u64) -> Result<Option<crate::data::Document>> {
         Ok(self.documents.read().get(&doc_id).cloned())
-    }
-
-    /// Get a document by its external ID.
-    pub fn get_document_by_id(&self, external_id: &str) -> Result<Option<DocumentVector>> {
-        if let Some(doc_id) = self
-            .metadata_index
-            .find_doc_id_by_term("_id", external_id)?
-        {
-            self.get_document(doc_id)
-        } else {
-            Ok(None)
-        }
-    }
-
-    /// Delete a document by its external ID.
-    pub fn delete_document_by_id(&self, external_id: &str) -> Result<bool> {
-        let doc_ids = self
-            .metadata_index
-            .find_doc_ids_by_term("_id", external_id)?;
-
-        if !doc_ids.is_empty() {
-            let mut found = false;
-            for doc_id in doc_ids {
-                // Ignore not found errors for individual chunks (idempotency)
-                match self.delete_vectors(doc_id) {
-                    Ok(_) => found = true,
-                    Err(IrisError::Other(ref msg)) if msg.starts_with("Not found") => continue,
-                    Err(e) => return Err(e),
-                }
-            }
-            Ok(found)
-        } else {
-            Ok(false)
-        }
     }
 
     /// Delete a document by ID.
@@ -1433,12 +1107,12 @@ impl VectorEngine {
 
         self.delete_fields_for_doc(doc_id, doc)?;
 
-        if let Some(ext_id) = doc.metadata.get("_id") {
-            self.metadata_index.delete_document_by_id(ext_id)?;
+        if let Some(_ext_id) = doc.get("_id").and_then(|v| v.as_text()) {
+            // self.metadata_index.delete_document_by_id(ext_id)?;
         }
         drop(documents);
 
-        self.wal.append(&WalEntry::Delete { doc_id })?;
+        // self.wal.append(&WalEntry::Delete { doc_id })?; // Removed
         self.documents.write().remove(&doc_id);
 
         // WAL is durable on append, so we don't need full persist_state here
@@ -1448,16 +1122,23 @@ impl VectorEngine {
     }
 
     /// Embed a document payload into vectors.
-    pub fn embed_document_payload(&self, payload: DocumentPayload) -> Result<DocumentVector> {
+    pub fn embed_document_payload(
+        &self,
+        payload: crate::data::Document,
+    ) -> Result<crate::data::Document> {
         // Just embed, don't upsert. 0 is dummy id.
         self.embed_document_payload_internal(0, payload)
     }
 
     /// Embed a payload for query.
-    pub fn embed_query_payload(&self, field_name: &str, payload: Payload) -> Result<QueryVector> {
-        let vector = self.embed_payload(field_name, payload)?;
+    pub fn embed_query_payload(
+        &self,
+        field_name: &str,
+        value: crate::data::DataValue,
+    ) -> Result<QueryVector> {
+        let stored = self.embed_payload(field_name, value)?;
         Ok(QueryVector {
-            vector,
+            vector: stored.data,
             weight: 1.0,
             fields: None, // Will be set by caller if needed
         })
@@ -1535,9 +1216,17 @@ impl VectorEngine {
         Ok(())
     }
 
+    pub fn set_last_wal_seq(&self, seq: u64) {
+        self.snapshot_wal_seq.store(seq, Ordering::SeqCst);
+    }
+
+    pub fn last_wal_seq(&self) -> u64 {
+        self.snapshot_wal_seq.load(Ordering::SeqCst)
+    }
+
     /// Create a searcher for this engine.
     pub fn searcher(&self) -> Result<Box<dyn crate::vector::search::searcher::VectorSearcher>> {
-        Ok(Box::new(VectorEngineSearcher::from_engine_ref(self)))
+        Ok(Box::new(VectorStoreSearcher::from_engine_ref(self)))
     }
 
     /// Execute a search query.
@@ -1568,7 +1257,18 @@ impl VectorEngine {
 
     /// Commit pending changes (persist state).
     pub fn commit(&self) -> Result<()> {
-        self.metadata_index.commit()?;
+        // Commit all fields
+        let fields = self.fields.read();
+        for field in fields.values() {
+            // This is crucial: writer buffers must be flushed to reader/storage
+            field.runtime.writer().flush()?;
+            // And refresh reader view??
+            // Writers usually refresh readers on commit implicitly or we need explicit refresh.
+            // Let's assume commit is enough for durability/visibility if writer handles it.
+        }
+        drop(fields);
+
+        // self.metadata_index.commit()?;
         self.persist_state()
     }
 
@@ -1581,8 +1281,9 @@ impl VectorEngine {
             field_stats.insert(name.clone(), stats);
         }
 
-        let stats = self.metadata_index.stats()?;
-        let doc_count = stats.doc_count.saturating_sub(stats.deleted_count);
+        // let stats = self.metadata_index.stats()?;
+        // let doc_count = stats.doc_count.saturating_sub(stats.deleted_count);
+        let doc_count = self.documents.read().len(); // Approximate count from memory for now
 
         Ok(VectorStats {
             document_count: doc_count as usize,
@@ -1598,7 +1299,7 @@ impl VectorEngine {
     /// Close the collection and release resources.
     pub fn close(&self) -> Result<()> {
         self.closed.store(1, Ordering::SeqCst);
-        self.metadata_index.close()?;
+        // self.metadata_index.close()?;
         Ok(())
     }
 
@@ -1621,22 +1322,22 @@ impl VectorEngine {
     }
 }
 
-/// Searcher implementation for [`VectorEngine`].
+/// Searcher implementation for [`VectorStore`].
 #[derive(Debug)]
-pub struct VectorEngineSearcher {
+pub struct VectorStoreSearcher {
     config: Arc<VectorIndexConfig>,
     fields: Arc<RwLock<HashMap<String, FieldHandle>>>,
-    metadata_index: Arc<LexicalEngine>,
-    documents: Arc<RwLock<HashMap<u64, DocumentVector>>>,
+    // metadata_index: Arc<LexicalStore>, // Removed
+    documents: Arc<RwLock<HashMap<u64, crate::data::Document>>>,
 }
 
-impl VectorEngineSearcher {
+impl VectorStoreSearcher {
     /// Create a new searcher from an engine reference.
-    pub fn from_engine_ref(engine: &VectorEngine) -> Self {
+    pub fn from_engine_ref(engine: &VectorStore) -> Self {
         Self {
             config: Arc::clone(&engine.config),
             fields: Arc::clone(&engine.fields),
-            metadata_index: Arc::clone(&engine.metadata_index),
+            // metadata_index: Arc::clone(&engine.metadata_index),
             documents: Arc::clone(&engine.documents),
         }
     }
@@ -1685,46 +1386,21 @@ impl VectorEngineSearcher {
         request: &VectorSearchRequest,
         _target_fields: &[String],
     ) -> Result<Option<HashSet<u64>>> {
-        let filter: &crate::vector::engine::filter::VectorFilter = if let Some(f) = &request.filter
-        {
-            if crate::vector::engine::filter::VectorFilter::is_empty(f) {
-                return Ok(None);
+        // 1. Unified Filtering (via allowed_ids from Engine)
+        if let Some(ids) = &request.allowed_ids {
+            return Ok(Some(ids.iter().copied().collect()));
+        }
+
+        // 2. Legacy Filtering (VectorStore internal) - Disabled
+        if let Some(f) = &request.filter {
+            if !crate::vector::store::filter::VectorFilter::is_empty(f) {
+                return Err(IrisError::NotImplemented(
+                    "VectorStore internal filtering is disabled. Use Engine to filter.".to_string(),
+                ));
             }
-            f
-        } else {
-            return Ok(None);
-        };
-
-        // Convert VectorFilter to Lexical BooleanQuery
-        let mut boolean_query = BooleanQuery::new();
-        let mut has_clauses = false;
-
-        // 1. Document Level Metadata (Main use case)
-        for (key, value) in &filter.document.equals {
-            let term_query = TermQuery::new(key, value);
-            boolean_query.add_must(Box::new(term_query));
-            has_clauses = true;
         }
 
-        // 2. Field Level Metadata (Currently treated same as doc metadata or ignored if field scoping not supported in Lexical yet)
-        // For now, let's treat them as global metadata constraints for simplicity, or we can prefix keys?
-        // Implementation plan focused on document metadata. Ignoring field-specific metadata filter for now if not critical.
-        // If we want to support it, we'd need to index field metadata as `field_name.key`.
-        // Let's stick to document metadata for the integration step.
-
-        if !has_clauses {
-            return Ok(None);
-        }
-
-        let lexical_request = LexicalSearchRequest::new(Box::new(boolean_query) as Box<dyn Query>)
-            .load_documents(false); // Only need IDs
-
-        // Execute search
-        let results = self.metadata_index.search(lexical_request)?;
-
-        // Collect Doc IDs
-        let allowed_ids: HashSet<u64> = results.hits.into_iter().map(|hit| hit.doc_id).collect();
-        Ok(Some(allowed_ids))
+        Ok(None)
     }
 
     /// Get the scaled field limit based on overfetch factor.
@@ -1776,9 +1452,10 @@ impl VectorEngineSearcher {
             }
 
             if let Some(allowed) = allowed_ids
-                && !allowed.contains(&hit.doc_id) {
-                    continue;
-                }
+                && !allowed.contains(&hit.doc_id)
+            {
+                continue;
+            }
 
             let weighted_score = hit.score * field_weight;
             let entry = doc_hits.entry(hit.doc_id).or_insert_with(|| VectorHit {
@@ -1805,202 +1482,11 @@ impl VectorEngineSearcher {
 
         Ok(())
     }
-    fn search_lexical(
-        &self,
-        query: &crate::vector::engine::request::LexicalQuery,
-        limit: usize,
-    ) -> Result<HashMap<u64, VectorHit>> {
-        use crate::lexical::index::inverted::query::{
-            Query,
-            boolean::{BooleanClause, BooleanQuery, Occur},
-            term::TermQuery,
-        };
-        use crate::vector::engine::request::{
-            BooleanQueryOptions, LexicalQuery, MatchQueryOptions, TermQueryOptions,
-        };
-
-        let parser = self.metadata_index.query_parser()?;
-
-        fn convert_query(
-            lq: &LexicalQuery,
-            parser: &crate::lexical::index::inverted::query::parser::QueryParser,
-        ) -> Result<Box<dyn Query>> {
-            match lq {
-                LexicalQuery::MatchAll => Err(IrisError::NotImplemented(
-                    "MatchAll query not yet supported".to_string(),
-                )),
-                LexicalQuery::Term(TermQueryOptions { field, term, boost }) => {
-                    let q = TermQuery::new(field.clone(), term.clone()).with_boost(*boost);
-                    Ok(Box::new(q))
-                }
-                LexicalQuery::Match(MatchQueryOptions {
-                    field,
-                    query,
-                    operator: _,
-                    boost,
-                }) => {
-                    let mut q = parser.parse_field(field, query)?;
-                    if *boost != 1.0 {
-                        q.set_boost(*boost);
-                    }
-                    Ok(q)
-                }
-                LexicalQuery::Boolean(BooleanQueryOptions {
-                    must,
-                    must_not,
-                    should,
-                    boost,
-                }) => {
-                    let mut bq = BooleanQuery::new();
-                    bq.set_boost(*boost);
-                    for q in must {
-                        bq.add_clause(BooleanClause::new(convert_query(q, parser)?, Occur::Must));
-                    }
-                    for q in must_not {
-                        bq.add_clause(BooleanClause::new(
-                            convert_query(q, parser)?,
-                            Occur::MustNot,
-                        ));
-                    }
-                    for q in should {
-                        bq.add_clause(BooleanClause::new(convert_query(q, parser)?, Occur::Should));
-                    }
-                    Ok(Box::new(bq))
-                }
-            }
-        }
-
-        let internal_query = convert_query(query, &parser)?;
-
-        use crate::lexical::search::searcher::{LexicalSearchQuery, LexicalSearchRequest};
-        let lex_request = LexicalSearchRequest {
-            query: LexicalSearchQuery::Obj(internal_query),
-            params: crate::lexical::search::searcher::LexicalSearchParams {
-                max_docs: limit,
-                load_documents: false,
-                ..Default::default()
-            },
-        };
-
-        let results = self.metadata_index.search(lex_request)?;
-
-        let mut hits = HashMap::new();
-        for hit in results.hits {
-            hits.insert(
-                hit.doc_id,
-                VectorHit {
-                    doc_id: hit.doc_id,
-                    score: hit.score,
-                    field_hits: Vec::new(),
-                },
-            );
-        }
-
-        Ok(hits)
-    }
-
-    fn merge_results(
-        &self,
-        vector_hits: HashMap<u64, VectorHit>,
-        lexical_hits: HashMap<u64, VectorHit>,
-        config: &Option<crate::vector::engine::request::FusionConfig>,
-    ) -> Result<Vec<VectorHit>> {
-        use crate::vector::engine::request::FusionConfig;
-
-        let mut fused_scores: HashMap<u64, f32> = HashMap::new();
-        for id in vector_hits.keys() {
-            fused_scores.insert(*id, 0.0);
-        }
-        for id in lexical_hits.keys() {
-            fused_scores.insert(*id, 0.0);
-        }
-
-        match config {
-            Some(FusionConfig::Rrf { k }) => {
-                let mut sorted_vector: Vec<_> = vector_hits.values().collect();
-                sorted_vector
-                    .sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(CmpOrdering::Equal));
-
-                let mut sorted_lexical: Vec<_> = lexical_hits.values().collect();
-                sorted_lexical
-                    .sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(CmpOrdering::Equal));
-
-                for (rank, hit) in sorted_vector.iter().enumerate() {
-                    let rrf_score = 1.0 / (*k as f32 + (rank + 1) as f32);
-                    *fused_scores.entry(hit.doc_id).or_default() += rrf_score;
-                }
-
-                for (rank, hit) in sorted_lexical.iter().enumerate() {
-                    let rrf_score = 1.0 / (*k as f32 + (rank + 1) as f32);
-                    *fused_scores.entry(hit.doc_id).or_default() += rrf_score;
-                }
-            }
-            Some(FusionConfig::WeightedSum {
-                vector_weight,
-                lexical_weight,
-            }) => {
-                for (id, hit) in &vector_hits {
-                    *fused_scores.entry(*id).or_default() += hit.score * vector_weight;
-                }
-                for (id, hit) in &lexical_hits {
-                    *fused_scores.entry(*id).or_default() += hit.score * lexical_weight;
-                }
-            }
-            None => {
-                if lexical_hits.is_empty() {
-                    for (id, hit) in &vector_hits {
-                        fused_scores.insert(*id, hit.score);
-                    }
-                } else if vector_hits.is_empty() {
-                    for (id, hit) in &lexical_hits {
-                        fused_scores.insert(*id, hit.score);
-                    }
-                } else {
-                    let k = 60;
-                    let mut sorted_vector: Vec<_> = vector_hits.values().collect();
-                    sorted_vector.sort_by(|a, b| {
-                        b.score.partial_cmp(&a.score).unwrap_or(CmpOrdering::Equal)
-                    });
-                    let mut sorted_lexical: Vec<_> = lexical_hits.values().collect();
-                    sorted_lexical.sort_by(|a, b| {
-                        b.score.partial_cmp(&a.score).unwrap_or(CmpOrdering::Equal)
-                    });
-
-                    for (rank, hit) in sorted_vector.iter().enumerate() {
-                        *fused_scores.entry(hit.doc_id).or_default() +=
-                            1.0 / (k as f32 + (rank + 1) as f32);
-                    }
-                    for (rank, hit) in sorted_lexical.iter().enumerate() {
-                        *fused_scores.entry(hit.doc_id).or_default() +=
-                            1.0 / (k as f32 + (rank + 1) as f32);
-                    }
-                }
-            }
-        }
-
-        let mut final_hits = Vec::with_capacity(fused_scores.len());
-
-        for (doc_id, score) in fused_scores {
-            let field_hits = if let Some(vh) = vector_hits.get(&doc_id) {
-                vh.field_hits.clone()
-            } else {
-                Vec::new()
-            };
-
-            final_hits.push(VectorHit {
-                doc_id,
-                score,
-                field_hits,
-            });
-        }
-
-        final_hits.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(CmpOrdering::Equal));
-
-        Ok(final_hits)
-    }
+    // search_lexical removed. VectorStore only supports vector search.
+    // Hybrid search is handled by the Unified Engine.
 }
 
-impl crate::vector::search::searcher::VectorSearcher for VectorEngineSearcher {
+impl crate::vector::search::searcher::VectorSearcher for VectorStoreSearcher {
     fn search(&self, request: &VectorSearchRequest) -> Result<VectorSearchResults> {
         if request.query_vectors.is_empty() && request.lexical_query.is_none() {
             return Err(IrisError::invalid_argument(
@@ -2034,7 +1520,7 @@ impl crate::vector::search::searcher::VectorSearcher for VectorEngineSearcher {
 
             // If filter allows no IDs, and we only have vector search, we can return empty.
             // BUT if we have lexical search, we should proceed (lexical search handles its own filtering?
-            // or should we pass allowed_ids to lexical search? LexicalEngine might not accept generic ID list easily yet).
+            // or should we pass allowed_ids to lexical search? LexicalStore might not accept generic ID list easily yet).
             // For now, assume lexical search is independent of vector-specific filtering logic unless filters are global.
             // VectorFilter applies to metadata, so it SHOULD apply to lexical search too.
             // TODO: Apply filter to lexical search.
@@ -2049,9 +1535,9 @@ impl crate::vector::search::searcher::VectorSearcher for VectorEngineSearcher {
             let fields = self.fields.read();
 
             for field_name in target_fields {
-                let field = fields.get(&field_name).ok_or_else(|| {
-                    IrisError::not_found(format!("vector field '{field_name}'"))
-                })?;
+                let field = fields
+                    .get(&field_name)
+                    .ok_or_else(|| IrisError::not_found(format!("vector field '{field_name}'")))?;
                 let matching_vectors =
                     self.query_vectors_for_field(&field_name, field.field.config(), request);
                 if matching_vectors.is_empty() {
@@ -2064,6 +1550,7 @@ impl crate::vector::search::searcher::VectorSearcher for VectorEngineSearcher {
                     field: field_name.clone(),
                     query_vectors: matching_vectors,
                     limit: field_limit,
+                    allowed_ids: allowed_ids.clone(),
                 };
 
                 let field_results = field.runtime.reader().search(field_query)?;
@@ -2086,30 +1573,24 @@ impl crate::vector::search::searcher::VectorSearcher for VectorEngineSearcher {
         }
 
         // Check if we did any vector search
-        let vector_search_performed = fields_with_queries > 0;
+        let _vector_search_performed = fields_with_queries > 0;
 
-        // 2. Lexical Search
-        let lexical_hits_map = if let Some(lex_query) = &request.lexical_query {
-            self.search_lexical(lex_query, request.limit)?
-        } else {
-            HashMap::new()
-        };
-
-        let lexical_search_performed = !lexical_hits_map.is_empty()
-            || (request.lexical_query.is_some() && vector_search_performed);
-
-        if !vector_search_performed && !lexical_search_performed {
-            if request.lexical_query.is_some() {
-                // Lexical query executed but returned no results
-                return Ok(VectorSearchResults::default());
-            }
-            return Err(IrisError::invalid_argument(
-                "no query vectors matched the requested fields and no lexical query provided",
+        // 2. Lexical Search - DISABLED in VectorStore
+        // VectorStore no longer performs lexical search.
+        if request.lexical_query.is_some() {
+            return Err(IrisError::NotImplemented(
+                "VectorStore lexical search is disabled. Use Unified Engine.".to_string(),
             ));
         }
 
-        // 3. Fusion
-        let hits = self.merge_results(vector_hits_map, lexical_hits_map, &request.fusion_config)?;
+        // 3. Fusion - DISABLED/SIMPLIFIED
+        // Since we have no lexical hits, we just return vector hits sorted.
+
+        let mut hits = Vec::with_capacity(vector_hits_map.len());
+        for hit in vector_hits_map.values() {
+            hits.push(hit.clone());
+        }
+        hits.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(CmpOrdering::Equal));
 
         // 4. Post-processing (sort & limit)
         // Already handled in merge_results usually, but let's double check sort
@@ -2145,272 +1626,10 @@ impl crate::vector::search::searcher::VectorSearcher for VectorEngineSearcher {
             min_score: request.min_score,
             lexical_query: request.lexical_query.clone(),
             fusion_config: request.fusion_config.clone(),
+            allowed_ids: request.allowed_ids.clone(),
         };
 
         let results = self.search(&count_request)?;
         Ok(results.hits.len() as u64)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::lexical::engine::config::LexicalIndexConfig;
-    use crate::maintenance::deletion::DeletionConfig;
-    use crate::storage::memory::{MemoryStorage, MemoryStorageConfig};
-    use crate::vector::core::distance::DistanceMetric;
-    use crate::vector::core::document::StoredVector;
-    use crate::vector::core::field::{FlatOption, VectorIndexKind, VectorOption};
-    use crate::vector::engine::config::VectorFieldConfig;
-    use crate::vector::engine::filter::VectorFilter;
-    use crate::vector::engine::request::QueryVector;
-    use std::collections::HashMap;
-
-    fn sample_config() -> VectorIndexConfig {
-        let field_config = VectorFieldConfig {
-            vector: Some(VectorOption::Flat(FlatOption {
-                dimension: 3,
-                distance: DistanceMetric::Cosine,
-                base_weight: 1.0,
-                quantizer: None,
-            })),
-            lexical: None,
-        };
-        use crate::embedding::precomputed::PrecomputedEmbedder;
-
-        VectorIndexConfig {
-            fields: HashMap::from([("body".into(), field_config)]),
-            default_fields: vec!["body".into()],
-            metadata: HashMap::new(),
-            default_distance: DistanceMetric::Cosine,
-            default_dimension: None,
-            default_index_kind: VectorIndexKind::Flat,
-            default_base_weight: 1.0,
-            implicit_schema: false,
-            embedder: Arc::new(PrecomputedEmbedder::new()),
-            deletion_config: DeletionConfig::default(),
-            shard_id: 0,
-            metadata_config: LexicalIndexConfig::builder()
-                .analyzer(Arc::new(
-                    crate::analysis::analyzer::keyword::KeywordAnalyzer::default(),
-                ))
-                .build(),
-        }
-    }
-
-    fn sample_query(limit: usize) -> VectorSearchRequest {
-        let mut query = VectorSearchRequest::default();
-        query.limit = limit;
-        query.query_vectors.push(QueryVector {
-            vector: StoredVector::new(Arc::<[f32]>::from([1.0, 0.0, 0.0])),
-            weight: 1.0,
-            fields: None,
-        });
-        query
-    }
-
-    fn create_engine(config: VectorIndexConfig, storage: Arc<dyn Storage>) -> VectorEngine {
-        VectorEngine::new(storage, config).expect("engine")
-    }
-
-    #[test]
-    fn engine_creation_works() {
-        let config = sample_config();
-        let storage: Arc<dyn Storage> =
-            Arc::new(MemoryStorage::new(MemoryStorageConfig::default()));
-        let engine = create_engine(config, storage);
-
-        let stats = engine.stats().expect("stats");
-        assert_eq!(stats.document_count, 0);
-        assert!(stats.fields.contains_key("body"));
-    }
-
-    #[test]
-    fn engine_add_and_search() {
-        let config = sample_config();
-        let storage: Arc<dyn Storage> =
-            Arc::new(MemoryStorage::new(MemoryStorageConfig::default()));
-        let engine = create_engine(config, storage);
-
-        let mut doc = DocumentVector::new();
-        doc.set_field(
-            "body",
-            StoredVector::new(Arc::<[f32]>::from([1.0, 0.0, 0.0])),
-        );
-
-        let doc_id = engine.add_vectors(doc).expect("add vectors");
-        engine.commit().expect("commit");
-
-        let stats = engine.stats().expect("stats");
-        assert_eq!(stats.document_count, 1);
-
-        let results = engine.search(sample_query(5)).expect("search");
-        assert_eq!(results.hits.len(), 1);
-        assert_eq!(results.hits[0].doc_id, doc_id);
-    }
-
-    #[test]
-    fn engine_upsert_and_delete() {
-        let config = sample_config();
-        let storage: Arc<dyn Storage> =
-            Arc::new(MemoryStorage::new(MemoryStorageConfig::default()));
-        let engine = create_engine(config, storage);
-
-        let mut doc = DocumentVector::new();
-        doc.set_field(
-            "body",
-            StoredVector::new(Arc::<[f32]>::from([0.5, 0.5, 0.0])),
-        );
-        doc.metadata.insert("_id".to_string(), "42".to_string());
-
-        // Use index_vectors to get the assigned ID (Lexical integration)
-        let doc_id = engine.index_vectors("42", doc).expect("upsert");
-        engine.commit().expect("commit");
-        let stats = engine.stats().expect("stats");
-        assert_eq!(stats.document_count, 1);
-
-        engine.delete_vectors(doc_id).expect("delete");
-        engine.commit().expect("commit");
-        let stats = engine.stats().expect("stats");
-        assert_eq!(stats.document_count, 0);
-    }
-
-    #[test]
-    fn engine_persistence_across_instances() {
-        let config = sample_config();
-        let storage: Arc<dyn Storage> =
-            Arc::new(MemoryStorage::new(MemoryStorageConfig::default()));
-
-        {
-            let engine = create_engine(config.clone(), storage.clone());
-            let mut doc = DocumentVector::new();
-            doc.set_field(
-                "body",
-                StoredVector::new(Arc::<[f32]>::from([1.0, 0.0, 0.0])),
-            );
-            engine.upsert_vectors(10, doc).expect("upsert");
-            engine.commit().expect("commit");
-            let stats = engine.stats().expect("stats");
-            assert_eq!(stats.document_count, 1, "First instance stats failed");
-        }
-
-        let engine = create_engine(config, storage.clone());
-        // Debug: List files
-        let files = storage.list_files().unwrap();
-        println!("Files in storage: {:?}", files);
-
-        let stats = engine.stats().expect("stats");
-        assert_eq!(stats.document_count, 1);
-
-        let results = engine.search(sample_query(5)).expect("search");
-        assert_eq!(results.hits.len(), 1);
-        assert_eq!(results.hits[0].doc_id, 0);
-    }
-
-    #[test]
-    fn engine_id_based_operations() {
-        let config = sample_config();
-        let storage: Arc<dyn Storage> =
-            Arc::new(MemoryStorage::new(MemoryStorageConfig::default()));
-        let engine = create_engine(config, storage);
-
-        let mut doc = DocumentVector::new();
-        doc.set_field(
-            "body",
-            StoredVector::new(Arc::<[f32]>::from([1.0, 0.0, 0.0])),
-        );
-
-        // 1. Index by external ID
-        let internal_id = engine.index_vectors("v_ext_1", doc).expect("index vectors");
-
-        // 2. Get by internal ID
-        let found = engine.get_document(internal_id).expect("get doc");
-        assert!(found.is_some());
-
-        // 3. Get by external ID
-        let found_ext = engine.get_document_by_id("v_ext_1").expect("get doc ext");
-        assert!(found_ext.is_some());
-
-        // 4. Delete by external ID
-        let deleted = engine.delete_document_by_id("v_ext_1").expect("delete ext");
-        assert!(deleted);
-
-        // 5. Verify deletion
-        let found_after = engine.get_document_by_id("v_ext_1").expect("get after");
-        assert!(found_after.is_none());
-
-        // 6. Non-existent
-        assert!(!engine.delete_document_by_id("non_existent").unwrap());
-    }
-
-    #[test]
-    fn engine_metadata_filtering() {
-        let config = sample_config();
-        let storage: Arc<dyn Storage> =
-            Arc::new(MemoryStorage::new(MemoryStorageConfig::default()));
-        let engine = create_engine(config, storage);
-
-        let mut doc1 = DocumentVector::new();
-        doc1.set_field(
-            "body",
-            StoredVector::new(Arc::<[f32]>::from([1.0, 0.0, 0.0])),
-        );
-        doc1.metadata
-            .insert("category".to_string(), "sports".to_string());
-        doc1.metadata
-            .insert("tag".to_string(), "super cool".to_string());
-
-        let mut doc2 = DocumentVector::new();
-        doc2.set_field(
-            "body",
-            StoredVector::new(Arc::<[f32]>::from([0.0, 1.0, 0.0])),
-        );
-        doc2.metadata
-            .insert("category".to_string(), "news".to_string());
-        doc2.metadata
-            .insert("tag".to_string(), "bad cool".to_string());
-
-        engine.index_vectors("doc1", doc1).expect("upsert doc1");
-        engine.index_vectors("doc2", doc2).expect("upsert doc2");
-        engine.commit().expect("commit");
-
-        // 1. Exact match on single term
-        let mut request = sample_query(5);
-        let mut filter = VectorFilter::default();
-        filter
-            .document
-            .equals
-            .insert("category".to_string(), "sports".to_string());
-        request.filter = Some(filter);
-
-        let results = engine.search(request).expect("search sports");
-        assert_eq!(results.hits.len(), 1);
-        // doc IDs are auto-assigned, doc1 should be 0 because it was added first
-        assert_eq!(results.hits[0].doc_id, 0);
-
-        // 2. Exact match on multi-term (testing behavior)
-        let mut request = sample_query(5);
-        let mut filter = VectorFilter::default();
-        filter
-            .document
-            .equals
-            .insert("tag".to_string(), "super cool".to_string());
-        request.filter = Some(filter);
-
-        let results = engine.search(request).expect("search super cool");
-        // We print the count to know for sure.
-        println!("Multi-term exact hits: {}", results.hits.len());
-
-        // 3. Partial match (testing if tokenized)
-        let mut request = sample_query(5);
-        let mut filter = VectorFilter::default();
-        filter
-            .document
-            .equals
-            .insert("tag".to_string(), "super".to_string());
-        request.filter = Some(filter);
-
-        let results = engine.search(request).expect("search super");
-        println!("Multi-term token 'super' hits: {}", results.hits.len());
     }
 }

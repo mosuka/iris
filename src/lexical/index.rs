@@ -83,6 +83,16 @@ pub trait LexicalIndex: Send + Sync + std::fmt::Debug {
     fn default_fields(&self) -> Result<Vec<String>> {
         Ok(Vec::new())
     }
+
+    /// Get the last processed WAL sequence number.
+    fn last_wal_seq(&self) -> u64 {
+        0
+    }
+
+    /// Set the last processed WAL sequence number.
+    fn set_last_wal_seq(&self, _seq: u64) -> Result<()> {
+        Ok(())
+    }
 }
 
 pub mod config;
