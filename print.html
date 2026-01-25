@@ -36,7 +36,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-14459b15.js";
+            window.path_to_searchindex_js = "searchindex-d4dd25ad.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-9d358a08.js"></script>
@@ -803,9 +803,27 @@ fn setup_japanese_engine() -&gt; iris::error::Result&lt;LexicalEngine&gt; {
 
     subgraph DocContainer1_Vec [Vector Document]
         direction TB
-        F11["Vector Field&lt;br&gt;Name: 'image_vec'&lt;br&gt;Value: [0.12, 0.05, ...]&lt;br&gt;Type: HNSW"]
-        F12["Metadata&lt;br&gt;Name: '_id'&lt;br&gt;Value: 'img_001'"]
-        F13["Metadata&lt;br&gt;Name: '_mime_type'&lt;br&gt;Value: 'image/jpeg'"]
+        subgraph VecField1 [Vector Field]
+            direction TB
+            F11["Vector Field&lt;br&gt;Name: 'image_vec'&lt;br&gt;Value: [0.12, 0.05, ...]&lt;br&gt;Type: HNSW"]
+        end
+        subgraph Meta1 [Metadata]
+            direction TB
+            F12["Metadata Field&lt;br&gt;Name: '_id'&lt;br&gt;Value: 'img_001'"]
+            F13["Metadata Field&lt;br&gt;Name: '_mime_type'&lt;br&gt;Value: 'image/jpeg'"]
+        end
+        VecField1 --&gt; Meta1
+
+        subgraph VecField1_2 [Vector Field]
+            direction TB
+            F11_2["Vector Field&lt;br&gt;Name: 'text_vec'&lt;br&gt;Value: [0.33, 0.44, ...]&lt;br&gt;Type: HNSW"]
+        end
+        subgraph Meta1_2 [Metadata]
+            direction TB
+            F12_2["Metadata Field&lt;br&gt;Name: '_id'&lt;br&gt;Value: 'img_001'"]
+            F13_2["Metadata Field&lt;br&gt;Name: '_mime_type'&lt;br&gt;Value: 'text/plain'"]
+        end
+        VecField1_2 --&gt; Meta1_2
     end
 
     subgraph DocContainer1_Lex [Lexical Document]
@@ -820,9 +838,27 @@ fn setup_japanese_engine() -&gt; iris::error::Result&lt;LexicalEngine&gt; {
 
     subgraph DocContainer2_Vec [Vector Document]
         direction TB
-        F21["Vector Field&lt;br&gt;Name: 'image_vec'&lt;br&gt;Value: [0.88, 0.91, ...]&lt;br&gt;Type: HNSW"]
-        F22["Metadata&lt;br&gt;Name: '_id'&lt;br&gt;Value: 'img_002'"]
-        F23["Metadata&lt;br&gt;Name: '_mime_type'&lt;br&gt;Value: 'image/jpeg'"]
+        subgraph VecField2 [Vector Field]
+            direction TB
+            F21["Vector Field&lt;br&gt;Name: 'image_vec'&lt;br&gt;Value: [0.88, 0.91, ...]&lt;br&gt;Type: HNSW"]
+        end
+        subgraph Meta2 [Metadata]
+            direction TB
+            F22["Metadata Field&lt;br&gt;Name: '_id'&lt;br&gt;Value: 'img_002'"]
+            F23["Metadata Field&lt;br&gt;Name: '_mime_type'&lt;br&gt;Value: 'image/jpeg'"]
+        end
+        VecField2 --&gt; Meta2
+
+        subgraph VecField2_2 [Vector Field]
+            direction TB
+            F21_2["Vector Field&lt;br&gt;Name: 'text_vec'&lt;br&gt;Value: [0.11, 0.99, ...]&lt;br&gt;Type: HNSW"]
+        end
+        subgraph Meta2_2 [Metadata]
+            direction TB
+            F22_2["Metadata Field&lt;br&gt;Name: '_id'&lt;br&gt;Value: 'img_002'"]
+            F23_2["Metadata Field&lt;br&gt;Name: '_mime_type'&lt;br&gt;Value: 'text/plain'"]
+        end
+        VecField2_2 --&gt; Meta2_2
     end
 
     subgraph DocContainer2_Lex [Lexical Document]
@@ -1064,11 +1100,13 @@ fn add_document(engine: &amp;VectorEngine) -&gt; iris::error::Result&lt;()&gt; {
     let vector_data = Arc::from(vec![0.1; 384]);
     doc.set_field("title_embedding", StoredVector::new(vector_data));
     
-    // Add metadata (available for filtering)
-    doc.metadata.insert("category".to_string(), "technology".to_string());
+    // Add metadata for filtering and hybrid search
+    doc.set_metadata("category", "technology");
+    doc.set_metadata("description", "Fast semantic search in Rust");
 
     // Add document with specific ID
-    engine.upsert_vectors(1, doc)?;
+    // Note: index_vectors triggers metadata indexing in the underlying LexicalEngine
+    engine.index_vectors("doc_001", doc)?;
     engine.commit()?; // Persist data
     
     Ok(())
@@ -1113,7 +1151,7 @@ fn search(engine: &amp;VectorEngine) -&gt; iris::error::Result&lt;()&gt; {
 
 fn filtered_search(engine: &amp;VectorEngine) -&gt; iris::error::Result&lt;()&gt; {
     let mut filter = VectorFilter::default();
-    filter.document.equals.insert("category".to_string(), "technology".to_string());
+    filter.document.equals.insert("category".to_string(), "technology".into());
 
     let request = VectorSearchRequest {
         query_vectors: vec![/* query vector */],
@@ -1130,24 +1168,42 @@ fn filtered_search(engine: &amp;VectorEngine) -&gt; iris::error::Result&lt;()&gt
 <p>Example of combining vector and keyword search.</p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use iris::vector::engine::query::{VectorSearchRequest, HybridSearchQuery};
+</span>use iris::vector::engine::request::{
+    VectorSearchRequest, LexicalQuery, MatchQueryOptions, FusionConfig, VectorScoreMode
+};
 
-async fn hybrid_search(engine: &amp;VectorEngine, query_vector: Vec&lt;f32&gt;) -&gt; iris::error::Result&lt;()&gt; {
+fn hybrid_search(engine: &amp;VectorEngine, query_vector: Vec&lt;f32&gt;) -&gt; iris::error::Result&lt;()&gt; {
+    // Prepare query vector
+    let q_vec = QueryVector {
+        vector: StoredVector::new(Arc::from(query_vector.as_slice())),
+        weight: 1.0,
+        fields: None,
+    };
+
     // Define Hybrid Query
-    let request = VectorSearchRequest::builder()
-        .vector(query_vector.into())
-        .hybrid_query(HybridSearchQuery {
-            keyword_query: "fast rust search".to_string(),
-            keyword_weight: 0.5,
+    let request = VectorSearchRequest {
+        query_vectors: vec![q_vec],
+        limit: 10,
+        // Add Lexical Query (Keyword Search)
+        lexical_query: Some(LexicalQuery::Match(MatchQueryOptions {
+            field: "description".to_string(),
+            query: "fast rust search".to_string(),
+            operator: Default::default(),
+            boost: 1.0,
+        })),
+        // Configure Fusion Strategy
+        fusion_config: Some(FusionConfig::WeightedSum {
             vector_weight: 0.5,
-            top_k: 10,
-        })
-        .build();
+            lexical_weight: 0.5,
+        }),
+        score_mode: VectorScoreMode::WeightedSum,
+        ..Default::default()
+    };
 
-    let results = engine.search(request).await?;
+    let results = engine.search(request)?;
     
     for res in results.hits {
-        println!("Doc ID: {}, Score: {}", res.id, res.score);
+        println!("Doc ID: {}, Score: {}", res.doc_id, res.score);
     }
     Ok(())
 }
