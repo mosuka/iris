@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use std::io::{Read, Write};
 use std::sync::{Arc, Mutex};
 
-use crate::vector::core::document::DocumentVector;
+use crate::data::Document;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 pub type SeqNumber = u64;
@@ -19,10 +19,7 @@ pub type SeqNumber = u64;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum WalEntry {
     /// Insert or update a document.
-    Upsert {
-        doc_id: u64,
-        document: DocumentVector,
-    },
+    Upsert { doc_id: u64, document: Document },
     /// Delete a document.
     Delete { doc_id: u64 },
 }
@@ -172,19 +169,17 @@ impl WalManager {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::data::{DataValue, Document};
     use crate::storage::memory::{MemoryStorage, MemoryStorageConfig};
-    use crate::vector::core::document::{DocumentVector, StoredVector};
 
     #[test]
     fn test_wal_append_read_truncate() {
         let storage = Arc::new(MemoryStorage::new(MemoryStorageConfig::default()));
         let wal = WalManager::new(storage.clone(), "test.wal").unwrap();
 
-        let mut doc = DocumentVector::new();
-        doc.set_field(
-            "body",
-            StoredVector::new(Arc::<[f32]>::from([1.0, 2.0, 3.0])),
-        );
+        let doc = Document::builder()
+            .with_field("body", DataValue::Vector(vec![1.0, 2.0, 3.0].into()))
+            .build();
 
         // 1. Append
         let seq1 = wal

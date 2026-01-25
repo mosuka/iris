@@ -8,11 +8,10 @@ use iris::analysis::analyzer::analyzer::Analyzer;
 use iris::analysis::analyzer::keyword::KeywordAnalyzer;
 use iris::analysis::analyzer::per_field::PerFieldAnalyzer;
 use iris::analysis::analyzer::standard::StandardAnalyzer;
-use iris::lexical::core::document::Document;
-use iris::lexical::core::field::TextOption;
+use iris::data::{DataValue, Document};
 use iris::error::Result;
-use iris::lexical::engine::LexicalEngine;
-use iris::lexical::engine::config::LexicalIndexConfig;
+use iris::lexical::store::LexicalStore;
+use iris::lexical::store::config::LexicalIndexConfig;
 use iris::lexical::index::config::InvertedIndexConfig;
 use iris::lexical::index::inverted::query::Query;
 use iris::lexical::index::inverted::query::term::TermQuery;
@@ -40,69 +39,55 @@ fn main() -> Result<()> {
         analyzer: Arc::new(per_field_analyzer.clone()),
         ..InvertedIndexConfig::default()
     });
-    let lexical_engine = LexicalEngine::new(storage, lexical_index_config)?;
+    let lexical_engine = LexicalStore::new(storage, lexical_index_config)?;
 
     // Add documents with various terms
     let documents = vec![
-        Document::builder()
-            .add_text("title", "Rust Programming Language", TextOption::default())
-            .add_text(
+        Document::new()
+            .with_field("title", DataValue::Text("Rust Programming Language".into()))
+            .with_field(
                 "body",
-                "Rust is a systems programming language focused on safety, speed, and concurrency",
-                TextOption::default(),
+                DataValue::Text("Rust is a systems programming language focused on safety, speed, and concurrency".into()),
             )
-            .add_text("author", "Steve Klabnik", TextOption::default())
-            .add_text("category", "programming", TextOption::default())
-            .add_text("id", "doc1", TextOption::default())
-            .build(),
-        Document::builder()
-            .add_text("title", "Python for Beginners", TextOption::default())
-            .add_text(
+            .with_field("author", DataValue::Text("Steve Klabnik".into()))
+            .with_field("category", DataValue::Text("programming".into()))
+            .with_field("id", DataValue::Text("doc1".into())),
+        Document::new()
+            .with_field("title", DataValue::Text("Python for Beginners".into()))
+            .with_field(
                 "body",
-                "Python is a versatile and easy-to-learn programming language",
-                TextOption::default(),
+                DataValue::Text("Python is a versatile and easy-to-learn programming language".into()),
             )
-            .add_text("author", "John Smith", TextOption::default())
-            .add_text("category", "programming", TextOption::default())
-            .add_text("id", "doc2", TextOption::default())
-            .build(),
-        Document::builder()
-            .add_text("title", "JavaScript Essentials", TextOption::default())
-            .add_text(
+            .with_field("author", DataValue::Text("John Smith".into()))
+            .with_field("category", DataValue::Text("programming".into()))
+            .with_field("id", DataValue::Text("doc2".into())),
+        Document::new()
+            .with_field("title", DataValue::Text("JavaScript Essentials".into()))
+            .with_field(
                 "body",
-                "JavaScript is the language of the web, used for frontend and backend development",
-                TextOption::default(),
+                DataValue::Text("JavaScript is the language of the web, used for frontend and backend development".into()),
             )
-            .add_text("author", "Jane Doe", TextOption::default())
-            .add_text("category", "web-development", TextOption::default())
-            .add_text("id", "doc3", TextOption::default())
-            .build(),
-        Document::builder()
-            .add_text(
-                "title",
-                "Machine Learning Fundamentals",
-                TextOption::default(),
-            )
-            .add_text(
+            .with_field("author", DataValue::Text("Jane Doe".into()))
+            .with_field("category", DataValue::Text("web-development".into()))
+            .with_field("id", DataValue::Text("doc3".into())),
+        Document::new()
+            .with_field("title", DataValue::Text("Machine Learning Fundamentals".into()))
+            .with_field(
                 "body",
-                "Machine learning is a subset of artificial intelligence focused on algorithms",
-                TextOption::default(),
+                DataValue::Text("Machine learning is a subset of artificial intelligence focused on algorithms".into()),
             )
-            .add_text("author", "Alice Johnson", TextOption::default())
-            .add_text("category", "data-science", TextOption::default())
-            .add_text("id", "doc4", TextOption::default())
-            .build(),
-        Document::builder()
-            .add_text("title", "Data Structures in C++", TextOption::default())
-            .add_text(
+            .with_field("author", DataValue::Text("Alice Johnson".into()))
+            .with_field("category", DataValue::Text("data-science".into()))
+            .with_field("id", DataValue::Text("doc4".into())),
+        Document::new()
+            .with_field("title", DataValue::Text("Data Structures in C++".into()))
+            .with_field(
                 "body",
-                "Understanding data structures is crucial for efficient programming",
-                TextOption::default(),
+                DataValue::Text("Understanding data structures is crucial for efficient programming".into()),
             )
-            .add_text("author", "Bob Wilson", TextOption::default())
-            .add_text("category", "programming", TextOption::default())
-            .add_text("id", "doc5", TextOption::default())
-            .build(),
+            .with_field("author", DataValue::Text("Bob Wilson".into()))
+            .with_field("category", DataValue::Text("programming".into()))
+            .with_field("id", DataValue::Text("doc5".into())),
     ];
 
     println!("Adding {} documents to the index...", documents.len());
@@ -128,11 +113,17 @@ fn main() -> Result<()> {
             hit.score,
             hit.doc_id
         );
-        if let Some(doc) = &hit.document
-            && let Some(field_value) = doc.get_field("title")
-            && let Some(title) = field_value.value.as_text()
-        {
-            println!("      Title: {title}");
+        if let Some(doc) = &hit.document {
+            if let Some(field) = doc.get_field("title")
+                && let DataValue::Text(title) = field
+            {
+                println!("      Title: {title}");
+            }
+            if let Some(field) = doc.get_field("author")
+                && let DataValue::Text(author) = field
+            {
+                println!("      Author: {author}");
+            }
         }
     }
 
@@ -150,11 +141,17 @@ fn main() -> Result<()> {
             hit.score,
             hit.doc_id
         );
-        if let Some(doc) = &hit.document
-            && let Some(field_value) = doc.get_field("title")
-            && let Some(title) = field_value.value.as_text()
-        {
-            println!("      Title: {title}");
+        if let Some(doc) = &hit.document {
+            if let Some(field) = doc.get_field("title")
+                && let DataValue::Text(title) = field
+            {
+                println!("      Title: {title}");
+            }
+            if let Some(field) = doc.get_field("author")
+                && let DataValue::Text(author) = field
+            {
+                println!("      Author: {author}");
+            }
         }
     }
 
@@ -172,11 +169,17 @@ fn main() -> Result<()> {
             hit.score,
             hit.doc_id
         );
-        if let Some(doc) = &hit.document
-            && let Some(field_value) = doc.get_field("title")
-            && let Some(title) = field_value.value.as_text()
-        {
-            println!("      Title: {title}");
+        if let Some(doc) = &hit.document {
+            if let Some(field) = doc.get_field("title")
+                && let DataValue::Text(title) = field
+            {
+                println!("      Title: {title}");
+            }
+            if let Some(field) = doc.get_field("author")
+                && let DataValue::Text(author) = field
+            {
+                println!("      Author: {author}");
+            }
         }
     }
 
@@ -212,13 +215,13 @@ fn main() -> Result<()> {
             hit.doc_id
         );
         if let Some(doc) = &hit.document {
-            if let Some(field_value) = doc.get_field("title")
-                && let Some(title) = field_value.value.as_text()
+            if let Some(field) = doc.get_field("title")
+                && let DataValue::Text(title) = field
             {
                 println!("      Title: {title}");
             }
-            if let Some(field_value) = doc.get_field("author")
-                && let Some(author) = field_value.value.as_text()
+            if let Some(field) = doc.get_field("author")
+                && let DataValue::Text(author) = field
             {
                 println!("      Author: {author}");
             }

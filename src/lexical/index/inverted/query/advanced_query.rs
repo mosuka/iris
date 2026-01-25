@@ -189,9 +189,8 @@ impl AdvancedQuery {
 
             let doc_id = matcher.doc_id();
 
-            // Calculate score with field boosts
-            let mut score = scorer.score(doc_id, 1.0, None); // Use default term frequency
-            score = self.apply_field_boosts(doc_id, score, reader)?;
+            // Calculate score
+            let mut score = scorer.score(doc_id, matcher.term_freq() as f32, None);
             score *= self.boost;
 
             // Apply minimum score threshold
@@ -216,22 +215,6 @@ impl AdvancedQuery {
         results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap());
 
         Ok(results)
-    }
-
-    /// Apply field boosts to the score.
-    fn apply_field_boosts(
-        &self,
-        _doc_id: u64,
-        base_score: f32,
-        _reader: &dyn LexicalIndexReader,
-    ) -> Result<f32> {
-        if self.field_boosts.is_empty() {
-            return Ok(base_score);
-        }
-
-        // For now, return base score - field boost calculation would require
-        // more detailed field-level scoring information
-        Ok(base_score)
     }
 
     /// Apply post filters to a document.
@@ -290,6 +273,26 @@ impl Query for AdvancedQuery {
 
     fn as_any(&self) -> &dyn std::any::Any {
         self
+    }
+
+    fn apply_field_boosts(&mut self, boosts: &HashMap<String, f32>) {
+        // Apply field-level boosts from AdvanceQuery's own field_boosts first
+        if !self.field_boosts.is_empty() {
+            self.core_query.apply_field_boosts(&self.field_boosts);
+        }
+
+        // Then apply external boosts
+        self.core_query.apply_field_boosts(boosts);
+
+        for filter in &mut self.filters {
+            filter.apply_field_boosts(boosts);
+        }
+        for filter in &mut self.negative_filters {
+            filter.apply_field_boosts(boosts);
+        }
+        for filter in &mut self.post_filters {
+            filter.apply_field_boosts(boosts);
+        }
     }
 
     fn clone_box(&self) -> Box<dyn Query> {
@@ -545,6 +548,14 @@ impl Query for MultiFieldQuery {
 
     fn set_boost(&mut self, _boost: f32) {
         // Multi-field queries manage boosts per field
+    }
+
+    fn apply_field_boosts(&mut self, boosts: &HashMap<String, f32>) {
+        for (f, &b) in boosts {
+            if let Some(field_boost) = self.fields.get_mut(f) {
+                *field_boost *= b;
+            }
+        }
     }
 
     fn description(&self) -> String {

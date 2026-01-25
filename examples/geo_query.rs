@@ -8,11 +8,10 @@ use iris::analysis::analyzer::analyzer::Analyzer;
 use iris::analysis::analyzer::keyword::KeywordAnalyzer;
 use iris::analysis::analyzer::per_field::PerFieldAnalyzer;
 use iris::analysis::analyzer::standard::StandardAnalyzer;
-use iris::lexical::core::document::Document;
-use iris::lexical::core::field::{GeoOption, TextOption};
+use iris::data::{DataValue, Document};
 use iris::error::Result;
-use iris::lexical::engine::LexicalEngine;
-use iris::lexical::engine::config::LexicalIndexConfig;
+use iris::lexical::store::LexicalStore;
+use iris::lexical::store::config::LexicalIndexConfig;
 use iris::lexical::index::config::InvertedIndexConfig;
 use iris::lexical::index::inverted::query::Query;
 use iris::lexical::index::inverted::query::geo::GeoQuery;
@@ -40,107 +39,91 @@ fn main() -> Result<()> {
         analyzer: Arc::new(per_field_analyzer.clone()),
         ..InvertedIndexConfig::default()
     });
-    let lexical_engine = LexicalEngine::new(storage, lexical_index_config)?;
+    let lexical_engine = LexicalStore::new(storage, lexical_index_config)?;
 
     // Add documents with geographic coordinates
     // Using famous locations around the world
     let documents = vec![
-        Document::builder()
-            .add_text("name", "Central Park", TextOption::default())
-            .add_text(
+        Document::new()
+            .with_field("name", DataValue::Text("Central Park".into()))
+            .with_field(
                 "description",
-                "Large public park in Manhattan, New York City",
-                TextOption::default(),
+                DataValue::Text("Large public park in Manhattan, New York City".into()),
             )
-            .add_text("category", "park", TextOption::default())
-            .add_geo("location", 40.7829, -73.9654, GeoOption::default()) // Central Park, NYC
-            .add_text("city", "New York", TextOption::default())
-            .add_text("id", "loc001", TextOption::default())
-            .build(),
-        Document::builder()
-            .add_text("name", "Statue of Liberty", TextOption::default())
-            .add_text(
+            .with_field("category", DataValue::Text("park".into()))
+            .with_field("location", DataValue::Geo(40.7829, -73.9654))
+            .with_field("city", DataValue::Text("New York".into()))
+            .with_field("id", DataValue::Text("loc001".into())),
+        Document::new()
+            .with_field("name", DataValue::Text("Statue of Liberty".into()))
+            .with_field(
                 "description",
-                "Iconic statue on Liberty Island",
-                TextOption::default(),
+                DataValue::Text("Iconic statue on Liberty Island".into()),
             )
-            .add_text("category", "monument", TextOption::default())
-            .add_geo("location", 40.6892, -74.0445, GeoOption::default()) // Statue of Liberty, NYC
-            .add_text("city", "New York", TextOption::default())
-            .add_text("id", "loc002", TextOption::default())
-            .build(),
-        Document::builder()
-            .add_text("name", "Golden Gate Bridge", TextOption::default())
-            .add_text(
+            .with_field("category", DataValue::Text("monument".into()))
+            .with_field("location", DataValue::Geo(40.6892, -74.0445))
+            .with_field("city", DataValue::Text("New York".into()))
+            .with_field("id", DataValue::Text("loc002".into())),
+        Document::new()
+            .with_field("name", DataValue::Text("Golden Gate Bridge".into()))
+            .with_field(
                 "description",
-                "Suspension bridge in San Francisco",
-                TextOption::default(),
+                DataValue::Text("Suspension bridge in San Francisco".into()),
             )
-            .add_text("category", "bridge", TextOption::default())
-            .add_geo("location", 37.8199, -122.4783, GeoOption::default()) // Golden Gate Bridge, SF
-            .add_text("city", "San Francisco", TextOption::default())
-            .add_text("id", "loc003", TextOption::default())
-            .build(),
-        Document::builder()
-            .add_text("name", "Alcatraz Island", TextOption::default())
-            .add_text(
+            .with_field("category", DataValue::Text("bridge".into()))
+            .with_field("location", DataValue::Geo(37.8199, -122.4783))
+            .with_field("city", DataValue::Text("San Francisco".into()))
+            .with_field("id", DataValue::Text("loc003".into())),
+        Document::new()
+            .with_field("name", DataValue::Text("Alcatraz Island".into()))
+            .with_field(
                 "description",
-                "Former federal prison on island in San Francisco Bay",
-                TextOption::default(),
+                DataValue::Text("Former federal prison on island in San Francisco Bay".into()),
             )
-            .add_text("category", "historical", TextOption::default())
-            .add_geo("location", 37.8267, -122.4233, GeoOption::default()) // Alcatraz Island, SF
-            .add_text("city", "San Francisco", TextOption::default())
-            .add_text("id", "loc004", TextOption::default())
-            .build(),
-        Document::builder()
-            .add_text("name", "Hollywood Sign", TextOption::default())
-            .add_text(
+            .with_field("category", DataValue::Text("historical".into()))
+            .with_field("location", DataValue::Geo(37.8267, -122.4233))
+            .with_field("city", DataValue::Text("San Francisco".into()))
+            .with_field("id", DataValue::Text("loc004".into())),
+        Document::new()
+            .with_field("name", DataValue::Text("Hollywood Sign".into()))
+            .with_field(
                 "description",
-                "Landmark sign in Hollywood Hills",
-                TextOption::default(),
+                DataValue::Text("Landmark sign in Hollywood Hills".into()),
             )
-            .add_text("category", "landmark", TextOption::default())
-            .add_geo("location", 34.1341, -118.3215, GeoOption::default()) // Hollywood Sign, LA
-            .add_text("city", "Los Angeles", TextOption::default())
-            .add_text("id", "loc005", TextOption::default())
-            .build(),
-        Document::builder()
-            .add_text("name", "Santa Monica Pier", TextOption::default())
-            .add_text(
+            .with_field("category", DataValue::Text("landmark".into()))
+            .with_field("location", DataValue::Geo(34.1341, -118.3215))
+            .with_field("city", DataValue::Text("Los Angeles".into()))
+            .with_field("id", DataValue::Text("loc005".into())),
+        Document::new()
+            .with_field("name", DataValue::Text("Santa Monica Pier".into()))
+            .with_field(
                 "description",
-                "Amusement park and pier on Santa Monica Beach",
-                TextOption::default(),
+                DataValue::Text("Amusement park and pier on Santa Monica Beach".into()),
             )
-            .add_text("category", "entertainment", TextOption::default())
-            .add_geo("location", 34.0084, -118.4966, GeoOption::default()) // Santa Monica Pier, LA
-            .add_text("city", "Los Angeles", TextOption::default())
-            .add_text("id", "loc006", TextOption::default())
-            .build(),
-        Document::builder()
-            .add_text("name", "Space Needle", TextOption::default())
-            .add_text(
+            .with_field("category", DataValue::Text("entertainment".into()))
+            .with_field("location", DataValue::Geo(34.0084, -118.4966))
+            .with_field("city", DataValue::Text("Los Angeles".into()))
+            .with_field("id", DataValue::Text("loc006".into())),
+        Document::new()
+            .with_field("name", DataValue::Text("Space Needle".into()))
+            .with_field(
                 "description",
-                "Observation tower in Seattle Center",
-                TextOption::default(),
+                DataValue::Text("Observation tower in Seattle Center".into()),
             )
-            .add_text("category", "tower", TextOption::default())
-            .add_geo("location", 47.6205, -122.3493, GeoOption::default()) // Space Needle, Seattle
-            .add_text("city", "Seattle", TextOption::default())
-            .add_text("id", "loc007", TextOption::default())
-            .build(),
-        Document::builder()
-            .add_text("name", "Pike Place Market", TextOption::default())
-            .add_text(
+            .with_field("category", DataValue::Text("tower".into()))
+            .with_field("location", DataValue::Geo(47.6205, -122.3493))
+            .with_field("city", DataValue::Text("Seattle".into()))
+            .with_field("id", DataValue::Text("loc007".into())),
+        Document::new()
+            .with_field("name", DataValue::Text("Pike Place Market".into()))
+            .with_field(
                 "description",
-                "Public market overlooking Elliott Bay",
-                TextOption::default(),
+                DataValue::Text("Public market overlooking Elliott Bay".into()),
             )
-            .add_text("category", "market", TextOption::default())
-            .add_geo("location", 47.6101, -122.3421, GeoOption::default()) // Pike Place Market, Seattle
-            .add_text("city", "Seattle", TextOption::default())
-            .add_text("id", "loc008", TextOption::default())
-            .build(),
+            .with_field("category", DataValue::Text("market".into()))
+            .with_field("location", DataValue::Geo(47.6101, -122.3421))
+            .with_field("city", DataValue::Text("Seattle".into()))
+            .with_field("id", DataValue::Text("loc008".into())),
     ];
 
     println!("Adding {} documents to the index...", documents.len());
@@ -168,13 +151,13 @@ fn main() -> Result<()> {
             hit.doc_id
         );
         if let Some(doc) = &hit.document {
-            if let Some(field_value) = doc.get_field("name")
-                && let Some(name) = field_value.value.as_text()
+            if let Some(field) = doc.get_field("name")
+                && let DataValue::Text(name) = field
             {
                 println!("      Name: {name}");
             }
-            if let Some(field_value) = doc.get_field("city")
-                && let Some(city) = field_value.value.as_text()
+            if let Some(field) = doc.get_field("city")
+                && let DataValue::Text(city) = field
             {
                 println!("      City: {city}");
             }
@@ -196,13 +179,13 @@ fn main() -> Result<()> {
             hit.doc_id
         );
         if let Some(doc) = &hit.document {
-            if let Some(field_value) = doc.get_field("name")
-                && let Some(name) = field_value.value.as_text()
+            if let Some(field) = doc.get_field("name")
+                && let DataValue::Text(name) = field
             {
                 println!("      Name: {name}");
             }
-            if let Some(field_value) = doc.get_field("description")
-                && let Some(description) = field_value.value.as_text()
+            if let Some(field) = doc.get_field("description")
+                && let DataValue::Text(description) = field
             {
                 println!("      Description: {description}");
             }
@@ -225,13 +208,13 @@ fn main() -> Result<()> {
             hit.doc_id
         );
         if let Some(doc) = &hit.document {
-            if let Some(field_value) = doc.get_field("name")
-                && let Some(name) = field_value.value.as_text()
+            if let Some(field) = doc.get_field("name")
+                && let DataValue::Text(name) = field
             {
                 println!("      Name: {name}");
             }
-            if let Some(field_value) = doc.get_field("category")
-                && let Some(category) = field_value.value.as_text()
+            if let Some(field) = doc.get_field("category")
+                && let DataValue::Text(category) = field
             {
                 println!("      Category: {category}");
             }
@@ -253,13 +236,13 @@ fn main() -> Result<()> {
             hit.doc_id
         );
         if let Some(doc) = &hit.document {
-            if let Some(field_value) = doc.get_field("name")
-                && let Some(name) = field_value.value.as_text()
+            if let Some(field) = doc.get_field("name")
+                && let DataValue::Text(name) = field
             {
                 println!("      Name: {name}");
             }
-            if let Some(field_value) = doc.get_field("city")
-                && let Some(city) = field_value.value.as_text()
+            if let Some(field) = doc.get_field("city")
+                && let DataValue::Text(city) = field
             {
                 println!("      City: {city}");
             }
@@ -281,13 +264,13 @@ fn main() -> Result<()> {
             hit.doc_id
         );
         if let Some(doc) = &hit.document {
-            if let Some(field_value) = doc.get_field("name")
-                && let Some(name) = field_value.value.as_text()
+            if let Some(field) = doc.get_field("name")
+                && let DataValue::Text(name) = field
             {
                 println!("      Name: {name}");
             }
-            if let Some(field_value) = doc.get_field("description")
-                && let Some(description) = field_value.value.as_text()
+            if let Some(field) = doc.get_field("description")
+                && let DataValue::Text(description) = field
             {
                 println!("      Description: {description}");
             }
@@ -318,13 +301,13 @@ fn main() -> Result<()> {
             hit.doc_id
         );
         if let Some(doc) = &hit.document {
-            if let Some(field_value) = doc.get_field("name")
-                && let Some(name) = field_value.value.as_text()
+            if let Some(field) = doc.get_field("name")
+                && let DataValue::Text(name) = field
             {
                 println!("      Name: {name}");
             }
-            if let Some(field_value) = doc.get_field("city")
-                && let Some(city) = field_value.value.as_text()
+            if let Some(field) = doc.get_field("city")
+                && let DataValue::Text(city) = field
             {
                 println!("      City: {city}");
             }

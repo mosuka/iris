@@ -18,12 +18,11 @@ use iris::analysis::analyzer::analyzer::Analyzer;
 use iris::analysis::analyzer::keyword::KeywordAnalyzer;
 use iris::analysis::analyzer::per_field::PerFieldAnalyzer;
 use iris::analysis::analyzer::standard::StandardAnalyzer;
-use iris::lexical::core::document::Document;
-use iris::lexical::core::field::TextOption;
-use iris::lexical::core::parser::DocumentParser;
+use iris::data::{DataValue, Document};
 use iris::error::Result;
-use iris::lexical::engine::LexicalEngine;
-use iris::lexical::engine::config::LexicalIndexConfig;
+use iris::lexical::core::parser::DocumentParser;
+use iris::lexical::store::LexicalStore;
+use iris::lexical::store::config::LexicalIndexConfig;
 use iris::lexical::index::inverted::writer::{InvertedIndexWriter, InvertedIndexWriterConfig};
 use iris::lexical::search::searcher::LexicalSearchRequest;
 use iris::storage::file::FileStorage;
@@ -49,7 +48,7 @@ fn main() -> Result<()> {
         temp_dir.path(),
         FileStorageConfig::new(temp_dir.path()),
     )?);
-    let engine = LexicalEngine::new(storage.clone(), config)?;
+    let engine = LexicalStore::new(storage.clone(), config)?;
 
     // Get storage for creating custom writer (already have it)
     let storage = storage.clone();
@@ -66,21 +65,18 @@ fn main() -> Result<()> {
 
     // Create documents
     let docs = vec![
-        Document::builder()
-            .add_text("id", "BOOK-001", TextOption::default())
-            .add_text("title", "Rust Programming Language", TextOption::default())
-            .add_text("category", "programming", TextOption::default())
-            .build(),
-        Document::builder()
-            .add_text("id", "BOOK-002", TextOption::default())
-            .add_text("title", "Learning Rust", TextOption::default())
-            .add_text("category", "programming", TextOption::default())
-            .build(),
-        Document::builder()
-            .add_text("id", "ARTICLE-001", TextOption::default())
-            .add_text("title", "Introduction to Python", TextOption::default())
-            .add_text("category", "tutorial", TextOption::default())
-            .build(),
+        Document::new()
+            .with_field("id", DataValue::Text("BOOK-001".into()))
+            .with_field("title", DataValue::Text("Rust Programming Language".into()))
+            .with_field("category", DataValue::Text("programming".into())),
+        Document::new()
+            .with_field("id", DataValue::Text("BOOK-002".into()))
+            .with_field("title", DataValue::Text("Learning Rust".into()))
+            .with_field("category", DataValue::Text("programming".into())),
+        Document::new()
+            .with_field("id", DataValue::Text("ARTICLE-001".into()))
+            .with_field("title", DataValue::Text("Introduction to Python".into()))
+            .with_field("category", DataValue::Text("tutorial".into())),
     ];
 
     // Analyze documents explicitly and add to index
@@ -127,13 +123,13 @@ fn main() -> Result<()> {
     for (i, hit) in results.hits.iter().enumerate() {
         println!("  {}. Doc {} (score: {:.4})", i + 1, hit.doc_id, hit.score);
         if let Some(doc) = &hit.document {
-            if let Some(title) = doc.get_field("title")
-                && let Some(title_text) = title.value.as_text()
+            if let Some(field) = doc.get_field("title")
+                && let DataValue::Text(title_text) = field
             {
                 println!("     Title: {title_text}");
             }
-            if let Some(id) = doc.get_field("id")
-                && let Some(id_text) = id.value.as_text()
+            if let Some(field) = doc.get_field("id")
+                && let DataValue::Text(id_text) = field
             {
                 println!("     ID: {id_text}");
             }

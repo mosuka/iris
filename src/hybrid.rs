@@ -20,13 +20,13 @@
 //! ```no_run
 //! use iris::hybrid::engine::HybridEngine;
 //! use iris::hybrid::search::searcher::{HybridSearchRequest, HybridSearchParams};
-//! use iris::lexical::engine::LexicalEngine;
-//! use iris::vector::engine::VectorEngine;
+//! use iris::lexical::store::LexicalStore;
+//! use iris::vector::store::VectorStore;
 //! use iris::storage::memory::MemoryStorage;
 //! use iris::error::Result;
 //! use std::sync::Arc;
 //!
-//! async fn example(lexical_engine: LexicalEngine, vector_engine: VectorEngine) -> Result<()> {
+//! async fn example(lexical_engine: LexicalStore, vector_engine: VectorStore) -> Result<()> {
 //!     // Create storage
 //!     let storage = Arc::new(MemoryStorage::default());
 //!

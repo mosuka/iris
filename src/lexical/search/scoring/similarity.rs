@@ -435,21 +435,23 @@ impl SimilaritySearchEngine {
             Ok(Some(document)) => {
                 // Extract the field value
                 if let Some(field_value) = document.get_field(field_name) {
-                    match &field_value.value {
-                        FieldValue::Text(text) => Ok(text.clone()),
-                        FieldValue::Integer(value) => Ok(value.to_string()),
-                        FieldValue::Float(value) => Ok(value.to_string()),
-                        FieldValue::Boolean(value) => Ok(value.to_string()),
-                        FieldValue::Blob(mime, data) => {
-                            if mime == "text/plain" {
+                    match field_value {
+                        FieldValue::Text(text) | FieldValue::String(text) => Ok(text.clone()),
+                        FieldValue::Int64(value) => Ok(value.to_string()),
+                        FieldValue::Float64(value) => Ok(value.to_string()),
+                        FieldValue::Bool(value) => Ok(value.to_string()),
+                        FieldValue::Bytes(data, mime) => {
+                            if mime.as_deref() == Some("text/plain") {
                                 Ok(String::from_utf8_lossy(data).to_string())
                             } else {
                                 Ok(String::new())
                             }
                         }
                         FieldValue::DateTime(dt) => Ok(dt.to_rfc3339()),
-                        FieldValue::Geo(point) => Ok(format!("{},{}", point.lat, point.lon)),
+                        FieldValue::Geo(lat, lon) => Ok(format!("{},{}", lat, lon)),
                         FieldValue::Null => Ok(String::new()),
+                        FieldValue::Vector(v) => Ok(format!("[vector: dim={}]", v.len())),
+                        FieldValue::List(l) => Ok(l.join(", ")),
                     }
                 } else {
                     Ok(String::new())

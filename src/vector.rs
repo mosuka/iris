@@ -9,15 +9,15 @@
 //! - `core`: Core data structures (vector, distance, quantization)
 //! - `index`: Index management (config, factory, traits, flat, hnsw, ivf)
 //! - `search`: Search execution (similarity, ranking, result processing)
-//! - `engine`: High-level engine interface
+//! - `store`: High-level store interface
 //! - `writer`: Index writer trait
 
 pub mod core;
 pub mod index;
 pub mod search;
 
-pub mod engine;
 pub mod reader;
+pub mod store;
 // pub mod field;
 // pub mod wal;
 // mod tests_deletion;

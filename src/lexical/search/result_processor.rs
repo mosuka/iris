@@ -382,10 +382,10 @@ impl ResultProcessor {
         let mut fields = HashMap::new();
 
         if let Some(document) = self.reader.document(doc_id)? {
-            for (field_name, field_value) in document.fields() {
+            for (field_name, data_value) in &document.fields {
                 // Check if field should be retrieved
                 if self.should_retrieve_field(field_name) {
-                    let value_str = self.field_value_to_string(&field_value.value);
+                    let value_str = self.field_value_to_string(data_value);
                     fields.insert(field_name.clone(), value_str);
                 }
             }
@@ -408,14 +408,19 @@ impl ResultProcessor {
     /// Convert field value to string.
     fn field_value_to_string(&self, field_value: &FieldValue) -> String {
         match field_value {
-            FieldValue::Text(s) => s.clone(),
-            FieldValue::Integer(i) => i.to_string(),
-            FieldValue::Float(f) => f.to_string(),
-            FieldValue::Boolean(b) => b.to_string(),
-            FieldValue::Blob(mime, data) => format!("[blob: {} ({} bytes)]", mime, data.len()),
+            FieldValue::Text(s) | FieldValue::String(s) => s.clone(),
+            FieldValue::Int64(i) => i.to_string(),
+            FieldValue::Float64(f) => f.to_string(),
+            FieldValue::Bool(b) => b.to_string(),
+            FieldValue::Bytes(data, mime) => {
+                let m = mime.as_deref().unwrap_or("bin");
+                format!("[blob: {} ({} bytes)]", m, data.len())
+            }
             FieldValue::DateTime(dt) => dt.to_rfc3339(),
-            FieldValue::Geo(point) => format!("{},{}", point.lat, point.lon),
+            FieldValue::Geo(lat, lon) => format!("{},{}", lat, lon),
             FieldValue::Null => "null".to_string(),
+            FieldValue::Vector(v) => format!("[vector: dim={}]", v.len()),
+            FieldValue::List(l) => format!("[list: {} items]", l.len()),
         }
     }
 

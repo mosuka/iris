@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use crate::error::{Result, IrisError};
+use crate::error::{IrisError, Result};
 use crate::storage::Storage;
 use crate::vector::core::vector::Vector;
 use crate::vector::index::HnswIndexConfig;
@@ -51,9 +51,10 @@ impl ConcurrentHnswGraph {
 
     fn set_neighbors(&self, doc_id: u64, level: usize, new_neighbors: Vec<u64>) {
         if let Some(layers) = self.nodes.get(&doc_id)
-            && let Some(lock) = layers.get(level) {
-                *lock.write() = new_neighbors;
-            }
+            && let Some(lock) = layers.get(level)
+        {
+            *lock.write() = new_neighbors;
+        }
     }
 
     fn add_neighbor_with_pruning(
@@ -65,18 +66,19 @@ impl ConcurrentHnswGraph {
         writer: &HnswIndexWriter,
     ) -> Result<()> {
         if let Some(layers) = self.nodes.get(&doc_id)
-            && let Some(lock) = layers.get(level) {
-                let mut neighbors = lock.write();
-                if !neighbors.contains(&neighbor_id) {
-                    neighbors.push(neighbor_id);
-                }
-
-                if neighbors.len() > max_conn {
-                    // Prune while holding lock
-                    let pruned = writer.prune_neighbors(doc_id, neighbors.clone(), max_conn)?;
-                    *neighbors = pruned;
-                }
+            && let Some(lock) = layers.get(level)
+        {
+            let mut neighbors = lock.write();
+            if !neighbors.contains(&neighbor_id) {
+                neighbors.push(neighbor_id);
             }
+
+            if neighbors.len() > max_conn {
+                // Prune while holding lock
+                let pruned = writer.prune_neighbors(doc_id, neighbors.clone(), max_conn)?;
+                *neighbors = pruned;
+            }
+        }
         Ok(())
     }
 
@@ -1014,9 +1016,11 @@ impl HnswIndexWriter {
         while let Some(curr) = to_visit.pop() {
             // If closest candidate to visit is further than the furthest found candidate, and we found enough, stop
             if let Some(furthest_found) = found.peek()
-                && curr.distance > furthest_found.distance && found.len() >= ef {
-                    break;
-                }
+                && curr.distance > furthest_found.distance
+                && found.len() >= ef
+            {
+                break;
+            }
 
             if let Some(neighbors) = graph.get_neighbors_view(curr.id, level) {
                 for neighbor_id in neighbors {
@@ -1162,9 +1166,10 @@ impl VectorIndexWriter for HnswIndexWriter {
 
         // Update next_vec_id
         if let Some((max_id, _, _)) = self.vectors.iter().max_by_key(|(id, _, _)| id)
-            && *max_id >= self.next_vec_id {
-                self.next_vec_id = *max_id + 1;
-            }
+            && *max_id >= self.next_vec_id
+        {
+            self.next_vec_id = *max_id + 1;
+        }
 
         self.total_vectors_to_add = Some(self.vectors.len());
 
@@ -1174,9 +1179,7 @@ impl VectorIndexWriter for HnswIndexWriter {
 
     fn add_vectors(&mut self, mut vectors: Vec<(u64, String, Vector)>) -> Result<()> {
         if self.is_finalized {
-            return Err(IrisError::InvalidOperation(
-                "Cannot add vectors to finalized index".to_string(),
-            ));
+            self.is_finalized = false;
         }
 
         self.validate_vectors(&vectors)?;
@@ -1199,9 +1202,10 @@ impl VectorIndexWriter for HnswIndexWriter {
 
         // Update next_vec_id
         if let Some((max_id, _, _)) = self.vectors.iter().max_by_key(|(id, _, _)| id)
-            && *max_id >= self.next_vec_id {
-                self.next_vec_id = *max_id + 1;
-            }
+            && *max_id >= self.next_vec_id
+        {
+            self.next_vec_id = *max_id + 1;
+        }
 
         self.check_memory_limit()?;
         Ok(())
@@ -1363,9 +1367,7 @@ impl VectorIndexWriter for HnswIndexWriter {
 
     fn delete_document(&mut self, doc_id: u64) -> Result<()> {
         if self.is_finalized {
-            return Err(IrisError::InvalidOperation(
-                "Cannot delete documents from finalized index".to_string(),
-            ));
+            self.is_finalized = false;
         }
 
         // Logical deletion from buffer
@@ -1433,9 +1435,7 @@ impl VectorIndexWriter for HnswIndexWriter {
         use crate::vector::index::hnsw::reader::HnswIndexReader;
 
         let storage = self.storage.as_ref().ok_or_else(|| {
-            IrisError::InvalidOperation(
-                "Cannot build reader: storage not configured".to_string(),
-            )
+            IrisError::InvalidOperation("Cannot build reader: storage not configured".to_string())
         })?;
 
         let reader = HnswIndexReader::load(

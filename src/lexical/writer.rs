@@ -85,4 +85,9 @@ pub trait LexicalIndexWriter: Send + Sync + std::fmt::Debug {
     ///
     /// This allows NRT lookups for multiple documents (chunks).
     fn find_doc_ids_by_term(&self, field: &str, term: &str) -> Result<Option<Vec<u64>>>;
+
+    /// Set the last processed WAL sequence number.
+    fn set_last_wal_seq(&mut self, _seq: u64) -> Result<()> {
+        Ok(())
+    }
 }

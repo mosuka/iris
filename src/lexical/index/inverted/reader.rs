@@ -12,7 +12,7 @@ use ahash::AHashMap;
 use crate::analysis::analyzer::analyzer::Analyzer;
 use crate::analysis::analyzer::standard::StandardAnalyzer;
 use crate::analysis::token::Token;
-use crate::error::{Result, IrisError};
+use crate::error::{IrisError, Result};
 use crate::lexical::core::document::Document;
 use crate::lexical::core::field::FieldValue;
 use crate::lexical::index::inverted::core::posting::{Posting, PostingList};
@@ -455,23 +455,23 @@ impl SegmentReader {
                         1 => {
                             // Integer
                             let num = reader.read_u64()? as i64; // Read as u64, convert to i64 preserving bit pattern
-                            FieldValue::Integer(num)
+                            FieldValue::Int64(num)
                         }
                         2 => {
                             // Float
                             let num = reader.read_f64()?;
-                            FieldValue::Float(num)
+                            FieldValue::Float64(num)
                         }
                         3 => {
                             // Boolean
                             let b = reader.read_u8()? != 0;
-                            FieldValue::Boolean(b)
+                            FieldValue::Bool(b)
                         }
                         4 => {
                             // Blob (MIME type + Data)
                             let mime = reader.read_string()?;
                             let data = reader.read_bytes()?;
-                            FieldValue::Blob(mime, data)
+                            FieldValue::Bytes(data, if mime.is_empty() { None } else { Some(mime) })
                         }
                         5 => {
                             // DateTime
@@ -487,10 +487,7 @@ impl SegmentReader {
                             // Geo
                             let lat = reader.read_f64()?;
                             let lon = reader.read_f64()?;
-                            FieldValue::Geo(crate::lexical::index::inverted::query::geo::GeoPoint {
-                                lat,
-                                lon,
-                            })
+                            FieldValue::Geo(lat, lon)
                         }
                         7 => {
                             // Null
@@ -499,7 +496,7 @@ impl SegmentReader {
                         8 => {
                             // Vector (Legacy, convert to Blob)
                             let text = reader.read_string()?;
-                            FieldValue::Blob("text/plain".to_string(), text.into_bytes())
+                            FieldValue::Bytes(text.into_bytes(), Some("text/plain".to_string()))
                         }
                         _ => {
                             return Err(IrisError::index(format!(
@@ -508,10 +505,7 @@ impl SegmentReader {
                         }
                     };
 
-                    doc.add_field(
-                        field_name,
-                        crate::lexical::core::field::Field::with_default_option(field_value),
-                    );
+                    doc = doc.add_field(field_name, field_value);
                 }
 
                 documents.insert(doc_id, doc);
@@ -827,7 +821,7 @@ impl SegmentReader {
                 }
 
                 if let Some(field_value) = doc.get_field(field)
-                    && let Some(text) = field_value.value.as_text()
+                    && let Some(text) = field_value.as_text()
                 {
                     // Use default analyzer (analyzers are configured at writer level)
                     let token_stream = default_analyzer.analyze(text)?;
@@ -875,9 +869,10 @@ impl SegmentReader {
 
         // Lazy load bitmap if needed
         if self.load_deletion_bitmap().is_ok()
-            && let Some(bitmap) = self.deletion_bitmap.read().unwrap().clone() {
-                return bitmap.live_count();
-            }
+            && let Some(bitmap) = self.deletion_bitmap.read().unwrap().clone()
+        {
+            return bitmap.live_count();
+        }
 
         self.info.doc_count
     }

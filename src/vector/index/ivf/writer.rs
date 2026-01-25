@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use rayon::prelude::*;
 
-use crate::error::{Result, IrisError};
+use crate::error::{IrisError, Result};
 use crate::storage::Storage;
 use crate::vector::core::vector::Vector;
 use crate::vector::index::IvfIndexConfig;
@@ -795,9 +795,7 @@ impl VectorIndexWriter for IvfIndexWriter {
 
     fn build(&mut self, mut vectors: Vec<(u64, String, Vector)>) -> Result<()> {
         if self.is_finalized {
-            return Err(IrisError::InvalidOperation(
-                "Cannot build on finalized index".to_string(),
-            ));
+            self.is_finalized = false;
         }
 
         self.validate_vectors(&vectors)?;
@@ -824,9 +822,7 @@ impl VectorIndexWriter for IvfIndexWriter {
 
     fn add_vectors(&mut self, mut vectors: Vec<(u64, String, Vector)>) -> Result<()> {
         if self.is_finalized {
-            return Err(IrisError::InvalidOperation(
-                "Cannot add vectors to finalized index".to_string(),
-            ));
+            self.is_finalized = false;
         }
 
         self.validate_vectors(&vectors)?;
@@ -972,9 +968,7 @@ impl VectorIndexWriter for IvfIndexWriter {
 
     fn delete_document(&mut self, doc_id: u64) -> Result<()> {
         if self.is_finalized {
-            return Err(IrisError::InvalidOperation(
-                "Cannot delete documents from finalized index".to_string(),
-            ));
+            self.is_finalized = false;
         }
         self.vectors.retain(|(id, _, _)| *id != doc_id);
         Ok(())
@@ -1062,9 +1056,7 @@ impl VectorIndexWriter for IvfIndexWriter {
         use crate::vector::index::ivf::reader::IvfIndexReader;
 
         let storage = self.storage.as_ref().ok_or_else(|| {
-            IrisError::InvalidOperation(
-                "Cannot build reader: storage not configured".to_string(),
-            )
+            IrisError::InvalidOperation("Cannot build reader: storage not configured".to_string())
         })?;
 
         let reader = IvfIndexReader::load(

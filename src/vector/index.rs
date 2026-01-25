@@ -36,7 +36,7 @@ use crate::vector::writer::VectorIndexWriter;
 ///
 /// This is analogous to [`crate::lexical::index::LexicalIndex`] in the lexical module.
 /// For high-level, document-centric operations, see
-/// [`crate::vector::engine::VectorEngine`] which manages multiple
+/// [`crate::vector::store::VectorStore`] which manages multiple
 /// vector fields and handles document-level operations.
 pub trait VectorIndex: Send + Sync + std::fmt::Debug {
     /// Get a reader for this index.
@@ -104,7 +104,7 @@ use crate::vector::index::ivf::reader::IvfIndexReader;
 /// Internal implementation for managing vector index lifecycle.
 ///
 /// This structure wraps a vector index writer and manages its state.
-/// For most use cases, prefer using `VectorEngine` which provides a higher-level interface.
+/// For most use cases, prefer using `VectorStore` which provides a higher-level interface.
 ///
 /// # Note
 ///

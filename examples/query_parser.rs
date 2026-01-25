@@ -18,11 +18,10 @@ use iris::analysis::analyzer::analyzer::Analyzer;
 use iris::analysis::analyzer::keyword::KeywordAnalyzer;
 use iris::analysis::analyzer::per_field::PerFieldAnalyzer;
 use iris::analysis::analyzer::standard::StandardAnalyzer;
-use iris::lexical::core::document::Document;
-use iris::lexical::core::field::{FloatOption, TextOption};
+use iris::data::{DataValue, Document};
 use iris::error::Result;
-use iris::lexical::engine::LexicalEngine;
-use iris::lexical::engine::config::LexicalIndexConfig;
+use iris::lexical::store::LexicalStore;
+use iris::lexical::store::config::LexicalIndexConfig;
 use iris::lexical::index::config::InvertedIndexConfig;
 use iris::lexical::index::inverted::query::parser::QueryParser;
 use iris::lexical::search::searcher::LexicalSearchRequest;
@@ -49,45 +48,40 @@ fn main() -> Result<()> {
         analyzer: Arc::new(per_field_analyzer.clone()),
         ..InvertedIndexConfig::default()
     });
-    let mut lexical_engine = LexicalEngine::new(storage, lexical_index_config)?;
+    let mut lexical_engine = LexicalStore::new(storage, lexical_index_config)?;
 
     // Add sample documents
     let documents = vec![
-        Document::builder()
-            .add_text("title", "The Great Gatsby", TextOption::default())
-            .add_text("body", "In my younger and more vulnerable years my father gave me some advice", TextOption::default())
-            .add_text("author", "F. Scott Fitzgerald", TextOption::default())
-            .add_float("year", 1925.0, FloatOption::default())
-            .add_text("id", "doc001", TextOption::default())
-            .build(),
-        Document::builder()
-            .add_text("title", "To Kill a Mockingbird", TextOption::default())
-            .add_text("body", "When I was almost six years old, I heard my brother arguing with my father", TextOption::default())
-            .add_text("author", "Harper Lee", TextOption::default())
-            .add_float("year", 1960.0, FloatOption::default())
-            .add_text("id", "doc002", TextOption::default())
-            .build(),
-        Document::builder()
-            .add_text("title", "1984", TextOption::default())
-            .add_text("body", "It was a bright cold day in April, and the clocks were striking thirteen", TextOption::default())
-            .add_text("author", "George Orwell", TextOption::default())
-            .add_float("year", 1949.0, FloatOption::default())
-            .add_text("id", "doc003", TextOption::default())
-            .build(),
-        Document::builder()
-            .add_text("title", "Pride and Prejudice", TextOption::default())
-            .add_text("body", "It is a truth universally acknowledged, that a single man in possession of a good fortune", TextOption::default())
-            .add_text("author", "Jane Austen", TextOption::default())
-            .add_float("year", 1813.0, FloatOption::default())
-            .add_text("id", "doc004", TextOption::default())
-            .build(),
-        Document::builder()
-            .add_text("title", "The Catcher in the Rye", TextOption::default())
-            .add_text("body", "If you really want to hear about it, the first thing you'll probably want to know", TextOption::default())
-            .add_text("author", "J.D. Salinger", TextOption::default())
-            .add_float("year", 1951.0, FloatOption::default())
-            .add_text("id", "doc005", TextOption::default())
-            .build(),
+        Document::new()
+            .with_field("title", DataValue::Text("The Great Gatsby".into()))
+            .with_field("body", DataValue::Text("In my younger and more vulnerable years my father gave me some advice".into()))
+            .with_field("author", DataValue::Text("F. Scott Fitzgerald".into()))
+            .with_field("year", DataValue::Float64(1925.0))
+            .with_field("id", DataValue::Text("doc001".into())),
+        Document::new()
+            .with_field("title", DataValue::Text("To Kill a Mockingbird".into()))
+            .with_field("body", DataValue::Text("When I was almost six years old, I heard my brother arguing with my father".into()))
+            .with_field("author", DataValue::Text("Harper Lee".into()))
+            .with_field("year", DataValue::Float64(1960.0))
+            .with_field("id", DataValue::Text("doc002".into())),
+        Document::new()
+            .with_field("title", DataValue::Text("1984".into()))
+            .with_field("body", DataValue::Text("It was a bright cold day in April, and the clocks were striking thirteen".into()))
+            .with_field("author", DataValue::Text("George Orwell".into()))
+            .with_field("year", DataValue::Float64(1949.0))
+            .with_field("id", DataValue::Text("doc003".into())),
+        Document::new()
+            .with_field("title", DataValue::Text("Pride and Prejudice".into()))
+            .with_field("body", DataValue::Text("It is a truth universally acknowledged, that a single man in possession of a good fortune".into()))
+            .with_field("author", DataValue::Text("Jane Austen".into()))
+            .with_field("year", DataValue::Float64(1813.0))
+            .with_field("id", DataValue::Text("doc004".into())),
+        Document::new()
+            .with_field("title", DataValue::Text("The Catcher in the Rye".into()))
+            .with_field("body", DataValue::Text("If you really want to hear about it, the first thing you'll probably want to know".into()))
+            .with_field("author", DataValue::Text("J.D. Salinger".into()))
+            .with_field("year", DataValue::Float64(1951.0))
+            .with_field("id", DataValue::Text("doc005".into())),
     ];
 
     println!("Adding {} documents to the index...", documents.len());
@@ -229,7 +223,7 @@ fn parse_and_show(parser: &QueryParser, queries: Vec<(&str, &str)>) {
     }
 }
 
-fn demo_search(engine: &mut LexicalEngine, parser: &QueryParser) -> Result<()> {
+fn demo_search(engine: &mut LexicalStore, parser: &QueryParser) -> Result<()> {
     println!("\n## 1. Simple OR Query");
     println!("{}", "-".repeat(80));
     execute_search(engine, parser, "Mockingbird OR Gatsby")?;
@@ -257,7 +251,7 @@ fn demo_search(engine: &mut LexicalEngine, parser: &QueryParser) -> Result<()> {
     Ok(())
 }
 
-fn execute_search(engine: &mut LexicalEngine, parser: &QueryParser, query_str: &str) -> Result<()> {
+fn execute_search(engine: &mut LexicalStore, parser: &QueryParser, query_str: &str) -> Result<()> {
     println!("Query: {query_str}");
 
     let query = parser.parse(query_str)?;
@@ -270,16 +264,15 @@ fn execute_search(engine: &mut LexicalEngine, parser: &QueryParser, query_str: &
     for (i, hit) in results.hits.iter().enumerate() {
         print!("  {}. Score: {:.4} ", i + 1, hit.score);
         if let Some(doc) = &hit.document {
-            if let Some(field_value) = doc.get_field("title")
-                && let Some(title) = field_value.value.as_text()
+            if let Some(field) = doc.get_field("title")
+                && let DataValue::Text(title) = field
             {
                 print!("- {title}");
             }
-            if let Some(field_value) = doc.get_field("year")
-                && let Some(year) = field_value.value.as_numeric()
-                && let Ok(year_num) = year.parse::<f64>()
+            if let Some(field) = doc.get_field("year")
+                && let DataValue::Float64(year_num) = field
             {
-                print!(" ({})", year_num as i32);
+                print!(" ({})", *year_num as i32);
             }
         }
         println!();

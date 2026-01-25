@@ -55,7 +55,7 @@ use std::time::SystemTime;
 
 use memmap2::{Mmap, MmapOptions};
 
-use crate::error::{Result, IrisError};
+use crate::error::{IrisError, Result};
 use crate::storage::{
     LockManager, Storage, StorageError, StorageInput, StorageLock, StorageOutput,
 };
@@ -363,11 +363,12 @@ impl Storage for FileStorage {
         let path = self.file_path(name);
 
         if let Some(parent) = path.parent()
-            && !parent.exists() {
-                std::fs::create_dir_all(parent).map_err(|e| {
-                    IrisError::storage(format!("Failed to create directory {:?}: {}", parent, e))
-                })?;
-            }
+            && !parent.exists()
+        {
+            std::fs::create_dir_all(parent).map_err(|e| {
+                IrisError::storage(format!("Failed to create directory {:?}: {}", parent, e))
+            })?;
+        }
 
         let file = OpenOptions::new()
             .write(true)
@@ -389,11 +390,12 @@ impl Storage for FileStorage {
         let path = self.file_path(name);
 
         if let Some(parent) = path.parent()
-            && !parent.exists() {
-                std::fs::create_dir_all(parent).map_err(|e| {
-                    IrisError::storage(format!("Failed to create directory {:?}: {}", parent, e))
-                })?;
-            }
+            && !parent.exists()
+        {
+            std::fs::create_dir_all(parent).map_err(|e| {
+                IrisError::storage(format!("Failed to create directory {:?}: {}", parent, e))
+            })?;
+        }
 
         let file = OpenOptions::new()
             .create(true)
@@ -432,17 +434,32 @@ impl Storage for FileStorage {
         self.check_closed()?;
 
         let mut files = Vec::new();
+        let mut queue = vec![self.directory.clone()];
 
-        for entry in
-            std::fs::read_dir(&self.directory).map_err(|e| StorageError::IoError(e.to_string()))?
-        {
-            let entry = entry.map_err(|e| StorageError::IoError(e.to_string()))?;
-            let path = entry.path();
+        while let Some(dir) = queue.pop() {
+            // Skip if error reading directory
+            let entries = match std::fs::read_dir(&dir) {
+                Ok(e) => e,
+                Err(_) => continue,
+            };
 
-            if path.is_file()
-                && let Some(name) = path.file_name().and_then(|n| n.to_str())
-            {
-                files.push(name.to_string());
+            for entry in entries {
+                let entry = match entry {
+                    Ok(e) => e,
+                    Err(_) => continue,
+                };
+                let path = entry.path();
+
+                if path.is_dir() {
+                    queue.push(path);
+                } else if path.is_file() {
+                    // Get relative path from root
+                    if let Ok(rel) = path.strip_prefix(&self.directory) {
+                        if let Some(name) = rel.to_str() {
+                            files.push(name.to_string());
+                        }
+                    }
+                }
             }
         }
 

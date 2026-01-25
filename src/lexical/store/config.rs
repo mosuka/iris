@@ -1,5 +1,6 @@
 //! Configuration for the lexical engine.
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
@@ -33,7 +34,7 @@ use crate::lexical::index::config::InvertedIndexConfig;
 /// # Example
 ///
 /// ```no_run
-/// use iris::lexical::engine::config::LexicalIndexConfig;
+/// use iris::lexical::store::config::LexicalIndexConfig;
 /// use iris::lexical::index::config::InvertedIndexConfig;
 ///
 /// // Use default inverted index
@@ -70,7 +71,7 @@ impl LexicalIndexConfig {
     /// # Example
     ///
     /// ```no_run
-    /// use iris::lexical::engine::config::LexicalIndexConfig;
+    /// use iris::lexical::store::config::LexicalIndexConfig;
     /// use iris::analysis::analyzer::standard::StandardAnalyzer;
     /// use std::sync::Arc;
     ///
@@ -112,7 +113,7 @@ impl LexicalIndexConfig {
 /// # Example
 ///
 /// ```no_run
-/// use iris::lexical::engine::config::LexicalIndexConfig;
+/// use iris::lexical::store::config::LexicalIndexConfig;
 /// use iris::analysis::analyzer::standard::StandardAnalyzer;
 /// use iris::analysis::analyzer::per_field::PerFieldAnalyzer;
 /// use std::sync::Arc;
@@ -126,7 +127,7 @@ impl LexicalIndexConfig {
 ///     .analyzer(analyzer)
 ///     .build();
 ///
-/// // With per-field analyzer (similar to VectorEngine's PerFieldEmbedder)
+/// // With per-field analyzer (similar to VectorStore's PerFieldEmbedder)
 /// let default_analyzer = Arc::new(StandardAnalyzer::default());
 /// let per_field = PerFieldAnalyzer::new(default_analyzer);
 /// let config = LexicalIndexConfig::builder()
@@ -144,7 +145,10 @@ pub struct LexicalIndexConfigBuilder {
     merge_factor: Option<u32>,
     max_segments: Option<u32>,
     default_fields: Vec<String>,
+    fields: HashMap<String, FieldOption>,
 }
+
+use crate::lexical::core::field::FieldOption;
 
 impl Default for LexicalIndexConfigBuilder {
     fn default() -> Self {
@@ -164,6 +168,7 @@ impl LexicalIndexConfigBuilder {
             merge_factor: None,
             max_segments: None,
             default_fields: Vec::new(),
+            fields: HashMap::new(),
         }
     }
 
@@ -175,7 +180,7 @@ impl LexicalIndexConfigBuilder {
     /// # Example
     ///
     /// ```no_run
-    /// use iris::lexical::engine::config::LexicalIndexConfig;
+    /// use iris::lexical::store::config::LexicalIndexConfig;
     /// use iris::analysis::analyzer::standard::StandardAnalyzer;
     /// use iris::analysis::analyzer::per_field::PerFieldAnalyzer;
     /// use std::sync::Arc;
@@ -274,6 +279,18 @@ impl LexicalIndexConfigBuilder {
         self
     }
 
+    /// Set field-specific configurations.
+    pub fn fields(mut self, fields: HashMap<String, FieldOption>) -> Self {
+        self.fields = fields;
+        self
+    }
+
+    /// Add a field-specific configuration.
+    pub fn add_field(mut self, name: impl Into<String>, option: FieldOption) -> Self {
+        self.fields.insert(name.into(), option);
+        self
+    }
+
     /// Build the configuration.
     ///
     /// Returns `LexicalIndexConfig::Inverted` with the configured settings.
@@ -304,6 +321,9 @@ impl LexicalIndexConfigBuilder {
         }
         if !self.default_fields.is_empty() {
             config.default_fields = self.default_fields;
+        }
+        if !self.fields.is_empty() {
+            config.fields = self.fields;
         }
 
         LexicalIndexConfig::Inverted(config)

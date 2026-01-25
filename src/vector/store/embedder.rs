@@ -1,4 +1,4 @@
-//! VectorEngine embedding related type definitions.
+//! VectorStore embedding related type definitions.
 //!
 //! This module provides embedding registry, embedding instance, and embedding executor.
 

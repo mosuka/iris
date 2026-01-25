@@ -173,6 +173,135 @@ pub enum VectorIndexKind {
     Ivf,
 }
 
+// From implementations for VectorOption
+impl From<FlatOption> for VectorOption {
+    fn from(opt: FlatOption) -> Self {
+        VectorOption::Flat(opt)
+    }
+}
+
+impl From<HnswOption> for VectorOption {
+    fn from(opt: HnswOption) -> Self {
+        VectorOption::Hnsw(opt)
+    }
+}
+
+impl From<IvfOption> for VectorOption {
+    fn from(opt: IvfOption) -> Self {
+        VectorOption::Ivf(opt)
+    }
+}
+
+// Builder pattern for FlatOption
+impl FlatOption {
+    pub fn new(dimension: usize) -> Self {
+        Self {
+            dimension,
+            ..Default::default()
+        }
+    }
+
+    pub fn dimension(mut self, dimension: usize) -> Self {
+        self.dimension = dimension;
+        self
+    }
+
+    pub fn distance(mut self, distance: DistanceMetric) -> Self {
+        self.distance = distance;
+        self
+    }
+
+    pub fn base_weight(mut self, weight: f32) -> Self {
+        self.base_weight = weight;
+        self
+    }
+
+    pub fn quantizer(mut self, quantizer: quantization::QuantizationMethod) -> Self {
+        self.quantizer = Some(quantizer);
+        self
+    }
+}
+
+// Builder pattern for HnswOption
+impl HnswOption {
+    pub fn new(dimension: usize) -> Self {
+        Self {
+            dimension,
+            ..Default::default()
+        }
+    }
+
+    pub fn dimension(mut self, dimension: usize) -> Self {
+        self.dimension = dimension;
+        self
+    }
+
+    pub fn distance(mut self, distance: DistanceMetric) -> Self {
+        self.distance = distance;
+        self
+    }
+
+    pub fn m(mut self, m: usize) -> Self {
+        self.m = m;
+        self
+    }
+
+    pub fn ef_construction(mut self, ef: usize) -> Self {
+        self.ef_construction = ef;
+        self
+    }
+
+    pub fn base_weight(mut self, weight: f32) -> Self {
+        self.base_weight = weight;
+        self
+    }
+
+    pub fn quantizer(mut self, quantizer: quantization::QuantizationMethod) -> Self {
+        self.quantizer = Some(quantizer);
+        self
+    }
+}
+
+// Builder pattern for IvfOption
+impl IvfOption {
+    pub fn new(dimension: usize) -> Self {
+        Self {
+            dimension,
+            ..Default::default()
+        }
+    }
+
+    pub fn dimension(mut self, dimension: usize) -> Self {
+        self.dimension = dimension;
+        self
+    }
+
+    pub fn distance(mut self, distance: DistanceMetric) -> Self {
+        self.distance = distance;
+        self
+    }
+
+    pub fn n_clusters(mut self, n: usize) -> Self {
+        self.n_clusters = n;
+        self
+    }
+
+    pub fn n_probe(mut self, n: usize) -> Self {
+        self.n_probe = n;
+        self
+    }
+
+    pub fn base_weight(mut self, weight: f32) -> Self {
+        self.base_weight = weight;
+        self
+    }
+
+    pub fn quantizer(mut self, quantizer: quantization::QuantizationMethod) -> Self {
+        self.quantizer = Some(quantizer);
+        self
+    }
+}
+
 // Helpers
 
 fn default_distance_metric() -> DistanceMetric {

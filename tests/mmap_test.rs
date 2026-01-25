@@ -2,12 +2,12 @@ use iris::embedding::precomputed::PrecomputedEmbedder;
 use iris::storage::file::FileStorageConfig;
 use iris::storage::{StorageConfig, StorageFactory};
 
+use iris::data::{DataValue, Document};
 use iris::vector::core::distance::DistanceMetric;
-use iris::vector::core::document::{DocumentPayload, Payload, PayloadSource};
 use iris::vector::core::field::{FlatOption, VectorOption};
-use iris::vector::engine::VectorEngine;
-use iris::vector::engine::config::{VectorFieldConfig, VectorIndexConfig};
-use iris::vector::engine::query::VectorSearchRequestBuilder;
+use iris::vector::store::VectorStore;
+use iris::vector::store::config::{VectorFieldConfig, VectorIndexConfig};
+use iris::vector::store::query::VectorSearchRequestBuilder;
 
 use std::sync::Arc;
 use tempfile::tempdir;
@@ -32,12 +32,12 @@ fn test_mmap_mode_basic_search() {
     };
 
     let config = VectorIndexConfig::builder()
-        .embedder(PrecomputedEmbedder::new())
+        .embedder(Arc::new(PrecomputedEmbedder::new()))
         .field("mmap_field", field_config)
         .build()
         .unwrap();
 
-    let engine = VectorEngine::new(storage, config).unwrap();
+    let engine = VectorStore::new(storage, config).unwrap();
 
     // Add vectors
     let vectors = vec![
@@ -47,13 +47,9 @@ fn test_mmap_mode_basic_search() {
     ];
 
     for vec_data in vectors {
-        let mut doc = DocumentPayload::new();
-        doc.set_field(
-            "mmap_field",
-            Payload::new(PayloadSource::Vector {
-                data: Arc::<[f32]>::from(vec_data.as_slice()),
-            }),
-        );
+        let doc = Document::builder()
+            .with_field("mmap_field", DataValue::Vector(vec_data))
+            .build();
         engine.add_payloads(doc).unwrap();
     }
     engine.commit().unwrap();
@@ -89,23 +85,19 @@ fn test_mmap_mode_persistence_reload() {
         };
 
         let config = VectorIndexConfig::builder()
-            .embedder(PrecomputedEmbedder::new())
+            .embedder(Arc::new(PrecomputedEmbedder::new()))
             .field("mmap_field", field_config)
             .build()
             .unwrap();
 
-        let engine = VectorEngine::new(storage, config).unwrap();
+        let engine = VectorStore::new(storage, config).unwrap();
 
         let vectors = vec![vec![1.0, 0.0, 0.0], vec![0.0, 1.0, 0.0]];
 
         for vec_data in vectors {
-            let mut doc = DocumentPayload::new();
-            doc.set_field(
-                "mmap_field",
-                Payload::new(PayloadSource::Vector {
-                    data: Arc::<[f32]>::from(vec_data.as_slice()),
-                }),
-            );
+            let doc = Document::builder()
+                .with_field("mmap_field", DataValue::Vector(vec_data))
+                .build();
             engine.add_payloads(doc).unwrap();
         }
         engine.commit().unwrap();
@@ -127,12 +119,12 @@ fn test_mmap_mode_persistence_reload() {
         };
 
         let config = VectorIndexConfig::builder()
-            .embedder(PrecomputedEmbedder::new())
+            .embedder(Arc::new(PrecomputedEmbedder::new()))
             .field("mmap_field", field_config)
             .build()
             .unwrap();
 
-        let engine = VectorEngine::new(storage, config).unwrap();
+        let engine = VectorStore::new(storage, config).unwrap();
 
         // IMPORTANT: In Mmap mode, vectors are LOADED from file on demand.
         // If file persistence works, search should find them.

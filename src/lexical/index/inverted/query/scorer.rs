@@ -2,6 +2,9 @@
 
 use std::fmt::Debug;
 
+use crate::error::Result;
+use crate::lexical::index::inverted::query::Query;
+use crate::lexical::index::inverted::query::matcher::Matcher;
 use crate::util::simd;
 
 /// Trait for document scorers.
@@ -323,6 +326,78 @@ impl Scorer for ConstantScorer {
 
     fn name(&self) -> &'static str {
         "Constant"
+    }
+}
+
+/// A scorer that combines multiple scorers by summing their scores.
+#[derive(Debug)]
+pub struct BooleanScorer {
+    /// The sub-queries and their scorers/matchers.
+    /// We use a Mutex for matchers since they are mutable.
+    clauses: std::sync::Mutex<Vec<(Box<dyn Scorer>, Box<dyn Matcher>)>>,
+    /// The boost factor for this scorer.
+    boost: f32,
+}
+
+impl BooleanScorer {
+    /// Create a new boolean scorer.
+    pub fn new(
+        reader: &dyn crate::lexical::reader::LexicalIndexReader,
+        queries: Vec<Box<dyn Query>>,
+    ) -> Result<Self> {
+        let mut clauses = Vec::new();
+        for query in queries {
+            let matcher = query.matcher(reader)?;
+            let scorer = query.scorer(reader)?;
+            clauses.push((scorer, matcher));
+        }
+        Ok(BooleanScorer {
+            clauses: std::sync::Mutex::new(clauses),
+            boost: 1.0,
+        })
+    }
+}
+
+impl Scorer for BooleanScorer {
+    fn score(&self, doc_id: u64, _term_freq: f32, field_length: Option<f32>) -> f32 {
+        let mut total_score = 0.0;
+        let mut clauses = self.clauses.lock().unwrap();
+
+        for (scorer, matcher) in clauses.iter_mut() {
+            // Skip to the target document
+            match matcher.skip_to(doc_id) {
+                Ok(true) if matcher.doc_id() == doc_id => {
+                    // This clause matches the document
+                    let tf = matcher.term_freq() as f32;
+                    total_score += scorer.score(doc_id, tf, field_length);
+                }
+                _ => {
+                    // This clause doesn't match, contributes zero
+                }
+            }
+        }
+        total_score * self.boost
+    }
+
+    fn boost(&self) -> f32 {
+        self.boost
+    }
+
+    fn set_boost(&mut self, boost: f32) {
+        self.boost = boost;
+    }
+
+    fn max_score(&self) -> f32 {
+        let mut total_max = 0.0;
+        let clauses = self.clauses.lock().unwrap();
+        for (scorer, _) in clauses.iter() {
+            total_max += scorer.max_score();
+        }
+        total_max * self.boost
+    }
+
+    fn name(&self) -> &'static str {
+        "Boolean"
     }
 }
 

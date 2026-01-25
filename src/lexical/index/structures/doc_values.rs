@@ -12,7 +12,7 @@ use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::sync::Arc;
 
-use crate::error::{Result, IrisError};
+use crate::error::{IrisError, Result};
 use crate::lexical::core::field::FieldValue;
 use crate::storage::Storage;
 
@@ -119,9 +119,8 @@ impl DocValuesWriter {
                 .iter()
                 .map(|(k, v)| (*k, v.clone()))
                 .collect();
-            let serialized = rkyv::to_bytes::<rkyv::rancor::Error>(&values_vec).map_err(|e| {
-                IrisError::Index(format!("Failed to serialize DocValues: {}", e))
-            })?;
+            let serialized = rkyv::to_bytes::<rkyv::rancor::Error>(&values_vec)
+                .map_err(|e| IrisError::Index(format!("Failed to serialize DocValues: {}", e)))?;
 
             output.write_all(&(serialized.len() as u64).to_le_bytes())?;
             output.write_all(&serialized)?;
@@ -251,15 +250,18 @@ mod tests {
         let mut dv = FieldDocValues::new("test_field".to_string());
 
         // Set some values
-        dv.set(0, FieldValue::Integer(100));
-        dv.set(1, FieldValue::Text("hello".to_string()));
-        dv.set(5, FieldValue::Float(3.15));
+        dv.set(0, crate::data::DataValue::Int64(100));
+        dv.set(1, crate::data::DataValue::Text("hello".to_string()));
+        dv.set(5, crate::data::DataValue::Float64(3.15));
 
         // Get values
-        assert_eq!(dv.get(0), Some(&FieldValue::Integer(100)));
-        assert_eq!(dv.get(1), Some(&FieldValue::Text("hello".to_string())));
+        assert_eq!(dv.get(0), Some(&crate::data::DataValue::Int64(100)));
+        assert_eq!(
+            dv.get(1),
+            Some(&crate::data::DataValue::Text("hello".to_string()))
+        );
         assert_eq!(dv.get(2), None);
-        assert_eq!(dv.get(5), Some(&FieldValue::Float(3.15)));
+        assert_eq!(dv.get(5), Some(&crate::data::DataValue::Float64(3.15)));
     }
 
     #[test]
@@ -270,10 +272,10 @@ mod tests {
         // Write DocValues
         {
             let mut writer = DocValuesWriter::new(storage.clone(), segment_name.clone());
-            writer.add_value(0, "year", FieldValue::Integer(2023));
-            writer.add_value(1, "year", FieldValue::Integer(2024));
-            writer.add_value(0, "rating", FieldValue::Float(4.5));
-            writer.add_value(1, "rating", FieldValue::Float(5.0));
+            writer.add_value(0, "year", crate::data::DataValue::Int64(2023));
+            writer.add_value(1, "year", crate::data::DataValue::Int64(2024));
+            writer.add_value(0, "rating", crate::data::DataValue::Float64(4.5));
+            writer.add_value(1, "rating", crate::data::DataValue::Float64(5.0));
             writer.write().unwrap();
         }
 
@@ -286,14 +288,20 @@ mod tests {
 
             assert_eq!(
                 reader.get_value("year", 0),
-                Some(&FieldValue::Integer(2023))
+                Some(&crate::data::DataValue::Int64(2023))
             );
             assert_eq!(
                 reader.get_value("year", 1),
-                Some(&FieldValue::Integer(2024))
+                Some(&crate::data::DataValue::Int64(2024))
             );
-            assert_eq!(reader.get_value("rating", 0), Some(&FieldValue::Float(4.5)));
-            assert_eq!(reader.get_value("rating", 1), Some(&FieldValue::Float(5.0)));
+            assert_eq!(
+                reader.get_value("rating", 0),
+                Some(&crate::data::DataValue::Float64(4.5))
+            );
+            assert_eq!(
+                reader.get_value("rating", 1),
+                Some(&crate::data::DataValue::Float64(5.0))
+            );
         }
     }
 }

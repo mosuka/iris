@@ -8,11 +8,10 @@ use iris::analysis::analyzer::analyzer::Analyzer;
 use iris::analysis::analyzer::keyword::KeywordAnalyzer;
 use iris::analysis::analyzer::per_field::PerFieldAnalyzer;
 use iris::analysis::analyzer::standard::StandardAnalyzer;
-use iris::lexical::core::document::Document;
-use iris::lexical::core::field::{FloatOption, TextOption};
+use iris::data::{DataValue, Document};
 use iris::error::Result;
-use iris::lexical::engine::LexicalEngine;
-use iris::lexical::engine::config::LexicalIndexConfig;
+use iris::lexical::store::LexicalStore;
+use iris::lexical::store::config::LexicalIndexConfig;
 use iris::lexical::index::config::InvertedIndexConfig;
 use iris::lexical::index::inverted::query::Query;
 use iris::lexical::index::inverted::query::boolean::BooleanQuery;
@@ -42,70 +41,63 @@ fn main() -> Result<()> {
         analyzer: Arc::new(per_field_analyzer.clone()),
         ..InvertedIndexConfig::default()
     });
-    let lexical_engine = LexicalEngine::new(storage, lexical_index_config)?;
+    let lexical_engine = LexicalStore::new(storage, lexical_index_config)?;
 
-    // Add documents for testing boolean queries
     let documents = vec![
-        Document::builder()
-            .add_text("title", "Advanced Python Programming", TextOption::default())
-            .add_text("body", "Learn advanced Python techniques including decorators, metaclasses, and async programming", TextOption::default())
-            .add_text("author", "Alice Johnson", TextOption::default())
-            .add_text("category", "programming", TextOption::default())
-            .add_float("price", 59.99, FloatOption::default())
-            .add_float("rating", 4.7, FloatOption::default())
-            .add_text("tags", "python advanced programming", TextOption::default())
-            .add_text("id", "book001", TextOption::default())
-            .build(),
-        Document::builder()
-            .add_text("title", "JavaScript for Web Development", TextOption::default())
-            .add_text("body", "Modern JavaScript techniques for frontend and backend web development", TextOption::default())
-            .add_text("author", "Bob Smith", TextOption::default())
-            .add_text("category", "web-development", TextOption::default())
-            .add_float("price", 45.50, FloatOption::default())
-            .add_float("rating", 4.3, FloatOption::default())
-            .add_text("tags", "javascript web frontend backend", TextOption::default())
-            .add_text("id", "book002", TextOption::default())
-            .build(),
-        Document::builder()
-            .add_text("title", "Machine Learning with Python", TextOption::default())
-            .add_text("body", "Practical machine learning algorithms implemented in Python", TextOption::default())
-            .add_text("author", "Carol Davis", TextOption::default())
-            .add_text("category", "data-science", TextOption::default())
-            .add_float("price", 72.99, FloatOption::default())
-            .add_float("rating", 4.8, FloatOption::default())
-            .add_text("tags", "python machine-learning data-science", TextOption::default())
-            .add_text("id", "book003", TextOption::default())
-            .build(),
-        Document::builder()
-            .add_text("title", "Web Design Fundamentals", TextOption::default())
-            .add_text("body", "Learn the basics of web design including HTML, CSS, and responsive design", TextOption::default())
-            .add_text("author", "David Brown", TextOption::default())
-            .add_text("category", "web-development", TextOption::default())
-            .add_float("price", 39.99, FloatOption::default())
-            .add_float("rating", 4.1, FloatOption::default())
-            .add_text("tags", "web design html css", TextOption::default())
-            .add_text("id", "book004", TextOption::default())
-            .build(),
-        Document::builder()
-            .add_text("title", "Data Science with R", TextOption::default())
-            .add_text("body", "Statistical computing and data analysis using the R programming language", TextOption::default())
-            .add_text("author", "Eva Wilson", TextOption::default())
-            .add_text("category", "data-science", TextOption::default())
-            .add_float("price", 65.00, FloatOption::default())
-            .add_float("rating", 4.5, FloatOption::default())
-            .add_text("tags", "r data-science statistics", TextOption::default())
-            .add_text("id", "book005", TextOption::default())
-            .build(),
-        Document::builder()
-            .add_text("title", "Advanced JavaScript Patterns", TextOption::default())
-            .add_text("body", "Design patterns and advanced programming techniques in JavaScript", TextOption::default())
-            .add_text("author", "Frank Miller", TextOption::default())
-            .add_text("category", "programming", TextOption::default())
-            .add_float("price", 54.99, FloatOption::default())
-            .add_float("rating", 4.6, FloatOption::default())
-            .add_text("tags", "javascript advanced patterns", TextOption::default())
-            .add_text("id", "book006", TextOption::default())
-            .build(),
+        Document::new()
+            .with_field("title", DataValue::Text("Advanced Python Programming".into()))
+            .with_field("body", DataValue::Text("Learn advanced Python techniques including decorators, metaclasses, and async programming".into()))
+            .with_field("author", DataValue::Text("Alice Johnson".into()))
+            .with_field("category", DataValue::Text("programming".into()))
+            .with_field("price", DataValue::Float64(59.99))
+            .with_field("rating", DataValue::Float64(4.7))
+            .with_field("tags", DataValue::Text("python advanced programming".into()))
+            .with_field("id", DataValue::Text("book001".into())),
+        Document::new()
+            .with_field("title", DataValue::Text("JavaScript for Web Development".into()))
+            .with_field("body", DataValue::Text("Modern JavaScript techniques for frontend and backend web development".into()))
+            .with_field("author", DataValue::Text("Bob Smith".into()))
+            .with_field("category", DataValue::Text("web-development".into()))
+            .with_field("price", DataValue::Float64(45.50))
+            .with_field("rating", DataValue::Float64(4.3))
+            .with_field("tags", DataValue::Text("javascript web frontend backend".into()))
+            .with_field("id", DataValue::Text("book002".into())),
+        Document::new()
+            .with_field("title", DataValue::Text("Machine Learning with Python".into()))
+            .with_field("body", DataValue::Text("Practical machine learning algorithms implemented in Python".into()))
+            .with_field("author", DataValue::Text("Carol Davis".into()))
+            .with_field("category", DataValue::Text("data-science".into()))
+            .with_field("price", DataValue::Float64(72.99))
+            .with_field("rating", DataValue::Float64(4.8))
+            .with_field("tags", DataValue::Text("python machine-learning data-science".into()))
+            .with_field("id", DataValue::Text("book003".into())),
+        Document::new()
+            .with_field("title", DataValue::Text("Web Design Fundamentals".into()))
+            .with_field("body", DataValue::Text("Learn the basics of web design including HTML, CSS, and responsive design".into()))
+            .with_field("author", DataValue::Text("David Brown".into()))
+            .with_field("category", DataValue::Text("web-development".into()))
+            .with_field("price", DataValue::Float64(39.99))
+            .with_field("rating", DataValue::Float64(4.1))
+            .with_field("tags", DataValue::Text("web design html css".into()))
+            .with_field("id", DataValue::Text("book004".into())),
+        Document::new()
+            .with_field("title", DataValue::Text("Data Science with R".into()))
+            .with_field("body", DataValue::Text("Statistical computing and data analysis using the R programming language".into()))
+            .with_field("author", DataValue::Text("Eva Wilson".into()))
+            .with_field("category", DataValue::Text("data-science".into()))
+            .with_field("price", DataValue::Float64(65.00))
+            .with_field("rating", DataValue::Float64(4.5))
+            .with_field("tags", DataValue::Text("r data-science statistics".into()))
+            .with_field("id", DataValue::Text("book005".into())),
+        Document::new()
+            .with_field("title", DataValue::Text("Advanced JavaScript Patterns".into()))
+            .with_field("body", DataValue::Text("Design patterns and advanced programming techniques in JavaScript".into()))
+            .with_field("author", DataValue::Text("Frank Miller".into()))
+            .with_field("category", DataValue::Text("programming".into()))
+            .with_field("price", DataValue::Float64(54.99))
+            .with_field("rating", DataValue::Float64(4.6))
+            .with_field("tags", DataValue::Text("javascript advanced patterns".into()))
+            .with_field("id", DataValue::Text("book006".into())),
     ];
 
     println!("Adding {} documents to the index...", documents.len());
@@ -138,8 +130,8 @@ fn main() -> Result<()> {
             hit.doc_id
         );
         if let Some(doc) = &hit.document
-            && let Some(field_value) = doc.get_field("title")
-            && let Some(title) = field_value.value.as_text()
+            && let Some(field) = doc.get_field("title")
+            && let DataValue::Text(title) = field
         {
             println!("      Title: {title}");
         }
@@ -162,8 +154,8 @@ fn main() -> Result<()> {
             hit.doc_id
         );
         if let Some(doc) = &hit.document
-            && let Some(field_value) = doc.get_field("title")
-            && let Some(title) = field_value.value.as_text()
+            && let Some(field) = doc.get_field("title")
+            && let DataValue::Text(title) = field
         {
             println!("      Title: {title}");
         }
@@ -186,8 +178,8 @@ fn main() -> Result<()> {
             hit.doc_id
         );
         if let Some(doc) = &hit.document
-            && let Some(field_value) = doc.get_field("title")
-            && let Some(title) = field_value.value.as_text()
+            && let Some(field) = doc.get_field("title")
+            && let DataValue::Text(title) = field
         {
             println!("      Title: {title}");
         }
@@ -219,18 +211,18 @@ fn main() -> Result<()> {
             hit.doc_id
         );
         if let Some(doc) = &hit.document {
-            if let Some(field_value) = doc.get_field("title")
-                && let Some(title) = field_value.value.as_text()
+            if let Some(field) = doc.get_field("title")
+                && let DataValue::Text(title) = field
             {
                 println!("      Title: {title}");
             }
             if let Some(field) = doc.get_field("price")
-                && let iris::lexical::core::field::FieldValue::Float(price) = &field.value
+                && let DataValue::Float64(price) = field
             {
                 println!("      Price: ${price:.2}");
             }
             if let Some(field) = doc.get_field("rating")
-                && let iris::lexical::core::field::FieldValue::Float(rating) = &field.value
+                && let DataValue::Float64(rating) = field
             {
                 println!("      Rating: {rating:.1}");
             }
@@ -257,8 +249,8 @@ fn main() -> Result<()> {
             hit.doc_id
         );
         if let Some(doc) = &hit.document
-            && let Some(field_value) = doc.get_field("title")
-            && let Some(title) = field_value.value.as_text()
+            && let Some(field) = doc.get_field("title")
+            && let DataValue::Text(title) = field
         {
             println!("      Title: {title}");
         }
@@ -286,8 +278,8 @@ fn main() -> Result<()> {
             hit.doc_id
         );
         if let Some(doc) = &hit.document
-            && let Some(field_value) = doc.get_field("title")
-            && let Some(title) = field_value.value.as_text()
+            && let Some(field) = doc.get_field("title")
+            && let DataValue::Text(title) = field
         {
             println!("      Title: {title}");
         }
@@ -314,13 +306,13 @@ fn main() -> Result<()> {
             hit.doc_id
         );
         if let Some(doc) = &hit.document {
-            if let Some(field_value) = doc.get_field("title")
-                && let Some(title) = field_value.value.as_text()
+            if let Some(field) = doc.get_field("title")
+                && let DataValue::Text(title) = field
             {
                 println!("      Title: {title}");
             }
             if let Some(field) = doc.get_field("price")
-                && let iris::lexical::core::field::FieldValue::Float(price) = &field.value
+                && let DataValue::Float64(price) = field
             {
                 println!("      Price: ${price:.2}");
             }
@@ -349,13 +341,13 @@ fn main() -> Result<()> {
             hit.doc_id
         );
         if let Some(doc) = &hit.document {
-            if let Some(field_value) = doc.get_field("title")
-                && let Some(title) = field_value.value.as_text()
+            if let Some(field) = doc.get_field("title")
+                && let DataValue::Text(title) = field
             {
                 println!("      Title: {title}");
             }
             if let Some(field) = doc.get_field("rating")
-                && let iris::lexical::core::field::FieldValue::Float(rating) = &field.value
+                && let DataValue::Float64(rating) = field
             {
                 println!("      Rating: {rating:.1}");
             }
@@ -405,18 +397,18 @@ fn main() -> Result<()> {
             hit.doc_id
         );
         if let Some(doc) = &hit.document {
-            if let Some(field_value) = doc.get_field("title")
-                && let Some(title) = field_value.value.as_text()
+            if let Some(field) = doc.get_field("title")
+                && let DataValue::Text(title) = field
             {
                 println!("      Title: {title}");
             }
             if let Some(field) = doc.get_field("price")
-                && let iris::lexical::core::field::FieldValue::Float(price) = &field.value
+                && let DataValue::Float64(price) = field
             {
                 println!("      Price: ${price:.2}");
             }
             if let Some(field) = doc.get_field("rating")
-                && let iris::lexical::core::field::FieldValue::Float(rating) = &field.value
+                && let DataValue::Float64(rating) = field
             {
                 println!("      Rating: {rating:.1}");
             }
@@ -465,13 +457,13 @@ fn main() -> Result<()> {
             hit.doc_id
         );
         if let Some(doc) = &hit.document {
-            if let Some(field_value) = doc.get_field("title")
-                && let Some(title) = field_value.value.as_text()
+            if let Some(field) = doc.get_field("title")
+                && let DataValue::Text(title) = field
             {
                 println!("      Title: {title}");
             }
             if let Some(field) = doc.get_field("price")
-                && let iris::lexical::core::field::FieldValue::Float(price) = &field.value
+                && let DataValue::Float64(price) = field
             {
                 println!("      Price: ${price:.2}");
             }

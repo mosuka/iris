@@ -1,6 +1,6 @@
 //! High-level lexical search engine that combines indexing and searching.
 //!
-//! This module provides the core `LexicalEngine` implementation.
+//! This module provides the core `LexicalStore` implementation.
 
 pub mod config;
 
@@ -9,19 +9,19 @@ use std::sync::Arc;
 use crate::analysis::analyzer::analyzer::Analyzer;
 use crate::error::Result;
 use crate::lexical::core::document::Document;
-use crate::lexical::engine::config::LexicalIndexConfig;
 use crate::lexical::index::LexicalIndex;
 use crate::lexical::index::factory::LexicalIndexFactory;
 use crate::lexical::index::inverted::InvertedIndexStats;
 use crate::lexical::index::inverted::query::LexicalSearchResults;
 use crate::lexical::search::searcher::{LexicalSearchRequest, LexicalSearcher};
+use crate::lexical::store::config::LexicalIndexConfig;
 use crate::lexical::writer::LexicalIndexWriter;
 use crate::storage::Storage;
 use parking_lot::{Mutex, RwLock};
 
 /// A high-level lexical search engine that provides both indexing and searching capabilities.
 ///
-/// The `LexicalEngine` wraps a `LexicalIndex` trait object and provides a simplified,
+/// The `LexicalStore` wraps a `LexicalIndex` trait object and provides a simplified,
 /// unified interface for all lexical search operations. It manages the complexity of
 /// coordinating between readers and writers while maintaining efficiency through caching.
 ///
@@ -42,8 +42,8 @@ use parking_lot::{Mutex, RwLock};
 ///
 /// ```rust,no_run
 /// use iris::lexical::core::document::Document;
-/// use iris::lexical::engine::LexicalEngine;
-/// use iris::lexical::engine::config::LexicalIndexConfig;
+/// use iris::lexical::store::LexicalStore;
+/// use iris::lexical::store::config::LexicalIndexConfig;
 /// use iris::lexical::search::searcher::LexicalSearchRequest;
 /// use iris::storage::memory::{MemoryStorage, MemoryStorageConfig};
 /// use std::sync::Arc;
@@ -51,7 +51,7 @@ use parking_lot::{Mutex, RwLock};
 /// // Create storage and engine
 /// let storage = Arc::new(MemoryStorage::new(MemoryStorageConfig::default()));
 /// let config = LexicalIndexConfig::default();
-/// let engine = LexicalEngine::new(storage, config).unwrap();
+/// let engine = LexicalStore::new(storage, config).unwrap();
 ///
 /// // Add documents
 /// use iris::lexical::core::field::TextOption;
@@ -64,22 +64,22 @@ use parking_lot::{Mutex, RwLock};
 /// // Search using DSL string
 /// let results = engine.search(LexicalSearchRequest::new("title:rust")).unwrap();
 /// ```
-pub struct LexicalEngine {
+pub struct LexicalStore {
     /// The underlying lexical index.
     index: Box<dyn LexicalIndex>,
     writer_cache: Mutex<Option<Box<dyn LexicalIndexWriter>>>,
     searcher_cache: RwLock<Option<Box<dyn LexicalSearcher>>>,
 }
 
-impl std::fmt::Debug for LexicalEngine {
+impl std::fmt::Debug for LexicalStore {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("LexicalEngine")
+        f.debug_struct("LexicalStore")
             .field("index", &self.index)
             .finish()
     }
 }
 
-impl LexicalEngine {
+impl LexicalStore {
     /// Create a new lexical search engine with the given storage and configuration.
     ///
     /// This constructor creates a `LexicalIndex` internally using the provided storage
@@ -93,34 +93,34 @@ impl LexicalEngine {
     ///
     /// # Returns
     ///
-    /// Returns a new `LexicalEngine` instance.
+    /// Returns a new `LexicalStore` instance.
     ///
     /// # Example with Memory Storage
     ///
     /// ```rust,no_run
-    /// use iris::lexical::engine::LexicalEngine;
-    /// use iris::lexical::engine::config::LexicalIndexConfig;
+    /// use iris::lexical::store::LexicalStore;
+    /// use iris::lexical::store::config::LexicalIndexConfig;
     /// use iris::storage::{Storage, StorageConfig, StorageFactory};
     /// use iris::storage::memory::MemoryStorageConfig;
     /// use std::sync::Arc;
     ///
     /// let storage_config = StorageConfig::Memory(MemoryStorageConfig::default());
     /// let storage = StorageFactory::create(storage_config).unwrap();
-    /// let engine = LexicalEngine::new(storage, LexicalIndexConfig::default()).unwrap();
+    /// let engine = LexicalStore::new(storage, LexicalIndexConfig::default()).unwrap();
     /// ```
     ///
     /// # Example with File Storage
     ///
     /// ```rust,no_run
-    /// use iris::lexical::engine::LexicalEngine;
-    /// use iris::lexical::engine::config::LexicalIndexConfig;
+    /// use iris::lexical::store::LexicalStore;
+    /// use iris::lexical::store::config::LexicalIndexConfig;
     /// use iris::storage::{Storage, StorageConfig, StorageFactory};
     /// use iris::storage::file::FileStorageConfig;
     /// use std::sync::Arc;
     ///
     /// let storage_config = StorageConfig::File(FileStorageConfig::new("/tmp/index"));
     /// let storage = StorageFactory::create(storage_config).unwrap();
-    /// let engine = LexicalEngine::new(storage, LexicalIndexConfig::default()).unwrap();
+    /// let engine = LexicalStore::new(storage, LexicalIndexConfig::default()).unwrap();
     /// ```
     pub fn new(storage: Arc<dyn Storage>, config: LexicalIndexConfig) -> Result<Self> {
         let index = LexicalIndexFactory::open_or_create(storage, config)?;
@@ -152,14 +152,14 @@ impl LexicalEngine {
     ///
     /// ```rust,no_run
     /// use iris::lexical::core::document::Document;
-    /// # use iris::lexical::engine::LexicalEngine;
-    /// # use iris::lexical::engine::config::LexicalIndexConfig;
+    /// # use iris::lexical::store::LexicalStore;
+    /// # use iris::lexical::store::config::LexicalIndexConfig;
     /// # use iris::storage::{StorageConfig, StorageFactory};
     /// use iris::storage::memory::MemoryStorageConfig;
     /// # use std::sync::Arc;
     /// # let storage_config = StorageConfig::Memory(MemoryStorageConfig::default());
     /// # let storage = StorageFactory::create(storage_config).unwrap();
-    /// # let engine = LexicalEngine::new(storage, LexicalIndexConfig::default()).unwrap();
+    /// # let engine = LexicalStore::new(storage, LexicalIndexConfig::default()).unwrap();
     ///
     /// use iris::lexical::core::field::TextOption;
     /// let doc = Document::builder()
@@ -206,14 +206,9 @@ impl LexicalEngine {
 
     /// Add or update a document for an external ID.
     pub fn index_document(&self, external_id: &str, mut doc: Document) -> Result<u64> {
-        use crate::lexical::core::field::{Field, FieldOption, FieldValue, TextOption};
-        doc.add_field(
-            "_id",
-            Field::new(
-                FieldValue::Text(external_id.to_string()),
-                FieldOption::Text(TextOption::default()),
-            ),
-        );
+        use crate::data::DataValue;
+        doc.fields
+            .insert("_id".to_string(), DataValue::Text(external_id.to_string()));
 
         if let Some(existing_id) = self.find_doc_id_by_term("_id", external_id)? {
             self.upsert_document(existing_id, doc)?;
@@ -234,9 +229,19 @@ impl LexicalEngine {
         guard.as_mut().unwrap().delete_document(doc_id)
     }
 
-    /// Get a document by its internal ID.
     pub fn get_document(&self, doc_id: u64) -> Result<Option<Document>> {
-        self.index.reader()?.document(doc_id)
+        let mut doc = self.index.reader()?.document(doc_id)?;
+
+        // If we have an _id field, use it to populate the Document.id property
+        if let Some(d) = &mut doc {
+            if d.id.is_none() {
+                if let Some(id_val) = d.fields.get("_id").and_then(|v| v.as_text()) {
+                    d.id = Some(id_val.to_string());
+                }
+            }
+        }
+
+        Ok(doc)
     }
 
     /// Get a document by its external ID.
@@ -269,9 +274,10 @@ impl LexicalEngine {
         {
             let guard = self.writer_cache.lock();
             if let Some(writer) = guard.as_ref()
-                && let Some(writer_ids) = writer.find_doc_ids_by_term(field, term)? {
-                    ids.extend(writer_ids);
-                }
+                && let Some(writer_ids) = writer.find_doc_ids_by_term(field, term)?
+            {
+                ids.extend(writer_ids);
+            }
         }
 
         // 2. Check reader (Committed)
@@ -327,9 +333,10 @@ impl LexicalEngine {
         {
             let guard = self.writer_cache.lock();
             if let Some(writer) = guard.as_ref()
-                && let Some(doc_id) = writer.find_doc_id_by_term(field, term)? {
-                    return Ok(Some(doc_id));
-                }
+                && let Some(doc_id) = writer.find_doc_id_by_term(field, term)?
+            {
+                return Ok(Some(doc_id));
+            }
         }
 
         // 2. Check reader (Committed)
@@ -369,14 +376,14 @@ impl LexicalEngine {
     ///
     /// ```rust,no_run
     /// use iris::lexical::core::document::Document;
-    /// # use iris::lexical::engine::LexicalEngine;
-    /// # use iris::lexical::engine::config::LexicalIndexConfig;
+    /// # use iris::lexical::store::LexicalStore;
+    /// # use iris::lexical::store::config::LexicalIndexConfig;
     /// # use iris::storage::{StorageConfig, StorageFactory};
     /// use iris::storage::memory::MemoryStorageConfig;
     /// # use std::sync::Arc;
     /// # let storage_config = StorageConfig::Memory(MemoryStorageConfig::default());
     /// # let storage = StorageFactory::create(storage_config).unwrap();
-    /// # let engine = LexicalEngine::new(storage, LexicalIndexConfig::default()).unwrap();
+    /// # let engine = LexicalStore::new(storage, LexicalIndexConfig::default()).unwrap();
     ///
     /// // Add multiple documents
     /// use iris::lexical::core::field::TextOption;
@@ -420,14 +427,14 @@ impl LexicalEngine {
     ///
     /// ```rust,no_run
     /// use iris::lexical::core::document::Document;
-    /// # use iris::lexical::engine::LexicalEngine;
-    /// # use iris::lexical::engine::config::LexicalIndexConfig;
+    /// # use iris::lexical::store::LexicalStore;
+    /// # use iris::lexical::store::config::LexicalIndexConfig;
     /// # use iris::storage::{StorageConfig, StorageFactory};
     /// use iris::storage::memory::MemoryStorageConfig;
     /// # use std::sync::Arc;
     /// # let storage_config = StorageConfig::Memory(MemoryStorageConfig::default());
     /// # let storage = StorageFactory::create(storage_config).unwrap();
-    /// # let mut engine = LexicalEngine::new(storage, LexicalIndexConfig::default()).unwrap();
+    /// # let mut engine = LexicalStore::new(storage, LexicalIndexConfig::default()).unwrap();
     ///
     /// // Add and commit many documents
     /// use iris::lexical::core::field::TextOption;
@@ -491,14 +498,14 @@ impl LexicalEngine {
     /// use iris::lexical::core::document::Document;
     /// use iris::lexical::search::searcher::LexicalSearchRequest;
     /// use iris::lexical::index::inverted::query::term::TermQuery;
-    /// # use iris::lexical::engine::LexicalEngine;
-    /// # use iris::lexical::engine::config::LexicalIndexConfig;
+    /// # use iris::lexical::store::LexicalStore;
+    /// # use iris::lexical::store::config::LexicalIndexConfig;
     /// # use iris::storage::{StorageConfig, StorageFactory};
     /// use iris::storage::memory::MemoryStorageConfig;
     /// # use std::sync::Arc;
     /// # let storage_config = StorageConfig::Memory(MemoryStorageConfig::default());
     /// # let storage = StorageFactory::create(storage_config).unwrap();
-    /// # let engine = LexicalEngine::new(storage, LexicalIndexConfig::default()).unwrap();
+    /// # let engine = LexicalStore::new(storage, LexicalIndexConfig::default()).unwrap();
     /// # use iris::lexical::core::field::TextOption;
     /// # let doc = Document::builder().add_text("title", "hello world", TextOption::default()).build();
     /// # engine.add_document(doc).unwrap();
@@ -522,15 +529,15 @@ impl LexicalEngine {
     /// use iris::lexical::index::inverted::query::parser::QueryParser;
     /// use iris::lexical::search::searcher::LexicalSearchRequest;
     /// # use iris::lexical::core::document::Document;
-    /// # use iris::lexical::engine::LexicalEngine;
-    /// # use iris::lexical::engine::config::LexicalIndexConfig;
+    /// # use iris::lexical::store::LexicalStore;
+    /// # use iris::lexical::store::config::LexicalIndexConfig;
     /// # use iris::storage::{StorageConfig, StorageFactory};
     /// use iris::storage::memory::MemoryStorageConfig;
     /// use iris::analysis::analyzer::standard::StandardAnalyzer;
     /// # use std::sync::Arc;
     /// # let storage_config = StorageConfig::Memory(MemoryStorageConfig::default());
     /// # let storage = StorageFactory::create(storage_config).unwrap();
-    /// # let engine = LexicalEngine::new(storage, LexicalIndexConfig::default()).unwrap();
+    /// # let engine = LexicalStore::new(storage, LexicalIndexConfig::default()).unwrap();
     ///
     /// let analyzer = Arc::new(StandardAnalyzer::default());
     /// let parser = QueryParser::new(analyzer).with_default_field("title");
@@ -565,15 +572,15 @@ impl LexicalEngine {
     /// # Examples
     ///
     /// ```no_run
-    /// # use iris::lexical::engine::LexicalEngine;
-    /// # use iris::lexical::engine::config::LexicalIndexConfig;
+    /// # use iris::lexical::store::LexicalStore;
+    /// # use iris::lexical::store::config::LexicalIndexConfig;
     /// # use iris::lexical::search::searcher::LexicalSearchRequest;
     /// # use iris::storage::memory::MemoryStorage;
     /// # use iris::storage::memory::MemoryStorageConfig;
     /// # use std::sync::Arc;
     /// # let config = LexicalIndexConfig::default();
     /// # let storage = Arc::new(MemoryStorage::new(MemoryStorageConfig::default()));
-    /// # let engine = LexicalEngine::new(storage, config).unwrap();
+    /// # let engine = LexicalStore::new(storage, config).unwrap();
     /// // Count all matching documents
     /// let count = engine.count(LexicalSearchRequest::new("title:hello")).unwrap();
     /// println!("Found {} documents", count);
@@ -651,12 +658,31 @@ impl LexicalEngine {
         let analyzer = self.analyzer()?;
         let mut parser = crate::lexical::index::inverted::query::parser::QueryParser::new(analyzer);
 
-        if let Ok(fields) = self.index.default_fields()
-            && !fields.is_empty() {
+        if let Ok(fields) = self.index.default_fields() {
+            if !fields.is_empty() {
                 parser = parser.with_default_fields(fields);
             }
+        }
 
         Ok(parser)
+    }
+
+    /// Get the last processed WAL sequence number.
+    pub fn last_wal_seq(&self) -> u64 {
+        self.index.last_wal_seq()
+    }
+
+    /// Set the last processed WAL sequence number.
+    ///
+    /// If a writer is cached, it sets the sequence on the writer.
+    /// Otherwise, it sets it on the underlying index.
+    pub fn set_last_wal_seq(&self, seq: u64) -> Result<()> {
+        if let Some(writer) = self.writer_cache.lock().as_mut() {
+            writer.set_last_wal_seq(seq)?;
+        } else {
+            self.index.set_last_wal_seq(seq)?;
+        }
+        Ok(())
     }
 }
 
@@ -664,9 +690,9 @@ impl LexicalEngine {
 mod tests {
     use super::*;
     use crate::lexical::core::field::TextOption;
-    use crate::lexical::engine::config::LexicalIndexConfig;
     use crate::lexical::index::inverted::query::Query;
     use crate::lexical::index::inverted::query::term::TermQuery;
+    use crate::lexical::store::config::LexicalIndexConfig;
     use crate::storage::file::{FileStorage, FileStorageConfig};
     use crate::storage::memory::{MemoryStorage, MemoryStorageConfig};
     use std::sync::Arc;
@@ -687,7 +713,7 @@ mod tests {
         let storage = Arc::new(
             FileStorage::new(temp_dir.path(), FileStorageConfig::new(temp_dir.path())).unwrap(),
         );
-        let engine = LexicalEngine::new(storage, config).unwrap();
+        let engine = LexicalStore::new(storage, config).unwrap();
 
         // Schema-less mode: no schema() method available
         assert!(!engine.is_closed());
@@ -697,7 +723,7 @@ mod tests {
     fn test_search_engine_in_memory() {
         let config = LexicalIndexConfig::default();
         let storage = Arc::new(MemoryStorage::new(MemoryStorageConfig::default()));
-        let engine = LexicalEngine::new(storage, config).unwrap();
+        let engine = LexicalStore::new(storage, config).unwrap();
 
         // Add some documents
         let docs = vec![
@@ -727,14 +753,14 @@ mod tests {
         let storage = Arc::new(
             FileStorage::new(temp_dir.path(), FileStorageConfig::new(temp_dir.path())).unwrap(),
         );
-        let engine = LexicalEngine::new(storage, config.clone()).unwrap();
+        let engine = LexicalStore::new(storage, config.clone()).unwrap();
         engine.close().unwrap();
 
         // Open engine
         let storage = Arc::new(
             FileStorage::new(temp_dir.path(), FileStorageConfig::new(temp_dir.path())).unwrap(),
         );
-        let engine = LexicalEngine::new(storage, config).unwrap();
+        let engine = LexicalStore::new(storage, config).unwrap();
 
         // Schema-less mode: no schema() method available
         assert!(!engine.is_closed());
@@ -748,7 +774,7 @@ mod tests {
         let storage = Arc::new(
             FileStorage::new(temp_dir.path(), FileStorageConfig::new(temp_dir.path())).unwrap(),
         );
-        let engine = LexicalEngine::new(storage, config).unwrap();
+        let engine = LexicalStore::new(storage, config).unwrap();
 
         let doc = create_test_document("Hello World", "This is a test document");
         engine.add_document(doc).unwrap();
@@ -769,7 +795,7 @@ mod tests {
         let storage = Arc::new(
             FileStorage::new(temp_dir.path(), FileStorageConfig::new(temp_dir.path())).unwrap(),
         );
-        let engine = LexicalEngine::new(storage, config).unwrap();
+        let engine = LexicalStore::new(storage, config).unwrap();
 
         let docs = vec![
             create_test_document("First Document", "Content of first document"),
@@ -792,7 +818,7 @@ mod tests {
         let storage = Arc::new(
             FileStorage::new(temp_dir.path(), FileStorageConfig::new(temp_dir.path())).unwrap(),
         );
-        let engine = LexicalEngine::new(storage, config).unwrap();
+        let engine = LexicalStore::new(storage, config).unwrap();
 
         let query = Box::new(TermQuery::new("title", "hello")) as Box<dyn Query>;
         let request = LexicalSearchRequest::new(query);
@@ -811,7 +837,7 @@ mod tests {
         let storage = Arc::new(
             FileStorage::new(temp_dir.path(), FileStorageConfig::new(temp_dir.path())).unwrap(),
         );
-        let engine = LexicalEngine::new(storage, config).unwrap();
+        let engine = LexicalStore::new(storage, config).unwrap();
 
         // Add some documents
         let docs = vec![
@@ -840,7 +866,7 @@ mod tests {
         let storage = Arc::new(
             FileStorage::new(temp_dir.path(), FileStorageConfig::new(temp_dir.path())).unwrap(),
         );
-        let engine = LexicalEngine::new(storage, config).unwrap();
+        let engine = LexicalStore::new(storage, config).unwrap();
 
         let query = Box::new(TermQuery::new("title", "hello")) as Box<dyn Query>;
         let count = engine.count(LexicalSearchRequest::new(query)).unwrap();
@@ -857,7 +883,7 @@ mod tests {
         let storage = Arc::new(
             FileStorage::new(temp_dir.path(), FileStorageConfig::new(temp_dir.path())).unwrap(),
         );
-        let engine = LexicalEngine::new(storage, config).unwrap();
+        let engine = LexicalStore::new(storage, config).unwrap();
 
         // Add a document
         let doc = create_test_document("Test Document", "Test content");
@@ -882,7 +908,7 @@ mod tests {
         let storage = Arc::new(
             FileStorage::new(temp_dir.path(), FileStorageConfig::new(temp_dir.path())).unwrap(),
         );
-        let engine = LexicalEngine::new(storage, config).unwrap();
+        let engine = LexicalStore::new(storage, config).unwrap();
 
         let stats = engine.stats().unwrap();
         // doc_count is usize, so >= 0 check is redundant
@@ -898,7 +924,7 @@ mod tests {
         let storage = Arc::new(
             FileStorage::new(temp_dir.path(), FileStorageConfig::new(temp_dir.path())).unwrap(),
         );
-        let engine = LexicalEngine::new(storage, config).unwrap();
+        let engine = LexicalStore::new(storage, config).unwrap();
 
         assert!(!engine.is_closed());
 
@@ -915,7 +941,7 @@ mod tests {
         let storage = Arc::new(
             FileStorage::new(temp_dir.path(), FileStorageConfig::new(temp_dir.path())).unwrap(),
         );
-        let engine = LexicalEngine::new(storage, config).unwrap();
+        let engine = LexicalStore::new(storage, config).unwrap();
 
         let query = Box::new(TermQuery::new("title", "hello")) as Box<dyn Query>;
         let request = LexicalSearchRequest::new(query)
@@ -938,7 +964,7 @@ mod tests {
         let storage = Arc::new(
             FileStorage::new(temp_dir.path(), FileStorageConfig::new(temp_dir.path())).unwrap(),
         );
-        let engine = LexicalEngine::new(storage, config).unwrap();
+        let engine = LexicalStore::new(storage, config).unwrap();
 
         // Add some documents with lowercase titles for testing
         let docs = vec![
@@ -972,7 +998,7 @@ mod tests {
         let storage = Arc::new(
             FileStorage::new(temp_dir.path(), FileStorageConfig::new(temp_dir.path())).unwrap(),
         );
-        let engine = LexicalEngine::new(storage, config).unwrap();
+        let engine = LexicalStore::new(storage, config).unwrap();
 
         // Search specific field
         use crate::analysis::analyzer::standard::StandardAnalyzer;
@@ -993,7 +1019,7 @@ mod tests {
         let storage = Arc::new(
             FileStorage::new(temp_dir.path(), FileStorageConfig::new(temp_dir.path())).unwrap(),
         );
-        let engine = LexicalEngine::new(storage.clone(), config).unwrap();
+        let engine = LexicalStore::new(storage.clone(), config).unwrap();
 
         // 1. Index document with external ID
         let doc = Document::builder()
@@ -1007,7 +1033,7 @@ mod tests {
         let found = engine.get_document(internal_id).unwrap();
         assert!(found.is_some());
         assert_eq!(
-            found.unwrap().get_field("title").unwrap().value.as_text(),
+            found.unwrap().get_field("title").unwrap().as_text(),
             Some("Test Doc")
         );
 
@@ -1015,12 +1041,7 @@ mod tests {
         let found_ext = engine.get_document_by_id("ext_1").unwrap();
         assert!(found_ext.is_some());
         assert_eq!(
-            found_ext
-                .unwrap()
-                .get_field("title")
-                .unwrap()
-                .value
-                .as_text(),
+            found_ext.unwrap().get_field("title").unwrap().as_text(),
             Some("Test Doc")
         );
 
@@ -1034,12 +1055,7 @@ mod tests {
 
         let found_v2 = engine.get_document_by_id("ext_1").unwrap();
         assert_eq!(
-            found_v2
-                .unwrap()
-                .get_field("title")
-                .unwrap()
-                .value
-                .as_text(),
+            found_v2.unwrap().get_field("title").unwrap().as_text(),
             Some("Test Doc V2")
         );
 

@@ -10,12 +10,12 @@
 //! - Pluggable storage backends
 //! - Multiple query types
 //! - BM25 scoring
-
+// Core modules
 pub mod analysis;
-
+pub mod data;
 pub mod embedding;
+pub mod engine;
 pub mod error;
-
 pub mod lexical;
 pub mod maintenance;
 pub mod spelling;

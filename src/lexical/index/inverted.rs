@@ -20,7 +20,7 @@ use parking_lot::RwLock;
 
 use serde::{Deserialize, Serialize};
 
-use crate::error::{Result, IrisError};
+use crate::error::{IrisError, Result};
 use crate::lexical::index::LexicalIndex;
 use crate::lexical::index::config::InvertedIndexConfig;
 use crate::lexical::reader::LexicalIndexReader;
@@ -63,6 +63,10 @@ pub struct IndexMetadata {
     /// Number of deleted documents.
     #[serde(default)]
     pub deleted_count: u64,
+
+    /// Last processed WAL sequence number.
+    #[serde(default)]
+    pub last_wal_seq: u64,
 }
 
 /// Statistics about an inverted index.
@@ -101,6 +105,7 @@ impl Default for IndexMetadata {
             doc_count: 0,
             generation: 0,
             deleted_count: 0,
+            last_wal_seq: 0,
         }
     }
 }
@@ -290,6 +295,19 @@ impl InvertedIndex {
         self.check_closed()?;
         self.storage.list_files()
     }
+
+    pub fn last_wal_seq(&self) -> u64 {
+        self.metadata.read().last_wal_seq
+    }
+
+    pub fn set_last_wal_seq(&self, seq: u64) -> Result<()> {
+        self.check_closed()?;
+        {
+            let mut metadata = self.metadata.write();
+            metadata.last_wal_seq = seq;
+        }
+        self.update_metadata()
+    }
 }
 
 impl LexicalIndex for InvertedIndex {
@@ -315,6 +333,7 @@ impl LexicalIndex for InvertedIndex {
         let writer_config = InvertedIndexWriterConfig {
             analyzer: self.config.analyzer.clone(),
             shard_id: self.config.shard_id,
+            fields: self.config.fields.clone(),
             ..Default::default()
         };
         let writer = InvertedIndexWriter::new(self.storage.clone(), writer_config)?;

@@ -311,55 +311,33 @@ impl Query for BooleanQuery {
     }
 
     fn scorer(&self, reader: &dyn LexicalIndexReader) -> Result<Box<dyn Scorer>> {
-        // For boolean queries, we combine the scores from child queries
-        // For simplicity, we'll estimate based on the most restrictive clause
-        let must_clauses = self.clauses_by_occur(Occur::Must);
-        let should_clauses = self.clauses_by_occur(Occur::Should);
+        use crate::lexical::index::inverted::query::scorer::BooleanScorer;
 
-        // If we have MUST clauses, use the first one for scoring estimation
-        if let Some(clause) = must_clauses.first() {
-            let child_scorer = clause.query.scorer(reader)?;
-            // Scale the boost to account for boolean combination
-            let combined_boost = self.boost * child_scorer.boost();
+        let mut sub_queries = Vec::new();
 
-            // Create a scorer with estimated parameters
-            let scorer = BM25Scorer::new(
-                reader.doc_count() / 4, // Estimate: 25% of docs might match
-                reader.doc_count() / 2, // Estimate: 50% term frequency
-                reader.doc_count(),
-                10.0, // Estimated average field length
-                reader.doc_count(),
-                combined_boost,
-            );
-            return Ok(Box::new(scorer));
+        // Collect queries from MUST and SHOULD clauses
+        for clause in &self.clauses {
+            if clause.occur == Occur::Must || clause.occur == Occur::Should {
+                sub_queries.push(clause.query.clone_box());
+            }
         }
 
-        // If we have SHOULD clauses, use the first one
-        if let Some(clause) = should_clauses.first() {
-            let child_scorer = clause.query.scorer(reader)?;
-            let combined_boost = self.boost * child_scorer.boost();
-
+        if sub_queries.is_empty() {
+            // Fallback for empty boolean query
             let scorer = BM25Scorer::new(
-                reader.doc_count() / 3, // More liberal estimate for SHOULD
-                reader.doc_count() / 2,
+                1,
+                1,
                 reader.doc_count(),
                 10.0,
                 reader.doc_count(),
-                combined_boost,
+                self.boost,
             );
             return Ok(Box::new(scorer));
         }
 
-        // Fallback for empty boolean query
-        let scorer = BM25Scorer::new(
-            1,
-            1,
-            reader.doc_count(),
-            10.0,
-            reader.doc_count(),
-            self.boost,
-        );
-        Ok(Box::new(scorer))
+        let mut boolean_scorer = BooleanScorer::new(reader, sub_queries)?;
+        boolean_scorer.set_boost(self.boost);
+        Ok(Box::new(boolean_scorer))
     }
 
     fn boost(&self) -> f32 {
@@ -426,6 +404,20 @@ impl Query for BooleanQuery {
 
     fn as_any(&self) -> &dyn std::any::Any {
         self
+    }
+
+    fn apply_field_boosts(&mut self, boosts: &std::collections::HashMap<String, f32>) {
+        // Apply overall boost if targeted (BooleanQuery doesn't target a field usually, but we check anyway)
+        if let Some(f) = self.field() {
+            if let Some(&b) = boosts.get(f) {
+                self.set_boost(self.boost() * b);
+            }
+        }
+
+        // Recursively apply to all clauses
+        for clause in &mut self.clauses {
+            clause.query.apply_field_boosts(boosts);
+        }
     }
 }
 

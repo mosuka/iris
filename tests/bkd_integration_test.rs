@@ -1,6 +1,6 @@
 use chrono::{TimeZone, Utc};
-use iris::lexical::core::document::Document;
-use iris::lexical::core::field::{DateTimeOption, FloatOption, IntegerOption, NumericType};
+use iris::data::{DataValue, Document};
+use iris::lexical::core::field::NumericType;
 use iris::lexical::index::inverted::query::Query;
 use iris::lexical::index::inverted::query::geo::{GeoDistanceQuery, GeoPoint};
 use iris::lexical::index::inverted::query::range::NumericRangeQuery;
@@ -19,95 +19,37 @@ fn test_bkd_file_creation_and_query() {
     };
     let mut writer = InvertedIndexWriter::new(storage.clone(), config).unwrap();
 
-    // Add documents
     // Doc 1: age=30, score=95.5
-    let doc1 = Document::builder()
-        .add_integer(
-            "age",
-            30,
-            IntegerOption {
-                indexed: true,
-                stored: true,
-            },
-        )
-        .add_float(
-            "score",
-            95.5,
-            FloatOption {
-                indexed: true,
-                stored: true,
-            },
-        )
-        .add_datetime(
+    let doc1 = Document::new()
+        .with_field("age", DataValue::Int64(30))
+        .with_field("score", DataValue::Float64(95.5))
+        .with_field(
             "created_at",
-            Utc.timestamp_opt(1600000000, 0).unwrap(),
-            DateTimeOption {
-                indexed: true,
-                stored: true,
-            },
+            DataValue::DateTime(Utc.timestamp_opt(1600000000, 0).unwrap()),
         )
-        .add_text("description", "User profile 1", Default::default())
-        .build();
+        .with_field("description", DataValue::Text("User profile 1".into()));
     writer.add_document(doc1).unwrap();
 
     // Doc 2: age=20, score=80.0
-    let doc2 = Document::builder()
-        .add_integer(
-            "age",
-            20,
-            IntegerOption {
-                indexed: true,
-                stored: true,
-            },
-        )
-        .add_float(
-            "score",
-            80.0,
-            FloatOption {
-                indexed: true,
-                stored: true,
-            },
-        )
-        .add_datetime(
+    let doc2 = Document::new()
+        .with_field("age", DataValue::Int64(20))
+        .with_field("score", DataValue::Float64(80.0))
+        .with_field(
             "created_at",
-            Utc.timestamp_opt(1500000000, 0).unwrap(),
-            DateTimeOption {
-                indexed: true,
-                stored: true,
-            },
+            DataValue::DateTime(Utc.timestamp_opt(1500000000, 0).unwrap()),
         )
-        .add_text("description", "User profile 2", Default::default())
-        .build();
+        .with_field("description", DataValue::Text("User profile 2".into()));
     writer.add_document(doc2).unwrap();
 
     // Doc 3: age=40, score=100.0
-    let doc3 = Document::builder()
-        .add_integer(
-            "age",
-            40,
-            IntegerOption {
-                indexed: true,
-                stored: true,
-            },
-        )
-        .add_float(
-            "score",
-            100.0,
-            FloatOption {
-                indexed: true,
-                stored: true,
-            },
-        )
-        .add_datetime(
+    let doc3 = Document::new()
+        .with_field("age", DataValue::Int64(40))
+        .with_field("score", DataValue::Float64(100.0))
+        .with_field(
             "created_at",
-            Utc.timestamp_opt(1700000000, 0).unwrap(),
-            DateTimeOption {
-                indexed: true,
-                stored: true,
-            },
+            DataValue::DateTime(Utc.timestamp_opt(1700000000, 0).unwrap()),
         )
-        .add_text("description", "User profile 3", Default::default())
-        .build();
+        .with_field("description", DataValue::Text("User profile 3".into()));
     writer.add_document(doc3).unwrap();
 
     // Commit to flush segment
@@ -176,28 +118,25 @@ fn test_geo_bkd_query() {
 
     writer
         .add_document(
-            Document::builder()
-                .add_geo("location", tokyo.lat, tokyo.lon, Default::default())
-                .add_text("city", "Tokyo", Default::default())
-                .build(),
+            Document::new()
+                .with_field("location", DataValue::Geo(tokyo.lat, tokyo.lon))
+                .with_field("city", DataValue::Text("Tokyo".into())),
         )
         .unwrap();
 
     writer
         .add_document(
-            Document::builder()
-                .add_geo("location", yokohama.lat, yokohama.lon, Default::default())
-                .add_text("city", "Yokohama", Default::default())
-                .build(),
+            Document::new()
+                .with_field("location", DataValue::Geo(yokohama.lat, yokohama.lon))
+                .with_field("city", DataValue::Text("Yokohama".into())),
         )
         .unwrap();
 
     writer
         .add_document(
-            Document::builder()
-                .add_geo("location", osaka.lat, osaka.lon, Default::default())
-                .add_text("city", "Osaka", Default::default())
-                .build(),
+            Document::new()
+                .with_field("location", DataValue::Geo(osaka.lat, osaka.lon))
+                .with_field("city", DataValue::Text("Osaka".into())),
         )
         .unwrap();
 

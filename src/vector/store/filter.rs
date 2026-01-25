@@ -1,4 +1,4 @@
-//! VectorEngine フィルタ関連の型定義
+//! VectorStore フィルタ関連の型定義
 //!
 //! このモジュールはメタデータフィルタ、エンジンフィルタ、フィルタマッチ結果を提供する。
 
@@ -20,7 +20,7 @@ impl MetadataFilter {
     }
 }
 
-use crate::vector::engine::request::LexicalQuery;
+use crate::vector::store::request::LexicalQuery;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]

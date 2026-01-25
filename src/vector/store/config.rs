@@ -1,11 +1,11 @@
-//! VectorEngine configuration types.
+//! VectorStore configuration types.
 //!
 //! This module provides engine configuration, field configuration, and embedder settings.
 //!
 //! # Configuration with Embedder
 //!
-//! The recommended way to configure a VectorEngine is to provide an `Embedder` directly
-//! in the configuration, similar to how `Analyzer` is used in `LexicalEngine`.
+//! The recommended way to configure a VectorStore is to provide an `Embedder` directly
+//! in the configuration, similar to how `Analyzer` is used in `LexicalStore`.
 //!
 //! ```no_run
 //! # #[cfg(feature = "embeddings-candle")]
@@ -13,7 +13,8 @@
 //! use iris::embedding::per_field::PerFieldEmbedder;
 //! use iris::embedding::candle_bert_embedder::CandleBertEmbedder;
 //! use iris::embedding::embedder::Embedder;
-//! use iris::vector::engine::config::VectorIndexConfig;
+//! use iris::vector::store::config::VectorIndexConfig;
+//! use iris::vector::core::field::FlatOption;
 //! use std::sync::Arc;
 //!
 //! # fn example() -> iris::error::Result<()> {
@@ -21,11 +22,11 @@
 //!     CandleBertEmbedder::new("sentence-transformers/all-MiniLM-L6-v2")?
 //! );
 //!
-//! let embedder = PerFieldEmbedder::new(text_embedder);
+//! let embedder = Arc::new(PerFieldEmbedder::new(text_embedder));
 //!
 //! let config = VectorIndexConfig::builder()
 //!     .embedder(embedder)
-//!     .add_field("title", 384)?
+//!     .add_field("title", FlatOption::new(384))?
 //!     .build()?;
 //! # Ok(())
 //! # }
@@ -39,11 +40,11 @@ use serde::{Deserialize, Serialize};
 
 use crate::embedding::embedder::{EmbedInput, EmbedInputType, Embedder};
 use crate::embedding::precomputed::PrecomputedEmbedder;
-use crate::error::{Result, IrisError};
-use crate::lexical::engine::config::LexicalIndexConfig;
+use crate::error::{IrisError, Result};
+use crate::lexical::store::config::LexicalIndexConfig;
 use crate::maintenance::deletion::DeletionConfig;
 use crate::vector::core::distance::DistanceMetric;
-use crate::vector::core::field::{FlatOption, VectorIndexKind, VectorOption};
+use crate::vector::core::field::VectorOption;
 use crate::vector::core::quantization;
 use crate::vector::core::vector::Vector;
 
@@ -59,8 +60,8 @@ use crate::vector::core::vector::Vector;
 /// use iris::embedding::per_field::PerFieldEmbedder;
 /// use iris::embedding::candle_bert_embedder::CandleBertEmbedder;
 /// use iris::embedding::embedder::Embedder;
-/// use iris::vector::engine::config::{VectorIndexConfig, VectorFieldConfig};
-/// use iris::vector::core::field::VectorIndexKind;
+/// use iris::vector::store::config::{VectorIndexConfig, VectorFieldConfig};
+/// use iris::vector::core::field::{VectorIndexKind, FlatOption};
 /// use iris::vector::core::distance::DistanceMetric;
 /// use std::sync::Arc;
 ///
@@ -69,11 +70,11 @@ use crate::vector::core::vector::Vector;
 ///     CandleBertEmbedder::new("sentence-transformers/all-MiniLM-L6-v2")?
 /// );
 ///
-/// let embedder = PerFieldEmbedder::new(text_embedder);
+/// let embedder = Arc::new(PerFieldEmbedder::new(text_embedder));
 ///
 /// let config = VectorIndexConfig::builder()
 ///     .embedder(embedder)
-///     .add_field("title", 384)?
+///     .add_field("title", FlatOption::new(384))?
 ///     .build()?;
 /// # Ok(())
 /// # }
@@ -99,7 +100,6 @@ pub enum IndexLoadingMode {
     /// for large datasets that exceed available RAM.
     Mmap,
 }
-
 
 /// Vector index configuration enum that specifies which index type to use.
 ///
@@ -524,27 +524,7 @@ pub struct VectorIndexConfig {
     /// Metadata for the collection.
     pub metadata: HashMap<String, serde_json::Value>,
 
-    /// Default distance metric when auto-generating fields.
-    pub default_distance: DistanceMetric,
-
-    /// Default dimension when auto-generating fields (implicit schema).
-    /// Must be set when `implicit_schema` is true.
-    pub default_dimension: Option<usize>,
-
-    /// Default index kind when auto-generating fields.
-    pub default_index_kind: VectorIndexKind,
-
-    /// Default base weight when auto-generating fields.
-    pub default_base_weight: f32,
-
-    /// Whether to allow implicit schema generation for unseen fields.
-    pub implicit_schema: bool,
-
     /// Embedder for text and image fields.
-    ///
-    /// This is analogous to `analyzer` in `InvertedIndexConfig`.
-    /// Use `PerFieldEmbedder` for field-specific embedders.
-    /// Use `PrecomputedEmbedder` when using pre-computed vectors.
     pub embedder: Arc<dyn Embedder>,
 
     /// Deletion maintenance configuration.
@@ -553,7 +533,7 @@ pub struct VectorIndexConfig {
     /// Shard ID for the collection.
     pub shard_id: u16,
 
-    /// Metadata index configuration (LexicalEngine).
+    /// Metadata index configuration (LexicalStore).
     pub metadata_config: LexicalIndexConfig,
 }
 
@@ -563,13 +543,7 @@ impl std::fmt::Debug for VectorIndexConfig {
             .field("fields", &self.fields)
             .field("default_fields", &self.default_fields)
             .field("metadata", &self.metadata)
-            .field("default_distance", &self.default_distance)
-            .field("default_dimension", &self.default_dimension)
-            .field("default_index_kind", &self.default_index_kind)
-            .field("default_base_weight", &self.default_base_weight)
-            .field("implicit_schema", &self.implicit_schema)
             .field("embedder", &format_args!("{:?}", self.embedder))
-            .field("deletion_config", &self.deletion_config)
             .field("deletion_config", &self.deletion_config)
             .field("shard_id", &self.shard_id)
             .field("metadata_config", &self.metadata_config)
@@ -592,17 +566,6 @@ impl VectorIndexConfig {
                 )));
             }
         }
-
-        if self.implicit_schema {
-            let dim = self.default_dimension.ok_or_else(|| {
-                IrisError::invalid_config("implicit_schema requires default_dimension")
-            })?;
-            if dim == 0 {
-                return Err(IrisError::invalid_config(
-                    "default_dimension must be greater than zero when implicit_schema is enabled",
-                ));
-            }
-        }
         Ok(())
     }
 
@@ -612,57 +575,20 @@ impl VectorIndexConfig {
     }
 }
 
+impl Default for VectorIndexConfig {
+    fn default() -> Self {
+        Self::builder()
+            .build()
+            .expect("Default config should be valid")
+    }
+}
+
 /// Builder for VectorIndexConfig.
-///
-/// Provides a fluent API for constructing VectorIndexConfig.
-///
-/// # Example
-///
-/// ```no_run
-/// # #[cfg(feature = "embeddings-candle")]
-/// # {
-/// use iris::embedding::per_field::PerFieldEmbedder;
-/// use iris::embedding::candle_bert_embedder::CandleBertEmbedder;
-/// use iris::embedding::embedder::Embedder;
-/// use iris::vector::engine::config::{VectorIndexConfig, VectorFieldConfig};
-/// use iris::vector::core::field::{VectorIndexKind, VectorOption, FlatOption};
-/// use iris::vector::core::distance::DistanceMetric;
-/// use std::sync::Arc;
-///
-/// # fn example() -> iris::error::Result<()> {
-/// let text_embedder: Arc<dyn Embedder> = Arc::new(
-///     CandleBertEmbedder::new("sentence-transformers/all-MiniLM-L6-v2")?
-/// );
-///
-/// let embedder = PerFieldEmbedder::new(text_embedder);
-///
-/// let config = VectorIndexConfig::builder()
-///     .embedder(embedder)
-///     .field("content_embedding", VectorFieldConfig {
-///         vector: Some(VectorOption::Flat(FlatOption {
-///             dimension: 384,
-///             distance: DistanceMetric::Cosine,
-///             base_weight: 1.0,
-///             quantizer: None,
-///         })),
-///         lexical: None,
-///     })
-///     .default_field("content_embedding")
-///     .build()?;
-/// # Ok(())
-/// # }
-/// # }
-/// ```
 pub struct VectorIndexConfigBuilder {
     fields: HashMap<String, VectorFieldConfig>,
     default_fields: Vec<String>,
     metadata: HashMap<String, serde_json::Value>,
     embedder: Option<Arc<dyn Embedder>>,
-    default_distance: DistanceMetric,
-    default_dimension: Option<usize>,
-    default_index_kind: VectorIndexKind,
-    default_base_weight: f32,
-    implicit_schema: bool,
     deletion_config: Option<DeletionConfig>,
     shard_id: Option<u16>,
     metadata_config: Option<LexicalIndexConfig>,
@@ -676,11 +602,6 @@ impl VectorIndexConfigBuilder {
             default_fields: Vec::new(),
             metadata: HashMap::new(),
             embedder: None,
-            default_distance: DistanceMetric::Cosine,
-            default_dimension: None,
-            default_index_kind: VectorIndexKind::Flat,
-            default_base_weight: VectorFieldConfig::default_weight(),
-            implicit_schema: false,
             deletion_config: None,
             shard_id: None,
             metadata_config: None,
@@ -690,13 +611,13 @@ impl VectorIndexConfigBuilder {
     /// Set the embedder for all fields.
     ///
     /// Use `PerFieldEmbedder` for field-specific embedders.
-    pub fn embedder(mut self, embedder: impl Embedder + 'static) -> Self {
-        self.embedder = Some(Arc::new(embedder));
-        self
-    }
+    // pub fn embedder(mut self, embedder: impl Embedder + 'static) -> Self {
+    //     self.embedder = Some(Arc::new(embedder));
+    //     self
+    // }
 
     /// Set the embedder from an Arc.
-    pub fn embedder_arc(mut self, embedder: Arc<dyn Embedder>) -> Self {
+    pub fn embedder(mut self, embedder: Arc<dyn Embedder>) -> Self {
         self.embedder = Some(embedder);
         self
     }
@@ -711,19 +632,28 @@ impl VectorIndexConfigBuilder {
         self
     }
 
-    /// Add a field with dimension only (uses default settings).
+    /// Add a vector field with explicit options.
     ///
-    /// This is the simplified API for adding fields.
-    pub fn add_field(mut self, name: impl Into<String>, dimension: usize) -> Result<Self> {
+    /// The option can be a `VectorOption` or any type that converts into it
+    /// (e.g. `FlatOption`, `HnswOption`).
+    ///
+    /// # Example
+    /// ```no_run
+    /// # use iris::vector::store::config::VectorIndexConfig;
+    /// # use iris::vector::core::field::FlatOption;
+    /// # fn example() {
+    /// VectorIndexConfig::builder()
+    ///     .add_field("title", FlatOption::default().dimension(384));
+    /// # }
+    /// ```
+    pub fn add_field(
+        mut self,
+        name: impl Into<String>,
+        option: impl Into<VectorOption>,
+    ) -> Result<Self> {
         let name = name.into();
-
         let config = VectorFieldConfig {
-            vector: Some(VectorOption::Flat(FlatOption {
-                dimension,
-                distance: DistanceMetric::Cosine,
-                base_weight: 1.0,
-                quantizer: None,
-            })),
+            vector: Some(option.into()),
             lexical: None,
         };
 
@@ -734,28 +664,15 @@ impl VectorIndexConfigBuilder {
         Ok(self)
     }
 
-    /// Add an image field with automatic configuration from the embedder.
+    /// Add an image field.
     ///
-    /// The dimension will be inferred from the embedder if available.
-    /// For PerFieldEmbedder, the field-specific embedder will be used.
-    pub fn image_field(mut self, name: impl Into<String>, dimension: usize) -> Result<Self> {
-        let name = name.into();
-
-        let config = VectorFieldConfig {
-            vector: Some(VectorOption::Flat(FlatOption {
-                dimension,
-                distance: DistanceMetric::Cosine,
-                base_weight: 1.0,
-                quantizer: None,
-            })),
-            lexical: None,
-        };
-
-        if !self.default_fields.contains(&name) {
-            self.default_fields.push(name.clone());
-        }
-        self.fields.insert(name, config);
-        Ok(self)
+    /// This is an alias for `add_field` but intended for image vectors.
+    pub fn image_field(
+        self,
+        name: impl Into<String>,
+        option: impl Into<VectorOption>,
+    ) -> Result<Self> {
+        self.add_field(name, option)
     }
 
     /// Add a default field for search.
@@ -776,36 +693,6 @@ impl VectorIndexConfigBuilder {
     /// Add metadata.
     pub fn metadata(mut self, key: impl Into<String>, value: serde_json::Value) -> Self {
         self.metadata.insert(key.into(), value);
-        self
-    }
-
-    /// Set default distance for implicit field generation.
-    pub fn default_distance(mut self, distance: DistanceMetric) -> Self {
-        self.default_distance = distance;
-        self
-    }
-
-    /// Set default dimension for implicit field generation.
-    pub fn default_dimension(mut self, dimension: usize) -> Self {
-        self.default_dimension = Some(dimension);
-        self
-    }
-
-    /// Set default index kind for implicit field generation.
-    pub fn default_index_kind(mut self, kind: VectorIndexKind) -> Self {
-        self.default_index_kind = kind;
-        self
-    }
-
-    /// Set default base weight for implicit field generation.
-    pub fn default_base_weight(mut self, base_weight: f32) -> Self {
-        self.default_base_weight = base_weight;
-        self
-    }
-
-    /// Enable or disable implicit schema generation for unseen fields.
-    pub fn implicit_schema(mut self, enabled: bool) -> Self {
-        self.implicit_schema = enabled;
         self
     }
 
@@ -839,11 +726,6 @@ impl VectorIndexConfigBuilder {
             fields: self.fields,
             default_fields: self.default_fields,
             metadata: self.metadata,
-            default_distance: self.default_distance,
-            default_dimension: self.default_dimension,
-            default_index_kind: self.default_index_kind,
-            default_base_weight: self.default_base_weight,
-            implicit_schema: self.implicit_schema,
             embedder,
             deletion_config: self.deletion_config.unwrap_or_default(),
             shard_id: self.shard_id.unwrap_or(0),
@@ -868,15 +750,10 @@ impl Serialize for VectorIndexConfig {
     {
         use serde::ser::SerializeStruct;
 
-        let mut state = serializer.serialize_struct("VectorIndexConfig", 11)?;
+        let mut state = serializer.serialize_struct("VectorIndexConfig", 5)?;
         state.serialize_field("fields", &self.fields)?;
         state.serialize_field("default_fields", &self.default_fields)?;
         state.serialize_field("metadata", &self.metadata)?;
-        state.serialize_field("default_distance", &self.default_distance)?;
-        state.serialize_field("default_dimension", &self.default_dimension)?;
-        state.serialize_field("default_index_kind", &self.default_index_kind)?;
-        state.serialize_field("default_base_weight", &self.default_base_weight)?;
-        state.serialize_field("implicit_schema", &self.implicit_schema)?;
         state.serialize_field("deletion_config", &self.deletion_config)?;
         state.serialize_field("shard_id", &self.shard_id)?;
         state.serialize_field("metadata_config", &self.metadata_config)?;
@@ -896,16 +773,6 @@ impl<'de> Deserialize<'de> for VectorIndexConfig {
             default_fields: Vec<String>,
             #[serde(default)]
             metadata: HashMap<String, serde_json::Value>,
-            #[serde(default = "default_distance_metric")]
-            default_distance: DistanceMetric,
-            #[serde(default)]
-            default_dimension: Option<usize>,
-            #[serde(default = "default_index_kind")]
-            default_index_kind: VectorIndexKind,
-            #[serde(default = "VectorFieldConfig::default_weight")]
-            default_base_weight: f32,
-            #[serde(default)]
-            implicit_schema: bool,
             #[serde(default)]
             deletion_config: DeletionConfig,
             #[serde(default)]
@@ -919,11 +786,6 @@ impl<'de> Deserialize<'de> for VectorIndexConfig {
             fields: helper.fields,
             default_fields: helper.default_fields,
             metadata: helper.metadata,
-            default_distance: helper.default_distance,
-            default_dimension: helper.default_dimension,
-            default_index_kind: helper.default_index_kind,
-            default_base_weight: helper.default_base_weight,
-            implicit_schema: helper.implicit_schema,
             deletion_config: helper.deletion_config,
             shard_id: helper.shard_id,
             metadata_config: helper.metadata_config,
@@ -931,14 +793,6 @@ impl<'de> Deserialize<'de> for VectorIndexConfig {
             embedder: Arc::new(PrecomputedEmbedder::new()),
         })
     }
-}
-
-fn default_distance_metric() -> DistanceMetric {
-    DistanceMetric::Cosine
-}
-
-fn default_index_kind() -> VectorIndexKind {
-    VectorIndexKind::Flat
 }
 
 /// Configuration for a single vector field.

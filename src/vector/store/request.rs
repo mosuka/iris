@@ -1,11 +1,12 @@
-//! VectorEngine 検索リクエスト関連の型定義
+//! VectorStore 検索リクエスト関連の型定義
 //!
 //! このモジュールは検索リクエスト、クエリベクトル、フィールドセレクタを提供する。
 
 use serde::{Deserialize, Serialize};
 
-use crate::vector::core::document::{Payload, StoredVector};
-use crate::vector::engine::filter::VectorFilter;
+use crate::data::DataValue;
+
+use crate::vector::store::filter::VectorFilter;
 
 fn default_query_limit() -> usize {
     10
@@ -54,6 +55,10 @@ pub struct VectorSearchRequest {
     /// Rank fusion configuration.
     #[serde(default)]
     pub fusion_config: Option<FusionConfig>,
+
+    /// List of allowed document IDs (for internal use by Engine filtering).
+    #[serde(skip)]
+    pub allowed_ids: Option<Vec<u64>>,
 }
 
 impl Default for VectorSearchRequest {
@@ -69,6 +74,7 @@ impl Default for VectorSearchRequest {
             min_score: 0.0,
             lexical_query: None,
             fusion_config: None,
+            allowed_ids: None,
         }
     }
 }
@@ -91,7 +97,7 @@ pub enum VectorScoreMode {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct QueryVector {
-    pub vector: StoredVector,
+    pub vector: Vec<f32>,
     #[serde(default = "QueryVector::default_weight")]
     pub weight: f32,
     /// Optional list of fields to restrict this query vector to.
@@ -119,14 +125,14 @@ pub struct QueryPayload {
     /// The field name to search in.
     pub field: String,
     /// The payload to embed.
-    pub payload: Payload,
+    pub payload: DataValue,
     /// Weight for this query vector (default: 1.0).
     pub weight: f32,
 }
 
 impl QueryPayload {
-    /// Create a new query payload from a `Payload`.
-    pub fn new(field: impl Into<String>, payload: Payload) -> Self {
+    /// Create a new query payload from a `DataValue`.
+    pub fn new(field: impl Into<String>, payload: DataValue) -> Self {
         Self {
             field: field.into(),
             payload,
@@ -135,7 +141,7 @@ impl QueryPayload {
     }
 
     /// Create a new query payload with a specific weight.
-    pub fn with_weight(field: impl Into<String>, payload: Payload, weight: f32) -> Self {
+    pub fn with_weight(field: impl Into<String>, payload: DataValue, weight: f32) -> Self {
         Self {
             field: field.into(),
             payload,

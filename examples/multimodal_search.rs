@@ -19,6 +19,8 @@
 use std::path::Path;
 
 #[cfg(feature = "embeddings-multimodal")]
+use iris::data::{DataValue, Document};
+#[cfg(feature = "embeddings-multimodal")]
 use iris::embedding::candle_clip_embedder::CandleClipEmbedder;
 #[cfg(feature = "embeddings-multimodal")]
 use iris::embedding::embedder::Embedder;
@@ -31,19 +33,19 @@ use iris::storage::{StorageConfig, StorageFactory};
 #[cfg(feature = "embeddings-multimodal")]
 use iris::vector::core::distance::DistanceMetric;
 #[cfg(feature = "embeddings-multimodal")]
-use iris::vector::core::document::{DocumentPayload, Payload};
-#[cfg(feature = "embeddings-multimodal")]
 use iris::vector::core::field::{FlatOption, VectorOption};
 #[cfg(feature = "embeddings-multimodal")]
-use iris::vector::engine::VectorEngine;
-use iris::vector::engine::config::{VectorFieldConfig, VectorIndexConfig};
+use iris::vector::store::VectorStore;
+use iris::vector::store::config::{VectorFieldConfig, VectorIndexConfig};
 #[cfg(feature = "embeddings-multimodal")]
-use iris::vector::engine::query::VectorSearchRequestBuilder;
+use iris::vector::store::query::VectorSearchRequestBuilder;
 #[cfg(feature = "embeddings-multimodal")]
 use tempfile::TempDir;
 
 #[cfg(feature = "embeddings-multimodal")]
 fn main() -> Result<()> {
+    use std::sync::Arc;
+
     println!("=== Multimodal Search Example (CLIP) ===\n");
 
     // 1. Setup Storage
@@ -68,12 +70,12 @@ fn main() -> Result<()> {
     };
 
     let index_config = VectorIndexConfig::builder()
-        .embedder(embedder)
+        .embedder(Arc::new(embedder))
         .field("content", field_config)
         .build()?;
 
     // 3. Create Engine
-    let engine = VectorEngine::new(storage, index_config)?;
+    let engine = VectorStore::new(storage, index_config)?;
 
     // 4. Index Images
     println!("\n--- Indexing Images ---");
@@ -100,17 +102,13 @@ fn main() -> Result<()> {
                     let filename = path.file_name().unwrap().to_string_lossy().to_string();
                     println!("Indexing image: {}", filename);
 
-                    let mut doc = DocumentPayload::new();
-
                     // Read image file into bytes
                     let bytes = std::fs::read(&path)?;
 
-                    // We index the image content into "content" field using PayloadSource::image_bytes
-                    doc.set_field("content", Payload::image_bytes(bytes));
-
-                    // Store filename in metadata for display
-                    doc.set_metadata("filename", filename.clone());
-                    doc.set_metadata("type", "image");
+                    let doc = Document::new()
+                        .with_field("content", DataValue::Bytes(bytes, None))
+                        .with_field("filename", DataValue::Text(filename.clone()))
+                        .with_field("type", DataValue::Text("image".into()));
 
                     engine.add_payloads(doc)?;
                     indexed_count += 1;
@@ -132,10 +130,10 @@ fn main() -> Result<()> {
 
     for text in &texts {
         println!("Indexing text: \"{}\"", text);
-        let mut doc = DocumentPayload::new();
-        doc.set_text("content", *text);
-        doc.set_metadata("text", *text);
-        doc.set_metadata("type", "text");
+        let doc = Document::new()
+            .with_field("content", DataValue::Text((*text).into()))
+            .with_field("text", DataValue::Text((*text).into()))
+            .with_field("type", DataValue::Text("text".into()));
         engine.add_payloads(doc)?;
     }
 
@@ -149,18 +147,6 @@ fn main() -> Result<()> {
     let query_text = "a photo of a cat";
     println!("Query: \"{}\"", query_text);
 
-    // VectorSearchRequestBuilder usage:
-    // It seems it doesn't have add_text/add_uri directly.
-    // We should use add_payload_text / add_payload_uri or check implementation.
-    // Based on previous error, add_text was missing.
-    // Let's assume add_vector(field, vector) exists, but for payloads...
-    // Checking query.rs...
-    // It has `add_vector` (for raw vectors).
-    // It likely has `add_payload` or similar? Or maybe `with_query_payload`?
-    // Let's rely on checking `query.rs` content which I just requested.
-    // Ah, I can't wait for `query.rs` content here inside replace call construction.
-    // But I will split this modification. First, check `query.rs`.
-    // Wait, I already called view_file to execute.
     let request = VectorSearchRequestBuilder::new()
         .add_text("content", query_text)
         .limit(3)
@@ -198,7 +184,7 @@ fn main() -> Result<()> {
 }
 
 #[cfg(feature = "embeddings-multimodal")]
-fn print_results(results: &iris::vector::engine::response::VectorSearchResults) {
+fn print_results(results: &iris::vector::store::response::VectorSearchResults) {
     for (i, hit) in results.hits.iter().enumerate() {
         println!("{}. Doc ID: {}, Score: {:.4}", i + 1, hit.doc_id, hit.score);
     }

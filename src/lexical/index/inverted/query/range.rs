@@ -455,14 +455,13 @@ impl NumericRangeQuery {
     pub fn count_matching_documents(&self, reader: &dyn LexicalIndexReader) -> Result<u64> {
         let mut count = 0u64;
         let total_docs = reader.max_doc();
-
         for doc_id in 0..total_docs {
             if let Ok(Some(doc)) = reader.document(doc_id)
-                && let Some(field_value) = doc.get_field(&self.field)
+                && let Some(val) = doc.get(&self.field)
             {
-                let numeric_value = match &field_value.value {
-                    crate::lexical::core::field::FieldValue::Float(f) => *f,
-                    crate::lexical::core::field::FieldValue::Integer(i) => *i as f64,
+                let numeric_value = match val {
+                    crate::data::DataValue::Float64(f) => *f,
+                    crate::data::DataValue::Int64(i) => *i as f64,
                     _ => continue, // Not a numeric field
                 };
 
@@ -651,13 +650,13 @@ impl Query for NumericRangeQuery {
 
         for doc_id in 0..max_doc {
             if let Ok(Some(doc)) = reader.document(doc_id)
-                && let Some(field_value) = doc.get_field(&self.field)
+                && let Some(val) = doc.get(&self.field)
             {
-                let numeric_value = match &field_value.value {
-                    crate::lexical::core::field::FieldValue::Float(f) => Some(*f),
-                    crate::lexical::core::field::FieldValue::Integer(i) => Some(*i as f64),
+                let numeric_value = match val {
+                    crate::data::DataValue::Float64(f) => Some(*f),
+                    crate::data::DataValue::Int64(i) => Some(*i as f64),
                     // WORKAROUND: Parse text values as numbers (needed because stored docs lose type info)
-                    crate::lexical::core::field::FieldValue::Text(s) => s.parse::<f64>().ok(),
+                    crate::data::DataValue::Text(s) => s.parse::<f64>().ok(),
                     _ => None,
                 };
 
@@ -857,11 +856,11 @@ impl NumericRangeFilterMatcher {
             // Get the document
             if let Ok(Some(doc)) = reader.document(doc_id) {
                 // Get the field value
-                if let Some(field_value) = doc.get_field(&self.query.field) {
+                if let Some(val) = doc.get(&self.query.field) {
                     // Check if it's a numeric field and extract the value
-                    let numeric_value = match &field_value.value {
-                        crate::lexical::core::field::FieldValue::Float(f) => *f,
-                        crate::lexical::core::field::FieldValue::Integer(i) => *i as f64,
+                    let numeric_value = match val {
+                        crate::data::DataValue::Float64(f) => *f,
+                        crate::data::DataValue::Int64(i) => *i as f64,
                         _ => return false, // Not a numeric field
                     };
 

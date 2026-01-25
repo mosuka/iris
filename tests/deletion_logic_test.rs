@@ -1,128 +1,188 @@
-#[cfg(test)]
-mod tests {
-    use iris::lexical::core::document::Document;
-    use iris::lexical::core::field::TextOption;
-    use iris::lexical::engine::config::LexicalIndexConfig;
-    use iris::lexical::index::inverted::writer::{
-        InvertedIndexWriter, InvertedIndexWriterConfig,
-    };
-    use iris::storage::memory::MemoryStorageConfig;
-    use iris::storage::{StorageConfig, StorageFactory};
-    use iris::vector::core::distance::DistanceMetric;
-    use iris::vector::core::document::{DocumentVector, StoredVector};
-    use iris::vector::core::field::{FlatOption, VectorIndexKind, VectorOption};
-    use iris::vector::engine::VectorEngine;
-    use iris::vector::engine::config::{VectorFieldConfig, VectorIndexConfig};
-    use iris::vector::engine::request::{VectorScoreMode, VectorSearchRequest};
-    use std::collections::HashMap;
-    use std::sync::Arc;
+use tempfile::TempDir;
 
-    #[test]
-    fn test_vector_engine_logical_deletion() {
-        // 1. Create VectorEngine
-        // Configure field
-        let field_config = VectorFieldConfig {
-            vector: Some(VectorOption::Flat(FlatOption {
-                dimension: 128,
-                distance: DistanceMetric::Cosine,
-                base_weight: 1.0,
-                quantizer: None,
-            })),
-            lexical: None,
-        };
+use iris::data::Document;
+use iris::engine::Engine;
+use iris::engine::config::{FieldConfig, IndexConfig};
+use iris::engine::search::SearchRequestBuilder;
+use iris::lexical::core::field::FieldOption as LexicalOption;
+use iris::lexical::index::inverted::query::term::TermQuery;
+use iris::storage::file::FileStorageConfig;
+use iris::storage::{StorageConfig, StorageFactory};
+use iris::vector::core::field::VectorOption;
+use iris::vector::store::query::VectorSearchRequestBuilder;
 
-        let config = VectorIndexConfig {
-            fields: HashMap::from([("embedding".to_string(), field_config)]),
-            default_fields: vec!["embedding".to_string()],
-            metadata: HashMap::new(),
-            default_distance: DistanceMetric::Cosine,
-            default_dimension: None,
-            default_index_kind: VectorIndexKind::Flat,
-            default_base_weight: 1.0,
-            implicit_schema: false,
-            embedder: Arc::new(iris::embedding::precomputed::PrecomputedEmbedder::new()),
-            deletion_config: iris::maintenance::deletion::DeletionConfig::default(),
-            shard_id: 0,
-            metadata_config: LexicalIndexConfig::default(),
-        };
+#[test]
+fn test_engine_unified_deletion() -> iris::error::Result<()> {
+    // 1. Setup Storage
+    let temp_dir = TempDir::new().unwrap();
+    let storage_config = StorageConfig::File(FileStorageConfig::new(temp_dir.path()));
+    let storage = StorageFactory::create(storage_config)?;
 
-        let storage =
-            StorageFactory::create(StorageConfig::Memory(MemoryStorageConfig::default())).unwrap();
+    // 2. Configure Engine
+    let vector_opt = VectorOption::default(); // dim=128
+    let lexical_opt = LexicalOption::default();
 
-        let engine = VectorEngine::new(storage, config).unwrap();
+    let config = IndexConfig::builder()
+        .add_field(
+            "title",
+            FieldConfig {
+                lexical: Some(lexical_opt.clone()),
+                vector: None,
+            },
+        )
+        .add_field(
+            "embedding",
+            FieldConfig {
+                lexical: None,
+                vector: Some(vector_opt),
+            },
+        )
+        .build();
 
-        // 2. Add a document
-        let doc_id = 0;
-        let mut doc_vector = DocumentVector::new();
-        // Use set_field with StoredVector
-        doc_vector.set_field("embedding", StoredVector::new(Arc::from(vec![0.1f32; 128])));
+    let engine = Engine::new(storage.clone(), config)?;
 
-        engine.upsert_vectors(doc_id, doc_vector).unwrap();
+    // 3. Index Document with ID "doc1"
+    let doc1 = Document::new()
+        .with_id("doc1")
+        .with_field("title", "Hello Iris")
+        .with_field("embedding", vec![0.1; 128]);
 
-        // 3. Verify it exists
-        // Search request
-        let request = VectorSearchRequest {
-            query_vectors: vec![iris::vector::engine::request::QueryVector {
-                vector: StoredVector::new(Arc::from(vec![0.1f32; 128])),
-                weight: 1.0,
-                fields: None,
-            }],
-            limit: 10,
-            overfetch: 1.5,
-            min_score: 0.0,
-            score_mode: VectorScoreMode::MaxSim,
-            filter: None,
-            fields: None, // All fields
-            query_payloads: vec![],
-            lexical_query: None,
-            fusion_config: None,
-        };
+    engine.index(doc1)?;
+    engine.commit()?;
 
-        let searcher = engine.searcher().unwrap();
-        let results = searcher.search(&request).unwrap();
-        assert_eq!(
-            results.hits.len(),
-            1,
-            "Document should be found before deletion"
-        );
-        assert_eq!(results.hits[0].doc_id, doc_id);
+    // 4. Verify it exists in both
+    // Lexical check
+    let req_lexical = SearchRequestBuilder::new()
+        .with_lexical(Box::new(TermQuery::new("title", "hello")))
+        .build();
+    let res_lexical = engine.search(req_lexical)?;
+    assert_eq!(res_lexical.len(), 1, "Should be found lexically");
 
-        // 4. Delete the document
-        engine.delete_vectors(doc_id).unwrap();
+    // Vector check
+    let req_vector = SearchRequestBuilder::new()
+        .with_vector(
+            VectorSearchRequestBuilder::new()
+                .add_vector("embedding", vec![0.1; 128])
+                .build(),
+        )
+        .build();
+    let res_vector = engine.search(req_vector)?;
+    assert_eq!(res_vector.len(), 1, "Should be found via vector");
 
-        // 5. Verify it is GONE (Logical Deletion check)
-        let searcher_after = engine.searcher().unwrap();
-        let results_after = searcher_after.search(&request).unwrap();
-        assert_eq!(
-            results_after.hits.len(),
-            0,
-            "Document should NOT be found after deletion (logical check)"
-        );
-    }
+    // 5. Delete by ID
+    engine.delete("doc1")?;
+    engine.commit()?;
 
-    #[test]
-    fn test_inverted_index_persisted_deletion() {
-        // Setup storage
-        let storage =
-            StorageFactory::create(StorageConfig::Memory(MemoryStorageConfig::default())).unwrap();
-        let config = InvertedIndexWriterConfig::default();
+    // 6. Verify it is GONE from both
+    let res_lexical_after = engine.search(
+        SearchRequestBuilder::new()
+            .with_lexical(Box::new(TermQuery::new("title", "hello")))
+            .build(),
+    )?;
+    assert_eq!(res_lexical_after.len(), 0, "Should be deleted lexically");
 
-        // Create writer
-        let mut writer = InvertedIndexWriter::new(storage.clone(), config.clone()).unwrap();
+    let res_vector_after = engine.search(
+        SearchRequestBuilder::new()
+            .with_vector(
+                VectorSearchRequestBuilder::new()
+                    .add_vector("embedding", vec![0.1; 128])
+                    .build(),
+            )
+            .build(),
+    )?;
+    assert_eq!(res_vector_after.len(), 0, "Should be deleted via vector");
 
-        // Add document
-        let doc_id = 100;
+    Ok(())
+}
 
-        let doc = Document::builder()
-            .add_text("title", "hello world", TextOption::default())
-            .build();
+#[test]
+fn test_engine_upsert() -> iris::error::Result<()> {
+    // 1. Setup Storage
+    let temp_dir = TempDir::new().unwrap();
+    let storage_config = StorageConfig::File(FileStorageConfig::new(temp_dir.path()));
+    let storage = StorageFactory::create(storage_config)?;
 
-        writer.upsert_document(doc_id, doc).unwrap();
+    // 2. Configure Engine
+    use iris::vector::core::field::FlatOption;
+    let vector_opt = VectorOption::Flat(FlatOption {
+        dimension: 2,
+        ..Default::default()
+    });
+    let lexical_opt = LexicalOption::default();
 
-        // Commit to persist
-        writer.commit().unwrap();
+    let config = IndexConfig::builder()
+        .add_field(
+            "title",
+            FieldConfig {
+                lexical: Some(lexical_opt.clone()),
+                vector: None,
+            },
+        )
+        .add_field(
+            "embedding",
+            FieldConfig {
+                lexical: None,
+                vector: Some(vector_opt),
+            },
+        )
+        .build();
 
-        // Verify deletion call works (it calls mark_persisted_doc_deleted internally now)
-        writer.delete_document(doc_id).unwrap();
-    }
+    let engine = Engine::new(storage.clone(), config)?;
+
+    // 3. Index Document with ID "doc1"
+    let doc1 = Document::new()
+        .with_id("doc1")
+        .with_field("title", "Initial Version")
+        .with_field("embedding", vec![1.0, 0.0]);
+
+    engine.index(doc1)?;
+    engine.commit()?;
+
+    // 4. Verify initial version exists
+    let res = engine.search(
+        SearchRequestBuilder::new()
+            .with_lexical(Box::new(TermQuery::new("title", "initial")))
+            .build(),
+    )?;
+    assert_eq!(res.len(), 1);
+
+    // 5. Index updated document with SAME ID "doc1"
+    let doc1_v2 = Document::new()
+        .with_id("doc1")
+        .with_field("title", "Updated Version")
+        .with_field("embedding", vec![0.0, 1.0]);
+
+    engine.index(doc1_v2)?;
+    engine.commit()?;
+
+    // 6. Verify update
+    // Old version lookup should fail
+    let res_old = engine.search(
+        SearchRequestBuilder::new()
+            .with_lexical(Box::new(TermQuery::new("title", "initial")))
+            .build(),
+    )?;
+    assert_eq!(res_old.len(), 0, "Old version should be replaced");
+
+    // New version lookup should succeed
+    let res_new = engine.search(
+        SearchRequestBuilder::new()
+            .with_lexical(Box::new(TermQuery::new("title", "updated")))
+            .build(),
+    )?;
+    assert_eq!(res_new.len(), 1, "New version should be found");
+
+    // Vector check for new vector
+    let res_vec = engine.search(
+        SearchRequestBuilder::new()
+            .with_vector(
+                VectorSearchRequestBuilder::new()
+                    .add_vector("embedding", vec![0.0, 1.0])
+                    .build(),
+            )
+            .build(),
+    )?;
+    assert_eq!(res_vec.len(), 1, "New vector should be found");
+
+    Ok(())
 }

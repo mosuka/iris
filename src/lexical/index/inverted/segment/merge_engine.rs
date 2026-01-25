@@ -9,7 +9,7 @@ use std::time::SystemTime;
 
 use ahash::AHashSet;
 
-use crate::error::{Result, IrisError};
+use crate::error::{IrisError, Result};
 use crate::lexical::core::document::Document;
 use crate::lexical::index::inverted::core::posting::TermPostingIndex;
 use crate::lexical::index::inverted::reader::InvertedIndexReader;
@@ -272,7 +272,8 @@ impl MergeEngine {
     ) -> Result<MergeResult> {
         let mut stats = MergeStats {
             segments_merged: segments.len(),
-            shard_id: segments.first()
+            shard_id: segments
+                .first()
                 .map(|s| s.segment_info.shard_id)
                 .unwrap_or(0),
             ..Default::default()
@@ -292,11 +293,12 @@ impl MergeEngine {
                     use crate::storage::structured::StructReader;
 
                     if let Ok(mut reader) = StructReader::new(input)
-                        && let Ok(bitmap) = DeletionBitmap::read_from_storage(&mut reader) {
-                            for doc_id in bitmap.get_deleted_docs() {
-                                deleted_doc_ids.insert(doc_id);
-                            }
+                        && let Ok(bitmap) = DeletionBitmap::read_from_storage(&mut reader)
+                    {
+                        for doc_id in bitmap.get_deleted_docs() {
+                            deleted_doc_ids.insert(doc_id);
                         }
+                    }
                 }
             }
         }
@@ -412,7 +414,7 @@ impl MergeEngine {
             // Add document to index
             // Convert document to the expected format for add_document
             let document_terms: Vec<(String, u32, Option<Vec<u32>>)> = document
-                .fields()
+                .fields
                 .keys()
                 .map(|field_name| {
                     (field_name.clone(), 1, None) // Simple frequency, no positions for now
@@ -478,22 +480,25 @@ impl MergeEngine {
                 writer.write_u64(*doc_id)?;
 
                 // Write document fields
-                writer.write_varint(document.fields().len() as u64)?;
-                for (field_name, field_value) in document.fields() {
+                writer.write_varint(document.fields.len() as u64)?;
+                for (field_name, field_value) in &document.fields {
                     writer.write_string(field_name)?;
-                    let field_str = match &field_value.value {
+                    let field_str = match field_value {
                         FieldValue::Text(s) => s.clone(),
-                        FieldValue::Integer(i) => i.to_string(),
-                        FieldValue::Float(f) => f.to_string(),
-                        FieldValue::Boolean(b) => b.to_string(),
-                        FieldValue::Blob(mime, data) => {
-                            format!("[blob: {} ({} bytes)]", mime, data.len())
+                        FieldValue::Int64(i) => i.to_string(),
+                        FieldValue::Float64(f) => f.to_string(),
+                        FieldValue::Bool(b) => b.to_string(),
+                        FieldValue::Bytes(data, mime) => {
+                            format!("[blob: {:?} ({} bytes)]", mime, data.len())
                         }
                         FieldValue::DateTime(dt) => dt.to_rfc3339(),
-                        FieldValue::Geo(point) => {
-                            format!("{},{}", point.lat, point.lon)
+                        FieldValue::Geo(lat, lon) => {
+                            format!("{},{}", lat, lon)
                         }
+                        FieldValue::Vector(v) => format!("[vector: {} dims]", v.len()),
+                        FieldValue::List(l) => l.join(","),
                         FieldValue::Null => "null".to_string(),
+                        FieldValue::String(s) => s.clone(),
                     };
                     writer.write_string(&field_str)?;
                 }

@@ -1,10 +1,10 @@
-//! VectorEngine スナップショット関連の型定義
+//! VectorStore スナップショット関連の型定義
 //!
 //! このモジュールはドキュメントスナップショット、コレクションマニフェストを提供する。
 
 use serde::{Deserialize, Serialize};
 
-use crate::vector::core::document::DocumentVector;
+use crate::data::Document;
 use crate::vector::index::wal::SeqNumber;
 
 pub const FIELD_INDEX_BASENAME: &str = "index";
@@ -27,7 +27,7 @@ pub(crate) struct DocumentSnapshot {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct SnapshotDocument {
     pub(crate) doc_id: u64,
-    pub(crate) document: DocumentVector,
+    pub(crate) document: Document,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -37,5 +37,5 @@ pub(crate) struct CollectionManifest {
     pub(crate) wal_last_seq: SeqNumber,
     #[serde(default)]
     pub(crate) field_configs:
-        std::collections::HashMap<String, crate::vector::engine::config::VectorFieldConfig>,
+        std::collections::HashMap<String, crate::vector::store::config::VectorFieldConfig>,
 }

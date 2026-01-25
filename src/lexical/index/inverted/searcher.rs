@@ -8,10 +8,13 @@ use std::time::{Duration, Instant};
 use rayon::prelude::*;
 
 use crate::analysis::analyzer::standard::StandardAnalyzer;
-use crate::error::{Result, IrisError};
-use crate::lexical::core::field::FieldValue::{
-    Blob, Boolean, DateTime, Float, Geo, Integer, Null, Text,
+use crate::data::DataValue::{
+    Bool as Boolean, Bytes as Blob, DateTime, Float64 as Float, Geo, Int64 as Integer, Null,
+    String as StrVal, Text,
 };
+use crate::error::{IrisError, Result};
+// Note: Geo and DateTime were removed from FieldValue definition implicitly by switching to DataValue.
+// Only standard types remain. Logic using Geo/DateTime needs update.
 use crate::lexical::index::inverted::query::Query;
 use crate::lexical::index::inverted::query::boolean::BooleanQuery;
 use crate::lexical::index::inverted::query::collector::{
@@ -433,17 +436,11 @@ impl InvertedIndexSearcher {
     /// Compare two search hits by a specific field value.
     #[allow(dead_code)]
     fn compare_field_values(&self, a: &SearchHit, b: &SearchHit, field_name: &str) -> Ordering {
-        let val_a = a
-            .document
-            .as_ref()
-            .and_then(|doc| doc.get_field(field_name));
-        let val_b = b
-            .document
-            .as_ref()
-            .and_then(|doc| doc.get_field(field_name));
+        let val_a = a.document.as_ref().and_then(|doc| doc.get(field_name));
+        let val_b = b.document.as_ref().and_then(|doc| doc.get(field_name));
 
         match (val_a, val_b) {
-            (Some(a_val), Some(b_val)) => self.compare_values(&a_val.value, &b_val.value),
+            (Some(a_val), Some(b_val)) => self.compare_values(a_val, b_val),
             (Some(_), None) => Ordering::Less, // Documents with value come first
             (None, Some(_)) => Ordering::Greater, // Documents without value come last
             (None, None) => Ordering::Equal,
@@ -453,8 +450,6 @@ impl InvertedIndexSearcher {
     /// Compare two field values.
     #[allow(dead_code)]
     fn compare_values(&self, a: &FieldValue, b: &FieldValue) -> Ordering {
-        // use FieldValue::*; // 不要なため削除
-
         match (a, b) {
             // Same type comparisons
             (Text(a_str), Text(b_str)) => a_str.cmp(b_str),
@@ -463,35 +458,41 @@ impl InvertedIndexSearcher {
                 a_float.partial_cmp(b_float).unwrap_or(Ordering::Equal)
             }
             (Boolean(a_bool), Boolean(b_bool)) => a_bool.cmp(b_bool),
-            (Geo(a_geo), Geo(b_geo)) => {
-                // Compare by latitude first, then longitude
-                match a_geo.lat.partial_cmp(&b_geo.lat) {
-                    Some(Ordering::Equal) | None => {
-                        a_geo.lon.partial_cmp(&b_geo.lon).unwrap_or(Ordering::Equal)
-                    }
-                    Some(ord) => ord,
-                }
-            }
             (DateTime(a_dt), DateTime(b_dt)) => a_dt.cmp(b_dt),
+            (Geo(a_lat, a_lon), Geo(b_lat, b_lon)) => a_lat
+                .partial_cmp(b_lat)
+                .unwrap_or(Ordering::Equal)
+                .then_with(|| a_lon.partial_cmp(b_lon).unwrap_or(Ordering::Equal)),
             (Blob(_, a_blob), Blob(_, b_blob)) => a_blob.cmp(b_blob),
             (Null, Null) => Ordering::Equal,
+            (StrVal(a_s), StrVal(b_s)) => a_s.cmp(b_s),
 
-            // For different types, use a consistent ordering based on type precedence
-            // Text < Integer < Float < Boolean < Geo < DateTime < Blob < Null
-            (Text(_), _) => Ordering::Less,
-            (_, Text(_)) => Ordering::Greater,
-            (Integer(_), _) => Ordering::Less,
-            (_, Integer(_)) => Ordering::Greater,
-            (Float(_), _) => Ordering::Less,
-            (_, Float(_)) => Ordering::Greater,
+            // Mixed types ordering precedence
+            // Null < Bool < Int < Float < String < Text < Blob < List?
+            (Null, _) => Ordering::Less,
+            (_, Null) => Ordering::Greater,
+
             (Boolean(_), _) => Ordering::Less,
             (_, Boolean(_)) => Ordering::Greater,
-            (Geo(_), _) => Ordering::Less,
-            (_, Geo(_)) => Ordering::Greater,
-            (DateTime(_), _) => Ordering::Less,
-            (_, DateTime(_)) => Ordering::Greater,
+
+            (Integer(_), _) => Ordering::Less,
+            (_, Integer(_)) => Ordering::Greater,
+
+            (Float(_), _) => Ordering::Less,
+            (_, Float(_)) => Ordering::Greater,
+
+            (StrVal(_), _) => Ordering::Less,
+            (_, StrVal(_)) => Ordering::Greater,
+
+            (Text(_), _) => Ordering::Less,
+            (_, Text(_)) => Ordering::Greater,
+
+            // Blob is last (except maybe List)
             (Blob(_, _), _) => Ordering::Less,
             (_, Blob(_, _)) => Ordering::Greater,
+
+            // Handle List if necessary or default
+            _ => Ordering::Equal, // Fallback
         }
     }
 

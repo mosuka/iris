@@ -1,10 +1,10 @@
-//! Vector Search Example - Basic usage guide
+//! Vector Search Example - Basic usage guide via the unified Engine API.
 //!
 //! This example demonstrates the fundamental steps to use Iris for vector search:
-//! 1. Setup storage
-//! 2. Configure the vector index with an Embedder (CandleBertEmbedder via PerFieldEmbedder)
+//! 1. Setup storage and configuration with an Embedder
+//! 2. Initialize the Engine
 //! 3. Add documents with text content (vectors are generated automatically)
-//! 4. Perform a nearest neighbor search (KNN) using text query
+//! 4. Perform a nearest neighbor search (KNN) using the unified search API
 //!
 //! To run this example:
 //! ```bash
@@ -12,191 +12,115 @@
 //! ```
 
 #[cfg(feature = "embeddings-candle")]
-#[cfg(feature = "embeddings-candle")]
-use std::sync::Arc;
-
+use iris::data::Document;
 #[cfg(feature = "embeddings-candle")]
 use iris::embedding::candle_bert_embedder::CandleBertEmbedder;
 #[cfg(feature = "embeddings-candle")]
-use iris::embedding::embedder::Embedder;
+use iris::engine::Engine;
 #[cfg(feature = "embeddings-candle")]
-use iris::embedding::per_field::PerFieldEmbedder;
+use iris::engine::config::{FieldConfig, IndexConfig};
+#[cfg(feature = "embeddings-candle")]
+use iris::engine::search::SearchRequestBuilder;
 #[cfg(feature = "embeddings-candle")]
 use iris::error::Result;
+#[cfg(feature = "embeddings-candle")]
+use iris::lexical::core::field::{FieldOption, TextOption};
 #[cfg(feature = "embeddings-candle")]
 use iris::storage::file::FileStorageConfig;
 #[cfg(feature = "embeddings-candle")]
 use iris::storage::{StorageConfig, StorageFactory};
 #[cfg(feature = "embeddings-candle")]
-use iris::vector::core::distance::DistanceMetric;
-#[cfg(feature = "embeddings-candle")]
-use iris::vector::core::document::DocumentPayload;
-#[cfg(feature = "embeddings-candle")]
 use iris::vector::core::field::{FlatOption, VectorOption};
 #[cfg(feature = "embeddings-candle")]
-use iris::vector::engine::VectorEngine;
-use iris::vector::engine::config::{VectorFieldConfig, VectorIndexConfig};
+use iris::vector::store::query::VectorSearchRequestBuilder;
 #[cfg(feature = "embeddings-candle")]
-use iris::vector::engine::query::VectorSearchRequestBuilder;
+use std::sync::Arc;
 #[cfg(feature = "embeddings-candle")]
 use tempfile::TempDir;
 
 #[cfg(feature = "embeddings-candle")]
 fn main() -> Result<()> {
-    println!("=== Vector Search Example (Candle + PerFieldEmbedder) ===\n");
+    println!("=== Vector Search Example (Unified Engine + Candle BERT) ===\n");
 
     // 1. Setup Storage
     let temp_dir = TempDir::new().unwrap();
     let storage_config = StorageConfig::File(FileStorageConfig::new(temp_dir.path()));
     let storage = StorageFactory::create(storage_config)?;
 
-    // 2. Configure Embedder (CandleBertEmbedder wrapped in PerFieldEmbedder)
-    // We use "sentence-transformers/all-MiniLM-L6-v2" which outputs 384-dimensional vectors.
+    // 2. Configure Embedder
+    // We use "sentence-transformers/all-MiniLM-L6-v2" (384-dimensional).
     println!("Loading BERT model (this may take a while on first run)...");
-    let candle_embedder = Arc::new(CandleBertEmbedder::new(
+    let embedder = Arc::new(CandleBertEmbedder::new(
         "sentence-transformers/all-MiniLM-L6-v2",
     )?);
 
-    // Create PerFieldEmbedder
-    // We map both "title_vector" and "body_vector" to the same embedder instance.
-    let mut per_field_embedder = PerFieldEmbedder::new(candle_embedder.clone());
-    per_field_embedder.add_embedder("title_vector", candle_embedder.clone());
-    per_field_embedder.add_embedder("body_vector", candle_embedder.clone());
-
-    let embedder_arc: Arc<dyn Embedder> = Arc::new(per_field_embedder);
-
-    // 3. Configure Index
-    let field_config = VectorFieldConfig {
-        vector: Some(VectorOption::Flat(FlatOption {
-            dimension: 384,
-            distance: DistanceMetric::Cosine,
-            base_weight: 1.0,
-            quantizer: None,
-        })),
-        lexical: None,
-    };
-
-    let index_config = VectorIndexConfig::builder()
-        .embedder_arc(embedder_arc)
-        .field("title_vector", field_config.clone())
-        .field("body_vector", field_config)
-        .field(
-            "category",
-            VectorFieldConfig {
-                vector: None,
-                lexical: Some(iris::lexical::core::field::FieldOption::Text(
-                    iris::lexical::core::field::TextOption::default(),
-                )),
+    // 3. Configure Index via Engine
+    let config = IndexConfig::builder()
+        .embedder(embedder)
+        // Define "content" as a field with both vector and lexical indexing
+        .add_field(
+            "content",
+            FieldConfig {
+                vector: Some(VectorOption::Flat(FlatOption {
+                    dimension: 384,
+                    ..Default::default()
+                })),
+                lexical: Some(FieldOption::Text(TextOption::default())),
             },
         )
-        .build()?;
+        // metadata fields
+        .add_lexical_field("category", FieldOption::Text(TextOption::default()))
+        .build();
 
     // 4. Create Engine
-    let engine = VectorEngine::new(storage, index_config)?;
+    let engine = Engine::new(storage, config)?;
 
-    // 5. Add Documents with Text
-    // We use the same data as lexical_search.rs
-    struct DocData<'a> {
-        title: &'a str,
-        body: &'a str,
-        _category: &'a str,
-    }
-
+    // 5. Add Documents
     let docs = vec![
-        DocData {
-            title: "The Rust Programming Language",
-            body: "Rust is fast and memory efficient.",
-            _category: "TECHNOLOGY",
-        },
-        DocData {
-            title: "Learning Search Engines",
-            body: "Search engines are complex but fascinating.",
-            _category: "EDUCATION",
-        },
-        DocData {
-            title: "Cooking with Rust (Iron Skillets)",
-            body: "How to season your cast iron skillet.",
-            _category: "LIFESTYLE",
-        },
+        ("doc1", "The Rust Programming Language", "TECHNOLOGY"),
+        ("doc2", "Learning Search Engines", "EDUCATION"),
+        ("doc3", "Cooking with Rust (Iron Skillets)", "LIFESTYLE"),
     ];
 
     println!("Indexing {} documents...", docs.len());
-    for data in docs {
-        let mut doc = DocumentPayload::new();
-        // Use set_text to provide the raw text content for embedding
-        doc.set_text("title_vector", data.title);
-
-        // Add metadata to vectors using the new set_metadata API
-        doc.set_metadata("category", data._category);
-
-        doc.set_text("body_vector", data.body);
-
-        let doc_id = engine.add_payloads(doc)?;
-        println!("   Added Doc ID: {} -> Title: \"{}\"", doc_id, data.title);
+    for (id, content, cat) in docs {
+        let doc = Document::new()
+            .with_id(id)
+            .with_field("content", content)
+            .with_field("category", cat);
+        engine.index(doc)?;
     }
     engine.commit()?;
 
     // 6. Search
-    // Demo 1: Search in 'title_vector'
-    println!("\n--- Search 1: 'Rust' in 'title_vector' ---");
-    let query_text = "Rust";
-
-    let request = VectorSearchRequestBuilder::new()
-        .add_text("title_vector", query_text)
-        .limit(3)
+    println!("\n--- Vector Search: 'Rust' in 'content' ---");
+    // We use VectorSearchRequestBuilder to build the vector part of the query.
+    // The Engine will automatically embed the query text.
+    let request = SearchRequestBuilder::new()
+        .with_vector(
+            VectorSearchRequestBuilder::new()
+                .add_text("content", "Rust")
+                .build(),
+        )
         .build();
 
     let results = engine.search(request)?;
 
-    println!("Found {} hits:", results.hits.len());
-    for (i, hit) in results.hits.iter().enumerate() {
-        println!("{}. Doc ID: {}, Score: {:.4}", i + 1, hit.doc_id, hit.score);
-    }
-
-    // Demo 2: Search in 'body_vector'
-    println!("\n--- Search 2: 'season skillet' in 'body_vector' ---");
-    let query_text_2 = "season skillet";
-
-    let request_2 = VectorSearchRequestBuilder::new()
-        .add_text("body_vector", query_text_2)
-        .limit(3)
-        .build();
-
-    let results_2 = engine.search(request_2)?;
-
-    println!("Found {} hits:", results_2.hits.len());
-    for (i, hit) in results_2.hits.iter().enumerate() {
-        println!("{}. Doc ID: {}, Score: {:.4}", i + 1, hit.doc_id, hit.score);
-    }
-
-    // Demo 3: Advanced Filtering with Vector Metadata
-    // Search for "engine" in 'body_vector' but restrict to category="EDUCATION"
-    println!("\n--- Search 3: 'engine' in 'body_vector' with category='EDUCATION' filter ---");
-
-    use iris::vector::engine::filter::VectorFilter;
-    use iris::vector::engine::request::{LexicalQuery, TermQueryOptions};
-
-    // Vector metadata is indexed alongside document metadata.
-    // Here we use the advanced filter to target the "category" field which we set earlier.
-    // Note: We use lowercase "education" because the default analyzer lowercases tokens,
-    // and TermQuery performs an exact match against the indexed tokens.
-    let filter = VectorFilter::Advanced(LexicalQuery::Term(TermQueryOptions {
-        field: "category".to_string(),
-        term: "education".to_string(),
-        boost: 1.0,
-    }));
-
-    let request_3 = VectorSearchRequestBuilder::new()
-        .add_text("body_vector", "engine")
-        .filter(filter)
-        .limit(3)
-        .build();
-
-    let results_3 = engine.search(request_3)?;
-
-    println!("Found {} hits (should be 1):", results_3.hits.len());
-    for (i, hit) in results_3.hits.iter().enumerate() {
-        println!("{}. Doc ID: {}, Score: {:.4}", i + 1, hit.doc_id, hit.score);
+    println!("Found {} hits:", results.len());
+    for (i, hit) in results.iter().enumerate() {
+        if let Ok(Some(doc)) = engine.get_document(hit.doc_id) {
+            let content = doc
+                .get_field("content")
+                .and_then(|v| v.as_text())
+                .unwrap_or("");
+            println!(
+                "{}. ID: {}, Content: '{}', Score: {:.4}",
+                i + 1,
+                doc.id.as_deref().unwrap_or("unknown"),
+                content,
+                hit.score
+            );
+        }
     }
 
     Ok(())

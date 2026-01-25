@@ -3,6 +3,7 @@
 //! This module defines:
 //! - [`Field`] - A struct combining a value and its indexing options
 //! - [`FieldValue`] - The value stored in a field (Text, Integer, etc.)
+//!   **Note:** This is now an alias for [`crate::data::DataValue`].
 //! - [`FieldOption`] - Type-specific indexing options (TextOption, VectorOption, etc.)
 //!
 //! # Field Structure
@@ -29,32 +30,19 @@
 //! let text_value = FieldValue::Text("hello".to_string());
 //! assert_eq!(text_value.as_text(), Some("hello"));
 //!
-//! let int_value = FieldValue::Integer(42);
-//! assert_eq!(int_value.as_numeric(), Some("42".to_string()));
+//! let int_value = FieldValue::Int64(42);
+//! assert_eq!(int_value.as_integer(), Some(42));
 //!
-//! let bool_value = FieldValue::Boolean(true);
+//! let bool_value = FieldValue::Bool(true);
 //! assert_eq!(bool_value.as_boolean(), Some(true));
 //! ```
 //!
-//! # Type Inference
-//!
-//! String values can be interpreted as different types:
-//!
-//! ```
-//! use iris::lexical::core::field::FieldValue;
-//!
-//! // Boolean inference from text
+//! // Type inference is not supported on DataValue alias.
 //! let text = FieldValue::Text("true".to_string());
-//! assert_eq!(text.as_boolean(), Some(true));
-//!
-//! let text2 = FieldValue::Text("yes".to_string());
-//! assert_eq!(text2.as_boolean(), Some(true));
-//! ```
+//! assert_eq!(text.as_boolean(), None);
 
 use rkyv::{Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize};
 use serde::{Deserialize, Serialize};
-
-use crate::lexical::index::inverted::query::geo::GeoPoint;
 
 /// Helper for archiving DateTime as micros timestamp (i64)
 pub struct MicroSeconds;
@@ -171,173 +159,12 @@ pub enum NumericType {
     Float,
 }
 
-/// Represents a value for a field in a document.
+/// Alias to the unified [`crate::data::DataValue`].
 ///
-/// This enum provides a flexible type system for document fields, supporting
-/// various data types commonly used in search and indexing applications.
-///
-/// # Serialization
-///
-/// DateTime values are serialized using their UTC timestamp representation
-/// for compatibility with bincode and other binary formats.
-///
-/// # Examples
-///
-/// Creating field values:
-///
-/// ```
-/// use iris::lexical::core::field::FieldValue;
-///
-/// let text = FieldValue::Text("Rust Programming".to_string());
-/// let number = FieldValue::Integer(2024);
-/// let price = FieldValue::Float(39.99);
-/// let active = FieldValue::Boolean(true);
-/// let data = FieldValue::Blob("application/octet-stream".to_string(), vec![0x00, 0x01, 0x02]);
-/// ```
-///
-/// Extracting typed values:
-///
-/// ```
-/// use iris::lexical::core::field::FieldValue;
-///
-/// let value = FieldValue::Integer(100);
-/// assert_eq!(value.as_numeric(), Some("100".to_string()));
-///
-/// let text = FieldValue::Text("42".to_string());
-/// assert_eq!(text.as_text(), Some("42"));
-/// ```
-#[derive(
-    Debug, Clone, PartialEq, Serialize, Deserialize, Archive, RkyvSerialize, RkyvDeserialize,
-)]
-#[serde(untagged)]
-pub enum FieldValue {
-    /// Text value
-    Text(String),
-    /// Integer value
-    Integer(i64),
-    /// Floating point value
-    Float(f64),
-    /// Boolean value
-    Boolean(bool),
-    /// DateTime value
-    DateTime(#[rkyv(with = MicroSeconds)] chrono::DateTime<chrono::Utc>),
-    /// Geographic point value
-    Geo(GeoPoint),
-    /// Blob value (MIME type, Data)
-    Blob(String, Vec<u8>),
-    /// Null value
-    Null,
-}
+/// For backward compatibility, `FieldValue` is preserved as an alias.
+pub type FieldValue = crate::data::DataValue;
 
-impl From<String> for FieldValue {
-    fn from(s: String) -> Self {
-        FieldValue::Text(s)
-    }
-}
-
-impl From<&str> for FieldValue {
-    fn from(s: &str) -> Self {
-        FieldValue::Text(s.to_string())
-    }
-}
-
-impl From<i64> for FieldValue {
-    fn from(i: i64) -> Self {
-        FieldValue::Integer(i)
-    }
-}
-
-impl From<f64> for FieldValue {
-    fn from(f: f64) -> Self {
-        FieldValue::Float(f)
-    }
-}
-
-impl From<bool> for FieldValue {
-    fn from(b: bool) -> Self {
-        FieldValue::Boolean(b)
-    }
-}
-
-impl From<chrono::DateTime<chrono::Utc>> for FieldValue {
-    fn from(dt: chrono::DateTime<chrono::Utc>) -> Self {
-        FieldValue::DateTime(dt)
-    }
-}
-
-impl From<GeoPoint> for FieldValue {
-    fn from(point: GeoPoint) -> Self {
-        FieldValue::Geo(point)
-    }
-}
-
-impl FieldValue {
-    /// Convert to text if this is a text value.
-    pub fn as_text(&self) -> Option<&str> {
-        match self {
-            FieldValue::Text(s) => Some(s),
-            _ => None,
-        }
-    }
-
-    /// Convert to numeric string representation.
-    pub fn as_numeric(&self) -> Option<String> {
-        match self {
-            FieldValue::Integer(i) => Some(i.to_string()),
-            FieldValue::Float(f) => Some(f.to_string()),
-            _ => None,
-        }
-    }
-
-    /// Convert to datetime string representation (RFC3339).
-    pub fn as_datetime(&self) -> Option<String> {
-        match self {
-            FieldValue::Text(s) => {
-                // Try to parse as datetime and return as string if valid
-                if s.parse::<chrono::DateTime<chrono::Utc>>().is_ok() {
-                    Some(s.clone())
-                } else {
-                    None
-                }
-            }
-            FieldValue::Integer(timestamp) => {
-                // Treat as Unix timestamp
-                chrono::DateTime::from_timestamp(*timestamp, 0).map(|dt| dt.to_rfc3339())
-            }
-            _ => None,
-        }
-    }
-
-    /// Convert to boolean.
-    pub fn as_boolean(&self) -> Option<bool> {
-        match self {
-            FieldValue::Boolean(b) => Some(*b),
-            FieldValue::Text(s) => match s.to_lowercase().as_str() {
-                "true" | "t" | "yes" | "y" | "1" | "on" => Some(true),
-                "false" | "f" | "no" | "n" | "0" | "off" => Some(false),
-                _ => None,
-            },
-            FieldValue::Integer(i) => Some(*i != 0),
-            _ => None,
-        }
-    }
-
-    /// Get the value as binary data, if possible.
-    pub fn as_blob(&self) -> Option<(&str, &[u8])> {
-        match self {
-            FieldValue::Blob(mime, data) => Some((mime, data)),
-            _ => None,
-        }
-    }
-
-    /// Convert to GeoPoint if this is a geo value.
-    pub fn as_geo(&self) -> Option<&GeoPoint> {
-        match self {
-            FieldValue::Geo(point) => Some(point),
-            _ => None,
-        }
-    }
-}
+// FieldValue (alias to DataValue) methods moved to src/data.rs
 
 // ============================================================================
 // Field Options - Configuration for indexing and storage
@@ -565,13 +392,21 @@ impl FieldOption {
     /// type of field value.
     pub fn from_field_value(value: &FieldValue) -> Self {
         match value {
-            FieldValue::Text(_) => FieldOption::Text(TextOption::default()),
-            FieldValue::Integer(_) => FieldOption::Integer(IntegerOption::default()),
-            FieldValue::Float(_) => FieldOption::Float(FloatOption::default()),
-            FieldValue::Boolean(_) => FieldOption::Boolean(BooleanOption::default()),
+            FieldValue::Text(_) | FieldValue::String(_) => FieldOption::Text(TextOption::default()),
+            FieldValue::Int64(_) => FieldOption::Integer(IntegerOption::default()),
+            FieldValue::Float64(_) => FieldOption::Float(FloatOption::default()),
+            FieldValue::Bool(_) => FieldOption::Boolean(BooleanOption::default()),
+            // Since DateTime and Geo are missing from DataValue, we guess based on context?
+            // Or access DataValue extensions if we adding them back?
+            // For now, assume Int64 might be DateTime if context implies, but here we only see value.
+            // So Int64 -> IntegerOption.
+            // If DataValue::Vector -> FieldOption::Blob?
+            FieldValue::Vector(_) | FieldValue::Bytes(_, _) => {
+                FieldOption::Blob(BlobOption::default())
+            }
             FieldValue::DateTime(_) => FieldOption::DateTime(DateTimeOption::default()),
-            FieldValue::Geo(_) => FieldOption::Geo(GeoOption::default()),
-            FieldValue::Blob(_, _) => FieldOption::Blob(BlobOption::default()), // Default to BlobOption
+            FieldValue::Geo(_, _) => FieldOption::Geo(GeoOption::default()),
+            FieldValue::List(_) => FieldOption::Text(TextOption::default()), // Default list to text?
             FieldValue::Null => FieldOption::Text(TextOption::default()),
         }
     }

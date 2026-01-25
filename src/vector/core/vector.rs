@@ -5,10 +5,11 @@ use std::collections::HashMap;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use crate::error::{Result, IrisError};
+use crate::error::{IrisError, Result};
 
 /// Metadata key used to store the original (pre-embedded) text.
 pub const ORIGINAL_TEXT_METADATA_KEY: &str = "original_text";
+pub const METADATA_WEIGHT: &str = "__weight";
 
 /// A dense vector representation for similarity search.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -133,6 +134,68 @@ impl Vector {
             for vector in vectors {
                 vector.normalize();
             }
+        }
+    }
+}
+
+/// Dense vector with embedded metadata, used for internal storage.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StoredVector {
+    pub data: Vec<f32>,
+    pub weight: f32,
+    #[serde(default)]
+    pub attributes: HashMap<String, crate::lexical::core::field::Field>,
+}
+
+impl StoredVector {
+    pub fn new(data: Vec<f32>) -> Self {
+        Self {
+            data,
+            weight: 1.0,
+            attributes: HashMap::new(),
+        }
+    }
+
+    pub fn with_weight(mut self, weight: f32) -> Self {
+        self.weight = weight;
+        self
+    }
+
+    pub fn dimension(&self) -> usize {
+        self.data.len()
+    }
+
+    pub fn to_vector(&self) -> Vector {
+        let mut metadata = HashMap::new();
+        for (k, v) in &self.attributes {
+            if let Some(text) = v.value.as_text() {
+                metadata.insert(k.clone(), text.to_string());
+            }
+        }
+        Vector {
+            data: self.data.clone(),
+            metadata,
+        }
+    }
+}
+
+impl From<Vector> for StoredVector {
+    fn from(vector: Vector) -> Self {
+        let mut attributes = HashMap::new();
+        for (k, v) in vector.metadata {
+            use crate::lexical::core::field::{Field, FieldOption, FieldValue, TextOption};
+            attributes.insert(
+                k,
+                Field::new(
+                    FieldValue::Text(v),
+                    FieldOption::Text(TextOption::default()),
+                ),
+            );
+        }
+        Self {
+            data: vector.data,
+            weight: 1.0,
+            attributes,
         }
     }
 }

@@ -105,7 +105,7 @@ fn bench_hnsw_search(c: &mut Criterion) {
             // We need `HnswSearcher` to do the search.
             // But `ManagedVectorIndex` only gives us a `VectorIndexReader`.
             // Let's create an `HnswSearcher` manually using the reader?
-            // Or look at how `VectorEngine` does it.
+            // Or look at how `VectorStore` does it.
             // Typically `searcher.search(...)`.
 
             // For now, let's look at `HnswSearcher`.

@@ -37,7 +37,7 @@ use crate::error::Result;
 /// // "title" and "body" will use StandardAnalyzer
 /// // "id" and "category" will use the same KeywordAnalyzer instance
 /// ```
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct PerFieldAnalyzer {
     /// Default analyzer for fields not in the map.
     default_analyzer: Arc<dyn Analyzer>,

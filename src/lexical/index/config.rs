@@ -2,12 +2,14 @@
 //!
 //! This module provides configuration types for lexical indexes.
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
 use crate::analysis::analyzer::analyzer::Analyzer;
 use crate::analysis::analyzer::standard::StandardAnalyzer;
+use crate::lexical::core::field::FieldOption;
 
 /// Configuration specific to inverted index.
 ///
@@ -66,6 +68,11 @@ pub struct InvertedIndexConfig {
     /// Shard ID for the index.
     #[serde(default)]
     pub shard_id: u16,
+
+    /// Field-specific configurations.
+    /// If empty, all fields are indexed with default options (schema-less).
+    #[serde(default)]
+    pub fields: HashMap<String, FieldOption>,
 }
 
 fn default_analyzer() -> Arc<dyn Analyzer> {
@@ -87,6 +94,7 @@ impl Default for InvertedIndexConfig {
             ),
             default_fields: Vec::new(),
             shard_id: 0,
+            fields: HashMap::new(),
         }
     }
 }
