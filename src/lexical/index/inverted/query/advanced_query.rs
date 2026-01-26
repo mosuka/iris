@@ -91,7 +91,7 @@ impl AdvancedQuery {
     }
 
     /// Set field boost for scoring.
-    pub fn with_field_boost(mut self, field: String, boost: f32) -> Self {
+    pub fn add_field_boost(mut self, field: String, boost: f32) -> Self {
         self.field_boosts.insert(field, boost);
         self
     }
@@ -596,7 +596,7 @@ mod tests {
         let advanced_query = AdvancedQuery::new(core_query)
             .with_boost(2.0)
             .with_min_score(0.5)
-            .with_field_boost("title".to_string(), 1.5);
+            .add_field_boost("title".to_string(), 1.5);
 
         assert_eq!(advanced_query.boost, 2.0);
         assert_eq!(advanced_query.min_score, 0.5);

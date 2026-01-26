@@ -124,15 +124,15 @@ async fn test_hybrid_search_unification_impl(
 ) -> std::result::Result<(), Box<dyn std::error::Error>> {
     // Index Doc 1: "apple"
     let payload1 = Document::new()
-        .with_field("title", DataValue::Text("apple".into()))
-        .with_field("_id", DataValue::Text("1".into()));
+        .add_field("title", DataValue::Text("apple".into()))
+        .add_field("_id", DataValue::Text("1".into()));
 
     engine.index_chunk(payload1)?;
 
     // Index Doc 2: "banana"
     let payload2 = Document::new()
-        .with_field("title", DataValue::Text("banana".into()))
-        .with_field("_id", DataValue::Text("2".into()));
+        .add_field("title", DataValue::Text("banana".into()))
+        .add_field("_id", DataValue::Text("2".into()));
 
     engine.index_chunk(payload2)?;
 

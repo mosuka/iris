@@ -10,12 +10,12 @@ use iris::analysis::analyzer::per_field::PerFieldAnalyzer;
 use iris::analysis::analyzer::standard::StandardAnalyzer;
 use iris::data::{DataValue, Document};
 use iris::error::Result;
-use iris::lexical::store::LexicalStore;
-use iris::lexical::store::config::LexicalIndexConfig;
 use iris::lexical::index::config::InvertedIndexConfig;
 use iris::lexical::index::inverted::query::Query;
 use iris::lexical::index::inverted::query::geo::GeoQuery;
 use iris::lexical::search::searcher::LexicalSearchRequest;
+use iris::lexical::store::LexicalStore;
+use iris::lexical::store::config::LexicalIndexConfig;
 use iris::storage::StorageConfig;
 use iris::storage::StorageFactory;
 use iris::storage::file::FileStorageConfig;
@@ -45,85 +45,85 @@ fn main() -> Result<()> {
     // Using famous locations around the world
     let documents = vec![
         Document::new()
-            .with_field("name", DataValue::Text("Central Park".into()))
-            .with_field(
+            .add_field("name", DataValue::Text("Central Park".into()))
+            .add_field(
                 "description",
                 DataValue::Text("Large public park in Manhattan, New York City".into()),
             )
-            .with_field("category", DataValue::Text("park".into()))
-            .with_field("location", DataValue::Geo(40.7829, -73.9654))
-            .with_field("city", DataValue::Text("New York".into()))
-            .with_field("id", DataValue::Text("loc001".into())),
+            .add_field("category", DataValue::Text("park".into()))
+            .add_field("location", DataValue::Geo(40.7829, -73.9654))
+            .add_field("city", DataValue::Text("New York".into()))
+            .add_field("id", DataValue::Text("loc001".into())),
         Document::new()
-            .with_field("name", DataValue::Text("Statue of Liberty".into()))
-            .with_field(
+            .add_field("name", DataValue::Text("Statue of Liberty".into()))
+            .add_field(
                 "description",
                 DataValue::Text("Iconic statue on Liberty Island".into()),
             )
-            .with_field("category", DataValue::Text("monument".into()))
-            .with_field("location", DataValue::Geo(40.6892, -74.0445))
-            .with_field("city", DataValue::Text("New York".into()))
-            .with_field("id", DataValue::Text("loc002".into())),
+            .add_field("category", DataValue::Text("monument".into()))
+            .add_field("location", DataValue::Geo(40.6892, -74.0445))
+            .add_field("city", DataValue::Text("New York".into()))
+            .add_field("id", DataValue::Text("loc002".into())),
         Document::new()
-            .with_field("name", DataValue::Text("Golden Gate Bridge".into()))
-            .with_field(
+            .add_field("name", DataValue::Text("Golden Gate Bridge".into()))
+            .add_field(
                 "description",
                 DataValue::Text("Suspension bridge in San Francisco".into()),
             )
-            .with_field("category", DataValue::Text("bridge".into()))
-            .with_field("location", DataValue::Geo(37.8199, -122.4783))
-            .with_field("city", DataValue::Text("San Francisco".into()))
-            .with_field("id", DataValue::Text("loc003".into())),
+            .add_field("category", DataValue::Text("bridge".into()))
+            .add_field("location", DataValue::Geo(37.8199, -122.4783))
+            .add_field("city", DataValue::Text("San Francisco".into()))
+            .add_field("id", DataValue::Text("loc003".into())),
         Document::new()
-            .with_field("name", DataValue::Text("Alcatraz Island".into()))
-            .with_field(
+            .add_field("name", DataValue::Text("Alcatraz Island".into()))
+            .add_field(
                 "description",
                 DataValue::Text("Former federal prison on island in San Francisco Bay".into()),
             )
-            .with_field("category", DataValue::Text("historical".into()))
-            .with_field("location", DataValue::Geo(37.8267, -122.4233))
-            .with_field("city", DataValue::Text("San Francisco".into()))
-            .with_field("id", DataValue::Text("loc004".into())),
+            .add_field("category", DataValue::Text("historical".into()))
+            .add_field("location", DataValue::Geo(37.8267, -122.4233))
+            .add_field("city", DataValue::Text("San Francisco".into()))
+            .add_field("id", DataValue::Text("loc004".into())),
         Document::new()
-            .with_field("name", DataValue::Text("Hollywood Sign".into()))
-            .with_field(
+            .add_field("name", DataValue::Text("Hollywood Sign".into()))
+            .add_field(
                 "description",
                 DataValue::Text("Landmark sign in Hollywood Hills".into()),
             )
-            .with_field("category", DataValue::Text("landmark".into()))
-            .with_field("location", DataValue::Geo(34.1341, -118.3215))
-            .with_field("city", DataValue::Text("Los Angeles".into()))
-            .with_field("id", DataValue::Text("loc005".into())),
+            .add_field("category", DataValue::Text("landmark".into()))
+            .add_field("location", DataValue::Geo(34.1341, -118.3215))
+            .add_field("city", DataValue::Text("Los Angeles".into()))
+            .add_field("id", DataValue::Text("loc005".into())),
         Document::new()
-            .with_field("name", DataValue::Text("Santa Monica Pier".into()))
-            .with_field(
+            .add_field("name", DataValue::Text("Santa Monica Pier".into()))
+            .add_field(
                 "description",
                 DataValue::Text("Amusement park and pier on Santa Monica Beach".into()),
             )
-            .with_field("category", DataValue::Text("entertainment".into()))
-            .with_field("location", DataValue::Geo(34.0084, -118.4966))
-            .with_field("city", DataValue::Text("Los Angeles".into()))
-            .with_field("id", DataValue::Text("loc006".into())),
+            .add_field("category", DataValue::Text("entertainment".into()))
+            .add_field("location", DataValue::Geo(34.0084, -118.4966))
+            .add_field("city", DataValue::Text("Los Angeles".into()))
+            .add_field("id", DataValue::Text("loc006".into())),
         Document::new()
-            .with_field("name", DataValue::Text("Space Needle".into()))
-            .with_field(
+            .add_field("name", DataValue::Text("Space Needle".into()))
+            .add_field(
                 "description",
                 DataValue::Text("Observation tower in Seattle Center".into()),
             )
-            .with_field("category", DataValue::Text("tower".into()))
-            .with_field("location", DataValue::Geo(47.6205, -122.3493))
-            .with_field("city", DataValue::Text("Seattle".into()))
-            .with_field("id", DataValue::Text("loc007".into())),
+            .add_field("category", DataValue::Text("tower".into()))
+            .add_field("location", DataValue::Geo(47.6205, -122.3493))
+            .add_field("city", DataValue::Text("Seattle".into()))
+            .add_field("id", DataValue::Text("loc007".into())),
         Document::new()
-            .with_field("name", DataValue::Text("Pike Place Market".into()))
-            .with_field(
+            .add_field("name", DataValue::Text("Pike Place Market".into()))
+            .add_field(
                 "description",
                 DataValue::Text("Public market overlooking Elliott Bay".into()),
             )
-            .with_field("category", DataValue::Text("market".into()))
-            .with_field("location", DataValue::Geo(47.6101, -122.3421))
-            .with_field("city", DataValue::Text("Seattle".into()))
-            .with_field("id", DataValue::Text("loc008".into())),
+            .add_field("category", DataValue::Text("market".into()))
+            .add_field("location", DataValue::Geo(47.6101, -122.3421))
+            .add_field("city", DataValue::Text("Seattle".into()))
+            .add_field("id", DataValue::Text("loc008".into())),
     ];
 
     println!("Adding {} documents to the index...", documents.len());

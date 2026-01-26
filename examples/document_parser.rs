@@ -21,10 +21,10 @@ use iris::analysis::analyzer::standard::StandardAnalyzer;
 use iris::data::{DataValue, Document};
 use iris::error::Result;
 use iris::lexical::core::parser::DocumentParser;
-use iris::lexical::store::LexicalStore;
-use iris::lexical::store::config::LexicalIndexConfig;
 use iris::lexical::index::inverted::writer::{InvertedIndexWriter, InvertedIndexWriterConfig};
 use iris::lexical::search::searcher::LexicalSearchRequest;
+use iris::lexical::store::LexicalStore;
+use iris::lexical::store::config::LexicalIndexConfig;
 use iris::storage::file::FileStorage;
 use iris::storage::file::FileStorageConfig;
 
@@ -66,17 +66,17 @@ fn main() -> Result<()> {
     // Create documents
     let docs = vec![
         Document::new()
-            .with_field("id", DataValue::Text("BOOK-001".into()))
-            .with_field("title", DataValue::Text("Rust Programming Language".into()))
-            .with_field("category", DataValue::Text("programming".into())),
+            .add_text("id", "BOOK-001")
+            .add_text("title", "Rust Programming Language")
+            .add_text("category", "programming"),
         Document::new()
-            .with_field("id", DataValue::Text("BOOK-002".into()))
-            .with_field("title", DataValue::Text("Learning Rust".into()))
-            .with_field("category", DataValue::Text("programming".into())),
+            .add_text("id", "BOOK-002")
+            .add_text("title", "Learning Rust")
+            .add_text("category", "programming"),
         Document::new()
-            .with_field("id", DataValue::Text("ARTICLE-001".into()))
-            .with_field("title", DataValue::Text("Introduction to Python".into()))
-            .with_field("category", DataValue::Text("tutorial".into())),
+            .add_text("id", "ARTICLE-001")
+            .add_text("title", "Introduction to Python")
+            .add_text("category", "tutorial"),
     ];
 
     // Analyze documents explicitly and add to index

@@ -71,16 +71,12 @@ fn main() -> Result<()> {
     // 2. Index Documents
     // "product-A": "Green Apple"
     println!("-> Indexing 'product-A'...");
-    let doc_a = Document::new()
-        .with_id("product-A")
-        .with_field("description", "Green Apple");
+    let doc_a = Document::new_with_id("product-A").add_field("description", "Green Apple");
     engine.index(doc_a)?;
 
     // "product-B": "Yellow Banana"
     println!("-> Indexing 'product-B'...");
-    let doc_b = Document::new()
-        .with_id("product-B")
-        .with_field("description", "Yellow Banana");
+    let doc_b = Document::new_with_id("product-B").add_field("description", "Yellow Banana");
     engine.index(doc_b)?;
 
     engine.commit()?;
@@ -89,9 +85,7 @@ fn main() -> Result<()> {
     // Change product-A to "Red Apple" (same ID)
     // The Engine will automatically detect the same ID and replace the old document.
     println!("\n-> Updating 'product-A' to 'Red Apple'...");
-    let doc_a_new = Document::new()
-        .with_id("product-A")
-        .with_field("description", "Red Apple");
+    let doc_a_new = Document::new_with_id("product-A").add_field("description", "Red Apple");
     engine.index(doc_a_new)?;
     engine.commit()?;
 

@@ -5,7 +5,7 @@
 
 use ahash::AHashMap;
 
-use crate::error::{Result, IrisError};
+use crate::error::{IrisError, Result};
 use crate::storage::structured::{StructReader, StructWriter};
 use crate::storage::{StorageInput, StorageOutput};
 

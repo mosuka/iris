@@ -816,10 +816,10 @@ impl VectorStore {
                                 for (k, v) in fields {
                                     let vec_data: Vec<f32> = v.data.iter().copied().collect();
                                     doc =
-                                        doc.with_field(k, crate::data::DataValue::Vector(vec_data));
+                                        doc.add_field(k, crate::data::DataValue::Vector(vec_data));
                                 }
                                 for (k, v) in legacy.metadata {
-                                    doc = doc.with_field(k, crate::data::DataValue::Text(v));
+                                    doc = doc.add_field(k, crate::data::DataValue::Text(v));
                                 }
                                 doc
                             },

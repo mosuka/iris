@@ -8,12 +8,12 @@ use std::sync::Arc;
 use iris::analysis::analyzer::standard::StandardAnalyzer;
 use iris::data::{DataValue, Document};
 use iris::error::Result;
-use iris::lexical::store::LexicalStore;
-use iris::lexical::store::config::LexicalIndexConfig;
 use iris::lexical::index::config::InvertedIndexConfig;
 use iris::lexical::index::inverted::query::span::{SpanQueryBuilder, SpanQueryWrapper};
 use iris::lexical::index::inverted::query::{LexicalSearchResults, Query};
 use iris::lexical::search::searcher::LexicalSearchRequest;
+use iris::lexical::store::LexicalStore;
+use iris::lexical::store::config::LexicalIndexConfig;
 use iris::storage::file::FileStorageConfig;
 use iris::storage::{StorageConfig, StorageFactory};
 use tempfile::TempDir;
@@ -39,14 +39,14 @@ fn main() -> Result<()> {
     // 4. Add Documents
     let documents = vec![
         Document::new()
-            .with_field("title", DataValue::Text("The quick brown fox".into()))
-            .with_field("body", DataValue::Text("Jumped over the lazy dog".into())),
+            .add_field("title", DataValue::Text("The quick brown fox".into()))
+            .add_field("body", DataValue::Text("Jumped over the lazy dog".into())),
         Document::new()
-            .with_field("title", DataValue::Text(" The quick red fox".into()))
-            .with_field("body", DataValue::Text("Jumped over the lazy cat".into())),
+            .add_field("title", DataValue::Text(" The quick red fox".into()))
+            .add_field("body", DataValue::Text("Jumped over the lazy cat".into())),
         Document::new()
-            .with_field("title", DataValue::Text("The lazy brown dog".into()))
-            .with_field("body", DataValue::Text("Jumped over the quick fox".into())),
+            .add_field("title", DataValue::Text("The lazy brown dog".into()))
+            .add_field("body", DataValue::Text("Jumped over the quick fox".into())),
     ];
 
     println!("Indexing {} documents...", documents.len());

@@ -10,12 +10,12 @@ use iris::analysis::analyzer::per_field::PerFieldAnalyzer;
 use iris::analysis::analyzer::standard::StandardAnalyzer;
 use iris::data::{DataValue, Document};
 use iris::error::Result;
-use iris::lexical::store::LexicalStore;
-use iris::lexical::store::config::LexicalIndexConfig;
 use iris::lexical::index::config::InvertedIndexConfig;
 use iris::lexical::index::inverted::query::Query;
 use iris::lexical::index::inverted::query::range::NumericRangeQuery;
 use iris::lexical::search::searcher::LexicalSearchRequest;
+use iris::lexical::store::LexicalStore;
+use iris::lexical::store::config::LexicalIndexConfig;
 use iris::storage::StorageConfig;
 use iris::storage::StorageFactory;
 use iris::storage::file::FileStorageConfig;
@@ -43,75 +43,75 @@ fn main() -> Result<()> {
 
     let documents = vec![
         Document::new()
-            .with_field(
+            .add_field(
                 "title",
                 DataValue::Text("Introduction to Algorithms".into()),
             )
-            .with_field(
+            .add_field(
                 "description",
                 DataValue::Text("Comprehensive guide to algorithms and data structures".into()),
             )
-            .with_field("price", DataValue::Float64(89.99))
-            .with_field("rating", DataValue::Float64(4.8))
-            .with_field("year", DataValue::Int64(2009))
-            .with_field("pages", DataValue::Int64(1312))
-            .with_field("id", DataValue::Text("book001".into())),
+            .add_field("price", DataValue::Float64(89.99))
+            .add_field("rating", DataValue::Float64(4.8))
+            .add_field("year", DataValue::Int64(2009))
+            .add_field("pages", DataValue::Int64(1312))
+            .add_field("id", DataValue::Text("book001".into())),
         Document::new()
-            .with_field("title", DataValue::Text("Clean Code".into()))
-            .with_field(
+            .add_field("title", DataValue::Text("Clean Code".into()))
+            .add_field(
                 "description",
                 DataValue::Text("A handbook of agile software craftsmanship".into()),
             )
-            .with_field("price", DataValue::Float64(45.50))
-            .with_field("rating", DataValue::Float64(4.6))
-            .with_field("year", DataValue::Int64(2008))
-            .with_field("pages", DataValue::Int64(464))
-            .with_field("id", DataValue::Text("book002".into())),
+            .add_field("price", DataValue::Float64(45.50))
+            .add_field("rating", DataValue::Float64(4.6))
+            .add_field("year", DataValue::Int64(2008))
+            .add_field("pages", DataValue::Int64(464))
+            .add_field("id", DataValue::Text("book002".into())),
         Document::new()
-            .with_field("title", DataValue::Text("Design Patterns".into()))
-            .with_field(
+            .add_field("title", DataValue::Text("Design Patterns".into()))
+            .add_field(
                 "description",
                 DataValue::Text("Elements of reusable object-oriented software".into()),
             )
-            .with_field("price", DataValue::Float64(62.95))
-            .with_field("rating", DataValue::Float64(4.5))
-            .with_field("year", DataValue::Int64(1994))
-            .with_field("pages", DataValue::Int64(395))
-            .with_field("id", DataValue::Text("book003".into())),
+            .add_field("price", DataValue::Float64(62.95))
+            .add_field("rating", DataValue::Float64(4.5))
+            .add_field("year", DataValue::Int64(1994))
+            .add_field("pages", DataValue::Int64(395))
+            .add_field("id", DataValue::Text("book003".into())),
         Document::new()
-            .with_field("title", DataValue::Text("The Pragmatic Programmer".into()))
-            .with_field(
+            .add_field("title", DataValue::Text("The Pragmatic Programmer".into()))
+            .add_field(
                 "description",
                 DataValue::Text("Your journey to mastery".into()),
             )
-            .with_field("price", DataValue::Float64(52.99))
-            .with_field("rating", DataValue::Float64(4.7))
-            .with_field("year", DataValue::Int64(2019))
-            .with_field("pages", DataValue::Int64(352))
-            .with_field("id", DataValue::Text("book004".into())),
+            .add_field("price", DataValue::Float64(52.99))
+            .add_field("rating", DataValue::Float64(4.7))
+            .add_field("year", DataValue::Int64(2019))
+            .add_field("pages", DataValue::Int64(352))
+            .add_field("id", DataValue::Text("book004".into())),
         Document::new()
-            .with_field("title", DataValue::Text("Refactoring".into()))
-            .with_field(
+            .add_field("title", DataValue::Text("Refactoring".into()))
+            .add_field(
                 "description",
                 DataValue::Text("Improving the design of existing code".into()),
             )
-            .with_field("price", DataValue::Float64(58.75))
-            .with_field("rating", DataValue::Float64(4.4))
-            .with_field("year", DataValue::Int64(2018))
-            .with_field("pages", DataValue::Int64(448))
-            .with_field("id", DataValue::Text("book005".into())),
+            .add_field("price", DataValue::Float64(58.75))
+            .add_field("rating", DataValue::Float64(4.4))
+            .add_field("year", DataValue::Int64(2018))
+            .add_field("pages", DataValue::Int64(448))
+            .add_field("id", DataValue::Text("book005".into())),
         Document::new()
-            .with_field("title", DataValue::Text("Code Complete".into()))
-            .with_field(
+            .add_field("title", DataValue::Text("Code Complete".into()))
+            .add_field(
                 "description",
                 DataValue::Text("A practical handbook of software construction".into()),
             )
-            .with_field("price", DataValue::Float64(73.99))
-            .with_field("rating", DataValue::Float64(4.9))
-            .with_field("year", DataValue::Int64(2004))
-            .with_field("pages", DataValue::Int64(914))
-            .with_field("category", DataValue::Text("software".into()))
-            .with_field("id", DataValue::Text("book006".into())),
+            .add_field("price", DataValue::Float64(73.99))
+            .add_field("rating", DataValue::Float64(4.9))
+            .add_field("year", DataValue::Int64(2004))
+            .add_field("pages", DataValue::Int64(914))
+            .add_field("category", DataValue::Text("software".into()))
+            .add_field("id", DataValue::Text("book006".into())),
     ];
 
     println!("Adding {} documents to the index...", documents.len());

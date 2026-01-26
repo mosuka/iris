@@ -85,9 +85,7 @@ async fn test_vector_segment_integration() {
 
     for (i, vec_data) in vectors.iter().enumerate() {
         let doc_id = (i as u64) + 1;
-        let doc = Document::builder()
-            .with_field("vector_field", DataValue::Vector(vec_data.clone()))
-            .build();
+        let doc = Document::new().add_field("vector_field", DataValue::Vector(vec_data.clone()));
 
         // Use upsert_payloads.
         engine.upsert_payloads(doc_id, doc).unwrap();

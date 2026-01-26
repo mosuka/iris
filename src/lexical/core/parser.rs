@@ -46,10 +46,9 @@
 //!
 //! let parser = DocumentParser::new(Arc::new(StandardAnalyzer::new().unwrap()));
 //!
-//! let doc = Document::builder()
-//!     .add_text("title", "Rust Programming Language", TextOption::default())
-//!     .add_integer("year", 2024, IntegerOption::default())
-//!     .build();
+//! let doc = Document::new()
+//!     .add_text("title", "Rust Programming Language")
+//!     .add_integer("year", 2024);
 //!
 //! let analyzed = parser.parse(doc).unwrap();
 //! assert!(analyzed.field_terms.contains_key("title"));
@@ -73,10 +72,9 @@
 //!
 //! let parser = DocumentParser::new(Arc::new(per_field));
 //!
-//! let doc = Document::builder()
-//!     .add_text("title", "Getting Started", TextOption::default())  // Uses StandardAnalyzer
-//!     .add_text("id", "DOC-001", TextOption::default())             // Uses KeywordAnalyzer
-//!     .build();
+//! let doc = Document::new()
+//!     .add_text("title", "Getting Started")  // Uses StandardAnalyzer
+//!     .add_text("id", "DOC-001");             // Uses KeywordAnalyzer
 //!
 //! let analyzed = parser.parse(doc).unwrap();
 //! // "id" field is treated as a single keyword token
@@ -117,10 +115,9 @@ use crate::lexical::core::field::FieldValue;
 ///
 /// let parser = DocumentParser::new(Arc::new(per_field));
 ///
-/// let doc = Document::builder()
-///     .add_text("title", "Rust Programming", TextOption::default())
-///     .add_text("id", "BOOK-001", TextOption::default())
-///     .build();
+/// let doc = Document::new()
+///     .add_text("title", "Rust Programming")
+///     .add_text("id", "BOOK-001");
 ///
 /// let analyzed = parser.parse(doc).unwrap();
 /// ```
@@ -341,16 +338,14 @@ mod tests {
     use super::*;
     use crate::analysis::analyzer::keyword::KeywordAnalyzer;
     use crate::analysis::analyzer::standard::StandardAnalyzer;
-    use crate::lexical::core::field::{BooleanOption, FloatOption, IntegerOption, TextOption};
 
     #[test]
     fn test_basic_parsing() {
         let parser = DocumentParser::new(Arc::new(StandardAnalyzer::new().unwrap()));
 
-        let doc = Document::builder()
-            .add_text("title", "Rust Programming", TextOption::default())
-            .add_text("body", "Learn Rust", TextOption::default())
-            .build();
+        let doc = Document::new()
+            .add_text("title", "Rust Programming")
+            .add_text("body", "Learn Rust");
 
         let analyzed = parser.parse(doc).unwrap();
 
@@ -365,10 +360,9 @@ mod tests {
 
         let parser = DocumentParser::new(Arc::new(per_field));
 
-        let doc = Document::builder()
-            .add_text("title", "Rust Programming", TextOption::default())
-            .add_text("id", "BOOK-001", TextOption::default())
-            .build();
+        let doc = Document::new()
+            .add_text("title", "Rust Programming")
+            .add_text("id", "BOOK-001");
 
         let analyzed = parser.parse(doc).unwrap();
 
@@ -383,12 +377,11 @@ mod tests {
     fn test_numeric_fields() {
         let parser = DocumentParser::new(Arc::new(StandardAnalyzer::new().unwrap()));
 
-        let doc = Document::builder()
-            .add_text("title", "Test", TextOption::default())
-            .add_integer("year", 2024, IntegerOption::default())
-            .add_float("price", 19.99, FloatOption::default())
-            .add_boolean("active", true, BooleanOption::default())
-            .build();
+        let doc = Document::new()
+            .add_text("title", "Test")
+            .add_integer("year", 2024)
+            .add_float("price", 19.99)
+            .add_boolean("active", true);
 
         let analyzed = parser.parse(doc).unwrap();
 

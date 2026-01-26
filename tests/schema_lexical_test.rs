@@ -54,12 +54,11 @@ fn test_schema_lexical_guardrails() -> Result<()> {
     let engine = Engine::new(storage, config)?;
 
     // 3. Index a document with various fields (including one NOT in schema)
-    let doc = Document::new()
-        .with_id("test1")
-        .with_field("indexed_and_stored", "value1")
-        .with_field("indexed_only", "value2")
-        .with_field("stored_only", "value3")
-        .with_field("unknown_field", "should be ignored");
+    let doc = Document::new_with_id("test1")
+        .add_field("indexed_and_stored", "value1")
+        .add_field("indexed_only", "value2")
+        .add_field("stored_only", "value3")
+        .add_field("unknown_field", "should be ignored");
 
     engine.index(doc)?;
     engine.commit()?;

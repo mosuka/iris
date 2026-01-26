@@ -42,10 +42,9 @@ fn test_engine_unified_deletion() -> iris::error::Result<()> {
     let engine = Engine::new(storage.clone(), config)?;
 
     // 3. Index Document with ID "doc1"
-    let doc1 = Document::new()
-        .with_id("doc1")
-        .with_field("title", "Hello Iris")
-        .with_field("embedding", vec![0.1; 128]);
+    let doc1 = Document::new_with_id("doc1")
+        .add_field("title", "Hello Iris")
+        .add_field("embedding", vec![0.1; 128]);
 
     engine.index(doc1)?;
     engine.commit()?;
@@ -130,10 +129,9 @@ fn test_engine_upsert() -> iris::error::Result<()> {
     let engine = Engine::new(storage.clone(), config)?;
 
     // 3. Index Document with ID "doc1"
-    let doc1 = Document::new()
-        .with_id("doc1")
-        .with_field("title", "Initial Version")
-        .with_field("embedding", vec![1.0, 0.0]);
+    let doc1 = Document::new_with_id("doc1")
+        .add_field("title", "Initial Version")
+        .add_field("embedding", vec![1.0, 0.0]);
 
     engine.index(doc1)?;
     engine.commit()?;
@@ -147,10 +145,9 @@ fn test_engine_upsert() -> iris::error::Result<()> {
     assert_eq!(res.len(), 1);
 
     // 5. Index updated document with SAME ID "doc1"
-    let doc1_v2 = Document::new()
-        .with_id("doc1")
-        .with_field("title", "Updated Version")
-        .with_field("embedding", vec![0.0, 1.0]);
+    let doc1_v2 = Document::new_with_id("doc1")
+        .add_field("title", "Updated Version")
+        .add_field("embedding", vec![0.0, 1.0]);
 
     engine.index(doc1_v2)?;
     engine.commit()?;

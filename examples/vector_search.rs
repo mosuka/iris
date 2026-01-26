@@ -84,10 +84,9 @@ fn main() -> Result<()> {
 
     println!("Indexing {} documents...", docs.len());
     for (id, content, cat) in docs {
-        let doc = Document::new()
-            .with_id(id)
-            .with_field("content", content)
-            .with_field("category", cat);
+        let doc = Document::new_with_id(id)
+            .add_field("content", content)
+            .add_field("category", cat);
         engine.index(doc)?;
     }
     engine.commit()?;
