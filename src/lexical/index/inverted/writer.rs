@@ -305,9 +305,8 @@ impl InvertedIndexWriter {
     /// let mut writer = InvertedIndexWriter::new(storage, config).unwrap();
     ///
     /// use iris::lexical::core::field::TextOption;
-    /// let doc = Document::builder()
-    ///     .add_text("title", "Rust Programming", TextOption::default())
-    ///     .build();
+    /// let doc = Document::new()
+    ///     .add_text("title", "Rust Programming");
     ///
     /// let doc_parser = DocumentParser::new(Arc::new(per_field));
     /// let analyzed = doc_parser.parse(doc).unwrap();

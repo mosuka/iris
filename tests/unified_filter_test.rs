@@ -52,29 +52,26 @@ fn test_unified_filtering() -> iris::error::Result<()> {
     // 3. Index Documents
     // Doc 1: Apple (Fruit), Vector [1.0, 0.0]
     engine.index(
-        Document::new()
-            .with_id("doc1")
-            .with_field("name", "Apple")
-            .with_field("category", "fruit")
-            .with_field("embedding", vec![1.0, 0.0]),
+        Document::new_with_id("doc1")
+            .add_field("name", "Apple")
+            .add_field("category", "fruit")
+            .add_field("embedding", vec![1.0, 0.0]),
     )?;
 
     // Doc 2: Banana (Fruit), Vector [0.9, 0.1]
     engine.index(
-        Document::new()
-            .with_id("doc2")
-            .with_field("name", "Banana")
-            .with_field("category", "fruit")
-            .with_field("embedding", vec![0.9, 0.1]),
+        Document::new_with_id("doc2")
+            .add_field("name", "Banana")
+            .add_field("category", "fruit")
+            .add_field("embedding", vec![0.9, 0.1]),
     )?;
 
     // Doc 3: Carrot (Vegetable), Vector [1.0, 0.0] -> Identical vector to Apple!
     engine.index(
-        Document::new()
-            .with_id("doc3")
-            .with_field("name", "Carrot")
-            .with_field("category", "vegetable")
-            .with_field("embedding", vec![1.0, 0.0]),
+        Document::new_with_id("doc3")
+            .add_field("name", "Carrot")
+            .add_field("category", "vegetable")
+            .add_field("embedding", vec![1.0, 0.0]),
     )?;
 
     engine.commit()?;
@@ -169,24 +166,24 @@ fn test_unified_filtering_hnsw() -> iris::error::Result<()> {
     // 3. Index Documents
     engine.index(
         Document::new()
-            .with_id("doc1")
-            .with_field("name", "Apple")
-            .with_field("category", "fruit")
-            .with_field("embedding", vec![1.0, 0.0]),
+            .set_id("doc1")
+            .add_field("name", "Apple")
+            .add_field("category", "fruit")
+            .add_field("embedding", vec![1.0, 0.0]),
     )?;
     engine.index(
         Document::new()
-            .with_id("doc2")
-            .with_field("name", "Banana")
-            .with_field("category", "fruit")
-            .with_field("embedding", vec![0.9, 0.1]),
+            .set_id("doc2")
+            .add_field("name", "Banana")
+            .add_field("category", "fruit")
+            .add_field("embedding", vec![0.9, 0.1]),
     )?;
     engine.index(
         Document::new()
-            .with_id("doc3")
-            .with_field("name", "Carrot")
-            .with_field("category", "vegetable")
-            .with_field("embedding", vec![1.0, 0.0]),
+            .set_id("doc3")
+            .add_field("name", "Carrot")
+            .add_field("category", "vegetable")
+            .add_field("embedding", vec![1.0, 0.0]),
     )?;
     engine.commit()?;
 
@@ -253,24 +250,24 @@ fn test_unified_filtering_ivf() -> iris::error::Result<()> {
     // 3. Index Documents
     engine.index(
         Document::new()
-            .with_id("doc1")
-            .with_field("name", "Apple")
-            .with_field("category", "fruit")
-            .with_field("embedding", vec![1.0, 0.0]),
+            .set_id("doc1")
+            .add_field("name", "Apple")
+            .add_field("category", "fruit")
+            .add_field("embedding", vec![1.0, 0.0]),
     )?;
     engine.index(
         Document::new()
-            .with_id("doc2")
-            .with_field("name", "Banana")
-            .with_field("category", "fruit")
-            .with_field("embedding", vec![0.9, 0.1]),
+            .set_id("doc2")
+            .add_field("name", "Banana")
+            .add_field("category", "fruit")
+            .add_field("embedding", vec![0.9, 0.1]),
     )?;
     engine.index(
         Document::new()
-            .with_id("doc3")
-            .with_field("name", "Carrot")
-            .with_field("category", "vegetable")
-            .with_field("embedding", vec![1.0, 0.0]),
+            .set_id("doc3")
+            .add_field("name", "Carrot")
+            .add_field("category", "vegetable")
+            .add_field("embedding", vec![1.0, 0.0]),
     )?;
     engine.commit()?;
 

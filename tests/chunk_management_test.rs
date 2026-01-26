@@ -30,8 +30,8 @@ fn build_test_engine() -> Result<Engine> {
 
 fn create_payload(id: &str, vector: Vec<f32>) -> Document {
     Document::new()
-        .with_field("_id", DataValue::Text(id.into()))
-        .with_field("body", DataValue::Vector(vector))
+        .add_field("_id", DataValue::Text(id.into()))
+        .add_field("body", DataValue::Vector(vector))
 }
 
 #[test]

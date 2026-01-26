@@ -95,7 +95,7 @@ fn main() -> Result<()> {
 
     println!("Indexing {} documents...", docs.len());
     for (id, content) in docs {
-        let doc = Document::new().with_id(id).with_field("content", content);
+        let doc = Document::new_with_id(id).add_field("content", content);
         engine.index(doc)?;
     }
     engine.commit()?;

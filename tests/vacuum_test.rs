@@ -49,7 +49,7 @@ fn test_vacuum_reduces_file_size() {
     // 2. Insert vectors
     println!("Inserting {} vectors...", num_vectors);
     for i in 0..num_vectors {
-        let doc = Document::new().with_field("vectors", DataValue::Vector(vec![0.1f32; dim]));
+        let doc = Document::new().add_field("vectors", DataValue::Vector(vec![0.1f32; dim]));
         engine.upsert_vectors(i, doc).unwrap();
     }
 
@@ -189,7 +189,7 @@ fn test_vacuum_reduces_file_size_hnsw() {
             vec_data[j] = (i + j) as f32 % 500.0 / 500.0; // Deterministic pseudo-random, unique for i < 500
         }
 
-        let doc = Document::new().with_field("vectors", DataValue::Vector(vec_data));
+        let doc = Document::new().add_field("vectors", DataValue::Vector(vec_data));
         engine.upsert_vectors(i as u64, doc).unwrap();
     }
 

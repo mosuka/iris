@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use iris::analysis::analyzer::standard::StandardAnalyzer;
 use iris::lexical::core::document::Document;
-use iris::lexical::core::field::TextOption;
 use iris::lexical::index::inverted::query::Query;
 use iris::lexical::index::inverted::query::span::{
     SpanQuery, SpanQueryBuilder, SpanQueryWrapper, SpanTermQuery,
@@ -28,29 +27,13 @@ fn create_test_index() -> Result<
     let mut writer = InvertedIndexWriter::new(storage.clone(), config)?;
 
     // Doc 0: "hello world"
-    writer.add_document(
-        Document::builder()
-            .add_text("content", "hello world", TextOption::default())
-            .build(),
-    )?;
+    writer.add_document(Document::new().add_text("content", "hello world"))?;
     // Doc 1: "world hello"
-    writer.add_document(
-        Document::builder()
-            .add_text("content", "world hello", TextOption::default())
-            .build(),
-    )?;
+    writer.add_document(Document::new().add_text("content", "world hello"))?;
     // Doc 2: "hello iris world"
-    writer.add_document(
-        Document::builder()
-            .add_text("content", "hello iris world", TextOption::default())
-            .build(),
-    )?;
+    writer.add_document(Document::new().add_text("content", "hello iris world"))?;
     // Doc 3: "foo bar baz"
-    writer.add_document(
-        Document::builder()
-            .add_text("content", "foo bar baz", TextOption::default())
-            .build(),
-    )?;
+    writer.add_document(Document::new().add_text("content", "foo bar baz"))?;
 
     writer.commit()?;
     let reader = writer.build_reader()?;

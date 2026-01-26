@@ -98,7 +98,7 @@ impl SearchRequestBuilder {
         self
     }
 
-    pub fn with_field_boost(mut self, field: impl Into<String>, boost: f32) -> Self {
+    pub fn add_field_boost(mut self, field: impl Into<String>, boost: f32) -> Self {
         self.request.field_boosts.insert(field.into(), boost);
         self
     }

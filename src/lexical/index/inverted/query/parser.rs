@@ -20,7 +20,7 @@ use pest_derive::Parser;
 use crate::analysis::analyzer::analyzer::Analyzer;
 use crate::analysis::analyzer::per_field::PerFieldAnalyzer;
 use crate::analysis::analyzer::standard::StandardAnalyzer;
-use crate::error::{Result, IrisError};
+use crate::error::{IrisError, Result};
 use crate::lexical::core::field::NumericType;
 use crate::lexical::index::inverted::query::Query;
 use crate::lexical::index::inverted::query::boolean::{BooleanClause, BooleanQuery, Occur};
@@ -285,8 +285,8 @@ impl QueryParser {
                     field = Some(inner_pair.as_str().to_string());
                 }
                 Rule::field_value => {
-                    let field_name = field
-                        .ok_or_else(|| IrisError::parse("Missing field name".to_string()))?;
+                    let field_name =
+                        field.ok_or_else(|| IrisError::parse("Missing field name".to_string()))?;
                     return self.parse_field_value(inner_pair, Some(&field_name));
                 }
                 _ => {}

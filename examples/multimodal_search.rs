@@ -106,9 +106,9 @@ fn main() -> Result<()> {
                     let bytes = std::fs::read(&path)?;
 
                     let doc = Document::new()
-                        .with_field("content", DataValue::Bytes(bytes, None))
-                        .with_field("filename", DataValue::Text(filename.clone()))
-                        .with_field("type", DataValue::Text("image".into()));
+                        .add_field("content", DataValue::Bytes(bytes, None))
+                        .add_field("filename", DataValue::Text(filename.clone()))
+                        .add_field("type", DataValue::Text("image".into()));
 
                     engine.add_payloads(doc)?;
                     indexed_count += 1;
@@ -131,9 +131,9 @@ fn main() -> Result<()> {
     for text in &texts {
         println!("Indexing text: \"{}\"", text);
         let doc = Document::new()
-            .with_field("content", DataValue::Text((*text).into()))
-            .with_field("text", DataValue::Text((*text).into()))
-            .with_field("type", DataValue::Text("text".into()));
+            .add_field("content", DataValue::Text((*text).into()))
+            .add_field("text", DataValue::Text((*text).into()))
+            .add_field("type", DataValue::Text("text".into()));
         engine.add_payloads(doc)?;
     }
 

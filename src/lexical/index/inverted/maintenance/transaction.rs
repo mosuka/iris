@@ -10,7 +10,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use ahash::AHashMap;
 use uuid::Uuid;
 
-use crate::error::{Result, IrisError};
+use crate::error::{IrisError, Result};
 use crate::lexical::core::document::Document;
 use crate::lexical::index::inverted::segment::manager::SegmentManager;
 use crate::lexical::index::inverted::segment::merge_engine::MergeEngine;
@@ -448,7 +448,6 @@ pub trait AtomicOperations {
 mod tests {
     use super::*;
 
-    use crate::lexical::core::field::TextOption;
     use crate::storage::memory::MemoryStorage;
     use crate::storage::memory::MemoryStorageConfig;
 
@@ -484,9 +483,7 @@ mod tests {
     fn test_transaction_operations() {
         let mut txn = Transaction::new(IsolationLevel::ReadCommitted);
 
-        let doc = crate::lexical::core::document::Document::builder()
-            .add_text("title", "Test", TextOption::default())
-            .build();
+        let doc = crate::lexical::core::document::Document::new().add_text("title", "Test");
 
         let op = TransactionOperation::AddDocument {
             document: doc,
@@ -498,9 +495,7 @@ mod tests {
 
         // Cannot add operation to inactive transaction
         txn.state = TransactionState::Committed;
-        let doc2 = crate::lexical::core::document::Document::builder()
-            .add_text("title", "Test2", TextOption::default())
-            .build();
+        let doc2 = crate::lexical::core::document::Document::new().add_text("title", "Test2");
         let op2 = TransactionOperation::AddDocument {
             document: doc2,
             segment_id: None,

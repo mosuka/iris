@@ -55,9 +55,8 @@ use parking_lot::{Mutex, RwLock};
 ///
 /// // Add documents
 /// use iris::lexical::core::field::TextOption;
-/// let doc = Document::builder()
-///     .add_text("title", "Rust Programming", TextOption::default())
-///     .build();
+/// let doc = Document::new()
+///     .add_text("title", "Rust Programming");
 /// engine.add_document(doc).unwrap();
 /// engine.commit().unwrap();
 ///
@@ -161,11 +160,9 @@ impl LexicalStore {
     /// # let storage = StorageFactory::create(storage_config).unwrap();
     /// # let engine = LexicalStore::new(storage, LexicalIndexConfig::default()).unwrap();
     ///
-    /// use iris::lexical::core::field::TextOption;
-    /// let doc = Document::builder()
-    ///     .add_text("title", "Hello World", TextOption::default())
-    ///     .add_text("body", "This is a test", TextOption::default())
-    ///     .build();
+    /// let doc = Document::new()
+    ///     .add_text("title", "Hello World")
+    ///     .add_text("body", "This is a test");
     /// let doc_id = engine.add_document(doc).unwrap();
     /// engine.commit().unwrap();  // Don't forget to commit!
     /// ```
@@ -386,12 +383,10 @@ impl LexicalStore {
     /// # let engine = LexicalStore::new(storage, LexicalIndexConfig::default()).unwrap();
     ///
     /// // Add multiple documents
-    /// use iris::lexical::core::field::TextOption;
     /// for i in 0..10 {
-    ///     let doc = Document::builder()
-    ///         .add_text("id", &i.to_string(), TextOption::default())
-    ///         .add_text("title", &format!("Document {}", i), TextOption::default())
-    ///         .build();
+    ///     let doc = Document::new()
+    ///         .add_text("id", &i.to_string())
+    ///         .add_text("title", &format!("Document {}", i));
     ///     engine.add_document(doc).unwrap();
     /// }
     ///
@@ -437,11 +432,9 @@ impl LexicalStore {
     /// # let mut engine = LexicalStore::new(storage, LexicalIndexConfig::default()).unwrap();
     ///
     /// // Add and commit many documents
-    /// use iris::lexical::core::field::TextOption;
     /// for i in 0..1000 {
-    ///     let doc = Document::builder()
-    ///         .add_text("id", &i.to_string(), TextOption::default())
-    ///         .build();
+    ///     let doc = Document::new()
+    ///         .add_text("id", &i.to_string());
     ///     engine.add_document(doc).unwrap();
     /// }
     /// engine.commit().unwrap();
@@ -507,7 +500,7 @@ impl LexicalStore {
     /// # let storage = StorageFactory::create(storage_config).unwrap();
     /// # let engine = LexicalStore::new(storage, LexicalIndexConfig::default()).unwrap();
     /// # use iris::lexical::core::field::TextOption;
-    /// # let doc = Document::builder().add_text("title", "hello world", TextOption::default()).build();
+    /// # let doc = Document::new().add_text("title", "hello world");
     /// # engine.add_document(doc).unwrap();
     /// # engine.commit().unwrap();
     ///
@@ -689,7 +682,6 @@ impl LexicalStore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::lexical::core::field::TextOption;
     use crate::lexical::index::inverted::query::Query;
     use crate::lexical::index::inverted::query::term::TermQuery;
     use crate::lexical::store::config::LexicalIndexConfig;
@@ -700,10 +692,9 @@ mod tests {
 
     #[allow(dead_code)]
     fn create_test_document(title: &str, body: &str) -> Document {
-        Document::builder()
-            .add_text("title", title, TextOption::default())
-            .add_text("body", body, TextOption::default())
-            .build()
+        Document::new()
+            .add_text("title", title)
+            .add_text("body", body)
     }
 
     #[test]
@@ -1022,9 +1013,7 @@ mod tests {
         let engine = LexicalStore::new(storage.clone(), config).unwrap();
 
         // 1. Index document with external ID
-        let doc = Document::builder()
-            .add_text("title", "Test Doc", TextOption::default())
-            .build();
+        let doc = Document::new().add_text("title", "Test Doc");
 
         let internal_id = engine.index_document("ext_1", doc).unwrap();
         engine.commit().unwrap();
@@ -1046,9 +1035,7 @@ mod tests {
         );
 
         // 4. Update existing by index_document
-        let doc_v2 = Document::builder()
-            .add_text("title", "Test Doc V2", TextOption::default())
-            .build();
+        let doc_v2 = Document::new().add_text("title", "Test Doc V2");
         let internal_id_v2 = engine.index_document("ext_1", doc_v2).unwrap();
         assert_eq!(internal_id, internal_id_v2);
         engine.commit().unwrap();

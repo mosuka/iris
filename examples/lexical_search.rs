@@ -58,21 +58,18 @@ fn main() -> Result<()> {
     // 4. Add Documents
     // Let's index a few simple documents.
     let documents = vec![
-        Document::new()
-            .with_id("doc1")
-            .with_field("title", "The Rust Programming Language")
-            .with_field("body", "Rust is fast and memory efficient.")
-            .with_field("category", "TECHNOLOGY"),
-        Document::new()
-            .with_id("doc2")
-            .with_field("title", "Learning Search Engines")
-            .with_field("body", "Search engines are complex but fascinating.")
-            .with_field("category", "EDUCATION"),
-        Document::new()
-            .with_id("doc3")
-            .with_field("title", "Cooking with Rust (Iron Skillets)")
-            .with_field("body", "How to season your cast iron skillet.")
-            .with_field("category", "LIFESTYLE"),
+        Document::new_with_id("doc1")
+            .add_field("title", "The Rust Programming Language")
+            .add_field("body", "Rust is fast and memory efficient.")
+            .add_field("category", "TECHNOLOGY"),
+        Document::new_with_id("doc2")
+            .add_field("title", "Learning Search Engines")
+            .add_field("body", "Search engines are complex but fascinating.")
+            .add_field("category", "EDUCATION"),
+        Document::new_with_id("doc3")
+            .add_field("title", "Cooking with Rust (Iron Skillets)")
+            .add_field("body", "How to season your cast iron skillet.")
+            .add_field("category", "LIFESTYLE"),
     ];
 
     println!("Indexing {} documents...", documents.len());

@@ -10,12 +10,12 @@ use iris::analysis::analyzer::per_field::PerFieldAnalyzer;
 use iris::analysis::analyzer::standard::StandardAnalyzer;
 use iris::data::{DataValue, Document};
 use iris::error::Result;
-use iris::lexical::store::LexicalStore;
-use iris::lexical::store::config::LexicalIndexConfig;
 use iris::lexical::index::config::InvertedIndexConfig;
 use iris::lexical::index::inverted::query::Query;
 use iris::lexical::index::inverted::query::wildcard::WildcardQuery;
 use iris::lexical::search::searcher::LexicalSearchRequest;
+use iris::lexical::store::LexicalStore;
+use iris::lexical::store::config::LexicalIndexConfig;
 use iris::storage::StorageConfig;
 use iris::storage::StorageFactory;
 use iris::storage::file::FileStorageConfig;
@@ -44,106 +44,106 @@ fn main() -> Result<()> {
     // Add documents with various patterns for wildcard matching
     let documents = vec![
         Document::new()
-            .with_field(
+            .add_field(
                 "title",
                 DataValue::Text("JavaScript Tutorial for Beginners".into()),
             )
-            .with_field(
+            .add_field(
                 "filename",
                 DataValue::Text("javascript_tutorial.pdf".into()),
             )
-            .with_field(
+            .add_field(
                 "description",
                 DataValue::Text("Complete JavaScript programming guide".into()),
             )
-            .with_field("category", DataValue::Text("programming".into()))
-            .with_field("extension", DataValue::Text("pdf".into()))
-            .with_field("id", DataValue::Text("file001".into())),
+            .add_field("category", DataValue::Text("programming".into()))
+            .add_field("extension", DataValue::Text("pdf".into()))
+            .add_field("id", DataValue::Text("file001".into())),
         Document::new()
-            .with_field(
+            .add_field(
                 "title",
                 DataValue::Text("Python Programming Reference".into()),
             )
-            .with_field("filename", DataValue::Text("python_reference.html".into()))
-            .with_field(
+            .add_field("filename", DataValue::Text("python_reference.html".into()))
+            .add_field(
                 "description",
                 DataValue::Text("Comprehensive Python programming reference".into()),
             )
-            .with_field("category", DataValue::Text("programming".into()))
-            .with_field("extension", DataValue::Text("html".into()))
-            .with_field("id", DataValue::Text("file002".into())),
+            .add_field("category", DataValue::Text("programming".into()))
+            .add_field("extension", DataValue::Text("html".into()))
+            .add_field("id", DataValue::Text("file002".into())),
         Document::new()
-            .with_field(
+            .add_field(
                 "title",
                 DataValue::Text("Machine Learning Algorithms".into()),
             )
-            .with_field("filename", DataValue::Text("ml_algorithms.docx".into()))
-            .with_field(
+            .add_field("filename", DataValue::Text("ml_algorithms.docx".into()))
+            .add_field(
                 "description",
                 DataValue::Text("Understanding machine learning techniques".into()),
             )
-            .with_field("category", DataValue::Text("data-science".into()))
-            .with_field("extension", DataValue::Text("docx".into()))
-            .with_field("id", DataValue::Text("file003".into())),
+            .add_field("category", DataValue::Text("data-science".into()))
+            .add_field("extension", DataValue::Text("docx".into()))
+            .add_field("id", DataValue::Text("file003".into())),
         Document::new()
-            .with_field(
+            .add_field(
                 "title",
                 DataValue::Text("Database Design Principles".into()),
             )
-            .with_field("filename", DataValue::Text("database_design.pptx".into()))
-            .with_field(
+            .add_field("filename", DataValue::Text("database_design.pptx".into()))
+            .add_field(
                 "description",
                 DataValue::Text("Principles of good database design".into()),
             )
-            .with_field("category", DataValue::Text("database".into()))
-            .with_field("extension", DataValue::Text("pptx".into()))
-            .with_field("id", DataValue::Text("file004".into())),
+            .add_field("category", DataValue::Text("database".into()))
+            .add_field("extension", DataValue::Text("pptx".into()))
+            .add_field("id", DataValue::Text("file004".into())),
         Document::new()
-            .with_field(
+            .add_field(
                 "title",
                 DataValue::Text("Web Development Best Practices".into()),
             )
-            .with_field("filename", DataValue::Text("web_dev_practices.txt".into()))
-            .with_field(
+            .add_field("filename", DataValue::Text("web_dev_practices.txt".into()))
+            .add_field(
                 "description",
                 DataValue::Text("Best practices for web development".into()),
             )
-            .with_field("category", DataValue::Text("web-development".into()))
-            .with_field("extension", DataValue::Text("txt".into()))
-            .with_field("id", DataValue::Text("file005".into())),
+            .add_field("category", DataValue::Text("web-development".into()))
+            .add_field("extension", DataValue::Text("txt".into()))
+            .add_field("id", DataValue::Text("file005".into())),
         Document::new()
-            .with_field("title", DataValue::Text("React Component Patterns".into()))
-            .with_field("filename", DataValue::Text("react_patterns.jsx".into()))
-            .with_field(
+            .add_field("title", DataValue::Text("React Component Patterns".into()))
+            .add_field("filename", DataValue::Text("react_patterns.jsx".into()))
+            .add_field(
                 "description",
                 DataValue::Text("Common patterns in React component development".into()),
             )
-            .with_field("category", DataValue::Text("frontend".into()))
-            .with_field("extension", DataValue::Text("jsx".into()))
-            .with_field("id", DataValue::Text("file006".into())),
+            .add_field("category", DataValue::Text("frontend".into()))
+            .add_field("extension", DataValue::Text("jsx".into()))
+            .add_field("id", DataValue::Text("file006".into())),
         Document::new()
-            .with_field(
+            .add_field(
                 "title",
                 DataValue::Text("API Documentation Template".into()),
             )
-            .with_field("filename", DataValue::Text("api_docs_template.md".into()))
-            .with_field(
+            .add_field("filename", DataValue::Text("api_docs_template.md".into()))
+            .add_field(
                 "description",
                 DataValue::Text("Template for creating API documentation".into()),
             )
-            .with_field("category", DataValue::Text("documentation".into()))
-            .with_field("extension", DataValue::Text("md".into()))
-            .with_field("id", DataValue::Text("file007".into())),
+            .add_field("category", DataValue::Text("documentation".into()))
+            .add_field("extension", DataValue::Text("md".into()))
+            .add_field("id", DataValue::Text("file007".into())),
         Document::new()
-            .with_field("title", DataValue::Text("Configuration Settings".into()))
-            .with_field("filename", DataValue::Text("app_config.json".into()))
-            .with_field(
+            .add_field("title", DataValue::Text("Configuration Settings".into()))
+            .add_field("filename", DataValue::Text("app_config.json".into()))
+            .add_field(
                 "description",
                 DataValue::Text("Application configuration file".into()),
             )
-            .with_field("category", DataValue::Text("configuration".into()))
-            .with_field("extension", DataValue::Text("json".into()))
-            .with_field("id", DataValue::Text("file008".into())),
+            .add_field("category", DataValue::Text("configuration".into()))
+            .add_field("extension", DataValue::Text("json".into()))
+            .add_field("id", DataValue::Text("file008".into())),
     ];
 
     println!("Adding {} documents to the index...", documents.len());

@@ -177,9 +177,7 @@ mod tests {
         let storage = Arc::new(MemoryStorage::new(MemoryStorageConfig::default()));
         let wal = WalManager::new(storage.clone(), "test.wal").unwrap();
 
-        let doc = Document::builder()
-            .with_field("body", DataValue::Vector(vec![1.0, 2.0, 3.0].into()))
-            .build();
+        let doc = Document::new().add_field("body", DataValue::Vector(vec![1.0, 2.0, 3.0].into()));
 
         // 1. Append
         let seq1 = wal

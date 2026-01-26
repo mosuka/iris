@@ -397,16 +397,14 @@ impl LexicalIndex for InvertedIndex {
 mod tests {
     use super::*;
     use crate::lexical::core::document::Document;
-    use crate::lexical::core::field::{FloatOption, TextOption};
     use crate::storage::memory::{MemoryStorage, MemoryStorageConfig};
     use std::sync::Arc;
 
     #[allow(dead_code)]
     fn create_test_document(title: &str, body: &str) -> Document {
-        Document::builder()
-            .add_text("title", title, TextOption::default())
-            .add_text("body", body, TextOption::default())
-            .build()
+        Document::new()
+            .add_text("title", title)
+            .add_text("body", body)
     }
 
     #[test]
@@ -508,11 +506,10 @@ mod tests {
 
         let mut writer = InvertedIndexWriter::new(storage, config).unwrap();
 
-        let doc = Document::builder()
-            .add_text("title", "Test Document", TextOption::default())
-            .add_text("id", "doc1", TextOption::default())
-            .add_float("count", 42.0, FloatOption::default())
-            .build();
+        let doc = Document::new()
+            .add_text("title", "Test Document")
+            .add_text("id", "doc1")
+            .add_float("count", 42.0);
 
         writer.add_document(doc).unwrap();
         writer.commit().unwrap();

@@ -10,12 +10,12 @@ use iris::analysis::analyzer::per_field::PerFieldAnalyzer;
 use iris::analysis::analyzer::standard::StandardAnalyzer;
 use iris::data::{DataValue, Document};
 use iris::error::Result;
-use iris::lexical::store::LexicalStore;
-use iris::lexical::store::config::LexicalIndexConfig;
 use iris::lexical::index::config::InvertedIndexConfig;
 use iris::lexical::index::inverted::query::Query;
 use iris::lexical::index::inverted::query::phrase::PhraseQuery;
 use iris::lexical::search::searcher::LexicalSearchRequest;
+use iris::lexical::store::LexicalStore;
+use iris::lexical::store::config::LexicalIndexConfig;
 use iris::storage::StorageConfig;
 use iris::storage::StorageFactory;
 use iris::storage::file::FileStorageConfig;
@@ -44,35 +44,35 @@ fn main() -> Result<()> {
     // Add documents with various phrases
     let documents = vec![
         Document::new()
-            .with_field("title", DataValue::Text("Machine Learning Basics".into()))
-            .with_field("body", DataValue::Text("Machine learning is a powerful tool for data analysis and artificial intelligence applications".into()))
-            .with_field("author", DataValue::Text("Dr. Smith".into()))
-            .with_field("description", DataValue::Text("An introduction to machine learning concepts and algorithms".into()))
-            .with_field("id", DataValue::Text("001".into())),
+            .add_field("title", DataValue::Text("Machine Learning Basics".into()))
+            .add_field("body", DataValue::Text("Machine learning is a powerful tool for data analysis and artificial intelligence applications".into()))
+            .add_field("author", DataValue::Text("Dr. Smith".into()))
+            .add_field("description", DataValue::Text("An introduction to machine learning concepts and algorithms".into()))
+            .add_field("id", DataValue::Text("001".into())),
         Document::new()
-            .with_field("title", DataValue::Text("Deep Learning Networks".into()))
-            .with_field("body", DataValue::Text("Deep learning networks use artificial neural networks with multiple layers for complex pattern recognition".into()))
-            .with_field("author", DataValue::Text("Prof. Johnson".into()))
-            .with_field("description", DataValue::Text("Advanced techniques in deep learning and neural network architectures".into()))
-            .with_field("id", DataValue::Text("002".into())),
+            .add_field("title", DataValue::Text("Deep Learning Networks".into()))
+            .add_field("body", DataValue::Text("Deep learning networks use artificial neural networks with multiple layers for complex pattern recognition".into()))
+            .add_field("author", DataValue::Text("Prof. Johnson".into()))
+            .add_field("description", DataValue::Text("Advanced techniques in deep learning and neural network architectures".into()))
+            .add_field("id", DataValue::Text("002".into())),
         Document::new()
-            .with_field("title", DataValue::Text("Natural Language Processing".into()))
-            .with_field("body", DataValue::Text("Natural language processing combines computational linguistics with machine learning and artificial intelligence".into()))
-            .with_field("author", DataValue::Text("Dr. Wilson".into()))
-            .with_field("description", DataValue::Text("Processing and understanding human language using computational methods".into()))
-            .with_field("id", DataValue::Text("003".into())),
+            .add_field("title", DataValue::Text("Natural Language Processing".into()))
+            .add_field("body", DataValue::Text("Natural language processing combines computational linguistics with machine learning and artificial intelligence".into()))
+            .add_field("author", DataValue::Text("Dr. Wilson".into()))
+            .add_field("description", DataValue::Text("Processing and understanding human language using computational methods".into()))
+            .add_field("id", DataValue::Text("003".into())),
         Document::new()
-            .with_field("title", DataValue::Text("Computer Vision Applications".into()))
-            .with_field("body", DataValue::Text("Computer vision applications include image recognition, object detection, and visual pattern analysis".into()))
-            .with_field("author", DataValue::Text("Prof. Davis".into()))
-            .with_field("description", DataValue::Text("Practical applications of computer vision in various industries".into()))
-            .with_field("id", DataValue::Text("004".into())),
+            .add_field("title", DataValue::Text("Computer Vision Applications".into()))
+            .add_field("body", DataValue::Text("Computer vision applications include image recognition, object detection, and visual pattern analysis".into()))
+            .add_field("author", DataValue::Text("Prof. Davis".into()))
+            .add_field("description", DataValue::Text("Practical applications of computer vision in various industries".into()))
+            .add_field("id", DataValue::Text("004".into())),
         Document::new()
-            .with_field("title", DataValue::Text("Data Science Fundamentals".into()))
-            .with_field("body", DataValue::Text("Data science combines statistics, programming, and domain expertise to extract insights from data".into()))
-            .with_field("author", DataValue::Text("Dr. Brown".into()))
-            .with_field("description", DataValue::Text("Essential concepts and tools for data science practitioners".into()))
-            .with_field("id", DataValue::Text("005".into())),
+            .add_field("title", DataValue::Text("Data Science Fundamentals".into()))
+            .add_field("body", DataValue::Text("Data science combines statistics, programming, and domain expertise to extract insights from data".into()))
+            .add_field("author", DataValue::Text("Dr. Brown".into()))
+            .add_field("description", DataValue::Text("Essential concepts and tools for data science practitioners".into()))
+            .add_field("id", DataValue::Text("005".into())),
     ];
 
     println!("Adding {} documents to the index...", documents.len());

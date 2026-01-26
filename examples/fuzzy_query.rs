@@ -10,12 +10,12 @@ use iris::analysis::analyzer::per_field::PerFieldAnalyzer;
 use iris::analysis::analyzer::standard::StandardAnalyzer;
 use iris::data::{DataValue, Document};
 use iris::error::Result;
-use iris::lexical::store::LexicalStore;
-use iris::lexical::store::config::LexicalIndexConfig;
 use iris::lexical::index::config::InvertedIndexConfig;
 use iris::lexical::index::inverted::query::Query;
 use iris::lexical::index::inverted::query::fuzzy::FuzzyQuery;
 use iris::lexical::search::searcher::LexicalSearchRequest;
+use iris::lexical::store::LexicalStore;
+use iris::lexical::store::config::LexicalIndexConfig;
 use iris::storage::file::FileStorageConfig;
 use iris::storage::{StorageConfig, StorageFactory};
 
@@ -43,47 +43,47 @@ fn main() -> Result<()> {
     // Add documents with various spellings and terms for fuzzy matching
     let documents = vec![
         Document::new()
-            .with_field("title", DataValue::Text("JavaScript Programming Guide".into()))
-            .with_field("body", DataValue::Text("Comprehensive guide to JavaScript development and programming techniques".into()))
-            .with_field("author", DataValue::Text("John Smith".into()))
-            .with_field("tags", DataValue::Text("javascript programming tutorial".into()))
-            .with_field("id", DataValue::Text("doc001".into())),
+            .add_field("title", DataValue::Text("JavaScript Programming Guide".into()))
+            .add_field("body", DataValue::Text("Comprehensive guide to JavaScript development and programming techniques".into()))
+            .add_field("author", DataValue::Text("John Smith".into()))
+            .add_field("tags", DataValue::Text("javascript programming tutorial".into()))
+            .add_field("id", DataValue::Text("doc001".into())),
         Document::new()
-            .with_field("title", DataValue::Text("Python Programming Fundamentals".into()))
-            .with_field("body", DataValue::Text("Learn Python programming language from scratch with practical examples".into()))
-            .with_field("author", DataValue::Text("Alice Johnson".into()))
-            .with_field("tags", DataValue::Text("python programming beginner".into()))
-            .with_field("id", DataValue::Text("doc002".into())),
+            .add_field("title", DataValue::Text("Python Programming Fundamentals".into()))
+            .add_field("body", DataValue::Text("Learn Python programming language from scratch with practical examples".into()))
+            .add_field("author", DataValue::Text("Alice Johnson".into()))
+            .add_field("tags", DataValue::Text("python programming beginner".into()))
+            .add_field("id", DataValue::Text("doc002".into())),
         Document::new()
-            .with_field("title", DataValue::Text("Machine Learning Algorithms".into()))
-            .with_field("body", DataValue::Text("Understanding algorithms used in machine learning and artificial intelligence".into()))
-            .with_field("author", DataValue::Text("Bob Wilson".into()))
-            .with_field("tags", DataValue::Text("machine-learning algorithms ai".into()))
-            .with_field("id", DataValue::Text("doc003".into())),
+            .add_field("title", DataValue::Text("Machine Learning Algorithms".into()))
+            .add_field("body", DataValue::Text("Understanding algorithms used in machine learning and artificial intelligence".into()))
+            .add_field("author", DataValue::Text("Bob Wilson".into()))
+            .add_field("tags", DataValue::Text("machine-learning algorithms ai".into()))
+            .add_field("id", DataValue::Text("doc003".into())),
         Document::new()
-            .with_field("title", DataValue::Text("Database Management Systems".into()))
-            .with_field("body", DataValue::Text("Introduction to database systems, SQL, and data management principles".into()))
-            .with_field("author", DataValue::Text("Carol Davis".into()))
-            .with_field("tags", DataValue::Text("database sql management".into()))
-            .with_field("id", DataValue::Text("doc004".into())),
+            .add_field("title", DataValue::Text("Database Management Systems".into()))
+            .add_field("body", DataValue::Text("Introduction to database systems, SQL, and data management principles".into()))
+            .add_field("author", DataValue::Text("Carol Davis".into()))
+            .add_field("tags", DataValue::Text("database sql management".into()))
+            .add_field("id", DataValue::Text("doc004".into())),
         Document::new()
-            .with_field("title", DataValue::Text("Web Development with React".into()))
-            .with_field("body", DataValue::Text("Building modern web applications using React framework and components".into()))
-            .with_field("author", DataValue::Text("David Brown".into()))
-            .with_field("tags", DataValue::Text("react web-development frontend".into()))
-            .with_field("id", DataValue::Text("doc005".into())),
+            .add_field("title", DataValue::Text("Web Development with React".into()))
+            .add_field("body", DataValue::Text("Building modern web applications using React framework and components".into()))
+            .add_field("author", DataValue::Text("David Brown".into()))
+            .add_field("tags", DataValue::Text("react web-development frontend".into()))
+            .add_field("id", DataValue::Text("doc005".into())),
         Document::new()
-            .with_field("title", DataValue::Text("Artificial Intelligence Overview".into()))
-            .with_field("body", DataValue::Text("Introduction to artificial intelligence concepts, applications, and algorithms".into()))
-            .with_field("author", DataValue::Text("Eva Martinez".into()))
-            .with_field("tags", DataValue::Text("artificial-intelligence overview concepts".into()))
-            .with_field("id", DataValue::Text("doc006".into())),
+            .add_field("title", DataValue::Text("Artificial Intelligence Overview".into()))
+            .add_field("body", DataValue::Text("Introduction to artificial intelligence concepts, applications, and algorithms".into()))
+            .add_field("author", DataValue::Text("Eva Martinez".into()))
+            .add_field("tags", DataValue::Text("artificial-intelligence overview concepts".into()))
+            .add_field("id", DataValue::Text("doc006".into())),
         Document::new()
-            .with_field("title", DataValue::Text("Software Engineering Principles".into()))
-            .with_field("body", DataValue::Text("Best practices in software engineering, design patterns, and development".into()))
-            .with_field("author", DataValue::Text("Frank Miller".into()))
-            .with_field("tags", DataValue::Text("software engineering principles".into()))
-            .with_field("id", DataValue::Text("doc007".into())),
+            .add_field("title", DataValue::Text("Software Engineering Principles".into()))
+            .add_field("body", DataValue::Text("Best practices in software engineering, design patterns, and development".into()))
+            .add_field("author", DataValue::Text("Frank Miller".into()))
+            .add_field("tags", DataValue::Text("software engineering principles".into()))
+            .add_field("id", DataValue::Text("doc007".into())),
     ];
 
     println!("Adding {} documents to the index...", documents.len());

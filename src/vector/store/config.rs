@@ -642,7 +642,7 @@ impl VectorIndexConfigBuilder {
     /// # use iris::vector::store::config::VectorIndexConfig;
     /// # use iris::vector::core::field::FlatOption;
     /// # fn example() {
-    /// VectorIndexConfig::builder()
+    /// let _ = VectorIndexConfig::builder()
     ///     .add_field("title", FlatOption::default().dimension(384));
     /// # }
     /// ```

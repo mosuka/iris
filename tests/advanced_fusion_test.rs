@@ -46,20 +46,18 @@ fn test_advanced_fusion_normalization() -> iris::error::Result<()> {
     let mut vec1 = vec![0.0; 128];
     vec1[0] = 1.0;
     engine.index(
-        Document::new()
-            .with_id("doc1")
-            .with_field("title", "apple")
-            .with_field("embedding", vec1),
+        Document::new_with_id("doc1")
+            .add_field("title", "apple")
+            .add_field("embedding", vec1),
     )?;
 
     // Doc 2: Bad lexical, Good vector
     let mut vec2 = vec![0.0; 128];
     vec2[1] = 1.0;
     engine.index(
-        Document::new()
-            .with_id("doc2")
-            .with_field("title", "banana")
-            .with_field("embedding", vec2),
+        Document::new_with_id("doc2")
+            .add_field("title", "banana")
+            .add_field("embedding", vec2),
     )?;
 
     engine.commit()?;
@@ -123,16 +121,14 @@ fn test_field_boosts() -> iris::error::Result<()> {
 
     // 3. Index Documents
     engine.index(
-        Document::new()
-            .with_id("doc1")
-            .with_field("title", "rust")
-            .with_field("body", "programming"),
+        Document::new_with_id("doc1")
+            .add_field("title", "rust")
+            .add_field("body", "programming"),
     )?;
     engine.index(
-        Document::new()
-            .with_id("doc2")
-            .with_field("title", "java")
-            .with_field("body", "rust"),
+        Document::new_with_id("doc2")
+            .add_field("title", "java")
+            .add_field("body", "rust"),
     )?;
     engine.commit()?;
 
@@ -145,8 +141,8 @@ fn test_field_boosts() -> iris::error::Result<()> {
                 .should(Box::new(TermQuery::new("body", "rust")))
                 .build(),
         ))
-        .with_field_boost("title", 10.0)
-        .with_field_boost("body", 1.0)
+        .add_field_boost("title", 10.0)
+        .add_field_boost("body", 1.0)
         .build();
 
     let res_a = engine.search(req_a)?;
@@ -167,8 +163,8 @@ fn test_field_boosts() -> iris::error::Result<()> {
                 .should(Box::new(TermQuery::new("body", "rust")))
                 .build(),
         ))
-        .with_field_boost("title", 1.0)
-        .with_field_boost("body", 10.0)
+        .add_field_boost("title", 1.0)
+        .add_field_boost("body", 10.0)
         .build();
 
     let res_b = engine.search(req_b)?;
