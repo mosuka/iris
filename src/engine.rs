@@ -237,7 +237,7 @@ impl Engine {
     fn split_config(config: &IndexConfig) -> (LexicalIndexConfig, VectorIndexConfig) {
         // Construct Lexical Config
         let default_analyzer = config
-            .default_analyzer
+            .analyzer
             .clone()
             .unwrap_or_else(|| Arc::new(StandardAnalyzer::new().unwrap()));
 
