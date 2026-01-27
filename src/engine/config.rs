@@ -18,7 +18,7 @@ pub struct IndexConfig {
     pub default_fields: Vec<String>,
     /// Global analyzer (fallback if not specified per field).
     #[serde(skip)]
-    pub default_analyzer: Option<Arc<dyn Analyzer>>,
+    pub analyzer: Option<Arc<dyn Analyzer>>,
     /// Global embedder (fallback if not specified per field).
     #[serde(skip)]
     pub embedder: Option<Arc<dyn Embedder>>,
@@ -29,7 +29,7 @@ impl IndexConfig {
         Self {
             fields: HashMap::new(),
             default_fields: Vec::new(),
-            default_analyzer: None,
+            analyzer: None,
             embedder: None,
         }
     }
@@ -63,7 +63,7 @@ pub struct IndexConfigBuilder {
     fields: HashMap<String, FieldConfig>,
     default_fields: Vec<String>,
     embedder: Option<Arc<dyn Embedder>>,
-    default_analyzer: Option<Arc<dyn Analyzer>>,
+    analyzer: Option<Arc<dyn Analyzer>>,
 }
 
 impl Default for IndexConfigBuilder {
@@ -72,7 +72,7 @@ impl Default for IndexConfigBuilder {
             fields: HashMap::new(),
             default_fields: Vec::new(),
             embedder: None,
-            default_analyzer: None,
+            analyzer: None,
         }
     }
 }
@@ -112,13 +112,28 @@ impl IndexConfigBuilder {
         self
     }
 
+    pub fn add_hybrid_field(
+        mut self,
+        name: impl Into<String>,
+        vector_option: impl Into<VectorOption>,
+        lexical_option: impl Into<LexicalOption>,
+    ) -> Self {
+        let name = name.into();
+        let config = FieldConfig {
+            vector: Some(vector_option.into()),
+            lexical: Some(lexical_option.into()),
+        };
+        self.fields.insert(name, config);
+        self
+    }
+
     pub fn embedder(mut self, embedder: Arc<dyn Embedder>) -> Self {
         self.embedder = Some(embedder);
         self
     }
 
-    pub fn default_analyzer(mut self, analyzer: Arc<dyn Analyzer>) -> Self {
-        self.default_analyzer = Some(analyzer);
+    pub fn analyzer(mut self, analyzer: Arc<dyn Analyzer>) -> Self {
+        self.analyzer = Some(analyzer);
         self
     }
 
@@ -126,7 +141,7 @@ impl IndexConfigBuilder {
         IndexConfig {
             fields: self.fields,
             default_fields: self.default_fields,
-            default_analyzer: self.default_analyzer,
+            analyzer: self.analyzer,
             embedder: self.embedder,
         }
     }
