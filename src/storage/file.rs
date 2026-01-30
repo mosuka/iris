@@ -26,7 +26,7 @@
 //! use std::io::Write;
 //! use tempfile::TempDir;
 //!
-//! # fn main() -> iris::error::Result<()> {
+//! # fn main() -> iris::Result<()> {
 //! // Create storage with mmap enabled
 //! let temp_dir = TempDir::new().unwrap();
 //! let mut config = FileStorageConfig::new(temp_dir.path());

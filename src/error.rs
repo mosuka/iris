@@ -7,7 +7,7 @@
 //! # Examples
 //!
 //! ```
-//! use iris::error::{IrisError, Result};
+//! use iris::{IrisError, Result};
 //!
 //! fn example_operation() -> Result<()> {
 //!     // Return an error

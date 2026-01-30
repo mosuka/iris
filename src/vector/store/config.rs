@@ -17,7 +17,7 @@
 //! use iris::vector::core::field::FlatOption;
 //! use std::sync::Arc;
 //!
-//! # fn example() -> iris::error::Result<()> {
+//! # fn example() -> iris::Result<()> {
 //! let text_embedder: Arc<dyn Embedder> = Arc::new(
 //!     CandleBertEmbedder::new("sentence-transformers/all-MiniLM-L6-v2")?
 //! );
@@ -65,7 +65,7 @@ use crate::vector::core::vector::Vector;
 /// use iris::vector::core::distance::DistanceMetric;
 /// use std::sync::Arc;
 ///
-/// # fn example() -> iris::error::Result<()> {
+/// # fn example() -> iris::Result<()> {
 /// let text_embedder: Arc<dyn Embedder> = Arc::new(
 ///     CandleBertEmbedder::new("sentence-transformers/all-MiniLM-L6-v2")?
 /// );

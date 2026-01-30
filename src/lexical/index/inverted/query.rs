@@ -17,6 +17,21 @@ pub mod span;
 pub mod term;
 pub mod wildcard;
 
+// Re-exports for cleaner API
+pub use advanced_query::AdvancedQuery;
+pub use boolean::{BooleanQuery, BooleanQueryBuilder};
+pub use fuzzy::FuzzyQuery;
+pub use geo::{GeoBoundingBox, GeoBoundingBoxQuery, GeoDistanceQuery, GeoPoint, GeoQuery};
+pub use multi_term::MultiTermQuery;
+pub use parser::QueryParser;
+pub use phrase::PhraseQuery;
+pub use prefix::PrefixQuery;
+pub use range::NumericRangeQuery;
+pub use regexp::RegexpQuery;
+pub use span::{SpanNearQuery, SpanQuery, SpanTermQuery};
+pub use term::TermQuery;
+pub use wildcard::WildcardQuery;
+
 use std::any::Any;
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -45,7 +60,7 @@ pub struct Hit {
 /// A search hit containing a document and its score (legacy).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SearchHit {
-    /// The document ID.
+    /// The internal document ID.
     pub doc_id: u64,
     /// The relevance score.
     pub score: f32,

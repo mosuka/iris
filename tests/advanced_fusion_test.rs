@@ -1,18 +1,18 @@
 use tempfile::TempDir;
 
-use iris::data::Document;
-use iris::engine::Engine;
-use iris::engine::config::{FieldConfig, IndexConfig};
-use iris::engine::search::{FusionAlgorithm, SearchRequestBuilder};
-use iris::lexical::core::field::FieldOption as LexicalOption;
-use iris::lexical::index::inverted::query::term::TermQuery;
+use iris::Document;
+use iris::Engine;
+use iris::lexical::FieldOption as LexicalOption;
+use iris::lexical::TermQuery;
 use iris::storage::file::FileStorageConfig;
 use iris::storage::{StorageConfig, StorageFactory};
-use iris::vector::core::field::VectorOption;
-use iris::vector::store::query::VectorSearchRequestBuilder;
+use iris::vector::VectorOption;
+use iris::vector::VectorSearchRequestBuilder;
+use iris::{FieldConfig, IndexConfig};
+use iris::{FusionAlgorithm, SearchRequestBuilder};
 
 #[test]
-fn test_advanced_fusion_normalization() -> iris::error::Result<()> {
+fn test_advanced_fusion_normalization() -> iris::Result<()> {
     // 1. Setup Storage
     let temp_dir = TempDir::new().unwrap();
     let storage_config = StorageConfig::File(FileStorageConfig::new(temp_dir.path()));
@@ -93,7 +93,7 @@ fn test_advanced_fusion_normalization() -> iris::error::Result<()> {
 }
 
 #[test]
-fn test_field_boosts() -> iris::error::Result<()> {
+fn test_field_boosts() -> iris::Result<()> {
     // 1. Setup Storage
     let temp_dir = TempDir::new().unwrap();
     let storage_config = StorageConfig::File(FileStorageConfig::new(temp_dir.path()));
@@ -136,7 +136,7 @@ fn test_field_boosts() -> iris::error::Result<()> {
     // Case A: Boost title
     let req_a = SearchRequestBuilder::new()
         .with_lexical(Box::new(
-            iris::lexical::index::inverted::query::boolean::BooleanQueryBuilder::new()
+            iris::lexical::BooleanQueryBuilder::new()
                 .should(Box::new(TermQuery::new("title", "rust")))
                 .should(Box::new(TermQuery::new("body", "rust")))
                 .build(),
@@ -158,7 +158,7 @@ fn test_field_boosts() -> iris::error::Result<()> {
     // Case B: Boost body
     let req_b = SearchRequestBuilder::new()
         .with_lexical(Box::new(
-            iris::lexical::index::inverted::query::boolean::BooleanQueryBuilder::new()
+            iris::lexical::BooleanQueryBuilder::new()
                 .should(Box::new(TermQuery::new("title", "rust")))
                 .should(Box::new(TermQuery::new("body", "rust")))
                 .build(),

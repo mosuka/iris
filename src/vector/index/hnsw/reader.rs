@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use crate::error::{Result, IrisError};
+use crate::error::{IrisError, Result};
 use crate::storage::Storage;
 use crate::vector::core::distance::DistanceMetric;
 use crate::vector::core::vector::Vector;
@@ -154,10 +154,7 @@ impl HnswIndexReader {
                     let mut field_name_buf = vec![0u8; field_name_len];
                     input.read_exact(&mut field_name_buf)?;
                     let field_name = String::from_utf8(field_name_buf).map_err(|e| {
-                        IrisError::InvalidOperation(format!(
-                            "Invalid UTF-8 in field name: {}",
-                            e
-                        ))
+                        IrisError::InvalidOperation(format!("Invalid UTF-8 in field name: {}", e))
                     })?;
 
                     let metadata = read_metadata(&mut input)?;
@@ -204,10 +201,7 @@ impl HnswIndexReader {
                     let mut field_name_buf = vec![0u8; field_name_len];
                     input.read_exact(&mut field_name_buf)?;
                     let field_name = String::from_utf8(field_name_buf).map_err(|e| {
-                        IrisError::InvalidOperation(format!(
-                            "Invalid UTF-8 in field name: {}",
-                            e
-                        ))
+                        IrisError::InvalidOperation(format!("Invalid UTF-8 in field name: {}", e))
                     })?;
 
                     // Record offset for on-demand loading
@@ -282,10 +276,12 @@ impl VectorIndexReader for HnswIndexReader {
     fn get_vectors_for_doc(&self, doc_id: u64) -> Result<Vec<(String, Vector)>> {
         let mut result = Vec::new();
         for (id, field) in &self.vector_ids {
-            if *id == doc_id && !self.is_deleted(*id)
-                && let Some(vec) = self.vectors.get(&(*id, field.clone()), self.dimension)? {
-                    result.push((field.clone(), vec));
-                }
+            if *id == doc_id
+                && !self.is_deleted(*id)
+                && let Some(vec) = self.vectors.get(&(*id, field.clone()), self.dimension)?
+            {
+                result.push((field.clone(), vec));
+            }
         }
         Ok(result)
     }
@@ -353,10 +349,13 @@ impl VectorIndexReader for HnswIndexReader {
     ) -> Result<Vec<(u64, String, Vector)>> {
         let mut result = Vec::new();
         for (id, field) in &self.vector_ids {
-            if *id >= start_doc_id && *id < end_doc_id && !self.is_deleted(*id)
-                && let Some(vec) = self.vectors.get(&(*id, field.clone()), self.dimension)? {
-                    result.push((*id, field.clone(), vec));
-                }
+            if *id >= start_doc_id
+                && *id < end_doc_id
+                && !self.is_deleted(*id)
+                && let Some(vec) = self.vectors.get(&(*id, field.clone()), self.dimension)?
+            {
+                result.push((*id, field.clone(), vec));
+            }
         }
         Ok(result)
     }
@@ -364,10 +363,12 @@ impl VectorIndexReader for HnswIndexReader {
     fn get_vectors_by_field(&self, field_name: &str) -> Result<Vec<(u64, Vector)>> {
         let mut result = Vec::new();
         for (id, field) in &self.vector_ids {
-            if field == field_name && !self.is_deleted(*id)
-                && let Some(vec) = self.vectors.get(&(*id, field.clone()), self.dimension)? {
-                    result.push((*id, vec));
-                }
+            if field == field_name
+                && !self.is_deleted(*id)
+                && let Some(vec) = self.vectors.get(&(*id, field.clone()), self.dimension)?
+            {
+                result.push((*id, vec));
+            }
         }
         Ok(result)
     }
@@ -487,10 +488,11 @@ impl VectorIterator for HnswVectorIterator {
 
             // Check deletion
             if let Some(bitmap) = &self.deletion_bitmap
-                && bitmap.is_deleted(*doc_id) {
-                    self.current += 1;
-                    return self.next(); // Recursively skip deleted
-                }
+                && bitmap.is_deleted(*doc_id)
+            {
+                self.current += 1;
+                return self.next(); // Recursively skip deleted
+            }
 
             if let Some(vec) = self
                 .storage

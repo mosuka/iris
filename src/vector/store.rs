@@ -1108,7 +1108,7 @@ impl VectorStore {
         self.delete_fields_for_doc(doc_id, doc)?;
 
         if let Some(_ext_id) = doc.get("_id").and_then(|v| v.as_text()) {
-            // self.metadata_index.delete_document_by_id(ext_id)?;
+            // self.metadata_index.delete_documents(ext_id)?;
         }
         drop(documents);
 

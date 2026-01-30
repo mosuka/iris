@@ -2,15 +2,15 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tempfile::Builder;
 
-use iris::data::{DataValue, Document};
-use iris::lexical::store::config::LexicalIndexConfig;
+use iris::lexical::LexicalIndexConfig;
 use iris::storage::file::FileStorageConfig;
 use iris::storage::{StorageConfig, StorageFactory};
-use iris::vector::core::distance::DistanceMetric;
-use iris::vector::core::field::{FlatOption, HnswOption, VectorOption};
-use iris::vector::store::VectorStore;
-use iris::vector::store::config::{VectorFieldConfig, VectorIndexConfig};
-use iris::vector::store::request::{QueryVector, VectorScoreMode, VectorSearchRequest};
+use iris::vector::DistanceMetric;
+use iris::vector::VectorStore;
+use iris::vector::{FlatOption, HnswOption, VectorOption};
+use iris::vector::{QueryVector, VectorScoreMode, VectorSearchRequest};
+use iris::vector::{VectorFieldConfig, VectorIndexConfig};
+use iris::{DataValue, Document};
 
 #[test]
 fn test_vacuum_reduces_file_size() {
@@ -31,8 +31,8 @@ fn test_vacuum_reduces_file_size() {
         fields: HashMap::from([("vectors".to_string(), field_config)]),
         default_fields: vec!["vectors".to_string()],
         metadata: HashMap::new(),
-        embedder: Arc::new(iris::embedding::precomputed::PrecomputedEmbedder::new()),
-        deletion_config: iris::maintenance::deletion::DeletionConfig::default(),
+        embedder: Arc::new(iris::PrecomputedEmbedder::new()),
+        deletion_config: iris::DeletionConfig::default(),
         shard_id: 0,
         metadata_config: LexicalIndexConfig::default(),
     };
@@ -161,8 +161,8 @@ fn test_vacuum_reduces_file_size_hnsw() {
         fields: HashMap::from([("vectors".to_string(), field_config)]),
         default_fields: vec!["vectors".to_string()],
         metadata: HashMap::new(),
-        embedder: Arc::new(iris::embedding::precomputed::PrecomputedEmbedder::new()),
-        deletion_config: iris::maintenance::deletion::DeletionConfig::default(),
+        embedder: Arc::new(iris::PrecomputedEmbedder::new()),
+        deletion_config: iris::DeletionConfig::default(),
         shard_id: 0,
         metadata_config: LexicalIndexConfig::default(),
     };

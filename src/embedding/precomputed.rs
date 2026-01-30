@@ -39,7 +39,7 @@ use std::any::Any;
 use async_trait::async_trait;
 
 use crate::embedding::embedder::{EmbedInput, EmbedInputType, Embedder};
-use crate::error::{Result, IrisError};
+use crate::error::{IrisError, Result};
 use crate::vector::core::vector::Vector;
 
 /// An embedder that does not support text or image embedding, used for pre-computed vectors.

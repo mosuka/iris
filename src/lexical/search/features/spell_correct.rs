@@ -3,9 +3,9 @@
 use serde::{Deserialize, Serialize};
 
 use crate::error::Result;
-use crate::lexical::store::LexicalStore;
 use crate::lexical::index::inverted::query::LexicalSearchResults;
 use crate::lexical::search::searcher::LexicalSearchRequest;
+use crate::lexical::store::LexicalStore;
 use crate::spelling::corrector::{
     CorrectionResult, CorrectorConfig, DidYouMean, SpellingCorrector,
 };

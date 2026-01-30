@@ -14,20 +14,20 @@ use std::sync::Arc;
 
 use tempfile::TempDir;
 
+use iris::Result;
 use iris::analysis::analyzer::analyzer::Analyzer;
 use iris::analysis::analyzer::keyword::KeywordAnalyzer;
 use iris::analysis::analyzer::per_field::PerFieldAnalyzer;
 use iris::analysis::analyzer::standard::StandardAnalyzer;
-use iris::data::{DataValue, Document};
-use iris::error::Result;
-use iris::lexical::index::config::InvertedIndexConfig;
-use iris::lexical::index::inverted::query::parser::QueryParser;
-use iris::lexical::search::searcher::LexicalSearchRequest;
-use iris::lexical::store::LexicalStore;
-use iris::lexical::store::config::LexicalIndexConfig;
+use iris::lexical::InvertedIndexConfig;
+use iris::lexical::LexicalIndexConfig;
+use iris::lexical::LexicalSearchRequest;
+use iris::lexical::LexicalStore;
+use iris::lexical::QueryParser;
 use iris::storage::StorageConfig;
 use iris::storage::StorageFactory;
 use iris::storage::file::FileStorageConfig;
+use iris::{DataValue, Document};
 
 fn main() -> Result<()> {
     println!("=== Query Parser - Complete Feature Demonstration ===\n");

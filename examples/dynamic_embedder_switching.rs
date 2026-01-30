@@ -18,15 +18,15 @@
 use std::sync::Arc;
 
 #[cfg(all(feature = "embeddings-candle", feature = "embeddings-openai"))]
-use iris::embedding::candle_bert_embedder::CandleBertEmbedder;
+use iris::CandleBertEmbedder;
 #[cfg(all(feature = "embeddings-candle", feature = "embeddings-openai"))]
-use iris::embedding::embedder::{EmbedInput, Embedder};
+use iris::OpenAIEmbedder;
 #[cfg(all(feature = "embeddings-candle", feature = "embeddings-openai"))]
-use iris::embedding::openai_embedder::OpenAIEmbedder;
+use iris::{EmbedInput, Embedder};
 
 #[cfg(all(feature = "embeddings-candle", feature = "embeddings-openai"))]
 #[tokio::main]
-async fn main() -> iris::error::Result<()> {
+async fn main() -> iris::Result<()> {
     println!("=== Dynamic Embedder Switching Example ===\n");
 
     // Create a vector to hold different embedders

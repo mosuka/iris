@@ -24,7 +24,7 @@
 //! use iris::embedding::candle_bert_embedder::CandleBertEmbedder;
 //! use std::sync::Arc;
 //!
-//! # async fn example() -> iris::error::Result<()> {
+//! # async fn example() -> iris::Result<()> {
 //! // Create default embedder
 //! let default_embedder: Arc<dyn Embedder> = Arc::new(
 //!     CandleBertEmbedder::new("sentence-transformers/all-MiniLM-L6-v2")?
@@ -82,7 +82,7 @@ use crate::vector::core::vector::Vector;
 /// use iris::embedding::candle_bert_embedder::CandleBertEmbedder;
 /// use std::sync::Arc;
 ///
-/// # fn example() -> iris::error::Result<()> {
+/// # fn example() -> iris::Result<()> {
 /// // Create default embedder
 /// let default_embedder: Arc<dyn Embedder> = Arc::new(
 ///     CandleBertEmbedder::new("sentence-transformers/all-MiniLM-L6-v2")?
@@ -136,7 +136,7 @@ impl PerFieldEmbedder {
     /// use iris::embedding::candle_bert_embedder::CandleBertEmbedder;
     /// use std::sync::Arc;
     ///
-    /// # fn example() -> iris::error::Result<()> {
+    /// # fn example() -> iris::Result<()> {
     /// let default: Arc<dyn Embedder> = Arc::new(
     ///     CandleBertEmbedder::new("sentence-transformers/all-MiniLM-L6-v2")?
     /// );

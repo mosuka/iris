@@ -134,23 +134,24 @@ impl FuzzyQuery {
         reader: &dyn LexicalIndexReader,
     ) -> Result<Option<Box<dyn TermsEnum>>> {
         if let Some(inverted_reader) = reader.as_any().downcast_ref::<InvertedIndexReader>()
-            && let Some(terms) = inverted_reader.terms(&self.field)? {
-                // Use LevenshteinAutomaton
-                let automaton =
-                    crate::lexical::index::inverted::core::automaton::LevenshteinAutomaton::new(
-                        &self.term,
-                        self.max_edits,
-                        self.prefix_length as usize,
-                        self.transpositions,
-                    );
+            && let Some(terms) = inverted_reader.terms(&self.field)?
+        {
+            // Use LevenshteinAutomaton
+            let automaton =
+                crate::lexical::index::inverted::core::automaton::LevenshteinAutomaton::new(
+                    &self.term,
+                    self.max_edits,
+                    self.prefix_length as usize,
+                    self.transpositions,
+                );
 
-                let terms_enum =
-                    crate::lexical::index::inverted::core::automaton::AutomatonTermsEnum::new(
-                        terms.iterator()?,
-                        automaton,
-                    );
-                return Ok(Some(Box::new(terms_enum)));
-            }
+            let terms_enum =
+                crate::lexical::index::inverted::core::automaton::AutomatonTermsEnum::new(
+                    terms.iterator()?,
+                    automaton,
+                );
+            return Ok(Some(Box::new(terms_enum)));
+        }
         Ok(None)
     }
 

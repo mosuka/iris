@@ -1,16 +1,16 @@
 use tempfile::TempDir;
 
-use iris::data::{DataValue, Document};
-use iris::engine::Engine;
-use iris::engine::config::{FieldConfig, IndexConfig};
-use iris::lexical::core::field::FieldOption as LexicalOption;
-use iris::lexical::index::inverted::query::term::TermQuery;
+use iris::Engine;
+use iris::lexical::FieldOption as LexicalOption;
+use iris::lexical::TermQuery;
 use iris::storage::file::FileStorageConfig;
 use iris::storage::{StorageConfig, StorageFactory};
-use iris::vector::core::field::VectorOption;
+use iris::vector::VectorOption;
+use iris::{DataValue, Document};
+use iris::{FieldConfig, IndexConfig};
 
 #[test]
-fn test_wal_recovery_uncommitted() -> iris::error::Result<()> {
+fn test_wal_recovery_uncommitted() -> iris::Result<()> {
     // 1. Setup Storage
     let temp_dir = TempDir::new().unwrap();
     let storage_config = StorageConfig::File(FileStorageConfig::new(temp_dir.path()));
@@ -43,7 +43,7 @@ fn test_wal_recovery_uncommitted() -> iris::error::Result<()> {
 
         // Initial state
         let query = Box::new(TermQuery::new("title", "rust"));
-        let search_request = iris::engine::search::SearchRequestBuilder::new()
+        let search_request = iris::SearchRequestBuilder::new()
             .with_lexical(query)
             .build();
         let search_results = engine.search(search_request)?;
@@ -57,7 +57,7 @@ fn test_wal_recovery_uncommitted() -> iris::error::Result<()> {
 
         // Verify it's searchable in memory - SKIPPED because NRT might not be active without commit
         // let query = Box::new(TermQuery::new("title", "rust"));
-        // let search_request = iris::engine::search::SearchRequestBuilder::new()
+        // let search_request = iris::SearchRequestBuilder::new()
         //     .with_lexical(query)
         //     .build();
         // let search_results = engine.search(search_request)?;
@@ -76,7 +76,7 @@ fn test_wal_recovery_uncommitted() -> iris::error::Result<()> {
 
         // Should have recovered doc1 from WAL and now committed
         let query = Box::new(TermQuery::new("title", "rust"));
-        let search_request = iris::engine::search::SearchRequestBuilder::new()
+        let search_request = iris::SearchRequestBuilder::new()
             .with_lexical(query)
             .build();
         let search_results = engine.search(search_request)?;

@@ -374,10 +374,18 @@ impl InvertedIndexWriter {
     }
 
     /// Analyze a document into terms.
-    fn analyze_document(&mut self, doc: Document) -> Result<AnalyzedDocument> {
+    fn analyze_document(&mut self, mut doc: Document) -> Result<AnalyzedDocument> {
         let mut field_terms = AHashMap::new();
         let mut stored_fields = AHashMap::new();
         let mut point_values = AHashMap::new();
+
+        // Inject doc.id as _id field if present and not already in fields
+        if let Some(id) = &doc.id {
+            if !doc.fields.contains_key("_id") {
+                doc.fields
+                    .insert("_id".to_string(), crate::data::DataValue::Text(id.clone()));
+            }
+        }
 
         // Process each field in the document
         for (field_name, val) in &doc.fields {

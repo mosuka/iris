@@ -9,7 +9,6 @@ use crate::storage::Storage;
 use crate::vector::core::field::VectorOption;
 use crate::vector::core::vector::Vector;
 use crate::vector::core::vector::{METADATA_WEIGHT, StoredVector};
-use crate::vector::store::config::VectorFieldConfig;
 use crate::vector::index::VectorIndexWriter;
 use crate::vector::index::config::HnswIndexConfig;
 use crate::vector::index::field::{
@@ -24,6 +23,7 @@ use crate::vector::index::hnsw::writer::HnswIndexWriter;
 use crate::vector::search::searcher::{
     VectorIndexSearchParams, VectorIndexSearchRequest, VectorIndexSearcher,
 };
+use crate::vector::store::config::VectorFieldConfig;
 use crate::vector::writer::VectorIndexWriterConfig;
 use std::cmp::Ordering;
 

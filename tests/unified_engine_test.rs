@@ -1,15 +1,15 @@
 use tempfile::TempDir;
 
-use iris::data::{DataValue, Document};
-use iris::engine::Engine;
-use iris::engine::config::{FieldConfig, IndexConfig};
-use iris::lexical::core::field::FieldOption as LexicalOption;
+use iris::Engine;
+use iris::lexical::FieldOption as LexicalOption;
 use iris::storage::file::FileStorageConfig;
 use iris::storage::{StorageConfig, StorageFactory};
-use iris::vector::core::field::VectorOption;
+use iris::vector::VectorOption;
+use iris::{DataValue, Document};
+use iris::{FieldConfig, IndexConfig};
 
 #[test]
-fn test_unified_engine_indexing() -> iris::error::Result<()> {
+fn test_unified_engine_indexing() -> iris::Result<()> {
     // 1. Setup Storage
     let temp_dir = TempDir::new().unwrap();
     let storage_config = StorageConfig::File(FileStorageConfig::new(temp_dir.path()));

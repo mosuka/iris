@@ -1,18 +1,18 @@
 use tempfile::TempDir;
 
-use iris::data::Document;
-use iris::engine::Engine;
-use iris::engine::config::{FieldConfig, IndexConfig};
-use iris::engine::search::SearchRequestBuilder;
-use iris::lexical::core::field::FieldOption as LexicalOption;
-use iris::lexical::index::inverted::query::term::TermQuery;
+use iris::Document;
+use iris::Engine;
+use iris::SearchRequestBuilder;
+use iris::lexical::FieldOption as LexicalOption;
+use iris::lexical::TermQuery;
 use iris::storage::file::FileStorageConfig;
 use iris::storage::{StorageConfig, StorageFactory};
-use iris::vector::core::field::VectorOption;
-use iris::vector::store::query::VectorSearchRequestBuilder;
+use iris::vector::VectorOption;
+use iris::vector::VectorSearchRequestBuilder;
+use iris::{FieldConfig, IndexConfig};
 
 #[test]
-fn test_engine_unified_deletion() -> iris::error::Result<()> {
+fn test_engine_unified_deletion() -> iris::Result<()> {
     // 1. Setup Storage
     let temp_dir = TempDir::new().unwrap();
     let storage_config = StorageConfig::File(FileStorageConfig::new(temp_dir.path()));
@@ -95,14 +95,14 @@ fn test_engine_unified_deletion() -> iris::error::Result<()> {
 }
 
 #[test]
-fn test_engine_upsert() -> iris::error::Result<()> {
+fn test_engine_upsert() -> iris::Result<()> {
     // 1. Setup Storage
     let temp_dir = TempDir::new().unwrap();
     let storage_config = StorageConfig::File(FileStorageConfig::new(temp_dir.path()));
     let storage = StorageFactory::create(storage_config)?;
 
     // 2. Configure Engine
-    use iris::vector::core::field::FlatOption;
+    use iris::vector::FlatOption;
     let vector_opt = VectorOption::Flat(FlatOption {
         dimension: 2,
         ..Default::default()

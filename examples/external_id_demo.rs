@@ -6,16 +6,16 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use iris::data::Document;
-use iris::embedding::embedder::{EmbedInput, EmbedInputType, Embedder};
-use iris::engine::Engine;
-use iris::engine::config::{FieldConfig, IndexConfig};
-use iris::error::Result;
-use iris::lexical::core::field::{FieldOption, TextOption};
+use iris::Document;
+use iris::Engine;
+use iris::Result;
+use iris::lexical::{FieldOption, TextOption};
 use iris::storage::memory::MemoryStorageConfig;
 use iris::storage::{StorageConfig, StorageFactory};
-use iris::vector::core::field::{FlatOption, VectorOption};
-use iris::vector::core::vector::Vector;
+use iris::vector::Vector;
+use iris::vector::{FlatOption, VectorOption};
+use iris::{EmbedInput, EmbedInputType, Embedder};
+use iris::{FieldConfig, IndexConfig};
 use std::any::Any;
 
 // Simple Mock Embedder

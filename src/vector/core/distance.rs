@@ -3,7 +3,7 @@
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use crate::error::{Result, IrisError};
+use crate::error::{IrisError, Result};
 
 /// Distance metrics for vector similarity calculation.
 #[derive(

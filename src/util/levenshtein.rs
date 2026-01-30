@@ -188,21 +188,6 @@ pub fn damerau_levenshtein_distance(s1: &str, s2: &str) -> usize {
     matrix[len1][len2]
 }
 
-/// Calculate normalized Levenshtein distance as a ratio between 0.0 and 1.0.
-/// 0.0 means identical strings, 1.0 means completely different.
-pub fn levenshtein_ratio(s1: &str, s2: &str) -> f64 {
-    let len1 = s1.chars().count();
-    let len2 = s2.chars().count();
-    let max_len = len1.max(len2);
-
-    if max_len == 0 {
-        return 0.0;
-    }
-
-    let distance = levenshtein_distance(s1, s2);
-    1.0 - (distance as f64 / max_len as f64)
-}
-
 /// Optimized version for calculating distance between a query and multiple candidates.
 /// This reuses computation where possible for better performance.
 pub struct LevenshteinMatcher {
@@ -226,29 +211,9 @@ impl LevenshteinMatcher {
         }
     }
 
-    /// Get the original query string.
-    pub fn query(&self) -> &str {
-        &self.query
-    }
-
-    /// Calculate distance to a candidate string.
-    pub fn distance(&self, candidate: &str) -> usize {
-        levenshtein_distance(&self.query, candidate)
-    }
-
     /// Calculate distance with threshold for early termination.
     pub fn distance_threshold(&self, candidate: &str, threshold: usize) -> Option<usize> {
         levenshtein_distance_threshold(&self.query, candidate, threshold)
-    }
-
-    /// Calculate similarity ratio (0.0 to 1.0, higher is more similar).
-    pub fn similarity(&self, candidate: &str) -> f64 {
-        levenshtein_ratio(&self.query, candidate)
-    }
-
-    /// Check if a candidate is within the given edit distance threshold.
-    pub fn is_match(&self, candidate: &str, max_distance: usize) -> bool {
-        self.distance_threshold(candidate, max_distance).is_some()
     }
 }
 
@@ -292,25 +257,10 @@ mod tests {
     }
 
     #[test]
-    fn test_levenshtein_ratio() {
-        assert!((levenshtein_ratio("", "") - 0.0).abs() < 1e-6);
-        assert!((levenshtein_ratio("abc", "abc") - 1.0).abs() < 1e-6);
-        assert!((levenshtein_ratio("abc", "def") - 0.0).abs() < 1e-6);
-
-        let ratio = levenshtein_ratio("search", "serach");
-        assert!(ratio > 0.5 && ratio < 1.0);
-    }
-
-    #[test]
     fn test_levenshtein_matcher() {
         let matcher = LevenshteinMatcher::new("search".to_string());
-
-        assert_eq!(matcher.query(), "search");
-        assert_eq!(matcher.distance("search"), 0);
-        assert_eq!(matcher.distance("serach"), 2);
-        assert!(matcher.similarity("search") > matcher.similarity("serach"));
-        assert!(matcher.is_match("serach", 2));
-        assert!(!matcher.is_match("completely_different", 2));
+        assert_eq!(matcher.distance_threshold("search", 2), Some(0));
+        assert_eq!(matcher.distance_threshold("serach", 2), Some(2));
     }
 
     #[test]

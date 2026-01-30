@@ -1,12 +1,8 @@
 use iris::storage::file::{FileStorage, FileStorageConfig};
-use iris::vector::core::distance::DistanceMetric;
-use iris::vector::core::vector::Vector;
-use iris::vector::index::config::HnswIndexConfig;
-use iris::vector::index::hnsw::reader::HnswIndexReader;
-use iris::vector::index::hnsw::searcher::HnswSearcher;
-use iris::vector::index::hnsw::writer::HnswIndexWriter;
-use iris::vector::search::searcher::{VectorIndexSearchRequest, VectorIndexSearcher};
-use iris::vector::writer::{VectorIndexWriter, VectorIndexWriterConfig};
+use iris::vector::{
+    DistanceMetric, HnswIndexConfig, HnswIndexReader, HnswIndexWriter, HnswSearcher, Vector,
+    VectorIndexSearchRequest, VectorIndexSearcher, VectorIndexWriter, VectorIndexWriterConfig,
+};
 use std::sync::Arc;
 use tempfile::tempdir;
 

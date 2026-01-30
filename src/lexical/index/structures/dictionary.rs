@@ -7,7 +7,7 @@ use std::collections::BTreeMap;
 
 use ahash::AHashMap;
 
-use crate::error::{Result, IrisError};
+use crate::error::{IrisError, Result};
 use crate::storage::structured::{StructReader, StructWriter};
 use crate::storage::{StorageInput, StorageOutput};
 
@@ -152,9 +152,7 @@ impl SortedTermDictionary {
         let magic = reader.read_u32()?;
         if magic != 0x53544443 {
             // "STDC"
-            return Err(IrisError::index(
-                "Invalid sorted dictionary magic number",
-            ));
+            return Err(IrisError::index("Invalid sorted dictionary magic number"));
         }
 
         let version = reader.read_u32()?;

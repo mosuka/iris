@@ -39,7 +39,7 @@ use crate::error::Result;
 /// ```
 /// use iris::analysis::token::{Token, TokenStream};
 /// use iris::analysis::tokenizer::Tokenizer;
-/// use iris::error::Result;
+/// use iris::Result;
 ///
 /// struct CustomTokenizer;
 ///

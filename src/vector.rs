@@ -12,6 +12,7 @@
 //! - `store`: High-level store interface
 //! - `writer`: Index writer trait
 
+// Internal modules
 pub mod core;
 pub mod index;
 pub mod search;
@@ -22,3 +23,23 @@ pub mod store;
 // pub mod wal;
 // mod tests_deletion;
 pub mod writer;
+
+// Re-exports
+pub use core::distance::DistanceMetric;
+pub use core::field::{FlatOption, HnswOption, IvfOption, VectorOption};
+pub use core::vector::{StoredVector, Vector};
+pub use index::config::FlatIndexConfig;
+pub use index::config::{HnswIndexConfig, IvfIndexConfig};
+pub use index::flat::writer::FlatIndexWriter;
+pub use index::hnsw::reader::HnswIndexReader;
+pub use index::hnsw::searcher::HnswSearcher;
+pub use index::hnsw::writer::HnswIndexWriter;
+pub use search::searcher::{
+    VectorIndexSearchRequest, VectorIndexSearchResults, VectorIndexSearcher,
+};
+pub use store::VectorStore;
+pub use store::config::{VectorFieldConfig, VectorIndexConfig};
+pub use store::query::VectorSearchRequestBuilder;
+pub use store::request::{QueryVector, VectorScoreMode, VectorSearchRequest};
+pub use store::response::VectorSearchResults;
+pub use writer::{VectorIndexWriter, VectorIndexWriterConfig};

@@ -10,7 +10,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use ahash::AHashMap;
 use serde::{Deserialize, Serialize};
 
-use crate::error::{Result, IrisError};
+use crate::error::{IrisError, Result};
 use crate::storage::structured::{StructReader, StructWriter};
 use crate::storage::{Storage, StorageInput, StorageOutput};
 
@@ -534,10 +534,6 @@ pub struct DeletionManager {
 
     /// Global deletion state.
     global_state: RwLock<GlobalDeletionState>,
-
-    /// Automatic compaction scheduler.
-    #[allow(dead_code)]
-    compaction_scheduler: Option<CompactionScheduler>,
 }
 
 impl DeletionManager {
@@ -552,12 +548,6 @@ impl DeletionManager {
             None
         };
 
-        let compaction_scheduler = if config.auto_compaction {
-            Some(CompactionScheduler::new(config.compaction_interval_secs))
-        } else {
-            None
-        };
-
         let manager = DeletionManager {
             config,
             storage,
@@ -565,7 +555,6 @@ impl DeletionManager {
             deletion_log,
             stats: RwLock::new(DeletionStats::default()),
             global_state: RwLock::new(GlobalDeletionState::new()),
-            compaction_scheduler,
         };
 
         // Load existing bitmaps
@@ -1041,68 +1030,6 @@ impl DeletionReport {
     }
 }
 
-/// Automatic compaction scheduler.
-#[derive(Debug)]
-pub struct CompactionScheduler {
-    /// Compaction interval in seconds.
-    interval_secs: u64,
-
-    /// Last check timestamp.
-    last_check: std::sync::atomic::AtomicU64,
-
-    /// Number of compactions triggered.
-    compactions_triggered: std::sync::atomic::AtomicU64,
-}
-
-impl CompactionScheduler {
-    /// Create a new compaction scheduler.
-    pub fn new(interval_secs: u64) -> Self {
-        CompactionScheduler {
-            interval_secs,
-            last_check: std::sync::atomic::AtomicU64::new(0),
-            compactions_triggered: std::sync::atomic::AtomicU64::new(0),
-        }
-    }
-
-    /// Check if it's time for compaction.
-    pub fn should_compact(&self) -> bool {
-        let current_time = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
-
-        let last_check = self.last_check.load(std::sync::atomic::Ordering::SeqCst);
-
-        if current_time >= last_check + self.interval_secs {
-            self.last_check
-                .store(current_time, std::sync::atomic::Ordering::SeqCst);
-            true
-        } else {
-            false
-        }
-    }
-
-    /// Mark that compaction was triggered.
-    pub fn mark_compaction_triggered(&self) {
-        self.compactions_triggered
-            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-    }
-
-    /// Get statistics.
-    pub fn get_stats(&self) -> (u64, u64, u64) {
-        let current_time = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
-        let last_check = self.last_check.load(std::sync::atomic::Ordering::SeqCst);
-        let triggered = self
-            .compactions_triggered
-            .load(std::sync::atomic::Ordering::SeqCst);
-
-        (current_time, last_check, triggered)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1325,25 +1252,6 @@ mod tests {
         // Note: space may be 0 if deletion ratio is below compaction threshold
         // space is u64, so >= 0 check is redundant
         assert!(!needs_compaction); // Below 30% threshold
-    }
-
-    #[test]
-    fn test_compaction_scheduler() {
-        let scheduler = CompactionScheduler::new(60); // 1 minute interval
-
-        // Should compact initially (first check)
-        assert!(scheduler.should_compact());
-
-        // Should not compact immediately after
-        assert!(!scheduler.should_compact());
-
-        // Mark compaction triggered
-        scheduler.mark_compaction_triggered();
-
-        let (current_time, last_check, triggered) = scheduler.get_stats();
-        assert!(current_time > 0);
-        assert!(last_check > 0);
-        assert_eq!(triggered, 1);
     }
 
     #[test]

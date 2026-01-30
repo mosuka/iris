@@ -28,7 +28,7 @@
 //! use iris::storage::file::FileStorageConfig;
 //! use iris::storage::memory::MemoryStorageConfig;
 //!
-//! # fn main() -> iris::error::Result<()> {
+//! # fn main() -> iris::Result<()> {
 //! // Create file storage with mmap enabled
 //! let mut file_config = FileStorageConfig::new("/tmp/test_index");
 //! file_config.use_mmap = true;
@@ -43,7 +43,7 @@
 use std::io::{Read, Seek, Write};
 use std::sync::Arc;
 
-use crate::error::{Result, IrisError};
+use crate::error::{IrisError, Result};
 
 pub mod column;
 pub mod file;
@@ -109,7 +109,7 @@ pub trait Storage: Send + Sync + std::fmt::Debug {
     /// use iris::storage::Storage;
     /// use std::io::{Read, Write};
     ///
-    /// # fn main() -> iris::error::Result<()> {
+    /// # fn main() -> iris::Result<()> {
     /// let storage = MemoryStorage::new(MemoryStorageConfig::default());
     ///
     /// // First create a file
@@ -148,7 +148,7 @@ pub trait Storage: Send + Sync + std::fmt::Debug {
     /// use iris::storage::Storage;
     /// use std::io::Write;
     ///
-    /// # fn main() -> iris::error::Result<()> {
+    /// # fn main() -> iris::Result<()> {
     /// let storage = MemoryStorage::new(MemoryStorageConfig::default());
     ///
     /// let mut output = storage.create_output("index.bin")?;
@@ -182,7 +182,7 @@ pub trait Storage: Send + Sync + std::fmt::Debug {
     /// use iris::storage::Storage;
     /// use std::io::{Read, Write};
     ///
-    /// # fn main() -> iris::error::Result<()> {
+    /// # fn main() -> iris::Result<()> {
     /// let storage = MemoryStorage::new(MemoryStorageConfig::default());
     ///
     /// // Create file with initial content
@@ -227,7 +227,7 @@ pub trait Storage: Send + Sync + std::fmt::Debug {
     /// use iris::storage::Storage;
     /// use std::io::Write;
     ///
-    /// # fn main() -> iris::error::Result<()> {
+    /// # fn main() -> iris::Result<()> {
     /// let storage = MemoryStorage::new(MemoryStorageConfig::default());
     ///
     /// assert!(!storage.file_exists("index.bin"));
@@ -263,7 +263,7 @@ pub trait Storage: Send + Sync + std::fmt::Debug {
     /// use iris::storage::Storage;
     /// use std::io::Write;
     ///
-    /// # fn main() -> iris::error::Result<()> {
+    /// # fn main() -> iris::Result<()> {
     /// let storage = MemoryStorage::new(MemoryStorageConfig::default());
     ///
     /// // Create a file
@@ -300,7 +300,7 @@ pub trait Storage: Send + Sync + std::fmt::Debug {
     /// use iris::storage::Storage;
     /// use std::io::Write;
     ///
-    /// # fn main() -> iris::error::Result<()> {
+    /// # fn main() -> iris::Result<()> {
     /// let storage = MemoryStorage::new(MemoryStorageConfig::default());
     ///
     /// // Create some files
@@ -343,7 +343,7 @@ pub trait Storage: Send + Sync + std::fmt::Debug {
     /// use iris::storage::Storage;
     /// use std::io::Write;
     ///
-    /// # fn main() -> iris::error::Result<()> {
+    /// # fn main() -> iris::Result<()> {
     /// let storage = MemoryStorage::new(MemoryStorageConfig::default());
     ///
     /// // Create a file with known size
@@ -381,7 +381,7 @@ pub trait Storage: Send + Sync + std::fmt::Debug {
     /// use iris::storage::Storage;
     /// use std::io::Write;
     ///
-    /// # fn main() -> iris::error::Result<()> {
+    /// # fn main() -> iris::Result<()> {
     /// let storage = MemoryStorage::new(MemoryStorageConfig::default());
     ///
     /// // Create a file
@@ -422,7 +422,7 @@ pub trait Storage: Send + Sync + std::fmt::Debug {
     /// use iris::storage::Storage;
     /// use std::io::Write;
     ///
-    /// # fn main() -> iris::error::Result<()> {
+    /// # fn main() -> iris::Result<()> {
     /// let storage = MemoryStorage::new(MemoryStorageConfig::default());
     ///
     /// // Create a temp file
@@ -463,7 +463,7 @@ pub trait Storage: Send + Sync + std::fmt::Debug {
     /// use iris::storage::Storage;
     /// use std::io::Write;
     ///
-    /// # fn main() -> iris::error::Result<()> {
+    /// # fn main() -> iris::Result<()> {
     /// let storage = MemoryStorage::new(MemoryStorageConfig::default());
     ///
     /// // Create a temp file with prefix
@@ -500,7 +500,7 @@ pub trait Storage: Send + Sync + std::fmt::Debug {
     /// use iris::storage::Storage;
     /// use std::io::Write;
     ///
-    /// # fn main() -> iris::error::Result<()> {
+    /// # fn main() -> iris::Result<()> {
     /// let storage = MemoryStorage::new(MemoryStorageConfig::default());
     ///
     /// // Write some data
@@ -534,7 +534,7 @@ pub trait Storage: Send + Sync + std::fmt::Debug {
     /// use iris::storage::Storage;
     /// use std::io::Write;
     ///
-    /// # fn main() -> iris::error::Result<()> {
+    /// # fn main() -> iris::Result<()> {
     /// let mut storage = MemoryStorage::new(MemoryStorageConfig::default());
     ///
     /// // Use storage
@@ -699,7 +699,7 @@ impl StorageFactory {
     /// use iris::storage::file::FileStorageConfig;
     /// use iris::storage::memory::MemoryStorageConfig;
     ///
-    /// # fn main() -> iris::error::Result<()> {
+    /// # fn main() -> iris::Result<()> {
     /// // Create memory storage
     /// let config = StorageConfig::Memory(MemoryStorageConfig::default());
     /// let storage = StorageFactory::create(config)?;

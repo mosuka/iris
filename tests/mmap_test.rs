@@ -1,13 +1,13 @@
-use iris::embedding::precomputed::PrecomputedEmbedder;
+use iris::PrecomputedEmbedder;
 use iris::storage::file::FileStorageConfig;
 use iris::storage::{StorageConfig, StorageFactory};
 
-use iris::data::{DataValue, Document};
-use iris::vector::core::distance::DistanceMetric;
-use iris::vector::core::field::{FlatOption, VectorOption};
-use iris::vector::store::VectorStore;
-use iris::vector::store::config::{VectorFieldConfig, VectorIndexConfig};
-use iris::vector::store::query::VectorSearchRequestBuilder;
+use iris::vector::DistanceMetric;
+use iris::vector::VectorSearchRequestBuilder;
+use iris::vector::VectorStore;
+use iris::vector::{FlatOption, VectorOption};
+use iris::vector::{VectorFieldConfig, VectorIndexConfig};
+use iris::{DataValue, Document};
 
 use std::sync::Arc;
 use tempfile::tempdir;

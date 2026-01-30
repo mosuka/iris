@@ -22,7 +22,7 @@ use tokenizers::Tokenizer;
 #[cfg(feature = "embeddings-candle")]
 use crate::embedding::embedder::{EmbedInput, EmbedInputType, Embedder};
 #[cfg(feature = "embeddings-candle")]
-use crate::error::{Result, IrisError};
+use crate::error::{IrisError, Result};
 #[cfg(feature = "embeddings-candle")]
 use crate::vector::core::vector::Vector;
 
@@ -44,7 +44,7 @@ use crate::vector::core::vector::Vector;
 /// use iris::embedding::embedder::{Embedder, EmbedInput};
 /// use iris::embedding::candle_bert_embedder::CandleBertEmbedder;
 ///
-/// # async fn example() -> iris::error::Result<()> {
+/// # async fn example() -> iris::Result<()> {
 /// // Create embedder with a sentence-transformers model
 /// let embedder = CandleBertEmbedder::new(
 ///     "sentence-transformers/all-MiniLM-L6-v2"
@@ -109,7 +109,7 @@ impl CandleBertEmbedder {
     /// ```no_run
     /// use iris::embedding::candle_bert_embedder::CandleBertEmbedder;
     ///
-    /// # fn example() -> iris::error::Result<()> {
+    /// # fn example() -> iris::Result<()> {
     /// // Small and fast model
     /// let embedder = CandleBertEmbedder::new(
     ///     "sentence-transformers/all-MiniLM-L6-v2"
@@ -141,18 +141,18 @@ impl CandleBertEmbedder {
         let repo = api.model(model_name.to_string());
 
         // Load config
-        let config_filename = repo.get("config.json").map_err(|e| {
-            IrisError::InvalidOperation(format!("Config download failed: {}", e))
-        })?;
+        let config_filename = repo
+            .get("config.json")
+            .map_err(|e| IrisError::InvalidOperation(format!("Config download failed: {}", e)))?;
         let config_str = std::fs::read_to_string(config_filename)
             .map_err(|e| IrisError::InvalidOperation(format!("Config read failed: {}", e)))?;
         let config: Config = serde_json::from_str(&config_str)
             .map_err(|e| IrisError::InvalidOperation(format!("Config parse failed: {}", e)))?;
 
         // Load weights
-        let weights_filename = repo.get("model.safetensors").map_err(|e| {
-            IrisError::InvalidOperation(format!("Weights download failed: {}", e))
-        })?;
+        let weights_filename = repo
+            .get("model.safetensors")
+            .map_err(|e| IrisError::InvalidOperation(format!("Weights download failed: {}", e)))?;
         let vb = unsafe {
             VarBuilder::from_mmaped_safetensors(&[weights_filename], DType::F32, &device).map_err(
                 |e| IrisError::InvalidOperation(format!("VarBuilder creation failed: {}", e)),

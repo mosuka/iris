@@ -16,13 +16,13 @@
 //! ```
 
 #[cfg(feature = "embeddings-openai")]
-use iris::embedding::embedder::{EmbedInput, Embedder};
+use iris::OpenAIEmbedder;
 #[cfg(feature = "embeddings-openai")]
-use iris::embedding::openai_embedder::OpenAIEmbedder;
+use iris::{EmbedInput, Embedder};
 
 #[cfg(feature = "embeddings-openai")]
 #[tokio::main]
-async fn main() -> iris::error::Result<()> {
+async fn main() -> iris::Result<()> {
     println!("=== OpenAI Text Embedder Example ===\n");
 
     // Get API key from environment

@@ -5,17 +5,17 @@
 
 use std::sync::Arc;
 
+use iris::Result;
 use iris::analysis::analyzer::standard::StandardAnalyzer;
-use iris::data::{DataValue, Document};
-use iris::error::Result;
-use iris::lexical::index::config::InvertedIndexConfig;
-use iris::lexical::index::inverted::query::span::{SpanQueryBuilder, SpanQueryWrapper};
-use iris::lexical::index::inverted::query::{LexicalSearchResults, Query};
-use iris::lexical::search::searcher::LexicalSearchRequest;
-use iris::lexical::store::LexicalStore;
-use iris::lexical::store::config::LexicalIndexConfig;
+use iris::lexical::InvertedIndexConfig;
+use iris::lexical::LexicalIndexConfig;
+use iris::lexical::LexicalSearchRequest;
+use iris::lexical::LexicalStore;
+use iris::lexical::span::{SpanQueryBuilder, SpanQueryWrapper};
+use iris::lexical::{LexicalSearchResults, Query};
 use iris::storage::file::FileStorageConfig;
 use iris::storage::{StorageConfig, StorageFactory};
+use iris::{DataValue, Document};
 use tempfile::TempDir;
 
 fn main() -> Result<()> {

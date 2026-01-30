@@ -50,7 +50,7 @@
 //! ```
 //! use iris::analysis::analyzer::analyzer::Analyzer;
 //! use iris::analysis::token::TokenStream;
-//! use iris::error::Result;
+//! use iris::Result;
 //!
 //! #[derive(Debug)]
 //! struct MyAnalyzer;

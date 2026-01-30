@@ -242,6 +242,11 @@ impl Document {
         self
     }
 
+    /// Get the document ID.
+    pub fn id(&self) -> Option<&str> {
+        self.id.as_deref()
+    }
+
     /// Add a field to the document.
     pub fn add_field(mut self, name: impl Into<String>, value: impl Into<DataValue>) -> Self {
         self.fields.insert(name.into(), value.into());

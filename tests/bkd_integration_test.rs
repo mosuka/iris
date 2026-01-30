@@ -1,13 +1,13 @@
 use chrono::{TimeZone, Utc};
-use iris::data::{DataValue, Document};
-use iris::lexical::core::field::NumericType;
-use iris::lexical::index::inverted::query::Query;
-use iris::lexical::index::inverted::query::geo::{GeoDistanceQuery, GeoPoint};
-use iris::lexical::index::inverted::query::range::NumericRangeQuery;
-use iris::lexical::index::inverted::writer::{InvertedIndexWriter, InvertedIndexWriterConfig};
-use iris::lexical::writer::LexicalIndexWriter;
+use iris::lexical::LexicalIndexWriter;
+use iris::lexical::NumericRangeQuery;
+use iris::lexical::NumericType;
+use iris::lexical::Query;
+use iris::lexical::{GeoDistanceQuery, GeoPoint};
+use iris::lexical::{InvertedIndexWriter, InvertedIndexWriterConfig};
 use iris::storage::Storage;
 use iris::storage::memory::{MemoryStorage, MemoryStorageConfig};
+use iris::{DataValue, Document};
 use std::sync::Arc;
 
 #[test]

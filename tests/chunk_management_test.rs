@@ -1,11 +1,11 @@
-use iris::data::{DataValue, Document};
-use iris::engine::Engine;
-use iris::engine::config::{FieldConfig, IndexConfig};
-use iris::error::Result;
+use iris::Engine;
+use iris::Result;
 use iris::storage::memory::MemoryStorageConfig;
 use iris::storage::{StorageConfig, StorageFactory};
-use iris::vector::core::distance::DistanceMetric;
-use iris::vector::core::field::{FlatOption, VectorOption};
+use iris::vector::DistanceMetric;
+use iris::vector::{FlatOption, VectorOption};
+use iris::{DataValue, Document};
+use iris::{FieldConfig, IndexConfig};
 
 fn build_test_engine() -> Result<Engine> {
     let storage_config = StorageConfig::Memory(MemoryStorageConfig::default());

@@ -29,7 +29,7 @@ use crate::vector::index::ivf::IvfIndex;
 /// use iris::storage::{StorageFactory, StorageConfig};
 /// use iris::storage::memory::MemoryStorageConfig;
 ///
-/// # fn main() -> iris::error::Result<()> {
+/// # fn main() -> iris::Result<()> {
 /// // Create storage using factory
 /// let storage = StorageFactory::create(StorageConfig::Memory(MemoryStorageConfig::default()))?;
 ///
@@ -62,7 +62,7 @@ impl VectorIndexFactory {
     /// use iris::storage::{StorageFactory, StorageConfig};
     /// use iris::storage::file::FileStorageConfig;
     ///
-    /// # fn main() -> iris::error::Result<()> {
+    /// # fn main() -> iris::Result<()> {
     /// // Create file storage
     /// let storage_config = StorageConfig::File(FileStorageConfig::new("/tmp/index"));
     /// let storage = StorageFactory::create(storage_config)?;
@@ -113,7 +113,7 @@ impl VectorIndexFactory {
     /// use iris::storage::file::{FileStorage, FileStorageConfig};
     /// use std::sync::Arc;
     ///
-    /// # fn main() -> iris::error::Result<()> {
+    /// # fn main() -> iris::Result<()> {
     /// let storage = Arc::new(FileStorage::new("./index", FileStorageConfig::new("./index"))?);
     /// let config = VectorIndexTypeConfig::Flat(FlatIndexConfig::default());
     /// let index = VectorIndexFactory::open(storage, "test_index", config)?;

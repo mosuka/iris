@@ -41,3 +41,12 @@ pub mod synonym;
 pub mod token;
 pub mod token_filter;
 pub mod tokenizer;
+
+// Re-exports
+pub use analyzer::analyzer::Analyzer;
+pub use analyzer::keyword::KeywordAnalyzer;
+pub use analyzer::per_field::PerFieldAnalyzer;
+pub use analyzer::simple::SimpleAnalyzer;
+pub use analyzer::standard::StandardAnalyzer;
+pub use token_filter::Filter as TokenFilter;
+pub use tokenizer::Tokenizer;

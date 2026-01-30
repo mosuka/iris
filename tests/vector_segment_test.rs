@@ -1,13 +1,13 @@
 use async_trait::async_trait;
-use iris::data::{DataValue, Document};
-use iris::embedding::embedder::{EmbedInput, EmbedInputType, Embedder};
-use iris::error::{IrisError, Result};
-use iris::lexical::store::config::LexicalIndexConfig;
+use iris::lexical::LexicalIndexConfig;
 use iris::storage::memory::{MemoryStorage, MemoryStorageConfig};
-use iris::vector::core::distance::DistanceMetric;
-use iris::vector::core::field::{HnswOption, VectorOption};
-use iris::vector::core::vector::Vector;
-use iris::vector::store::config::{VectorFieldConfig, VectorIndexConfig};
+use iris::vector::DistanceMetric;
+use iris::vector::Vector;
+use iris::vector::{HnswOption, VectorOption};
+use iris::vector::{VectorFieldConfig, VectorIndexConfig};
+use iris::{DataValue, Document};
+use iris::{EmbedInput, EmbedInputType, Embedder};
+use iris::{IrisError, Result};
 use std::any::Any;
 use std::sync::Arc;
 
@@ -67,14 +67,14 @@ async fn test_vector_segment_integration() {
         embedder: Arc::new(MockTextEmbedder { dimension: 4 }),
         default_fields: vec!["vector_field".to_string()],
         metadata: std::collections::HashMap::new(),
-        deletion_config: iris::maintenance::deletion::DeletionConfig::default(),
+        deletion_config: iris::DeletionConfig::default(),
         shard_id: 0,
         metadata_config: LexicalIndexConfig::default(),
     };
 
     // We construct engine manually to inject storage
     let engine =
-        iris::vector::store::VectorStore::new(storage.clone(), collection_config.clone()).unwrap();
+        iris::vector::VectorStore::new(storage.clone(), collection_config.clone()).unwrap();
 
     // 2. Insert vectors
     let vectors = vec![
@@ -99,7 +99,7 @@ async fn test_vector_segment_integration() {
     drop(engine);
 
     let engine_2 =
-        iris::vector::store::VectorStore::new(storage.clone(), collection_config.clone()).unwrap();
+        iris::vector::VectorStore::new(storage.clone(), collection_config.clone()).unwrap();
 
     // We verify stats.
     // Recovery should load segments.

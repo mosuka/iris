@@ -13,21 +13,21 @@ use std::any::Any;
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use iris::Document;
+use iris::Engine;
+use iris::IndexConfig;
+use iris::Result;
 use iris::analysis::analyzer::standard::StandardAnalyzer;
-use iris::data::Document;
-use iris::embedding::embedder::{EmbedInput, EmbedInputType, Embedder};
-use iris::engine::Engine;
-use iris::engine::config::IndexConfig;
-use iris::engine::search::{FusionAlgorithm, SearchRequestBuilder};
-use iris::error::Result;
-use iris::lexical::core::field::{FieldOption, TextOption};
+use iris::lexical::{FieldOption, TextOption};
+use iris::{EmbedInput, EmbedInputType, Embedder};
+use iris::{FusionAlgorithm, SearchRequestBuilder};
 
-use iris::lexical::index::inverted::query::term::TermQuery;
+use iris::lexical::TermQuery;
 use iris::storage::memory::MemoryStorageConfig;
 use iris::storage::{StorageConfig, StorageFactory};
-use iris::vector::core::field::{FlatOption, VectorOption};
-use iris::vector::core::vector::Vector;
-use iris::vector::store::query::VectorSearchRequestBuilder;
+use iris::vector::Vector;
+use iris::vector::VectorSearchRequestBuilder;
+use iris::vector::{FlatOption, VectorOption};
 
 // --- Mock Embedder Setup ---
 // A simple embedder that deterministically converts specific keywords into vectors
@@ -245,7 +245,7 @@ fn main() -> Result<()> {
 }
 
 // Helper to print results cleanly
-fn print_results(engine: &Engine, results: &[iris::engine::search::SearchResult]) {
+fn print_results(engine: &Engine, results: &[iris::SearchResult]) {
     if results.is_empty() {
         println!("  (No results found)");
         return;

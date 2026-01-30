@@ -10,7 +10,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use crossbeam_channel::{Receiver, Sender, bounded, unbounded};
 
-use crate::error::{Result, IrisError};
+use crate::error::{IrisError, Result};
 use crate::lexical::index::inverted::segment::manager::SegmentManager;
 use crate::lexical::index::inverted::segment::merge_engine::MergeEngine;
 use crate::lexical::index::inverted::segment::merge_policy::MergePolicy;
