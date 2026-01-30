@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "embeddings-openai")]
 use crate::embedding::embedder::{EmbedInput, EmbedInputType, Embedder};
 #[cfg(feature = "embeddings-openai")]
-use crate::error::{Result, IrisError};
+use crate::error::{IrisError, Result};
 #[cfg(feature = "embeddings-openai")]
 use crate::vector::core::vector::Vector;
 
@@ -72,7 +72,7 @@ struct EmbeddingData {
 /// use iris::embedding::embedder::{Embedder, EmbedInput};
 /// use iris::embedding::openai_embedder::OpenAIEmbedder;
 ///
-/// # async fn example() -> iris::error::Result<()> {
+/// # async fn example() -> iris::Result<()> {
 /// // Create embedder with API key
 /// let embedder = OpenAIEmbedder::new(
 ///     std::env::var("OPENAI_API_KEY").unwrap(),
@@ -137,7 +137,7 @@ impl OpenAIEmbedder {
     /// ```no_run
     /// use iris::embedding::openai_embedder::OpenAIEmbedder;
     ///
-    /// # async fn example() -> iris::error::Result<()> {
+    /// # async fn example() -> iris::Result<()> {
     /// // Small model (recommended for most use cases)
     /// let embedder = OpenAIEmbedder::new(
     ///     "sk-...".to_string(),
@@ -195,7 +195,7 @@ impl OpenAIEmbedder {
     /// ```no_run
     /// use iris::embedding::openai_embedder::OpenAIEmbedder;
     ///
-    /// # async fn example() -> iris::error::Result<()> {
+    /// # async fn example() -> iris::Result<()> {
     /// // Use smaller dimension for cost savings
     /// let embedder = OpenAIEmbedder::with_dimension(
     ///     "sk-...".to_string(),

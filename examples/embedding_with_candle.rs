@@ -11,13 +11,13 @@
 //! ```
 
 #[cfg(feature = "embeddings-candle")]
-use iris::embedding::candle_bert_embedder::CandleBertEmbedder;
+use iris::CandleBertEmbedder;
 #[cfg(feature = "embeddings-candle")]
-use iris::embedding::embedder::{EmbedInput, Embedder};
+use iris::{EmbedInput, Embedder};
 
 #[cfg(feature = "embeddings-candle")]
 #[tokio::main]
-async fn main() -> iris::error::Result<()> {
+async fn main() -> iris::Result<()> {
     println!("=== Candle BERT Embedder Example ===\n");
 
     // Create embedder with a sentence-transformers model
@@ -34,7 +34,7 @@ async fn main() -> iris::error::Result<()> {
     let text = "Rust is a systems programming language";
     println!("Text: \"{}\"", text);
 
-    let vector = embedder.embed(&EmbedInput::Text(text)).await?;
+    let vector: iris::vector::Vector = embedder.embed(&EmbedInput::Text(text)).await?;
     println!("Generated embedding with {} dimensions", vector.dimension());
     println!(
         "First 5 values: {:?}\n",
@@ -51,7 +51,7 @@ async fn main() -> iris::error::Result<()> {
 
     println!("Processing {} texts...", texts.len());
     let inputs: Vec<EmbedInput> = texts.iter().map(|t| EmbedInput::Text(t)).collect();
-    let vectors = embedder.embed_batch(&inputs).await?;
+    let vectors: Vec<iris::vector::Vector> = embedder.embed_batch(&inputs).await?;
 
     for (i, (text, vector)) in texts.iter().zip(vectors.iter()).enumerate() {
         println!("Text {}: \"{}\"", i + 1, text);
@@ -71,10 +71,11 @@ async fn main() -> iris::error::Result<()> {
         "Software development requires good tools",
     ];
 
-    let query_vector = embedder.embed(&EmbedInput::Text(query)).await?;
+    let query_vector: iris::vector::Vector = embedder.embed(&EmbedInput::Text(query)).await?;
     let candidate_inputs: Vec<EmbedInput> =
         candidates.iter().map(|t| EmbedInput::Text(t)).collect();
-    let candidate_vectors = embedder.embed_batch(&candidate_inputs).await?;
+    let candidate_vectors: Vec<iris::vector::Vector> =
+        embedder.embed_batch(&candidate_inputs).await?;
 
     println!("Query: \"{}\"", query);
     println!("\nSimilarity scores:");

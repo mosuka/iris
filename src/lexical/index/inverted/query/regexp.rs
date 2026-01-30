@@ -6,7 +6,7 @@ use std::sync::Arc;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
-use crate::error::{Result, IrisError};
+use crate::error::{IrisError, Result};
 use crate::lexical::index::inverted::core::automaton::{AutomatonTermsEnum, RegexAutomaton};
 use crate::lexical::index::inverted::core::terms::{TermDictionaryAccess, TermsEnum};
 use crate::lexical::index::inverted::query::Query;
@@ -86,16 +86,17 @@ impl MultiTermQuery for RegexpQuery {
         reader: &dyn LexicalIndexReader,
     ) -> Result<Option<Box<dyn TermsEnum>>> {
         if let Some(inverted_reader) = reader.as_any().downcast_ref::<InvertedIndexReader>()
-            && let Some(terms) = inverted_reader.terms(&self.field)? {
-                let regex_automaton = if let Some(regex) = &self.regex {
-                    RegexAutomaton::from_regex(regex.as_ref().clone(), self.pattern.clone())
-                } else {
-                    RegexAutomaton::new(&self.pattern)?
-                };
+            && let Some(terms) = inverted_reader.terms(&self.field)?
+        {
+            let regex_automaton = if let Some(regex) = &self.regex {
+                RegexAutomaton::from_regex(regex.as_ref().clone(), self.pattern.clone())
+            } else {
+                RegexAutomaton::new(&self.pattern)?
+            };
 
-                let terms_enum = AutomatonTermsEnum::new(terms.iterator()?, regex_automaton);
-                return Ok(Some(Box::new(terms_enum)));
-            }
+            let terms_enum = AutomatonTermsEnum::new(terms.iterator()?, regex_automaton);
+            return Ok(Some(Box::new(terms_enum)));
+        }
         Ok(None)
     }
 
@@ -106,9 +107,10 @@ impl MultiTermQuery for RegexpQuery {
             while let Some(term_stats) = terms_enum.next()? {
                 results.push((term_stats.term.clone(), term_stats.doc_freq, 1.0));
                 if let Some(m) = max
-                    && results.len() >= m {
-                        break;
-                    }
+                    && results.len() >= m
+                {
+                    break;
+                }
             }
             return Ok(results);
         }

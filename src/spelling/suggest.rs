@@ -329,79 +329,6 @@ impl SuggestionEngine {
     }
 }
 
-/// Utility functions for common spelling correction tasks.
-pub struct SpellingUtils;
-
-impl SpellingUtils {
-    /// Quick check if a word looks like it might be misspelled.
-    /// This is a fast heuristic, not a definitive check.
-    pub fn might_be_misspelled(word: &str) -> bool {
-        // Very short words are usually correct
-        if word.len() <= 2 {
-            return false;
-        }
-
-        // Words with repeated characters might be typos
-        let chars: Vec<char> = word.chars().collect();
-        let has_repeated = chars.windows(3).any(|w| w[0] == w[1] && w[1] == w[2]);
-
-        // Words with unusual character patterns
-        let has_unusual_patterns =
-            word.contains("qq") || word.contains("xx") || word.contains("zz");
-
-        has_repeated || has_unusual_patterns
-    }
-
-    /// Extract potential words from mixed text for spell checking.
-    pub fn extract_words(text: &str) -> Vec<String> {
-        // Common stop words to filter out
-        let stop_words = [
-            "is", "a", "an", "the", "and", "or", "not", "in", "on", "at", "to", "for", "of",
-            "with", "by",
-        ];
-
-        text.split(|c: char| !c.is_alphabetic())
-            .filter_map(|word| {
-                let cleaned = word.to_lowercase();
-                if !word.is_empty() && word.len() > 1 && !stop_words.contains(&cleaned.as_str()) {
-                    Some(cleaned)
-                } else {
-                    None
-                }
-            })
-            .collect()
-    }
-
-    /// Calculate the overall "correctness" score of a text.
-    pub fn text_correctness_score(text: &str, engine: &SuggestionEngine) -> f64 {
-        let words = Self::extract_words(text);
-        if words.is_empty() {
-            return 1.0;
-        }
-
-        let correct_words = words.iter().filter(|word| engine.is_correct(word)).count();
-
-        correct_words as f64 / words.len() as f64
-    }
-
-    /// Get suggestions for all potentially misspelled words in text.
-    pub fn correct_text(text: &str, engine: &SuggestionEngine) -> Vec<(String, Vec<Suggestion>)> {
-        let words = Self::extract_words(text);
-        let mut corrections = Vec::new();
-
-        for word in words {
-            if !engine.is_correct(&word) {
-                let suggestions = engine.suggest(&word);
-                if !suggestions.is_empty() {
-                    corrections.push((word, suggestions));
-                }
-            }
-        }
-
-        corrections
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -502,53 +429,6 @@ mod tests {
 
         assert!(bonus1 > bonus2);
         assert!(bonus1 > 1.0);
-    }
-
-    #[test]
-    fn test_spelling_utils() {
-        // Test word extraction
-        let words = SpellingUtils::extract_words("Hello, world! This is a test.");
-        assert!(words.contains(&"hello".to_string()));
-        assert!(words.contains(&"world".to_string()));
-        assert!(words.contains(&"test".to_string()));
-        assert!(!words.contains(&"is".to_string())); // too short
-
-        // Test misspelling detection heuristics
-        assert!(SpellingUtils::might_be_misspelled("helllo")); // repeated l
-        assert!(SpellingUtils::might_be_misspelled("qqqword")); // unusual pattern
-        assert!(!SpellingUtils::might_be_misspelled("hello")); // normal word
-        assert!(!SpellingUtils::might_be_misspelled("it")); // too short
-    }
-
-    #[test]
-    fn test_text_correctness_score() {
-        let dict = BuiltinDictionary::minimal();
-        let engine = SuggestionEngine::new(dict);
-
-        let perfect_text = "hello world search query";
-        let score1 = SpellingUtils::text_correctness_score(perfect_text, &engine);
-
-        let imperfect_text = "helo world serach query";
-        let score2 = SpellingUtils::text_correctness_score(imperfect_text, &engine);
-
-        assert!(score1 > score2);
-        assert!(score1 > 0.5); // Should be reasonably high for mostly correct text
-    }
-
-    #[test]
-    fn test_correct_text() {
-        let dict = BuiltinDictionary::minimal();
-        let engine = SuggestionEngine::new(dict);
-
-        let text = "helo world, this is a tst";
-        let corrections = SpellingUtils::correct_text(text, &engine);
-
-        // Should find corrections for misspelled words
-        assert!(!corrections.is_empty());
-
-        // Check if we found expected misspellings
-        let misspelled_words: Vec<&String> = corrections.iter().map(|(word, _)| word).collect();
-        assert!(misspelled_words.contains(&&"helo".to_string()));
     }
 
     #[test]

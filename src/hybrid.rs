@@ -23,7 +23,7 @@
 //! use iris::lexical::store::LexicalStore;
 //! use iris::vector::store::VectorStore;
 //! use iris::storage::memory::MemoryStorage;
-//! use iris::error::Result;
+//! use iris::Result;
 //! use std::sync::Arc;
 //!
 //! async fn example(lexical_engine: LexicalStore, vector_engine: VectorStore) -> Result<()> {

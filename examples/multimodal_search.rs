@@ -19,26 +19,26 @@
 use std::path::Path;
 
 #[cfg(feature = "embeddings-multimodal")]
-use iris::data::{DataValue, Document};
+use iris::CandleClipEmbedder;
 #[cfg(feature = "embeddings-multimodal")]
-use iris::embedding::candle_clip_embedder::CandleClipEmbedder;
+use iris::Embedder;
 #[cfg(feature = "embeddings-multimodal")]
-use iris::embedding::embedder::Embedder;
-#[cfg(feature = "embeddings-multimodal")]
-use iris::error::Result;
+use iris::Result;
 #[cfg(feature = "embeddings-multimodal")]
 use iris::storage::file::FileStorageConfig;
 #[cfg(feature = "embeddings-multimodal")]
 use iris::storage::{StorageConfig, StorageFactory};
 #[cfg(feature = "embeddings-multimodal")]
-use iris::vector::core::distance::DistanceMetric;
+use iris::vector::DistanceMetric;
 #[cfg(feature = "embeddings-multimodal")]
-use iris::vector::core::field::{FlatOption, VectorOption};
+use iris::vector::VectorSearchRequestBuilder;
 #[cfg(feature = "embeddings-multimodal")]
-use iris::vector::store::VectorStore;
-use iris::vector::store::config::{VectorFieldConfig, VectorIndexConfig};
+use iris::vector::VectorStore;
 #[cfg(feature = "embeddings-multimodal")]
-use iris::vector::store::query::VectorSearchRequestBuilder;
+use iris::vector::{FlatOption, VectorOption};
+use iris::vector::{VectorFieldConfig, VectorIndexConfig};
+#[cfg(feature = "embeddings-multimodal")]
+use iris::{DataValue, Document};
 #[cfg(feature = "embeddings-multimodal")]
 use tempfile::TempDir;
 
@@ -184,7 +184,7 @@ fn main() -> Result<()> {
 }
 
 #[cfg(feature = "embeddings-multimodal")]
-fn print_results(results: &iris::vector::store::response::VectorSearchResults) {
+fn print_results(results: &iris::vector::VectorSearchResults) {
     for (i, hit) in results.hits.iter().enumerate() {
         println!("{}. Doc ID: {}, Score: {:.4}", i + 1, hit.doc_id, hit.score);
     }

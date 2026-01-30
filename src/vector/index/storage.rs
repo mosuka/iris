@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::io::{Read, Seek, SeekFrom};
 use std::sync::{Arc, Mutex};
 
-use crate::error::{Result, IrisError};
+use crate::error::{IrisError, Result};
 use crate::storage::StorageInput;
 use crate::vector::core::vector::Vector;
 use crate::vector::index::io::read_metadata;
@@ -52,9 +52,7 @@ impl VectorStorage {
                         .lock()
                         .map_err(|_| IrisError::internal("Mutex poisoned".to_string()))?;
 
-                    input
-                        .seek(SeekFrom::Start(offset))
-                        .map_err(IrisError::Io)?;
+                    input.seek(SeekFrom::Start(offset)).map_err(IrisError::Io)?;
 
                     let metadata = read_metadata(&mut *input)?;
                     let mut values = vec![0.0f32; dimension];

@@ -60,7 +60,7 @@ use crate::error::Result;
 /// ```
 /// use iris::analysis::token::{Token, TokenStream};
 /// use iris::analysis::token_filter::Filter;
-/// use iris::error::Result;
+/// use iris::Result;
 ///
 /// struct ReverseFilter;
 ///

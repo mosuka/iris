@@ -1,5 +1,4 @@
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
-use rand::Rng;
 use iris::storage::memory::MemoryStorageConfig;
 use iris::storage::{StorageConfig, StorageFactory};
 use iris::vector::core::distance::DistanceMetric;
@@ -8,6 +7,7 @@ use iris::vector::index::ManagedVectorIndex;
 use iris::vector::index::config::{HnswIndexConfig, VectorIndexTypeConfig};
 use iris::vector::index::hnsw::writer::HnswIndexWriter;
 use iris::vector::writer::{VectorIndexWriter, VectorIndexWriterConfig};
+use rand::Rng;
 
 fn generate_random_vector(dim: usize) -> Vector {
     let mut rng = rand::rng();

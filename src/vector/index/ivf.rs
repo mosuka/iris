@@ -12,7 +12,7 @@ use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, RwLock};
 
-use crate::error::{Result, IrisError};
+use crate::error::{IrisError, Result};
 use crate::storage::Storage;
 use crate::vector::index::config::IvfIndexConfig;
 use crate::vector::index::ivf::writer::IvfIndexWriter;
@@ -183,9 +183,7 @@ impl IvfIndex {
     /// Check if the index is closed.
     fn check_closed(&self) -> Result<()> {
         if self.closed.load(Ordering::SeqCst) {
-            return Err(IrisError::InvalidOperation(
-                "Index is closed".to_string(),
-            ));
+            return Err(IrisError::InvalidOperation("Index is closed".to_string()));
         }
         Ok(())
     }

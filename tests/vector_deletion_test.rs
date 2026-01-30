@@ -1,10 +1,10 @@
 #[cfg(test)]
 mod tests {
     use iris::storage::memory::MemoryStorage;
-    use iris::vector::core::vector::Vector;
-    use iris::vector::index::config::FlatIndexConfig;
-    use iris::vector::index::flat::writer::FlatIndexWriter;
-    use iris::vector::writer::{VectorIndexWriter, VectorIndexWriterConfig};
+    use iris::vector::FlatIndexConfig;
+    use iris::vector::FlatIndexWriter;
+    use iris::vector::Vector;
+    use iris::vector::{VectorIndexWriter, VectorIndexWriterConfig};
     use std::sync::Arc;
 
     #[test]

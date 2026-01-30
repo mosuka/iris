@@ -1,25 +1,25 @@
 use tempfile::TempDir;
 
-use iris::data::Document;
-use iris::engine::Engine;
-use iris::engine::config::{FieldConfig, IndexConfig};
-use iris::engine::search::SearchRequestBuilder;
-use iris::lexical::core::field::FieldOption as LexicalOption;
-use iris::lexical::index::inverted::query::term::TermQuery;
+use iris::Document;
+use iris::Engine;
+use iris::SearchRequestBuilder;
+use iris::lexical::FieldOption as LexicalOption;
+use iris::lexical::TermQuery;
 use iris::storage::file::FileStorageConfig;
 use iris::storage::{StorageConfig, StorageFactory};
-use iris::vector::core::field::VectorOption;
-use iris::vector::store::query::VectorSearchRequestBuilder;
+use iris::vector::VectorOption;
+use iris::vector::VectorSearchRequestBuilder;
+use iris::{FieldConfig, IndexConfig};
 
 #[test]
-fn test_unified_filtering() -> iris::error::Result<()> {
+fn test_unified_filtering() -> iris::Result<()> {
     // 1. Setup Storage
     let temp_dir = TempDir::new().unwrap();
     let storage_config = StorageConfig::File(FileStorageConfig::new(temp_dir.path()));
     let storage = StorageFactory::create(storage_config)?;
 
     // 2. Configure Engines
-    use iris::vector::core::field::FlatOption;
+    use iris::vector::FlatOption;
     let vector_opt: VectorOption = FlatOption::default().dimension(2).into();
     let lexical_opt = LexicalOption::default();
 
@@ -126,14 +126,14 @@ fn test_unified_filtering() -> iris::error::Result<()> {
 }
 
 #[test]
-fn test_unified_filtering_hnsw() -> iris::error::Result<()> {
+fn test_unified_filtering_hnsw() -> iris::Result<()> {
     // 1. Setup Storage
     let temp_dir = TempDir::new().unwrap();
     let storage_config = StorageConfig::File(FileStorageConfig::new(temp_dir.path()));
     let storage = StorageFactory::create(storage_config)?;
 
     // 2. Configure Engines with HNSW
-    use iris::vector::core::field::HnswOption;
+    use iris::vector::HnswOption;
     let vector_opt: VectorOption = HnswOption::default().dimension(2).into();
     let lexical_opt = LexicalOption::default();
 
@@ -205,14 +205,14 @@ fn test_unified_filtering_hnsw() -> iris::error::Result<()> {
 }
 
 #[test]
-fn test_unified_filtering_ivf() -> iris::error::Result<()> {
+fn test_unified_filtering_ivf() -> iris::Result<()> {
     // 1. Setup Storage
     let temp_dir = TempDir::new().unwrap();
     let storage_config = StorageConfig::File(FileStorageConfig::new(temp_dir.path()));
     let storage = StorageFactory::create(storage_config)?;
 
     // 2. Configure Engines with IVF
-    use iris::vector::core::field::IvfOption;
+    use iris::vector::IvfOption;
     // Note: IVF usually requires training or pre-defined centroids.
     // However, our mocked/simple implementation might work with small data or just use simple clustering (if implemented).
     // Or we rely on `IvfFieldReader` behavior validation specifically.

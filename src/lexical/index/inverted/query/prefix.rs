@@ -79,25 +79,24 @@ impl MultiTermQuery for PrefixQuery {
         reader: &dyn LexicalIndexReader,
     ) -> Result<Option<Box<dyn TermsEnum>>> {
         if let Some(inverted_reader) = reader.as_any().downcast_ref::<InvertedIndexReader>()
-            && let Some(terms) = inverted_reader.terms(&self.field)? {
-                // Use Generic AutomatonTermsEnum with RegexAutomaton for prefix
-                // Pattern: ^escaped_prefix.*
-                let escaped_prefix = regex::escape(&self.prefix);
-                let pattern = format!("^{}.*", escaped_prefix);
+            && let Some(terms) = inverted_reader.terms(&self.field)?
+        {
+            // Use Generic AutomatonTermsEnum with RegexAutomaton for prefix
+            // Pattern: ^escaped_prefix.*
+            let escaped_prefix = regex::escape(&self.prefix);
+            let pattern = format!("^{}.*", escaped_prefix);
 
-                let regex_automaton =
-                    crate::lexical::index::inverted::core::automaton::RegexAutomaton::new(
-                        &pattern,
-                    )?;
+            let regex_automaton =
+                crate::lexical::index::inverted::core::automaton::RegexAutomaton::new(&pattern)?;
 
-                let terms_enum =
-                    crate::lexical::index::inverted::core::automaton::AutomatonTermsEnum::new(
-                        terms.iterator()?,
-                        regex_automaton,
-                    );
+            let terms_enum =
+                crate::lexical::index::inverted::core::automaton::AutomatonTermsEnum::new(
+                    terms.iterator()?,
+                    regex_automaton,
+                );
 
-                return Ok(Some(Box::new(terms_enum)));
-            }
+            return Ok(Some(Box::new(terms_enum)));
+        }
         Ok(None)
     }
 
@@ -108,9 +107,10 @@ impl MultiTermQuery for PrefixQuery {
             while let Some(term_stats) = terms_enum.next()? {
                 results.push((term_stats.term.clone(), term_stats.doc_freq, 1.0));
                 if let Some(m) = max
-                    && results.len() >= m {
-                        break;
-                    }
+                    && results.len() >= m
+                {
+                    break;
+                }
             }
             return Ok(results);
         }

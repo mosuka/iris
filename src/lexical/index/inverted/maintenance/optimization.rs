@@ -6,7 +6,7 @@
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::error::{Result, IrisError};
+use crate::error::{IrisError, Result};
 use crate::lexical::index::inverted::segment::manager::{
     ManagedSegmentInfo, MergeStrategy, SegmentManager,
 };

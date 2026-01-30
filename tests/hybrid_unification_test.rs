@@ -3,18 +3,18 @@ use std::any::Any;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use iris::data::{DataValue, Document};
-use iris::embedding::embedder::{EmbedInput, EmbedInputType, Embedder};
-use iris::embedding::per_field::PerFieldEmbedder;
-use iris::engine::Engine;
-use iris::engine::config::{FieldConfig, IndexConfig};
-use iris::engine::search::{FusionAlgorithm, SearchRequestBuilder};
-use iris::error::IrisError;
-use iris::lexical::core::field::{FieldOption, TextOption};
-use iris::lexical::index::inverted::query::term::TermQuery;
+use iris::Engine;
+use iris::IrisError;
+use iris::PerFieldEmbedder;
+use iris::lexical::TermQuery;
+use iris::lexical::{FieldOption, TextOption};
 use iris::storage::memory::MemoryStorage;
-use iris::vector::core::field::{FlatOption, VectorOption};
-use iris::vector::store::request::{QueryVector, VectorSearchRequest};
+use iris::vector::{FlatOption, VectorOption};
+use iris::vector::{QueryVector, VectorSearchRequest};
+use iris::{DataValue, Document};
+use iris::{EmbedInput, EmbedInputType, Embedder};
+use iris::{FieldConfig, IndexConfig};
+use iris::{FusionAlgorithm, SearchRequestBuilder};
 
 #[derive(Debug, Clone)]
 struct MockEmbedder {

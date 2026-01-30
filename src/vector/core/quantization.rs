@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::error::{Result, IrisError};
+use crate::error::{IrisError, Result};
 use crate::vector::core::vector::Vector;
 
 /// Quantization methods for compressing vectors.

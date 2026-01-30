@@ -1,19 +1,17 @@
 use std::sync::Arc;
 
+use iris::Document;
 use iris::analysis::analyzer::standard::StandardAnalyzer;
-use iris::lexical::core::document::Document;
-use iris::lexical::index::inverted::query::Query;
-use iris::lexical::index::inverted::query::span::{
-    SpanQuery, SpanQueryBuilder, SpanQueryWrapper, SpanTermQuery,
-};
-use iris::lexical::index::inverted::writer::{InvertedIndexWriter, InvertedIndexWriterConfig};
-use iris::lexical::writer::LexicalIndexWriter;
+use iris::lexical::LexicalIndexWriter;
+use iris::lexical::Query;
+use iris::lexical::span::{SpanQuery, SpanQueryBuilder, SpanQueryWrapper, SpanTermQuery};
+use iris::lexical::{InvertedIndexWriter, InvertedIndexWriterConfig};
 use iris::storage::memory::MemoryStorage;
 
 fn create_test_index() -> Result<
     (
         Arc<iris::storage::memory::MemoryStorage>,
-        Arc<dyn iris::lexical::reader::LexicalIndexReader>,
+        Arc<dyn iris::lexical::LexicalIndexReader>,
     ),
     Box<dyn std::error::Error>,
 > {

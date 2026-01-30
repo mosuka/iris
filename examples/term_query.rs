@@ -4,21 +4,21 @@ use std::sync::Arc;
 
 use tempfile::TempDir;
 
+use iris::Result;
 use iris::analysis::analyzer::analyzer::Analyzer;
 use iris::analysis::analyzer::keyword::KeywordAnalyzer;
 use iris::analysis::analyzer::per_field::PerFieldAnalyzer;
 use iris::analysis::analyzer::standard::StandardAnalyzer;
-use iris::data::{DataValue, Document};
-use iris::error::Result;
-use iris::lexical::index::config::InvertedIndexConfig;
-use iris::lexical::index::inverted::query::Query;
-use iris::lexical::index::inverted::query::term::TermQuery;
-use iris::lexical::search::searcher::LexicalSearchRequest;
-use iris::lexical::store::LexicalStore;
-use iris::lexical::store::config::LexicalIndexConfig;
+use iris::lexical::InvertedIndexConfig;
+use iris::lexical::LexicalIndexConfig;
+use iris::lexical::LexicalSearchRequest;
+use iris::lexical::LexicalStore;
+use iris::lexical::Query;
+use iris::lexical::TermQuery;
 use iris::storage::StorageConfig;
 use iris::storage::StorageFactory;
 use iris::storage::file::FileStorageConfig;
+use iris::{DataValue, Document};
 
 fn main() -> Result<()> {
     println!("=== TermQuery Example - Single Term Exact Matching ===\n");
@@ -44,50 +44,50 @@ fn main() -> Result<()> {
     // Add documents with various terms
     let documents = vec![
         Document::new()
-            .add_field("title", DataValue::Text("Rust Programming Language".into()))
-            .add_field(
+            .add_text("title", "Rust Programming Language")
+            .add_text(
                 "body",
-                DataValue::Text("Rust is a systems programming language focused on safety, speed, and concurrency".into()),
+                "Rust is a systems programming language focused on safety, speed, and concurrency",
             )
-            .add_field("author", DataValue::Text("Steve Klabnik".into()))
-            .add_field("category", DataValue::Text("programming".into()))
-            .add_field("id", DataValue::Text("doc1".into())),
+            .add_text("author", "Steve Klabnik")
+            .add_text("category", "programming")
+            .add_text("id", "doc1"),
         Document::new()
-            .add_field("title", DataValue::Text("Python for Beginners".into()))
-            .add_field(
+            .add_text("title", "Python for Beginners")
+            .add_text(
                 "body",
-                DataValue::Text("Python is a versatile and easy-to-learn programming language".into()),
+                "Python is a versatile and easy-to-learn programming language",
             )
-            .add_field("author", DataValue::Text("John Smith".into()))
-            .add_field("category", DataValue::Text("programming".into()))
-            .add_field("id", DataValue::Text("doc2".into())),
+            .add_text("author", "John Smith")
+            .add_text("category", "programming")
+            .add_text("id", "doc2"),
         Document::new()
-            .add_field("title", DataValue::Text("JavaScript Essentials".into()))
-            .add_field(
+            .add_text("title", "JavaScript Essentials")
+            .add_text(
                 "body",
-                DataValue::Text("JavaScript is the language of the web, used for frontend and backend development".into()),
+                "JavaScript is the language of the web, used for frontend and backend development",
             )
-            .add_field("author", DataValue::Text("Jane Doe".into()))
-            .add_field("category", DataValue::Text("web-development".into()))
-            .add_field("id", DataValue::Text("doc3".into())),
+            .add_text("author", "Jane Doe")
+            .add_text("category", "web-development")
+            .add_text("id", "doc3"),
         Document::new()
-            .add_field("title", DataValue::Text("Machine Learning Fundamentals".into()))
-            .add_field(
+            .add_text("title", "Machine Learning Fundamentals")
+            .add_text(
                 "body",
-                DataValue::Text("Machine learning is a subset of artificial intelligence focused on algorithms".into()),
+                "Machine learning is a subset of artificial intelligence focused on algorithms",
             )
-            .add_field("author", DataValue::Text("Alice Johnson".into()))
-            .add_field("category", DataValue::Text("data-science".into()))
-            .add_field("id", DataValue::Text("doc4".into())),
+            .add_text("author", "Alice Johnson")
+            .add_text("category", "data-science")
+            .add_text("id", "doc4"),
         Document::new()
-            .add_field("title", DataValue::Text("Data Structures in C++".into()))
-            .add_field(
+            .add_text("title", "Data Structures in C++")
+            .add_text(
                 "body",
-                DataValue::Text("Understanding data structures is crucial for efficient programming".into()),
+                "Understanding data structures is crucial for efficient programming",
             )
-            .add_field("author", DataValue::Text("Bob Wilson".into()))
-            .add_field("category", DataValue::Text("programming".into()))
-            .add_field("id", DataValue::Text("doc5".into())),
+            .add_text("author", "Bob Wilson")
+            .add_text("category", "programming")
+            .add_text("id", "doc5"),
     ];
 
     println!("Adding {} documents to the index...", documents.len());

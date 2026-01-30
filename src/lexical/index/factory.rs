@@ -3,9 +3,9 @@
 use std::sync::Arc;
 
 use crate::error::Result;
-use crate::lexical::store::config::LexicalIndexConfig;
 use crate::lexical::index::LexicalIndex;
 use crate::lexical::index::inverted::InvertedIndex;
+use crate::lexical::store::config::LexicalIndexConfig;
 use crate::storage::Storage;
 
 /// Factory for creating lexical index instances.
@@ -27,7 +27,7 @@ use crate::storage::Storage;
 /// use iris::storage::{StorageFactory, StorageConfig};
 /// use iris::storage::memory::MemoryStorageConfig;
 ///
-/// # fn main() -> iris::error::Result<()> {
+/// # fn main() -> iris::Result<()> {
 /// // Create storage using factory
 /// let storage = StorageFactory::create(StorageConfig::Memory(MemoryStorageConfig::default()))?;
 ///
@@ -61,7 +61,7 @@ impl LexicalIndexFactory {
     /// use iris::storage::{StorageFactory, StorageConfig};
     /// use iris::storage::file::FileStorageConfig;
     ///
-    /// # fn main() -> iris::error::Result<()> {
+    /// # fn main() -> iris::Result<()> {
     /// // Create file storage
     /// let storage_config = StorageConfig::File(FileStorageConfig::new("/tmp/index"));
     /// let storage = StorageFactory::create(storage_config)?;
@@ -104,7 +104,7 @@ impl LexicalIndexFactory {
     /// use iris::storage::file::{FileStorage, FileStorageConfig};
     /// use std::sync::Arc;
     ///
-    /// # fn main() -> iris::error::Result<()> {
+    /// # fn main() -> iris::Result<()> {
     /// let storage = Arc::new(FileStorage::new("./index", FileStorageConfig::new("./index"))?);
     /// let config = LexicalIndexConfig::Inverted(InvertedIndexConfig::default());
     /// let index = LexicalIndexFactory::open(storage, config)?;

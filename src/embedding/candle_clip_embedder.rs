@@ -23,7 +23,7 @@ use tokenizers::Tokenizer;
 #[cfg(feature = "embeddings-multimodal")]
 use crate::embedding::embedder::{EmbedInput, EmbedInputType, Embedder};
 #[cfg(feature = "embeddings-multimodal")]
-use crate::error::{Result, IrisError};
+use crate::error::{IrisError, Result};
 #[cfg(feature = "embeddings-multimodal")]
 use crate::vector::core::vector::Vector;
 
@@ -57,7 +57,7 @@ use crate::vector::core::vector::Vector;
 /// use iris::embedding::candle_clip_embedder::CandleClipEmbedder;
 /// use std::fs;
 ///
-/// # async fn example() -> iris::error::Result<()> {
+/// # async fn example() -> iris::Result<()> {
 /// let embedder = CandleClipEmbedder::new(
 ///     "openai/clip-vit-base-patch32"
 /// )?;
@@ -85,7 +85,7 @@ use crate::vector::core::vector::Vector;
 /// use iris::embedding::candle_clip_embedder::CandleClipEmbedder;
 /// use std::fs;
 ///
-/// # async fn example() -> iris::error::Result<()> {
+/// # async fn example() -> iris::Result<()> {
 /// let embedder = CandleClipEmbedder::new(
 ///     "openai/clip-vit-base-patch32"
 /// )?;
@@ -164,7 +164,7 @@ impl CandleClipEmbedder {
     /// ```no_run
     /// use iris::embedding::candle_clip_embedder::CandleClipEmbedder;
     ///
-    /// # fn example() -> iris::error::Result<()> {
+    /// # fn example() -> iris::Result<()> {
     /// // Fast and efficient
     /// let embedder = CandleClipEmbedder::new(
     ///     "openai/clip-vit-base-patch32"
@@ -204,9 +204,7 @@ impl CandleClipEmbedder {
         let weights_filename = repo
             .get("model.safetensors")
             .or_else(|_| repo.get("pytorch_model.bin"))
-            .map_err(|e| {
-                IrisError::InvalidOperation(format!("Weights download failed: {}", e))
-            })?;
+            .map_err(|e| IrisError::InvalidOperation(format!("Weights download failed: {}", e)))?;
 
         let vb = if weights_filename.to_string_lossy().ends_with(".safetensors") {
             unsafe {
@@ -244,9 +242,7 @@ impl CandleClipEmbedder {
             projection_dim,
             vb.pp("text_projection"),
         )
-        .map_err(|e| {
-            IrisError::InvalidOperation(format!("Text projection load failed: {}", e))
-        })?;
+        .map_err(|e| IrisError::InvalidOperation(format!("Text projection load failed: {}", e)))?;
 
         let vision_projection = candle_nn::linear_no_bias(
             config.vision_config.embed_dim,
@@ -302,9 +298,10 @@ impl CandleClipEmbedder {
         })?;
 
         // Project to common embedding space
-        let projected = self.text_projection.forward(&text_features).map_err(|e| {
-            IrisError::InvalidOperation(format!("Text projection failed: {}", e))
-        })?;
+        let projected = self
+            .text_projection
+            .forward(&text_features)
+            .map_err(|e| IrisError::InvalidOperation(format!("Text projection failed: {}", e)))?;
 
         // Normalize
         let normalized = self.normalize(&projected)?;
@@ -333,9 +330,7 @@ impl CandleClipEmbedder {
         let projected = self
             .vision_projection
             .forward(&vision_features)
-            .map_err(|e| {
-                IrisError::InvalidOperation(format!("Vision projection failed: {}", e))
-            })?;
+            .map_err(|e| IrisError::InvalidOperation(format!("Vision projection failed: {}", e)))?;
 
         // Normalize
         let normalized = self.normalize(&projected)?;
@@ -471,10 +466,7 @@ impl Embedder for CandleClipEmbedder {
                     && mime_type.starts_with("text/")
                 {
                     let text = std::str::from_utf8(bytes).map_err(|e| {
-                        IrisError::invalid_argument(format!(
-                            "invalid utf-8 for text bytes: {}",
-                            e
-                        ))
+                        IrisError::invalid_argument(format!("invalid utf-8 for text bytes: {}", e))
                     })?;
                     return self.embed_text(text).await;
                 }

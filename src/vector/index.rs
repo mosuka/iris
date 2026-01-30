@@ -19,7 +19,7 @@ pub mod wal;
 
 use std::sync::{Arc, RwLock};
 
-use crate::error::{Result, IrisError};
+use crate::error::{IrisError, Result};
 use crate::storage::Storage;
 use crate::vector::core::vector::Vector;
 use crate::vector::index::config::{

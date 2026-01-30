@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use crate::error::{Result, IrisError};
+use crate::error::{IrisError, Result};
 use crate::maintenance::deletion::DeletionBitmap;
 use crate::storage::Storage;
 use crate::vector::core::distance::DistanceMetric;
@@ -225,10 +225,12 @@ impl VectorIndexReader for IvfIndexReader {
     fn get_vectors_for_doc(&self, doc_id: u64) -> Result<Vec<(String, Vector)>> {
         let mut result = Vec::new();
         for (id, field) in &self.vector_ids {
-            if *id == doc_id && !self.is_deleted(*id)
-                && let Some(vec) = self.vectors.get(&(*id, field.clone()), self.dimension)? {
-                    result.push((field.clone(), vec));
-                }
+            if *id == doc_id
+                && !self.is_deleted(*id)
+                && let Some(vec) = self.vectors.get(&(*id, field.clone()), self.dimension)?
+            {
+                result.push((field.clone(), vec));
+            }
         }
         Ok(result)
     }
@@ -282,10 +284,13 @@ impl VectorIndexReader for IvfIndexReader {
     ) -> Result<Vec<(u64, String, Vector)>> {
         let mut result = Vec::new();
         for (id, field) in &self.vector_ids {
-            if *id >= start_doc_id && *id < end_doc_id && !self.is_deleted(*id)
-                && let Some(vec) = self.vectors.get(&(*id, field.clone()), self.dimension)? {
-                    result.push((*id, field.clone(), vec));
-                }
+            if *id >= start_doc_id
+                && *id < end_doc_id
+                && !self.is_deleted(*id)
+                && let Some(vec) = self.vectors.get(&(*id, field.clone()), self.dimension)?
+            {
+                result.push((*id, field.clone(), vec));
+            }
         }
         Ok(result)
     }
@@ -293,10 +298,12 @@ impl VectorIndexReader for IvfIndexReader {
     fn get_vectors_by_field(&self, field_name: &str) -> Result<Vec<(u64, Vector)>> {
         let mut result = Vec::new();
         for (id, field) in &self.vector_ids {
-            if field == field_name && !self.is_deleted(*id)
-                && let Some(vec) = self.vectors.get(&(*id, field.clone()), self.dimension)? {
-                    result.push((*id, vec));
-                }
+            if field == field_name
+                && !self.is_deleted(*id)
+                && let Some(vec) = self.vectors.get(&(*id, field.clone()), self.dimension)?
+            {
+                result.push((*id, vec));
+            }
         }
         Ok(result)
     }
@@ -431,10 +438,11 @@ impl VectorIterator for IvfVectorIterator {
 
             // Check deletion
             if let Some(bitmap) = &self.deletion_bitmap
-                && bitmap.is_deleted(*doc_id) {
-                    self.current += 1;
-                    return self.next(); // Recursively skip deleted
-                }
+                && bitmap.is_deleted(*doc_id)
+            {
+                self.current += 1;
+                return self.next(); // Recursively skip deleted
+            }
 
             if let Some(vec) = self
                 .storage

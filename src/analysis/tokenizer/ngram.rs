@@ -20,7 +20,7 @@
 
 use crate::analysis::token::{Token, TokenStream};
 use crate::analysis::tokenizer::Tokenizer;
-use crate::error::{Result, IrisError};
+use crate::error::{IrisError, Result};
 
 /// A tokenizer that generates character n-grams.
 ///

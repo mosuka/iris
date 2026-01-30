@@ -4,23 +4,23 @@ use std::sync::Arc;
 
 use tempfile::TempDir;
 
+use iris::Result;
 use iris::analysis::analyzer::analyzer::Analyzer;
 use iris::analysis::analyzer::keyword::KeywordAnalyzer;
 use iris::analysis::analyzer::per_field::PerFieldAnalyzer;
 use iris::analysis::analyzer::standard::StandardAnalyzer;
-use iris::data::{DataValue, Document};
-use iris::error::Result;
-use iris::lexical::store::LexicalStore;
-use iris::lexical::store::config::LexicalIndexConfig;
-use iris::lexical::index::config::InvertedIndexConfig;
-use iris::lexical::index::inverted::query::Query;
-use iris::lexical::index::inverted::query::boolean::BooleanQuery;
-use iris::lexical::index::inverted::query::phrase::PhraseQuery;
-use iris::lexical::index::inverted::query::range::NumericRangeQuery;
-use iris::lexical::index::inverted::query::term::TermQuery;
-use iris::lexical::search::searcher::LexicalSearchRequest;
+use iris::lexical::BooleanQuery;
+use iris::lexical::InvertedIndexConfig;
+use iris::lexical::LexicalIndexConfig;
+use iris::lexical::LexicalSearchRequest;
+use iris::lexical::LexicalStore;
+use iris::lexical::NumericRangeQuery;
+use iris::lexical::PhraseQuery;
+use iris::lexical::Query;
+use iris::lexical::TermQuery;
 use iris::storage::file::FileStorageConfig;
 use iris::storage::{StorageConfig, StorageFactory};
+use iris::{DataValue, Document};
 
 fn main() -> Result<()> {
     println!("=== BooleanQuery Example - Complex Boolean Logic ===\n");
@@ -45,59 +45,59 @@ fn main() -> Result<()> {
 
     let documents = vec![
         Document::new()
-            .add_field("title", DataValue::Text("Advanced Python Programming".into()))
-            .add_field("body", DataValue::Text("Learn advanced Python techniques including decorators, metaclasses, and async programming".into()))
-            .add_field("author", DataValue::Text("Alice Johnson".into()))
-            .add_field("category", DataValue::Text("programming".into()))
-            .add_field("price", DataValue::Float64(59.99))
-            .add_field("rating", DataValue::Float64(4.7))
-            .add_field("tags", DataValue::Text("python advanced programming".into()))
-            .add_field("id", DataValue::Text("book001".into())),
+            .add_text("title", "Advanced Python Programming")
+            .add_text("body", "Learn advanced Python techniques including decorators, metaclasses, and async programming")
+            .add_text("author", "Alice Johnson")
+            .add_text("category", "programming")
+            .add_float("price", 59.99)
+            .add_float("rating", 4.7)
+            .add_text("tags", "python advanced programming")
+            .set_id("book001"),
         Document::new()
-            .add_field("title", DataValue::Text("JavaScript for Web Development".into()))
-            .add_field("body", DataValue::Text("Modern JavaScript techniques for frontend and backend web development".into()))
-            .add_field("author", DataValue::Text("Bob Smith".into()))
-            .add_field("category", DataValue::Text("web-development".into()))
-            .add_field("price", DataValue::Float64(45.50))
-            .add_field("rating", DataValue::Float64(4.3))
-            .add_field("tags", DataValue::Text("javascript web frontend backend".into()))
-            .add_field("id", DataValue::Text("book002".into())),
+            .add_text("title", "JavaScript for Web Development")
+            .add_text("body", "Modern JavaScript techniques for frontend and backend web development")
+            .add_text("author", "Bob Smith")
+            .add_text("category", "web-development")
+            .add_float("price", 45.50)
+            .add_float("rating", 4.3)
+            .add_text("tags", "javascript web frontend backend")
+            .set_id("book002"),
         Document::new()
-            .add_field("title", DataValue::Text("Machine Learning with Python".into()))
-            .add_field("body", DataValue::Text("Practical machine learning algorithms implemented in Python".into()))
-            .add_field("author", DataValue::Text("Carol Davis".into()))
-            .add_field("category", DataValue::Text("data-science".into()))
-            .add_field("price", DataValue::Float64(72.99))
-            .add_field("rating", DataValue::Float64(4.8))
-            .add_field("tags", DataValue::Text("python machine-learning data-science".into()))
-            .add_field("id", DataValue::Text("book003".into())),
+            .add_text("title", "Machine Learning with Python")
+            .add_text("body", "Practical machine learning algorithms implemented in Python")
+            .add_text("author", "Carol Davis")
+            .add_text("category", "data-science")
+            .add_float("price", 72.99)
+            .add_float("rating", 4.8)
+            .add_text("tags", "python machine-learning data-science")
+            .set_id("book003"),
         Document::new()
-            .add_field("title", DataValue::Text("Web Design Fundamentals".into()))
-            .add_field("body", DataValue::Text("Learn the basics of web design including HTML, CSS, and responsive design".into()))
-            .add_field("author", DataValue::Text("David Brown".into()))
-            .add_field("category", DataValue::Text("web-development".into()))
-            .add_field("price", DataValue::Float64(39.99))
-            .add_field("rating", DataValue::Float64(4.1))
-            .add_field("tags", DataValue::Text("web design html css".into()))
-            .add_field("id", DataValue::Text("book004".into())),
+            .add_text("title", "Web Design Fundamentals")
+            .add_text("body", "Learn the basics of web design including HTML, CSS, and responsive design")
+            .add_text("author", "David Brown")
+            .add_text("category", "web-development")
+            .add_float("price", 39.99)
+            .add_float("rating", 4.1)
+            .add_text("tags", "web design html css")
+            .set_id("book004"),
         Document::new()
-            .add_field("title", DataValue::Text("Data Science with R".into()))
-            .add_field("body", DataValue::Text("Statistical computing and data analysis using the R programming language".into()))
-            .add_field("author", DataValue::Text("Eva Wilson".into()))
-            .add_field("category", DataValue::Text("data-science".into()))
-            .add_field("price", DataValue::Float64(65.00))
-            .add_field("rating", DataValue::Float64(4.5))
-            .add_field("tags", DataValue::Text("r data-science statistics".into()))
-            .add_field("id", DataValue::Text("book005".into())),
+            .add_text("title", "Data Science with R")
+            .add_text("body", "Statistical computing and data analysis using the R programming language")
+            .add_text("author", "Eva Wilson")
+            .add_text("category", "data-science")
+            .add_float("price", 65.00)
+            .add_float("rating", 4.5)
+            .add_text("tags", "r data-science statistics")
+            .set_id("book005"),
         Document::new()
-            .add_field("title", DataValue::Text("Advanced JavaScript Patterns".into()))
-            .add_field("body", DataValue::Text("Design patterns and advanced programming techniques in JavaScript".into()))
-            .add_field("author", DataValue::Text("Frank Miller".into()))
-            .add_field("category", DataValue::Text("programming".into()))
-            .add_field("price", DataValue::Float64(54.99))
-            .add_field("rating", DataValue::Float64(4.6))
-            .add_field("tags", DataValue::Text("javascript advanced patterns".into()))
-            .add_field("id", DataValue::Text("book006".into())),
+            .add_text("title", "Advanced JavaScript Patterns")
+            .add_text("body", "Design patterns and advanced programming techniques in JavaScript")
+            .add_text("author", "Frank Miller")
+            .add_text("category", "programming")
+            .add_float("price", 54.99)
+            .add_float("rating", 4.6)
+            .add_text("tags", "javascript advanced patterns")
+            .set_id("book006"),
     ];
 
     println!("Adding {} documents to the index...", documents.len());
@@ -124,16 +124,20 @@ fn main() -> Result<()> {
     println!("   Found {} results", results.total_hits);
     for (i, hit) in results.hits.iter().enumerate() {
         println!(
-            "   {}. Score: {:.4}, Doc ID: {}",
+            "   {}. Score: {:.4}, Internal Doc ID: {}",
             i + 1,
             hit.score,
             hit.doc_id
         );
-        if let Some(doc) = &hit.document
-            && let Some(field) = doc.get_field("title")
-            && let DataValue::Text(title) = field
-        {
-            println!("      Title: {title}");
+        if let Some(doc) = &hit.document {
+            if let Some(id) = doc.id() {
+                println!("      ID: {id}");
+            }
+            if let Some(field) = doc.get_field("title")
+                && let DataValue::Text(title) = field
+            {
+                println!("      Title: {title}");
+            }
         }
     }
 
@@ -148,16 +152,20 @@ fn main() -> Result<()> {
     println!("   Found {} results", results.total_hits);
     for (i, hit) in results.hits.iter().enumerate() {
         println!(
-            "   {}. Score: {:.4}, Doc ID: {}",
+            "   {}. Score: {:.4}, Internal Doc ID: {}",
             i + 1,
             hit.score,
             hit.doc_id
         );
-        if let Some(doc) = &hit.document
-            && let Some(field) = doc.get_field("title")
-            && let DataValue::Text(title) = field
-        {
-            println!("      Title: {title}");
+        if let Some(doc) = &hit.document {
+            if let Some(id) = doc.id() {
+                println!("      ID: {id}");
+            }
+            if let Some(field) = doc.get_field("title")
+                && let DataValue::Text(title) = field
+            {
+                println!("      Title: {title}");
+            }
         }
     }
 
@@ -172,16 +180,20 @@ fn main() -> Result<()> {
     println!("   Found {} results", results.total_hits);
     for (i, hit) in results.hits.iter().enumerate() {
         println!(
-            "   {}. Score: {:.4}, Doc ID: {}",
+            "   {}. Score: {:.4}, Internal Doc ID: {}",
             i + 1,
             hit.score,
             hit.doc_id
         );
-        if let Some(doc) = &hit.document
-            && let Some(field) = doc.get_field("title")
-            && let DataValue::Text(title) = field
-        {
-            println!("      Title: {title}");
+        if let Some(doc) = &hit.document {
+            if let Some(id) = doc.id() {
+                println!("      ID: {id}");
+            }
+            if let Some(field) = doc.get_field("title")
+                && let DataValue::Text(title) = field
+            {
+                println!("      Title: {title}");
+            }
         }
     }
 
@@ -205,12 +217,15 @@ fn main() -> Result<()> {
     println!("   Found {} results", results.total_hits);
     for (i, hit) in results.hits.iter().enumerate() {
         println!(
-            "   {}. Score: {:.4}, Doc ID: {}",
+            "   {}. Score: {:.4}, Internal Doc ID: {}",
             i + 1,
             hit.score,
             hit.doc_id
         );
         if let Some(doc) = &hit.document {
+            if let Some(id) = doc.id() {
+                println!("      ID: {id}");
+            }
             if let Some(field) = doc.get_field("title")
                 && let DataValue::Text(title) = field
             {
@@ -243,16 +258,20 @@ fn main() -> Result<()> {
     println!("   Found {} results", results.total_hits);
     for (i, hit) in results.hits.iter().enumerate() {
         println!(
-            "   {}. Score: {:.4}, Doc ID: {}",
+            "   {}. Score: {:.4}, Internal Doc ID: {}",
             i + 1,
             hit.score,
             hit.doc_id
         );
-        if let Some(doc) = &hit.document
-            && let Some(field) = doc.get_field("title")
-            && let DataValue::Text(title) = field
-        {
-            println!("      Title: {title}");
+        if let Some(doc) = &hit.document {
+            if let Some(id) = doc.id() {
+                println!("      ID: {id}");
+            }
+            if let Some(field) = doc.get_field("title")
+                && let DataValue::Text(title) = field
+            {
+                println!("      Title: {title}");
+            }
         }
     }
 
@@ -272,16 +291,20 @@ fn main() -> Result<()> {
     println!("   Found {} results", results.total_hits);
     for (i, hit) in results.hits.iter().enumerate() {
         println!(
-            "   {}. Score: {:.4}, Doc ID: {}",
+            "   {}. Score: {:.4}, Internal Doc ID: {}",
             i + 1,
             hit.score,
             hit.doc_id
         );
-        if let Some(doc) = &hit.document
-            && let Some(field) = doc.get_field("title")
-            && let DataValue::Text(title) = field
-        {
-            println!("      Title: {title}");
+        if let Some(doc) = &hit.document {
+            if let Some(id) = doc.id() {
+                println!("      ID: {id}");
+            }
+            if let Some(field) = doc.get_field("title")
+                && let DataValue::Text(title) = field
+            {
+                println!("      Title: {title}");
+            }
         }
     }
 
@@ -300,12 +323,15 @@ fn main() -> Result<()> {
     println!("   Found {} results", results.total_hits);
     for (i, hit) in results.hits.iter().enumerate() {
         println!(
-            "   {}. Score: {:.4}, Doc ID: {}",
+            "   {}. Score: {:.4}, Internal Doc ID: {}",
             i + 1,
             hit.score,
             hit.doc_id
         );
         if let Some(doc) = &hit.document {
+            if let Some(id) = doc.id() {
+                println!("      ID: {id}");
+            }
             if let Some(field) = doc.get_field("title")
                 && let DataValue::Text(title) = field
             {
@@ -335,12 +361,15 @@ fn main() -> Result<()> {
     println!("   Found {} results", results.total_hits);
     for (i, hit) in results.hits.iter().enumerate() {
         println!(
-            "   {}. Score: {:.4}, Doc ID: {}",
+            "   {}. Score: {:.4}, Internal Doc ID: {}",
             i + 1,
             hit.score,
             hit.doc_id
         );
         if let Some(doc) = &hit.document {
+            if let Some(id) = doc.id() {
+                println!("      ID: {id}");
+            }
             if let Some(field) = doc.get_field("title")
                 && let DataValue::Text(title) = field
             {
@@ -391,12 +420,15 @@ fn main() -> Result<()> {
     println!("   Found {} results", results.total_hits);
     for (i, hit) in results.hits.iter().enumerate() {
         println!(
-            "   {}. Score: {:.4}, Doc ID: {}",
+            "   {}. Score: {:.4}, Internal Doc ID: {}",
             i + 1,
             hit.score,
             hit.doc_id
         );
         if let Some(doc) = &hit.document {
+            if let Some(id) = doc.id() {
+                println!("      ID: {id}");
+            }
             if let Some(field) = doc.get_field("title")
                 && let DataValue::Text(title) = field
             {
@@ -451,12 +483,15 @@ fn main() -> Result<()> {
     println!("   Found {} results", results.total_hits);
     for (i, hit) in results.hits.iter().enumerate() {
         println!(
-            "   {}. Score: {:.4}, Doc ID: {}",
+            "   {}. Score: {:.4}, Internal Doc ID: {}",
             i + 1,
             hit.score,
             hit.doc_id
         );
         if let Some(doc) = &hit.document {
+            if let Some(id) = doc.id() {
+                println!("      ID: {id}");
+            }
             if let Some(field) = doc.get_field("title")
                 && let DataValue::Text(title) = field
             {

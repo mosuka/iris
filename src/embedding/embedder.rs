@@ -34,7 +34,7 @@
 //! use iris::embedding::precomputed::PrecomputedEmbedder;
 //! use std::sync::Arc;
 //!
-//! # async fn example() -> iris::error::Result<()> {
+//! # async fn example() -> iris::Result<()> {
 //! let text_embedder = Arc::new(
 //!     CandleBertEmbedder::new("sentence-transformers/all-MiniLM-L6-v2")?
 //! );
@@ -78,9 +78,10 @@ impl<'a> EmbedInput<'a> {
             EmbedInput::Text(_) => EmbedInputType::Text,
             EmbedInput::Bytes(_, mime) => {
                 if let Some(mime) = mime
-                    && mime.starts_with("text/") {
-                        return EmbedInputType::Text;
-                    }
+                    && mime.starts_with("text/")
+                {
+                    return EmbedInputType::Text;
+                }
                 EmbedInputType::Image
             }
         }
@@ -143,7 +144,7 @@ pub enum EmbedInputType {
 /// ```
 /// use async_trait::async_trait;
 /// use iris::embedding::embedder::{Embedder, EmbedInput, EmbedInputType};
-/// use iris::error::{IrisError, Result};
+/// use iris::{IrisError, Result};
 /// use iris::vector::core::vector::Vector;
 ///
 /// #[derive(Debug)]

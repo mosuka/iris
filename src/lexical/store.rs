@@ -166,6 +166,25 @@ impl LexicalStore {
     /// let doc_id = engine.add_document(doc).unwrap();
     /// engine.commit().unwrap();  // Don't forget to commit!
     /// ```
+    /// Add a document to the index.
+    ///
+    /// This method intelligently handles both insertion and updates (upsert) based on the presence
+    /// of `Document.id`.
+    ///
+    /// - If `doc.id` is present: checks for an existing document with the same ID.
+    ///   - If found: updates the existing document (Upsert).
+    ///   - If not found: adds a new document with the specified ID.
+    /// - If `doc.id` is missing: adds a new document with an auto-generated internal ID.
+    ///
+    /// Changes are not persisted until you call `commit()`.
+    ///
+    /// # Arguments
+    ///
+    /// * `doc` - The document to add
+    ///
+    /// # Returns
+    ///
+    /// Returns the internal document ID on success.
     pub fn add_document(&self, doc: Document) -> Result<u64> {
         let mut guard = self.writer_cache.lock();
         if guard.is_none() {
@@ -174,60 +193,102 @@ impl LexicalStore {
         guard.as_mut().unwrap().add_document(doc)
     }
 
-    /// Upsert a document with a specific document ID.
-    /// Note: You must call `commit()` to persist the changes.
-    pub fn upsert_document(&self, doc_id: u64, doc: Document) -> Result<()> {
-        let mut guard = self.writer_cache.lock();
-        if guard.is_none() {
-            *guard = Some(self.index.writer()?);
-        }
-        guard.as_mut().unwrap().upsert_document(doc_id, doc)
-    }
+    /// Put (upsert) a document into the index.
+    ///
+    /// This method ensures that the document is uniquely identified by its `id`.
+    /// - If a document with the same `id` exists, it is updated (Upsert).
+    /// - If no such document exists, it is added (Insert).
+    ///
+    /// # Arguments
+    ///
+    /// * `doc` - The document to put. Must have `id` set.
+    ///
+    /// # Returns
+    ///
+    /// Returns the internal document ID on success.
+    /// Returns an error if `doc.id` is missing.
+    pub fn put_document(&self, mut doc: Document) -> Result<u64> {
+        let external_id = doc.id.clone().ok_or_else(|| {
+            crate::error::IrisError::invalid_argument("Document ID is required for put_document")
+        })?;
 
-    /// Add multiple documents to the index.
-    /// Returns a vector of assigned document IDs.
-    /// Note: You must call `commit()` to persist the changes.
-    pub fn add_documents(&self, docs: Vec<Document>) -> Result<Vec<u64>> {
-        let mut guard = self.writer_cache.lock();
-        if guard.is_none() {
-            *guard = Some(self.index.writer()?);
-        }
-        let writer = guard.as_mut().unwrap();
-        let mut doc_ids = Vec::with_capacity(docs.len());
-        for doc in docs {
-            let doc_id = writer.add_document(doc)?;
-            doc_ids.push(doc_id);
-        }
-        Ok(doc_ids)
-    }
-
-    /// Add or update a document for an external ID.
-    pub fn index_document(&self, external_id: &str, mut doc: Document) -> Result<u64> {
         use crate::data::DataValue;
-        doc.fields
-            .insert("_id".to_string(), DataValue::Text(external_id.to_string()));
+        if !doc.fields.contains_key("_id") {
+            doc.fields
+                .insert("_id".to_string(), DataValue::Text(external_id.clone()));
+        }
 
-        if let Some(existing_id) = self.find_doc_id_by_term("_id", external_id)? {
-            self.upsert_document(existing_id, doc)?;
-            Ok(existing_id)
+        if let Some(internal_id) = self.find_doc_id_by_term("_id", &external_id)? {
+            self.upsert_document(internal_id, doc)?;
+            Ok(internal_id)
         } else {
             self.add_document(doc)
         }
     }
 
-    /// Delete a document by ID.
+    /// Get documents by external ID.
     ///
-    /// Note: You must call `commit()` to persist the changes.
-    pub fn delete_document(&self, doc_id: u64) -> Result<()> {
+    /// Returns all documents that match the given external ID.
+    pub fn get_documents(&self, external_id: &str) -> Result<Vec<Document>> {
+        let doc_ids = self.find_doc_ids_by_term("_id", external_id)?;
+        let mut docs = Vec::with_capacity(doc_ids.len());
+        for doc_id in doc_ids {
+            if let Some(doc) = self.get_document_by_internal_id(doc_id)? {
+                docs.push(doc);
+            }
+        }
+        Ok(docs)
+    }
+
+    /// Delete documents by external ID.
+    ///
+    /// Returns `true` if any documents were found and deleted, `false` otherwise.
+    pub fn delete_documents(&self, external_id: &str) -> Result<bool> {
+        let ids = self.find_doc_ids_by_term("_id", external_id)?;
+        if ids.is_empty() {
+            return Ok(false);
+        }
+
         let mut guard = self.writer_cache.lock();
         if guard.is_none() {
             *guard = Some(self.index.writer()?);
         }
-        guard.as_mut().unwrap().delete_document(doc_id)
+        let writer = guard.as_mut().unwrap();
+
+        for doc_id in ids {
+            writer.delete_document(doc_id)?;
+        }
+
+        Ok(true)
     }
 
-    pub fn get_document(&self, doc_id: u64) -> Result<Option<Document>> {
-        let mut doc = self.index.reader()?.document(doc_id)?;
+    /// Upsert a document with a specific internal ID.
+    ///
+    /// Note: You must call `commit()` to persist the changes.
+    pub(crate) fn upsert_document(&self, internal_id: u64, doc: Document) -> Result<()> {
+        let mut guard = self.writer_cache.lock();
+        if guard.is_none() {
+            *guard = Some(self.index.writer()?);
+        }
+        guard.as_mut().unwrap().upsert_document(internal_id, doc)
+    }
+
+    /// Delete a document by internal ID.
+    ///
+    /// Note: You must call `commit()` to persist the changes.
+    pub(crate) fn delete_document_by_internal_id(&self, internal_id: u64) -> Result<()> {
+        let mut guard = self.writer_cache.lock();
+        if guard.is_none() {
+            *guard = Some(self.index.writer()?);
+        }
+        guard.as_mut().unwrap().delete_document(internal_id)
+    }
+
+    /// Get a document by its internal ID.
+    ///
+    /// This uses the system-reserved `_id` field to find the internal ID first.
+    pub(crate) fn get_document_by_internal_id(&self, internal_id: u64) -> Result<Option<Document>> {
+        let mut doc = self.index.reader()?.document(internal_id)?;
 
         // If we have an _id field, use it to populate the Document.id property
         if let Some(d) = &mut doc {
@@ -241,30 +302,11 @@ impl LexicalStore {
         Ok(doc)
     }
 
-    /// Get a document by its external ID.
-    ///
-    /// This uses the system-reserved `_id` field to find the internal ID first.
-    pub fn get_document_by_id(&self, external_id: &str) -> Result<Option<Document>> {
-        if let Some(doc_id) = self.find_doc_id_by_term("_id", external_id)? {
-            self.get_document(doc_id)
-        } else {
-            Ok(None)
-        }
-    }
-
-    /// Delete a document by its external ID.
-    ///
-    /// Returns `true` if the document was found and deleted, `false` otherwise.
-    pub fn delete_document_by_id(&self, external_id: &str) -> Result<bool> {
-        let count = self.delete_documents_by_term("_id", external_id)?;
-        Ok(count > 0)
-    }
-
     /// Find all internal document IDs for a given term (field:value).
     ///
     /// This searches both the uncommitted in-memory buffer (via Writer) and
     /// the committed index (via Searcher).
-    pub fn find_doc_ids_by_term(&self, field: &str, term: &str) -> Result<Vec<u64>> {
+    pub(crate) fn find_doc_ids_by_term(&self, field: &str, term: &str) -> Result<Vec<u64>> {
         let mut ids = Vec::new();
 
         // 1. Check writer (NRT - Uncommitted)
@@ -296,36 +338,11 @@ impl LexicalStore {
         Ok(ids)
     }
 
-    /// Delete all documents matching a given term (field:value).
-    ///
-    /// Returns the number of deleted documents.
-    /// Note: You must call `commit()` to persist the changes.
-    pub fn delete_documents_by_term(&self, field: &str, term: &str) -> Result<usize> {
-        let ids = self.find_doc_ids_by_term(field, term)?;
-        let count = ids.len();
-
-        if count == 0 {
-            return Ok(0);
-        }
-
-        let mut guard = self.writer_cache.lock();
-        if guard.is_none() {
-            *guard = Some(self.index.writer()?);
-        }
-        let writer = guard.as_mut().unwrap();
-
-        for doc_id in ids {
-            writer.delete_document(doc_id)?;
-        }
-
-        Ok(count)
-    }
-
     /// Find the internal document ID for a given term (field:value).
     ///
     /// This searches both the uncommitted in-memory buffer (via Writer) and
     /// the committed index (via Searcher).
-    pub fn find_doc_id_by_term(&self, field: &str, term: &str) -> Result<Option<u64>> {
+    fn find_doc_id_by_term(&self, field: &str, term: &str) -> Result<Option<u64>> {
         // 1. Check writer (NRT - Uncommitted)
         {
             let guard = self.writer_cache.lock();
@@ -538,17 +555,32 @@ impl LexicalStore {
     /// let results = engine.search(LexicalSearchRequest::new(query)).unwrap();
     /// ```
     pub fn search(&self, request: LexicalSearchRequest) -> Result<LexicalSearchResults> {
-        {
+        let mut results = {
             let guard = self.searcher_cache.read();
             if let Some(ref searcher) = *guard {
-                return searcher.search(request);
+                searcher.search(request)?
+            } else {
+                drop(guard);
+                let mut guard = self.searcher_cache.write();
+                if guard.is_none() {
+                    *guard = Some(self.index.searcher()?);
+                }
+                guard.as_ref().unwrap().search(request)?
+            }
+        };
+
+        // Hydrate doc.id from _id field
+        for hit in &mut results.hits {
+            if let Some(doc) = &mut hit.document {
+                if doc.id.is_none() {
+                    if let Some(id_val) = doc.fields.get("_id").and_then(|v| v.as_text()) {
+                        doc.id = Some(id_val.to_string());
+                    }
+                }
             }
         }
-        let mut guard = self.searcher_cache.write();
-        if guard.is_none() {
-            *guard = Some(self.index.searcher()?);
-        }
-        guard.as_ref().unwrap().search(request)
+
+        Ok(results)
     }
 
     /// Count documents matching the request.
@@ -721,7 +753,9 @@ mod tests {
             create_test_document("Test Document 1", "Content of test document 1"),
             create_test_document("Test Document 2", "Content of test document 2"),
         ];
-        engine.add_documents(docs).unwrap();
+        for doc in docs {
+            engine.add_document(doc).unwrap();
+        }
         engine.commit().unwrap();
 
         // Search for documents
@@ -794,7 +828,9 @@ mod tests {
             create_test_document("Third Document", "Content of third document"),
         ];
 
-        engine.add_documents(docs).unwrap();
+        for doc in docs {
+            engine.add_document(doc).unwrap();
+        }
         engine.commit().unwrap();
 
         let _stats = engine.stats().unwrap();
@@ -835,7 +871,9 @@ mod tests {
             create_test_document("Hello World", "This is a test document"),
             create_test_document("Goodbye World", "This is another test document"),
         ];
-        engine.add_documents(docs).unwrap();
+        for doc in docs {
+            engine.add_document(doc).unwrap();
+        }
         engine.commit().unwrap();
 
         // Search for documents
@@ -962,7 +1000,9 @@ mod tests {
             create_test_document("hello world", "This is a test document"),
             create_test_document("goodbye world", "This is another test document"),
         ];
-        engine.add_documents(docs).unwrap();
+        for doc in docs {
+            engine.add_document(doc).unwrap();
+        }
         engine.commit().unwrap();
 
         // Search with QueryParser (Lucene style)
@@ -1013,50 +1053,53 @@ mod tests {
         let engine = LexicalStore::new(storage.clone(), config).unwrap();
 
         // 1. Index document with external ID
-        let doc = Document::new().add_text("title", "Test Doc");
-
-        let internal_id = engine.index_document("ext_1", doc).unwrap();
+        let mut doc = Document::new().add_text("title", "Test Doc");
+        doc.id = Some("ext_1".to_string());
+        let internal_id = engine.put_document(doc).unwrap();
         engine.commit().unwrap();
 
         // 2. Get by internal ID
-        let found = engine.get_document(internal_id).unwrap();
+        let found = engine.get_document_by_internal_id(internal_id).unwrap();
         assert!(found.is_some());
         assert_eq!(
             found.unwrap().get_field("title").unwrap().as_text(),
             Some("Test Doc")
         );
 
-        // 3. Get by external ID
-        let found_ext = engine.get_document_by_id("ext_1").unwrap();
-        assert!(found_ext.is_some());
-        assert_eq!(
-            found_ext.unwrap().get_field("title").unwrap().as_text(),
-            Some("Test Doc")
-        );
+        // 3. Index with external ID
+        let mut doc = Document::new().add_text("title", "Test Doc");
+        doc.id = Some("ext_1".to_string());
+        let internal_id = engine.put_document(doc).unwrap();
 
-        // 4. Update existing by index_document
-        let doc_v2 = Document::new().add_text("title", "Test Doc V2");
-        let internal_id_v2 = engine.index_document("ext_1", doc_v2).unwrap();
+        // Verify ID search
+        let found_id = engine.find_doc_id_by_term("_id", "ext_1").unwrap();
+        assert_eq!(found_id, Some(internal_id));
+
+        // 4. Update existing by put_document
+        let mut doc_v2 = Document::new().add_text("title", "Test Doc Updated");
+        doc_v2.id = Some("ext_1".to_string());
+        let internal_id_v2 = engine.put_document(doc_v2).unwrap();
         assert_eq!(internal_id, internal_id_v2);
         engine.commit().unwrap();
 
-        let found_v2 = engine.get_document_by_id("ext_1").unwrap();
+        let found_v2 = engine.get_documents("ext_1").unwrap();
+        assert_eq!(found_v2.len(), 1);
         assert_eq!(
-            found_v2.unwrap().get_field("title").unwrap().as_text(),
-            Some("Test Doc V2")
+            found_v2[0].get_field("title").unwrap().as_text(),
+            Some("Test Doc Updated")
         );
 
         // 5. Delete by external ID
-        let deleted = engine.delete_document_by_id("ext_1").unwrap();
+        let deleted = engine.delete_documents("ext_1").unwrap();
         assert!(deleted);
         engine.commit().unwrap();
 
         // 6. Verify deletion
-        let found_after = engine.get_document_by_id("ext_1").unwrap();
-        assert!(found_after.is_none());
+        let found_after = engine.get_documents("ext_1").unwrap();
+        assert!(found_after.is_empty());
 
         // 7. Delete non-existent
-        let deleted_non = engine.delete_document_by_id("non_existent").unwrap();
+        let deleted_non = engine.delete_documents("non_existent").unwrap();
         assert!(!deleted_non);
     }
 }

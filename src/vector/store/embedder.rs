@@ -10,7 +10,7 @@ use parking_lot::RwLock;
 use tokio::runtime::Builder as TokioRuntimeBuilder;
 
 use crate::embedding::embedder::Embedder;
-use crate::error::{Result, IrisError};
+use crate::error::{IrisError, Result};
 
 /// Registry for managing embedder instances keyed byフィールド名.
 ///

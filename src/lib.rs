@@ -11,17 +11,37 @@
 //! - Multiple query types
 //! - BM25 scoring
 // Core modules
+// Core modules
 pub mod analysis;
-pub mod data;
+mod data;
 pub mod embedding;
-pub mod engine;
-pub mod error;
+mod engine;
+mod error;
 pub mod lexical;
-pub mod maintenance;
+mod maintenance;
 pub mod spelling;
 pub mod storage;
-pub mod util;
+mod util;
 pub mod vector;
+
+// Re-exports for the public API
+pub use analysis::analyzer::analyzer::Analyzer;
+pub use data::{DataValue, Document};
+#[cfg(feature = "embeddings-candle")]
+pub use embedding::candle_bert_embedder::CandleBertEmbedder;
+#[cfg(feature = "embeddings-multimodal")]
+pub use embedding::candle_clip_embedder::CandleClipEmbedder;
+pub use embedding::embedder::{EmbedInput, EmbedInputType, Embedder};
+#[cfg(feature = "embeddings-openai")]
+pub use embedding::openai_embedder::OpenAIEmbedder;
+pub use embedding::per_field::PerFieldEmbedder;
+pub use embedding::precomputed::PrecomputedEmbedder;
+pub use engine::Engine;
+pub use engine::config::{FieldConfig, IndexConfig};
+pub use engine::search::{FusionAlgorithm, SearchRequest, SearchRequestBuilder, SearchResult};
+pub use error::{IrisError, Result};
+pub use maintenance::deletion::DeletionConfig;
+pub use storage::{Storage, StorageConfig, StorageFactory};
 
 // Version information
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

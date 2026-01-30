@@ -1,26 +1,26 @@
 use tempfile::TempDir;
 
-use iris::data::{DataValue, Document};
-use iris::engine::Engine;
-use iris::engine::config::{FieldConfig, IndexConfig};
-use iris::engine::search::SearchRequestBuilder;
-use iris::lexical::core::field::FieldOption as LexicalOption;
-use iris::lexical::index::inverted::query::Query;
-use iris::lexical::index::inverted::query::term::TermQuery;
+use iris::Engine;
+use iris::SearchRequestBuilder;
+use iris::lexical::FieldOption as LexicalOption;
+use iris::lexical::Query;
+use iris::lexical::TermQuery;
 use iris::storage::file::FileStorageConfig;
 use iris::storage::{StorageConfig, StorageFactory};
-use iris::vector::core::field::VectorOption;
-use iris::vector::store::query::VectorSearchRequestBuilder;
+use iris::vector::VectorOption;
+use iris::vector::VectorSearchRequestBuilder;
+use iris::{DataValue, Document};
+use iris::{FieldConfig, IndexConfig};
 
 #[test]
-fn test_unified_search_hybrid() -> iris::error::Result<()> {
+fn test_unified_search_hybrid() -> iris::Result<()> {
     // 1. Setup Storage
     let temp_dir = TempDir::new().unwrap();
     let storage_config = StorageConfig::File(FileStorageConfig::new(temp_dir.path()));
     let storage = StorageFactory::create(storage_config)?;
 
     // 2. Configure Engines
-    use iris::vector::core::field::FlatOption;
+    use iris::vector::FlatOption;
     let vector_opt: VectorOption = FlatOption::default().dimension(3).into();
     let lexical_opt = LexicalOption::default();
 
@@ -91,7 +91,7 @@ fn test_unified_search_hybrid() -> iris::error::Result<()> {
 }
 
 #[test]
-fn test_unified_search_hybrid_fusion() -> iris::error::Result<()> {
+fn test_unified_search_hybrid_fusion() -> iris::Result<()> {
     let temp_dir = TempDir::new().unwrap();
     let storage_config = StorageConfig::File(FileStorageConfig::new(temp_dir.path()));
     let storage = StorageFactory::create(storage_config)?;
@@ -108,11 +108,7 @@ fn test_unified_search_hybrid_fusion() -> iris::error::Result<()> {
             "embedding",
             FieldConfig {
                 lexical: None,
-                vector: Some(
-                    iris::vector::core::field::FlatOption::default()
-                        .dimension(3)
-                        .into(),
-                ),
+                vector: Some(iris::vector::FlatOption::default().dimension(3).into()),
             },
         )
         .build();
@@ -135,7 +131,7 @@ fn test_unified_search_hybrid_fusion() -> iris::error::Result<()> {
     engine.commit()?;
 
     // Search for "Rust" (Lexical) AND [0, 1, 0] (Vector - matches Doc 2)
-    use iris::engine::search::FusionAlgorithm;
+    use iris::FusionAlgorithm;
     let req = SearchRequestBuilder::new()
         .with_lexical(Box::new(TermQuery::new("title", "rust")))
         .with_vector(

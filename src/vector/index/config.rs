@@ -178,7 +178,6 @@ pub enum IndexLoadingMode {
     Mmap,
 }
 
-
 /// Vector index configuration enum that specifies which index type to use.
 ///
 /// This enum provides a unified way to configure different vector index types.

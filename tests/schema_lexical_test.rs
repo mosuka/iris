@@ -1,12 +1,12 @@
-use iris::data::Document;
-use iris::engine::Engine;
-use iris::engine::config::{FieldConfig, IndexConfig};
-use iris::engine::search::SearchRequestBuilder;
-use iris::error::Result;
-use iris::lexical::core::field::{FieldOption, TextOption};
-use iris::lexical::index::inverted::query::term::TermQuery;
+use iris::Document;
+use iris::Engine;
+use iris::Result;
+use iris::SearchRequestBuilder;
+use iris::lexical::TermQuery;
+use iris::lexical::{FieldOption, TextOption};
 use iris::storage::memory::MemoryStorageConfig;
 use iris::storage::{StorageConfig, StorageFactory};
+use iris::{FieldConfig, IndexConfig};
 
 #[test]
 fn test_schema_lexical_guardrails() -> Result<()> {

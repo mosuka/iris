@@ -30,7 +30,7 @@ use regex::Regex;
 
 use crate::analysis::token::{Token, TokenStream};
 use crate::analysis::tokenizer::Tokenizer;
-use crate::error::{Result, IrisError};
+use crate::error::{IrisError, Result};
 
 /// A regex-based tokenizer that extracts tokens using regular expressions.
 ///

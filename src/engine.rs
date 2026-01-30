@@ -113,7 +113,7 @@ impl Engine {
                 }
                 WalEntry::Delete { doc_id } => {
                     if record.seq > lexical_last_seq {
-                        self.lexical.delete_document(doc_id)?;
+                        self.lexical.delete_document_by_internal_id(doc_id)?;
                         self.lexical.set_last_wal_seq(record.seq)?;
                     }
                     if record.seq > vector_last_seq {
@@ -167,7 +167,12 @@ impl Engine {
         let doc_id = if as_chunk {
             self.lexical.add_document(doc.clone())?
         } else {
-            self.lexical.index_document(&external_id, doc.clone())?
+            // New API: put_document handles upsert based on doc.id
+            let mut doc_to_put = doc.clone();
+            if doc_to_put.id.is_none() {
+                doc_to_put.id = Some(external_id.clone());
+            }
+            self.lexical.put_document(doc_to_put)?
         };
 
         // 3. Write to Centralized WAL
@@ -207,7 +212,7 @@ impl Engine {
             self.lexical.set_last_wal_seq(seq)?;
             self.vector.set_last_wal_seq(seq);
             // 3. Delete from Lexical
-            self.lexical.delete_document(doc_id)?;
+            self.lexical.delete_document_by_internal_id(doc_id)?;
             // 4. Delete from Vector
             self.vector.delete_vectors(doc_id)?;
         }
@@ -230,7 +235,7 @@ impl Engine {
 
     /// Get a document by its internal ID.
     pub fn get_document(&self, doc_id: u64) -> Result<Option<Document>> {
-        self.lexical.get_document(doc_id)
+        self.lexical.get_document_by_internal_id(doc_id)
     }
 
     /// Split the unified config into specialized configs.
@@ -502,7 +507,7 @@ impl Engine {
         // Fill missing documents from Lexical Store if needed
         for result in &mut results {
             if result.document.is_none() {
-                if let Ok(Some(doc)) = self.lexical.get_document(result.doc_id) {
+                if let Ok(Some(doc)) = self.lexical.get_document_by_internal_id(result.doc_id) {
                     result.document = Some(doc);
                 }
             }
