@@ -8,6 +8,7 @@ use std::sync::Arc;
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 
+use crate::data::DataValue;
 use crate::error::Result;
 use crate::vector::core::vector::StoredVector;
 use crate::vector::core::vector::Vector;
@@ -46,6 +47,18 @@ pub trait VectorField: Send + Sync + Debug {
 pub trait VectorFieldWriter: Send + Sync + Debug {
     /// Add or replace a vector for the given document and field version.
     fn add_stored_vector(&self, doc_id: u64, vector: &StoredVector, version: u64) -> Result<()>;
+    /// Add or replace a value (to be embedded) for the given document and field version.
+    fn add_value(&self, doc_id: u64, value: &DataValue, version: u64) -> Result<()> {
+        // Default implementation just errors if not supported/implemented
+        if let DataValue::Vector(v) = value {
+            let sv = StoredVector::new(v.clone());
+            self.add_stored_vector(doc_id, &sv, version)
+        } else {
+            Err(crate::error::IrisError::invalid_argument(
+                "add_value not supported for this field writer (needs embedding helper)",
+            ))
+        }
+    }
     /// Delete the vectors associated with the provided document id.
     fn delete_document(&self, doc_id: u64, version: u64) -> Result<()>;
 
@@ -152,6 +165,26 @@ where
         let mut guard = self.writer.lock();
         let legacy = self.to_legacy_vector(doc_id, vector);
         guard.add_vectors(vec![legacy])
+    }
+
+    fn add_value(&self, doc_id: u64, value: &DataValue, _version: u64) -> Result<()> {
+        let mut guard = self.writer.lock();
+
+        // If it's already a vector, use standard path
+        if let DataValue::Vector(v) = value {
+            let legacy = (doc_id, self.field_name.clone(), Vector::new(v.clone()));
+            return guard.add_vectors(vec![legacy]);
+        }
+
+        // We need to check if the underlying writer is an EmbeddingVectorIndexWriter
+        // but since W is generic and we don't have specialization easily here,
+        // we can try to use a trait-based approach if we want to be clean.
+        // Or just realize that if we wrapped it in EmbeddingVectorIndexWriter,
+        // we should have a way to call its add_value.
+
+        // Actually, we can add add_value to VectorIndexWriter trait (buffered/async-bridged).
+        // Let's add add_value to VectorIndexWriter trait as well.
+        VectorIndexWriter::add_value(&mut *guard, doc_id, self.field_name.clone(), value.clone())
     }
 
     fn has_storage(&self) -> bool {

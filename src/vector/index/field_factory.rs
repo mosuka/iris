@@ -21,6 +21,7 @@ use crate::vector::index::ivf::field_reader::IvfFieldReader;
 use crate::vector::index::ivf::reader::IvfIndexReader as IvfVectorIndexReader;
 use crate::vector::index::ivf::writer::IvfIndexWriter;
 use crate::vector::store::config::VectorFieldConfig;
+use crate::vector::store::embedder::EmbedderExecutor;
 use crate::vector::writer::VectorIndexWriterConfig;
 
 /// Base name for field index files.
@@ -36,6 +37,7 @@ impl VectorFieldFactory {
         vector_option: &VectorOption,
         storage: Arc<dyn Storage>,
         embedder: Arc<dyn Embedder>,
+        executor: Arc<EmbedderExecutor>,
     ) -> Result<Arc<dyn VectorFieldWriter>> {
         if vector_option.dimension() == 0 {
             return Err(IrisError::invalid_config(format!(
@@ -43,21 +45,23 @@ impl VectorFieldFactory {
             )));
         }
 
-        let writer: Arc<dyn VectorFieldWriter> = match vector_option {
+        use crate::vector::store::embedding_writer::EmbeddingVectorIndexWriter;
+        use crate::vector::writer::VectorIndexWriter;
+
+        let inner_writer: Box<dyn VectorIndexWriter> = match vector_option {
             VectorOption::Flat(opt) => {
                 let flat = FlatIndexConfig {
                     dimension: opt.dimension,
                     distance_metric: opt.distance,
-                    embedder,
+                    embedder: embedder.clone(),
                     ..FlatIndexConfig::default()
                 };
-                let writer = FlatIndexWriter::with_storage(
+                Box::new(FlatIndexWriter::with_storage(
                     flat,
                     VectorIndexWriterConfig::default(),
                     FIELD_INDEX_BASENAME,
                     storage,
-                )?;
-                Arc::new(LegacyVectorFieldWriter::new(field_name, writer))
+                )?)
             }
             VectorOption::Hnsw(opt) => {
                 let hnsw = HnswIndexConfig {
@@ -65,16 +69,15 @@ impl VectorFieldFactory {
                     distance_metric: opt.distance,
                     m: opt.m,
                     ef_construction: opt.ef_construction,
-                    embedder,
+                    embedder: embedder.clone(),
                     ..HnswIndexConfig::default()
                 };
-                let writer = HnswIndexWriter::with_storage(
+                Box::new(HnswIndexWriter::with_storage(
                     hnsw,
                     VectorIndexWriterConfig::default(),
                     FIELD_INDEX_BASENAME,
                     storage,
-                )?;
-                Arc::new(LegacyVectorFieldWriter::new(field_name, writer))
+                )?)
             }
             VectorOption::Ivf(opt) => {
                 let ivf = IvfIndexConfig {
@@ -82,18 +85,21 @@ impl VectorFieldFactory {
                     distance_metric: opt.distance,
                     n_clusters: opt.n_clusters,
                     n_probe: opt.n_probe,
-                    embedder,
+                    embedder: embedder.clone(),
                     ..IvfIndexConfig::default()
                 };
-                let writer = IvfIndexWriter::with_storage(
+                Box::new(IvfIndexWriter::with_storage(
                     ivf,
                     VectorIndexWriterConfig::default(),
                     FIELD_INDEX_BASENAME,
                     storage,
-                )?;
-                Arc::new(LegacyVectorFieldWriter::new(field_name, writer))
+                )?)
             }
         };
+
+        let embedding_writer = EmbeddingVectorIndexWriter::new(inner_writer, embedder, executor);
+        let writer: Arc<dyn VectorFieldWriter> =
+            Arc::new(LegacyVectorFieldWriter::new(field_name, embedding_writer));
 
         Ok(writer)
     }
@@ -155,6 +161,7 @@ impl VectorFieldFactory {
         storage: Arc<dyn Storage>,
         deletion_bitmap: Option<Arc<crate::maintenance::deletion::DeletionBitmap>>,
         embedder: Arc<dyn Embedder>,
+        executor: Arc<EmbedderExecutor>,
     ) -> Result<Arc<dyn VectorField>> {
         use crate::vector::index::hnsw::segment::manager::{SegmentManager, SegmentManagerConfig};
         use crate::vector::index::segmented_field::SegmentedVectorField;
@@ -179,7 +186,8 @@ impl VectorFieldFactory {
                 let vector_option = config.vector.as_ref();
                 let (delegate_writer, delegate_reader) = if let Some(opt) = vector_option {
                     if opt.dimension() > 0 {
-                        let writer = Self::create_writer(&name, opt, storage.clone(), embedder)?;
+                        let writer =
+                            Self::create_writer(&name, opt, storage.clone(), embedder, executor)?;
                         // Only create reader if storage exists, otherwise None?
                         // Actually create_reader attempts to LOAD. If file doesn't exist, it might fail or return empty?
                         // FlatVectorIndexReader::load checks file existence usually?

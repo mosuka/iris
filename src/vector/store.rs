@@ -23,12 +23,12 @@
 
 pub mod config;
 pub mod embedder;
+pub mod embedding_writer;
 pub mod filter;
 pub mod memory;
 pub mod query;
 pub mod request;
 pub mod response;
-pub mod segmented_docs;
 pub mod snapshot;
 #[cfg(test)]
 mod tests;
@@ -43,13 +43,13 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use parking_lot::{Mutex, RwLock};
 
 use crate::data::{DataValue, Document};
-use crate::embedding::embedder::{EmbedInput, Embedder};
+use crate::embedding::embedder::Embedder;
 use crate::embedding::per_field::PerFieldEmbedder;
 use crate::error::{IrisError, Result};
 use crate::maintenance::deletion::DeletionManager;
 use crate::storage::Storage;
 use crate::storage::prefixed::PrefixedStorage;
-use crate::vector::core::vector::{StoredVector, Vector};
+use crate::vector::core::vector::Vector;
 use crate::vector::index::field::{
     AdapterBackedVectorField, FieldHit, FieldSearchInput, VectorField, VectorFieldReader,
     VectorFieldStats, VectorFieldWriter,
@@ -81,8 +81,6 @@ pub struct VectorStore {
 
     storage: Arc<dyn Storage>,
     doc_store: Arc<RwLock<UnifiedDocumentStore>>,
-    active_docs: Arc<RwLock<HashMap<u64, Document>>>,
-    next_doc_id: AtomicU64,
     snapshot_wal_seq: AtomicU64,
     closed: AtomicU64, // 0 = open, 1 = closed
 }
@@ -112,17 +110,17 @@ impl VectorStore {
 
         let deletion_manager = Arc::new(DeletionManager::new(deletion_config, storage.clone())?);
 
+        let executor = Arc::new(EmbedderExecutor::new()?);
+
         let mut store = Self {
             config: Arc::new(config),
             field_configs: field_configs.clone(),
             fields: Arc::new(RwLock::new(HashMap::new())),
             embedder_registry,
-            embedder_executor: Mutex::new(None),
+            embedder_executor: Mutex::new(Some(executor)),
             deletion_manager,
             storage: storage.clone(),
             doc_store,
-            active_docs: Arc::new(RwLock::new(HashMap::new())),
-            next_doc_id: AtomicU64::new(0),
             snapshot_wal_seq: AtomicU64::new(0),
             closed: AtomicU64::new(0),
         };
@@ -202,126 +200,6 @@ impl VectorStore {
         Ok(())
     }
 
-    fn embed_document_payload_internal(&self, _doc_id: u64, payload: Document) -> Result<Document> {
-        let mut document = Document::new();
-        document.fields = payload.fields.clone();
-
-        for (field_name, field_val) in payload.fields.into_iter() {
-            if matches!(
-                field_val,
-                DataValue::Text(_) | DataValue::String(_) | DataValue::Bytes(_, _)
-            ) {
-                if let Ok(stored_vec) = self.embed_payload(&field_name, field_val) {
-                    document
-                        .fields
-                        .insert(field_name, DataValue::Vector(stored_vec.data.clone()));
-                }
-            }
-        }
-
-        Ok(document)
-    }
-
-    /// Embeds a single `DataValue` into a `StoredVector`.
-    fn embed_payload(&self, field_name: &str, value: DataValue) -> Result<StoredVector> {
-        let fields = self.fields.read();
-        let handle = fields.get(field_name).ok_or_else(|| {
-            IrisError::invalid_argument(format!("vector field '{field_name}' is not registered"))
-        })?;
-        let field_config = handle.field.config().clone();
-        drop(fields);
-
-        let dimension = match &field_config.vector {
-            Some(opt) => opt.dimension(),
-            None => {
-                return Ok(StoredVector::new(Vec::new()));
-            }
-        };
-
-        match value {
-            DataValue::Text(text_value) => {
-                let executor = self.ensure_embedder_executor()?;
-                let embedder = self.embedder_registry.resolve(field_name)?;
-
-                if !embedder.supports_text() {
-                    return Err(IrisError::invalid_config(format!(
-                        "embedder '{}' does not support text embedding",
-                        field_name
-                    )));
-                }
-
-                let embedder_name_owned = field_name.to_string();
-                let text_for_embed = text_value.clone();
-                let vector = executor
-                    .run(async move { embedder.embed(&EmbedInput::Text(&text_for_embed)).await })?;
-                vector.validate_dimension(dimension)?;
-                if !vector.is_valid() {
-                    return Err(IrisError::InvalidOperation(format!(
-                        "embedder '{}' produced invalid values for field '{}'",
-                        embedder_name_owned, field_name
-                    )));
-                }
-                let mut stored: StoredVector = vector.into();
-
-                if field_config.lexical.is_some() {
-                    use crate::lexical::core::field::{Field, FieldOption, TextOption};
-                    stored.attributes.insert(
-                        "__iris_lexical_source".to_string(),
-                        Field::new(
-                            DataValue::Text(text_value),
-                            FieldOption::Text(TextOption::default()),
-                        ),
-                    );
-                }
-                Ok(stored)
-            }
-            DataValue::Bytes(bytes, mime) => {
-                let executor = self.ensure_embedder_executor()?;
-                let embedder = self.embedder_registry.resolve(field_name)?;
-
-                if !embedder.supports_image() {
-                    return Err(IrisError::invalid_config(format!(
-                        "embedder '{}' does not support image embedding",
-                        field_name
-                    )));
-                }
-
-                let embedder_name_owned = field_name.to_string();
-                let payload_bytes = bytes.clone();
-                let mime_hint = mime.clone();
-                let vector = executor.run(async move {
-                    embedder
-                        .embed(&EmbedInput::Bytes(&payload_bytes, mime_hint.as_deref()))
-                        .await
-                })?;
-                let vector_obj = Vector::new(vector.data);
-                if !vector_obj.is_valid() {
-                    return Err(IrisError::InvalidOperation(format!(
-                        "embedder '{}' produced invalid values for field '{}': {:?}",
-                        embedder_name_owned, field_name, vector_obj
-                    )));
-                }
-                let stored: StoredVector = vector_obj.into();
-                Ok(stored)
-            }
-            DataValue::Vector(data) => {
-                let vector = Vector::new(data.to_vec());
-                vector.validate_dimension(dimension)?;
-                if !vector.is_valid() {
-                    return Err(IrisError::InvalidOperation(format!(
-                        "provided vector for field '{}' contains invalid values",
-                        field_name
-                    )));
-                }
-                let stored: StoredVector = vector.into();
-                Ok(stored)
-            }
-            _ => Err(IrisError::invalid_argument(
-                "unsupported field value for embedding",
-            )),
-        }
-    }
-
     fn ensure_embedder_executor(&self) -> Result<Arc<EmbedderExecutor>> {
         let mut guard = self.embedder_executor.lock();
         if let Some(executor) = guard.as_ref() {
@@ -356,12 +234,14 @@ impl VectorStore {
         config: VectorFieldConfig,
     ) -> Result<Arc<dyn VectorField>> {
         let storage = self.field_storage(&name);
+        let executor = self.ensure_embedder_executor()?;
         VectorFieldFactory::create_field(
             name,
             config,
             storage,
             self.deletion_manager.get_bitmap("global"),
             self.config.embedder.clone(),
+            executor,
         )
     }
 
@@ -377,12 +257,14 @@ impl VectorStore {
             ))
         })?;
 
+        let executor = self.ensure_embedder_executor()?;
         let storage = self.field_storage(field_name);
         let writer = VectorFieldFactory::create_writer(
             field_name,
             vector_option,
             storage,
             self.config.embedder.clone(),
+            executor,
         )?;
 
         writer.rebuild(vectors)?;
@@ -451,22 +333,11 @@ impl VectorStore {
         Ok(())
     }
 
-    fn apply_field_updates(
-        &self,
-        doc_id: u64,
-        version: u64,
-        fields_data: &HashMap<String, DataValue>,
-    ) -> Result<()> {
+    fn apply_field_updates(&self, doc_id: u64, version: u64, document: &Document) -> Result<()> {
         let fields = self.fields.read();
-        for (field_name, val) in fields_data {
-            if let Some(stored_vector) = val.as_vector_ref() {
-                if let Some(field) = fields.get(field_name) {
-                    let sv = StoredVector::new(stored_vector.clone());
-                    field
-                        .runtime
-                        .writer()
-                        .add_stored_vector(doc_id, &sv, version)?;
-                }
+        for (field_name, val) in &document.fields {
+            if let Some(field) = fields.get(field_name) {
+                field.runtime.writer().add_value(doc_id, val, version)?;
             }
         }
         Ok(())
@@ -509,30 +380,11 @@ impl VectorStore {
             field_entry.runtime.writer().flush()?;
         }
 
-        // 2. Flush documents to segment
-        // 2. Flush documents to segment
-        // NOTE: We do not persist to doc_store here because Engine/LexicalStore manages persistence
-        // to UnifiedDocumentStore. VectorStore's active_docs is just a cache/buffer for indexing.
-        let mut active = self.active_docs.write();
-        active.clear();
-
         Ok(())
     }
 
     fn find_all_internal_ids_by_external_id(&self, external_id: &str) -> Result<Vec<u64>> {
-        let mut results = Vec::new();
-
-        // 1. Check active
-        let active = self.active_docs.read();
-        for (id, doc) in active.iter() {
-            if doc.id() == Some(external_id) {
-                results.push(*id);
-            }
-        }
-        drop(active);
-
-        // 2. Check segments
-        results.extend(self.doc_store.read().find_all_by_external_id(external_id)?);
+        let mut results = self.doc_store.read().find_all_by_external_id(external_id)?;
 
         // Remove duplicates if any
         results.sort_unstable();
@@ -589,7 +441,7 @@ impl VectorStore {
             return self.put_document(doc);
         }
 
-        let doc_id = self.next_doc_id.fetch_add(1, Ordering::SeqCst);
+        let doc_id = self.doc_store.write().add_document(doc.clone())?;
         self.upsert_document_by_internal_id(doc_id, doc)?;
         Ok(doc_id)
     }
@@ -614,7 +466,7 @@ impl VectorStore {
             self.delete_document_by_internal_id(id)?;
         }
 
-        let doc_id = self.next_doc_id.fetch_add(1, Ordering::SeqCst);
+        let doc_id = self.doc_store.write().add_document(doc.clone())?;
         self.upsert_document_by_internal_id(doc_id, doc)?;
         Ok(doc_id)
     }
@@ -647,7 +499,7 @@ impl VectorStore {
 
     pub fn index_payload_chunk(&self, payload: Document) -> Result<u64> {
         self.check_closed()?;
-        let doc_id = self.next_doc_id.fetch_add(1, Ordering::SeqCst);
+        let doc_id = self.doc_store.write().add_document(payload.clone())?;
         self.upsert_document_by_internal_id(doc_id, payload)?;
         Ok(doc_id)
     }
@@ -657,20 +509,12 @@ impl VectorStore {
         self.check_closed()?;
         self.validate_document_fields(&document)?;
 
-        // 1. Extract Vectors
-        let mut vector_fields = HashMap::new();
-        for (name, val) in &document.fields {
-            if let DataValue::Vector(_) = val {
-                vector_fields.insert(name.clone(), val.clone());
-            }
-        }
-
         // 2. Update In-Memory Structures
-        // Update document store
-        self.active_docs.write().insert(doc_id, document);
+        // NOTE: Document is managed by UnifiedDocumentStore.
+        // We only update field writers here.
 
         // Update Field Writers
-        self.apply_field_updates(doc_id, 0, &vector_fields)?;
+        self.apply_field_updates(doc_id, 0, &document)?;
 
         Ok(())
     }
@@ -747,14 +591,10 @@ impl VectorStore {
     }
 
     pub(crate) fn upsert_document_by_internal_id(&self, doc_id: u64, doc: Document) -> Result<()> {
-        let embedded_doc = self.embed_document_payload_internal(doc_id, doc)?;
-        self.upsert_document_with_id(doc_id, embedded_doc)
+        self.upsert_document_with_id(doc_id, doc)
     }
 
     pub(crate) fn get_document_by_internal_id(&self, doc_id: u64) -> Result<Option<Document>> {
-        if let Some(doc) = self.active_docs.read().get(&doc_id) {
-            return Ok(Some(doc.clone()));
-        }
         self.doc_store.read().get_document(doc_id)
     }
 
@@ -763,23 +603,10 @@ impl VectorStore {
             .get_document_by_internal_id(doc_id)?
             .ok_or_else(|| IrisError::not_found(format!("doc_id {doc_id}")))?;
 
-        // Only record deletion in DeletionManager if it was NOT in active_docs
-        // because active_docs are subtracted by just removing them from the map.
-        let was_active = self.active_docs.read().contains_key(&doc_id);
-
-        if was_active {
-            self.active_docs.write().remove(&doc_id);
-            // We still need to notify field writers
-            let fields = self.fields.read();
-            for field in fields.values() {
-                field.runtime.writer().delete_document(doc_id, 0)?;
-            }
-        } else {
-            self.delete_fields_for_doc(doc_id, &doc)?;
-            self.doc_store.write().delete_document(doc_id)?;
-            self.deletion_manager
-                .delete_document("global", doc_id, "user_request")?;
-        }
+        self.delete_fields_for_doc(doc_id, &doc)?;
+        self.doc_store.write().delete_document(doc_id)?;
+        self.deletion_manager
+            .delete_document("global", doc_id, "user_request")?;
 
         self.persist_state()?;
         Ok(())
@@ -814,7 +641,7 @@ impl VectorStore {
             field_stats.insert(name.clone(), stats);
         }
 
-        let mut doc_count = self.active_docs.read().len();
+        let mut doc_count = 0;
         for segment in self.doc_store.read().segments() {
             doc_count += segment.doc_count as usize;
         }
@@ -860,9 +687,34 @@ impl VectorStore {
     }
 
     fn embed_query_payload(&self, field_name: &str, value: DataValue) -> Result<QueryVector> {
-        let stored = self.embed_payload(field_name, value)?;
+        let embedder = self.embedder_registry.resolve(field_name)?;
+        let executor = self.ensure_embedder_executor()?;
+
+        let result_vec = match value {
+            DataValue::Text(t) => {
+                let embedder_owned = embedder.clone();
+                executor.run(async move {
+                    let input = crate::embedding::embedder::EmbedInput::Text(&t);
+                    embedder_owned.embed(&input).await
+                })?
+            }
+            DataValue::Bytes(b, m) => {
+                let embedder_owned = embedder.clone();
+                executor.run(async move {
+                    let input = crate::embedding::embedder::EmbedInput::Bytes(&b, m.as_deref());
+                    embedder_owned.embed(&input).await
+                })?
+            }
+            DataValue::Vector(v) => Vector::new(v),
+            _ => {
+                return Err(IrisError::invalid_argument(format!(
+                    "unsupported query data type for field '{field_name}'"
+                )));
+            }
+        };
+
         Ok(QueryVector {
-            vector: stored.data,
+            vector: result_vec.data,
             weight: 1.0,
             fields: None,
         })
@@ -875,7 +727,6 @@ pub struct VectorStoreSearcher {
     config: Arc<VectorIndexConfig>,
     fields: Arc<RwLock<HashMap<String, FieldHandle>>>,
     _doc_store: Arc<RwLock<UnifiedDocumentStore>>,
-    _active_docs: Arc<RwLock<HashMap<u64, Document>>>,
 }
 
 impl VectorStoreSearcher {
@@ -884,7 +735,6 @@ impl VectorStoreSearcher {
             config: Arc::clone(&engine.config),
             fields: Arc::clone(&engine.fields),
             _doc_store: Arc::clone(&engine.doc_store),
-            _active_docs: Arc::clone(&engine.active_docs),
         }
     }
 
