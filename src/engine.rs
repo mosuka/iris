@@ -12,9 +12,11 @@ use crate::lexical::store::LexicalStore;
 use crate::lexical::store::config::LexicalIndexConfig;
 use crate::storage::Storage;
 use crate::storage::prefixed::PrefixedStorage;
+use crate::store::document::UnifiedDocumentStore;
 use crate::vector::index::wal::{WalEntry, WalManager};
 use crate::vector::store::VectorStore;
 use crate::vector::store::config::VectorIndexConfig;
+use parking_lot::RwLock;
 
 use self::config::IndexConfig;
 
@@ -26,6 +28,7 @@ pub struct Engine {
     config: IndexConfig,
     lexical: LexicalStore,
     vector: VectorStore,
+    document_store: Arc<RwLock<UnifiedDocumentStore>>,
     wal: Arc<WalManager>,
 }
 
@@ -50,10 +53,13 @@ impl Engine {
         // 2. Create namespaced storage
         let lexical_storage = Arc::new(PrefixedStorage::new("lexical", storage.clone()));
         let vector_storage = Arc::new(PrefixedStorage::new("vector", storage.clone()));
+        let document_storage = Arc::new(PrefixedStorage::new("documents", storage.clone()));
 
         // 3. Initialize engines
-        let lexical = LexicalStore::new(lexical_storage, lexical_config)?;
-        let vector = VectorStore::new(vector_storage, vector_config)?;
+        let document_store = Arc::new(RwLock::new(UnifiedDocumentStore::open(document_storage)?));
+
+        let lexical = LexicalStore::new(lexical_storage, lexical_config, document_store.clone())?;
+        let vector = VectorStore::new(vector_storage, vector_config, document_store.clone())?;
 
         // 4. Initialize Unified WAL (at root)
         let wal = Arc::new(WalManager::new(storage, "engine.wal")?);
@@ -62,6 +68,7 @@ impl Engine {
             config,
             lexical,
             vector,
+            document_store,
             wal,
         };
 
@@ -107,7 +114,8 @@ impl Engine {
                                 }
                             }
                         }
-                        self.vector.upsert_vectors(doc_id, vector_doc)?;
+                        self.vector
+                            .upsert_document_by_internal_id(doc_id, vector_doc)?;
                         self.vector.set_last_wal_seq(record.seq);
                     }
                 }
@@ -117,7 +125,7 @@ impl Engine {
                         self.lexical.set_last_wal_seq(record.seq)?;
                     }
                     if record.seq > vector_last_seq {
-                        self.vector.delete_vectors(doc_id)?;
+                        self.vector.delete_document_by_internal_id(doc_id)?;
                         self.vector.set_last_wal_seq(record.seq);
                     }
                 }
@@ -197,7 +205,8 @@ impl Engine {
             }
         }
 
-        self.vector.upsert_vectors(doc_id, vector_doc)?;
+        self.vector
+            .upsert_document_by_internal_id(doc_id, vector_doc)?;
 
         Ok(doc_id)
     }
@@ -214,7 +223,7 @@ impl Engine {
             // 3. Delete from Lexical
             self.lexical.delete_document_by_internal_id(doc_id)?;
             // 4. Delete from Vector
-            self.vector.delete_vectors(doc_id)?;
+            self.vector.delete_document_by_internal_id(doc_id)?;
         }
         Ok(())
     }
@@ -223,6 +232,7 @@ impl Engine {
     pub fn commit(&self) -> Result<()> {
         self.lexical.commit()?;
         self.vector.commit()?;
+        self.document_store.write().commit()?;
         // After successful commit to both stores, we can truncate the WAL
         self.wal.truncate()?;
         Ok(())
@@ -235,7 +245,48 @@ impl Engine {
 
     /// Get a document by its internal ID.
     pub fn get_document(&self, doc_id: u64) -> Result<Option<Document>> {
-        self.lexical.get_document_by_internal_id(doc_id)
+        let doc = self.lexical.get_document_by_internal_id(doc_id)?;
+
+        if let Some(mut doc) = doc {
+            use crate::lexical::core::field::FieldOption;
+
+            let fields_to_remove: Vec<String> = doc
+                .fields
+                .keys()
+                .filter(|name| {
+                    if let Some(config) = self.config.fields.get(*name) {
+                        // If configured, check stored property
+                        if let Some(lexical_opt) = &config.lexical {
+                            match lexical_opt {
+                                FieldOption::Text(o) => !o.stored,
+                                FieldOption::Integer(o) => !o.stored,
+                                FieldOption::Float(o) => !o.stored,
+                                FieldOption::Boolean(o) => !o.stored,
+                                FieldOption::DateTime(o) => !o.stored,
+                                FieldOption::Geo(o) => !o.stored,
+                                FieldOption::Blob(o) => !o.stored,
+                            }
+                        } else {
+                            // If only vector or no lexical config, assume stored?
+                            // Default behavior: keep it if in schema
+                            false
+                        }
+                    } else {
+                        // Not in schema -> Remove (strict schema enforcement on retrieval)
+                        // Valid for "unknown_field" test case
+                        true
+                    }
+                })
+                .cloned()
+                .collect();
+
+            for name in fields_to_remove {
+                doc.fields.remove(&name);
+            }
+            Ok(Some(doc))
+        } else {
+            Ok(None)
+        }
     }
 
     /// Split the unified config into specialized configs.

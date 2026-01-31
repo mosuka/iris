@@ -24,10 +24,13 @@ use iris::CandleClipEmbedder;
 use iris::Embedder;
 #[cfg(feature = "embeddings-multimodal")]
 use iris::Result;
+use iris::parking_lot::RwLock;
 #[cfg(feature = "embeddings-multimodal")]
 use iris::storage::file::FileStorageConfig;
+use iris::storage::prefixed::PrefixedStorage;
 #[cfg(feature = "embeddings-multimodal")]
 use iris::storage::{StorageConfig, StorageFactory};
+use iris::store::document::UnifiedDocumentStore;
 #[cfg(feature = "embeddings-multimodal")]
 use iris::vector::DistanceMetric;
 #[cfg(feature = "embeddings-multimodal")]
@@ -75,7 +78,9 @@ fn main() -> Result<()> {
         .build()?;
 
     // 3. Create Engine
-    let engine = VectorStore::new(storage, index_config)?;
+    let doc_storage = Arc::new(PrefixedStorage::new("documents", storage.clone()));
+    let doc_store = Arc::new(RwLock::new(UnifiedDocumentStore::open(doc_storage)?));
+    let engine = VectorStore::new(storage, index_config, doc_store.clone())?;
 
     // 4. Index Images
     println!("\n--- Indexing Images ---");
@@ -110,7 +115,7 @@ fn main() -> Result<()> {
                         .add_field("filename", DataValue::Text(filename.clone()))
                         .add_field("type", DataValue::Text("image".into()));
 
-                    engine.add_payloads(doc)?;
+                    engine.add_document(doc)?;
                     indexed_count += 1;
                 }
             }
@@ -134,11 +139,12 @@ fn main() -> Result<()> {
             .add_field("content", DataValue::Text((*text).into()))
             .add_field("text", DataValue::Text((*text).into()))
             .add_field("type", DataValue::Text("text".into()));
-        engine.add_payloads(doc)?;
+        engine.add_document(doc)?;
     }
 
     // Commit to make documents searchable
     engine.commit()?;
+    doc_store.write().commit()?;
 
     // 6. Search Demonstrations
 

@@ -140,6 +140,22 @@ pub trait VectorIndexWriter: Send + Sync + std::fmt::Debug {
         self.write()
     }
 
+    /// Add a value (Text, Bytes, etc.) to the index, embedding it automatically if supported.
+    fn add_value(
+        &mut self,
+        doc_id: u64,
+        field_name: String,
+        value: crate::data::DataValue,
+    ) -> Result<()> {
+        if let crate::data::DataValue::Vector(v) = value {
+            self.add_vectors(vec![(doc_id, field_name, Vector::new(v))])
+        } else {
+            Err(crate::error::IrisError::invalid_argument(
+                "Auto-embedding not supported by this index writer. Wrap it in EmbeddingVectorIndexWriter.",
+            ))
+        }
+    }
+
     /// Rollback pending changes.
     ///
     /// This method discards all pending changes that haven't been committed.

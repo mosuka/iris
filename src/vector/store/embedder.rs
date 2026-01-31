@@ -47,7 +47,7 @@ impl VectorEmbedderRegistry {
 
 /// Executor for running async embedding operations.
 #[derive(Clone)]
-pub(crate) struct EmbedderExecutor {
+pub struct EmbedderExecutor {
     runtime: Arc<tokio::runtime::Runtime>,
 }
 

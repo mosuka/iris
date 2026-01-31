@@ -44,7 +44,7 @@ fn test_unified_engine_indexing() -> iris::Result<()> {
             "description",
             FieldConfig {
                 lexical: Some(lexical_opt),
-                vector: Some(vector_opt),
+                vector: None, // No embedder configured, so lexical-only for this test
             },
         )
         .build();

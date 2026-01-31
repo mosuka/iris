@@ -139,6 +139,9 @@ pub struct InvertedIndexWriter {
 
     /// Last processed WAL sequence number.
     last_wal_seq: u64,
+
+    /// Pending deletions that are not yet reflected in the reader (NRT).
+    pending_deletions: std::collections::HashSet<u64>,
 }
 
 impl std::fmt::Debug for InvertedIndexWriter {
@@ -209,6 +212,7 @@ impl InvertedIndexWriter {
             },
             last_wal_seq: base_metadata.last_wal_seq,
             base_metadata,
+            pending_deletions: std::collections::HashSet::new(),
         })
     }
 
@@ -1135,7 +1139,15 @@ impl InvertedIndexWriter {
             self.stats.deleted_count += 1;
         }
 
+        // Add to pending deletions for NRT visibility
+        self.pending_deletions.insert(doc_id);
+
         Ok(())
+    }
+
+    /// Check if a document is marked as deleted in the pending set.
+    pub fn is_updated_deleted(&self, doc_id: u64) -> bool {
+        self.pending_deletions.contains(&doc_id)
     }
 
     /// Find all segments containing the global doc_id by scanning segment metadata files.
@@ -1253,6 +1265,10 @@ impl LexicalIndexWriter for InvertedIndexWriter {
     fn set_last_wal_seq(&mut self, seq: u64) -> Result<()> {
         self.last_wal_seq = seq;
         Ok(())
+    }
+
+    fn is_updated_deleted(&self, doc_id: u64) -> bool {
+        InvertedIndexWriter::is_updated_deleted(self, doc_id)
     }
 
     /// Builds an InvertedIndexReader from the current state of the writer's storage.

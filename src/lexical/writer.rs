@@ -90,4 +90,9 @@ pub trait LexicalIndexWriter: Send + Sync + std::fmt::Debug {
     fn set_last_wal_seq(&mut self, _seq: u64) -> Result<()> {
         Ok(())
     }
+
+    /// Check if a document is marked as deleted in the pending set.
+    fn is_updated_deleted(&self, _doc_id: u64) -> bool {
+        false
+    }
 }

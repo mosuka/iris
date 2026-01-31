@@ -18,8 +18,11 @@ use iris::lexical::NumericRangeQuery;
 use iris::lexical::PhraseQuery;
 use iris::lexical::Query;
 use iris::lexical::TermQuery;
+use iris::parking_lot::RwLock;
 use iris::storage::file::FileStorageConfig;
+use iris::storage::prefixed::PrefixedStorage;
 use iris::storage::{StorageConfig, StorageFactory};
+use iris::store::document::UnifiedDocumentStore;
 use iris::{DataValue, Document};
 
 fn main() -> Result<()> {
@@ -41,7 +44,11 @@ fn main() -> Result<()> {
         analyzer: Arc::new(per_field_analyzer.clone()),
         ..InvertedIndexConfig::default()
     });
-    let lexical_engine = LexicalStore::new(storage, lexical_index_config)?;
+    let doc_storage = Arc::new(PrefixedStorage::new("documents", storage.clone()));
+    let doc_store = Arc::new(RwLock::new(
+        UnifiedDocumentStore::open(doc_storage).unwrap(),
+    ));
+    let lexical_store = LexicalStore::new(storage, lexical_index_config, doc_store)?;
 
     let documents = vec![
         Document::new()
@@ -104,11 +111,11 @@ fn main() -> Result<()> {
 
     // Add documents to the lexical engine
     for doc in documents {
-        lexical_engine.add_document(doc)?;
+        lexical_store.add_document(doc)?;
     }
 
     // Commit changes to engine
-    lexical_engine.commit()?;
+    lexical_store.commit()?;
 
     println!("\n=== BooleanQuery Examples ===\n");
 
@@ -119,7 +126,7 @@ fn main() -> Result<()> {
     query.add_must(Box::new(TermQuery::new("body", "python")));
     query.add_must(Box::new(TermQuery::new("body", "programming")));
     let request = LexicalSearchRequest::new(Box::new(query) as Box<dyn Query>).load_documents(true);
-    let results = lexical_engine.search(request)?;
+    let results = lexical_store.search(request)?;
 
     println!("   Found {} results", results.total_hits);
     for (i, hit) in results.hits.iter().enumerate() {
@@ -147,7 +154,7 @@ fn main() -> Result<()> {
     query.add_should(Box::new(TermQuery::new("body", "python")));
     query.add_should(Box::new(TermQuery::new("body", "javascript")));
     let request = LexicalSearchRequest::new(Box::new(query) as Box<dyn Query>).load_documents(true);
-    let results = lexical_engine.search(request)?;
+    let results = lexical_store.search(request)?;
 
     println!("   Found {} results", results.total_hits);
     for (i, hit) in results.hits.iter().enumerate() {
@@ -175,7 +182,7 @@ fn main() -> Result<()> {
     query.add_must(Box::new(TermQuery::new("category", "programming")));
     query.add_must_not(Box::new(TermQuery::new("body", "javascript")));
     let request = LexicalSearchRequest::new(Box::new(query) as Box<dyn Query>).load_documents(true);
-    let results = lexical_engine.search(request)?;
+    let results = lexical_store.search(request)?;
 
     println!("   Found {} results", results.total_hits);
     for (i, hit) in results.hits.iter().enumerate() {
@@ -212,7 +219,7 @@ fn main() -> Result<()> {
         Some(50.0),
     )));
     let request = LexicalSearchRequest::new(Box::new(query) as Box<dyn Query>).load_documents(true);
-    let results = lexical_engine.search(request)?;
+    let results = lexical_store.search(request)?;
 
     println!("   Found {} results", results.total_hits);
     for (i, hit) in results.hits.iter().enumerate() {
@@ -253,7 +260,7 @@ fn main() -> Result<()> {
         vec!["machine".to_string(), "learning".to_string()],
     )));
     let request = LexicalSearchRequest::new(Box::new(query) as Box<dyn Query>).load_documents(true);
-    let results = lexical_engine.search(request)?;
+    let results = lexical_store.search(request)?;
 
     println!("   Found {} results", results.total_hits);
     for (i, hit) in results.hits.iter().enumerate() {
@@ -286,7 +293,7 @@ fn main() -> Result<()> {
     query.add_must(Box::new(language_query));
 
     let request = LexicalSearchRequest::new(Box::new(query) as Box<dyn Query>).load_documents(true);
-    let results = lexical_engine.search(request)?;
+    let results = lexical_store.search(request)?;
 
     println!("   Found {} results", results.total_hits);
     for (i, hit) in results.hits.iter().enumerate() {
@@ -318,7 +325,7 @@ fn main() -> Result<()> {
     )));
     query.add_must_not(Box::new(TermQuery::new("body", "design")));
     let request = LexicalSearchRequest::new(Box::new(query) as Box<dyn Query>).load_documents(true);
-    let results = lexical_engine.search(request)?;
+    let results = lexical_store.search(request)?;
 
     println!("   Found {} results", results.total_hits);
     for (i, hit) in results.hits.iter().enumerate() {
@@ -356,7 +363,7 @@ fn main() -> Result<()> {
         None,
     )));
     let request = LexicalSearchRequest::new(Box::new(query) as Box<dyn Query>).load_documents(true);
-    let results = lexical_engine.search(request)?;
+    let results = lexical_store.search(request)?;
 
     println!("   Found {} results", results.total_hits);
     for (i, hit) in results.hits.iter().enumerate() {
@@ -415,7 +422,7 @@ fn main() -> Result<()> {
 
     let request =
         LexicalSearchRequest::new(Box::new(main_query) as Box<dyn Query>).load_documents(true);
-    let results = lexical_engine.search(request)?;
+    let results = lexical_store.search(request)?;
 
     println!("   Found {} results", results.total_hits);
     for (i, hit) in results.hits.iter().enumerate() {
@@ -478,7 +485,7 @@ fn main() -> Result<()> {
 
     let request =
         LexicalSearchRequest::new(Box::new(final_query) as Box<dyn Query>).load_documents(true);
-    let results = lexical_engine.search(request)?;
+    let results = lexical_store.search(request)?;
 
     println!("   Found {} results", results.total_hits);
     for (i, hit) in results.hits.iter().enumerate() {
@@ -511,10 +518,10 @@ fn main() -> Result<()> {
     query.add_should(Box::new(TermQuery::new("category", "data-science")));
     query.add_should(Box::new(TermQuery::new("category", "web-development")));
     let count =
-        lexical_engine.count(LexicalSearchRequest::new(Box::new(query) as Box<dyn Query>))?;
+        lexical_store.count(LexicalSearchRequest::new(Box::new(query) as Box<dyn Query>))?;
     println!("   Count: {count} books");
 
-    lexical_engine.close()?;
+    lexical_store.close()?;
     println!("\nBooleanQuery example completed successfully!");
 
     Ok(())
