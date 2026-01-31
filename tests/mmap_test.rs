@@ -9,6 +9,9 @@ use iris::vector::{FlatOption, VectorOption};
 use iris::vector::{VectorFieldConfig, VectorIndexConfig};
 use iris::{DataValue, Document};
 
+use iris::parking_lot::RwLock;
+use iris::storage::prefixed::PrefixedStorage;
+use iris::store::document::UnifiedDocumentStore;
 use std::sync::Arc;
 use tempfile::tempdir;
 
@@ -37,7 +40,11 @@ fn test_mmap_mode_basic_search() {
         .build()
         .unwrap();
 
-    let engine = VectorStore::new(storage, config).unwrap();
+    let doc_storage = Arc::new(PrefixedStorage::new("documents", storage.clone()));
+    let doc_store = Arc::new(RwLock::new(
+        UnifiedDocumentStore::open(doc_storage).unwrap(),
+    ));
+    let engine = VectorStore::new(storage, config, doc_store.clone()).unwrap();
 
     // Add vectors
     let vectors = vec![
@@ -48,9 +55,10 @@ fn test_mmap_mode_basic_search() {
 
     for vec_data in vectors {
         let doc = Document::new().add_field("mmap_field", DataValue::Vector(vec_data));
-        engine.add_payloads(doc).unwrap();
+        engine.add_document(doc).unwrap();
     }
     engine.commit().unwrap();
+    doc_store.write().commit().unwrap();
 
     let query_vector = vec![1.0, 0.1, 0.0];
     let request = VectorSearchRequestBuilder::new()
@@ -88,15 +96,20 @@ fn test_mmap_mode_persistence_reload() {
             .build()
             .unwrap();
 
-        let engine = VectorStore::new(storage, config).unwrap();
+        let doc_storage = Arc::new(PrefixedStorage::new("documents", storage.clone()));
+        let doc_store = Arc::new(RwLock::new(
+            UnifiedDocumentStore::open(doc_storage).unwrap(),
+        ));
+        let engine = VectorStore::new(storage, config, doc_store.clone()).unwrap();
 
         let vectors = vec![vec![1.0, 0.0, 0.0], vec![0.0, 1.0, 0.0]];
 
         for vec_data in vectors {
             let doc = Document::new().add_field("mmap_field", DataValue::Vector(vec_data));
-            engine.add_payloads(doc).unwrap();
+            engine.add_document(doc).unwrap();
         }
         engine.commit().unwrap();
+        doc_store.write().commit().unwrap();
     }
 
     // Re-open
@@ -120,7 +133,11 @@ fn test_mmap_mode_persistence_reload() {
             .build()
             .unwrap();
 
-        let engine = VectorStore::new(storage, config).unwrap();
+        let doc_storage = Arc::new(PrefixedStorage::new("documents", storage.clone()));
+        let doc_store = Arc::new(RwLock::new(
+            UnifiedDocumentStore::open(doc_storage).unwrap(),
+        ));
+        let engine = VectorStore::new(storage, config, doc_store).unwrap();
 
         // IMPORTANT: In Mmap mode, vectors are LOADED from file on demand.
         // If file persistence works, search should find them.

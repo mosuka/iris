@@ -21,6 +21,7 @@ pub mod lexical;
 mod maintenance;
 pub mod spelling;
 pub mod storage;
+pub mod store;
 mod util;
 pub mod vector;
 
@@ -41,6 +42,7 @@ pub use engine::config::{FieldConfig, IndexConfig};
 pub use engine::search::{FusionAlgorithm, SearchRequest, SearchRequestBuilder, SearchResult};
 pub use error::{IrisError, Result};
 pub use maintenance::deletion::DeletionConfig;
+pub use parking_lot;
 pub use storage::{Storage, StorageConfig, StorageFactory};
 
 // Version information

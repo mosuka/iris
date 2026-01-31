@@ -134,7 +134,7 @@ pub enum VectorIndexTypeConfig {
 
 impl Default for VectorIndexTypeConfig {
     fn default() -> Self {
-        VectorIndexTypeConfig::Flat(FlatIndexConfig::default())
+        VectorIndexTypeConfig::HNSW(HnswIndexConfig::default())
     }
 }
 

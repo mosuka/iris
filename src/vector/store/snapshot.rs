@@ -4,7 +4,6 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::data::Document;
 use crate::vector::index::wal::SeqNumber;
 
 pub const FIELD_INDEX_BASENAME: &str = "index";
@@ -15,20 +14,6 @@ pub const DOCUMENT_SNAPSHOT_FILE: &str = "documents.json";
 pub const DOCUMENT_SNAPSHOT_TEMP_FILE: &str = "documents.tmp";
 pub const COLLECTION_MANIFEST_FILE: &str = "manifest.json";
 pub const COLLECTION_MANIFEST_VERSION: u32 = 1;
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub(crate) struct DocumentSnapshot {
-    #[serde(default)]
-    pub(crate) last_wal_seq: SeqNumber,
-    #[serde(default)]
-    pub(crate) documents: Vec<SnapshotDocument>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct SnapshotDocument {
-    pub(crate) doc_id: u64,
-    pub(crate) document: Document,
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct CollectionManifest {

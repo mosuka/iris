@@ -19,23 +19,20 @@ use crate::vector::index::field::{
 use crate::vector::store::config::VectorFieldConfig;
 
 #[derive(Clone, Debug)]
-pub(crate) struct FieldHandle {
-    pub(crate) field: Arc<dyn VectorField>,
-    pub(crate) runtime: Arc<FieldRuntime>,
+pub struct FieldHandle {
+    pub field: Arc<dyn VectorField>,
+    pub runtime: Arc<FieldRuntime>,
 }
 
 #[derive(Debug)]
-pub(crate) struct FieldRuntime {
+pub struct FieldRuntime {
     default_reader: Arc<dyn VectorFieldReader>,
     current_reader: RwLock<Arc<dyn VectorFieldReader>>,
     writer: Arc<dyn VectorFieldWriter>,
 }
 
 impl FieldRuntime {
-    pub(crate) fn new(
-        reader: Arc<dyn VectorFieldReader>,
-        writer: Arc<dyn VectorFieldWriter>,
-    ) -> Self {
+    pub fn new(reader: Arc<dyn VectorFieldReader>, writer: Arc<dyn VectorFieldWriter>) -> Self {
         Self {
             current_reader: RwLock::new(reader.clone()),
             default_reader: reader,
@@ -43,33 +40,30 @@ impl FieldRuntime {
         }
     }
 
-    pub(crate) fn from_field(field: &Arc<dyn VectorField>) -> Arc<Self> {
+    pub fn from_field(field: &Arc<dyn VectorField>) -> Arc<Self> {
         Arc::new(Self::new(field.reader_handle(), field.writer_handle()))
     }
 
-    pub(crate) fn reader(&self) -> Arc<dyn VectorFieldReader> {
+    pub fn reader(&self) -> Arc<dyn VectorFieldReader> {
         self.current_reader.read().clone()
     }
 
-    pub(crate) fn writer(&self) -> Arc<dyn VectorFieldWriter> {
+    pub fn writer(&self) -> Arc<dyn VectorFieldWriter> {
         self.writer.clone()
     }
 
-    pub(crate) fn replace_reader(
-        &self,
-        reader: Arc<dyn VectorFieldReader>,
-    ) -> Arc<dyn VectorFieldReader> {
+    pub fn replace_reader(&self, reader: Arc<dyn VectorFieldReader>) -> Arc<dyn VectorFieldReader> {
         let mut guard = self.current_reader.write();
         std::mem::replace(&mut *guard, reader)
     }
 
-    pub(crate) fn reset_reader(&self) -> Arc<dyn VectorFieldReader> {
+    pub fn reset_reader(&self) -> Arc<dyn VectorFieldReader> {
         self.replace_reader(self.default_reader.clone())
     }
 }
 
 #[derive(Debug)]
-pub(crate) struct InMemoryVectorField {
+pub struct InMemoryVectorField {
     name: String,
     config: VectorFieldConfig,
     store: Arc<FieldStore>,
@@ -78,22 +72,24 @@ pub(crate) struct InMemoryVectorField {
 }
 
 impl InMemoryVectorField {
-    pub(crate) fn new(
+    pub fn new(
         name: String,
         config: VectorFieldConfig,
-        delegate: Option<Arc<dyn VectorFieldWriter>>,
+        delegate_writer: Option<Arc<dyn VectorFieldWriter>>,
+        delegate_reader: Option<Arc<dyn VectorFieldReader>>,
     ) -> Result<Self> {
         let store = Arc::new(FieldStore::default());
         let writer = Arc::new(InMemoryFieldWriter::new(
             name.clone(),
             config.clone(),
             store.clone(),
-            delegate,
+            delegate_writer,
         ));
         let reader = Arc::new(InMemoryFieldReader::new(
             name.clone(),
             config.clone(),
             store.clone(),
+            delegate_reader,
         ));
         Ok(Self {
             name,
@@ -104,7 +100,7 @@ impl InMemoryVectorField {
         })
     }
 
-    pub(crate) fn vector_tuples(&self) -> Vec<(u64, String, Vector)> {
+    pub fn vector_tuples(&self) -> Vec<(u64, String, Vector)> {
         self.store.vector_tuples(&self.name)
     }
 }
@@ -280,14 +276,21 @@ pub(crate) struct InMemoryFieldReader {
     field_name: String,
     config: VectorFieldConfig,
     store: Arc<FieldStore>,
+    delegate: Option<Arc<dyn VectorFieldReader>>,
 }
 
 impl InMemoryFieldReader {
-    fn new(field_name: String, config: VectorFieldConfig, store: Arc<FieldStore>) -> Self {
+    fn new(
+        field_name: String,
+        config: VectorFieldConfig,
+        store: Arc<FieldStore>,
+        delegate: Option<Arc<dyn VectorFieldReader>>,
+    ) -> Self {
         Self {
             field_name,
             config,
             store,
+            delegate,
         }
     }
 }
@@ -304,6 +307,8 @@ impl VectorFieldReader for InMemoryFieldReader {
         if request.query_vectors.is_empty() {
             return Ok(FieldSearchResults::default());
         }
+
+        let limit = request.limit;
 
         let snapshot = self.store.snapshot();
         let mut merged: HashMap<u64, FieldHit> = HashMap::new();
@@ -357,10 +362,35 @@ impl VectorFieldReader for InMemoryFieldReader {
             }
         }
 
+        // Merge with delegate results if available
+        if let Some(delegate) = &self.delegate {
+            let delegate_results = delegate.search(request)?;
+            for hit in delegate_results.hits {
+                match merged.entry(hit.doc_id) {
+                    Entry::Vacant(slot) => {
+                        slot.insert(hit);
+                    }
+                    Entry::Occupied(_slot) => {
+                        // If same doc exists in both (unlikely for typical update pattern unless update is insert+delete),
+                        // we prioritize memory version as it is newer, OR we sum scores?
+                        // For now, let's assume memory overrides disk (newer).
+                        // Or maybe we treat them as separate parts?
+                        // In Iris, updates are usually full document replacements with new IDs?
+                        // If same ID, it means update. Memory is newer.
+                        // So we do NOT overwrite if already in memory.
+                        // Actually, wait. The loop above puts memory hits into `merged`.
+                        // So if it's already in `merged`, it came from memory.
+                        // We should KEEP the memory version.
+                        // So do nothing.
+                    }
+                }
+            }
+        }
+
         let mut hits: Vec<FieldHit> = merged.into_values().collect();
         hits.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(CmpOrdering::Equal));
-        if hits.len() > request.limit {
-            hits.truncate(request.limit);
+        if hits.len() > limit {
+            hits.truncate(limit);
         }
 
         Ok(FieldSearchResults { hits })

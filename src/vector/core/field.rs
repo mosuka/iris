@@ -22,7 +22,7 @@ pub enum VectorOption {
 
 impl Default for VectorOption {
     fn default() -> Self {
-        VectorOption::Flat(FlatOption::default())
+        VectorOption::Hnsw(HnswOption::default())
     }
 }
 

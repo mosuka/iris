@@ -9,6 +9,7 @@
 pub mod config;
 pub mod factory;
 pub mod field;
+pub mod field_factory;
 pub mod flat;
 pub mod hnsw;
 pub mod io;

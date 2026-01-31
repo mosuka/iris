@@ -146,7 +146,7 @@ fn test_field_boosts() -> iris::Result<()> {
         .build();
 
     let res_a = engine.search(req_a)?;
-    assert_eq!(res_a[0].doc_id, 0); // doc1 has "rust" in title (doc_id 0 if indexed first)
+    assert_eq!(res_a[0].doc_id, 1); // doc1 has "rust" in title (doc_id 1 if indexed first)
     // Wait, doc_id might be internal. Let's check which doc it is.
     let doc_a = engine.get_document(res_a[0].doc_id)?.unwrap();
     assert_eq!(

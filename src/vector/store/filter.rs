@@ -14,12 +14,6 @@ pub struct MetadataFilter {
     pub equals: HashMap<String, FieldValue>,
 }
 
-impl MetadataFilter {
-    pub(crate) fn is_empty(&self) -> bool {
-        self.equals.is_empty()
-    }
-}
-
 use crate::vector::store::request::LexicalQuery;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -39,18 +33,6 @@ impl Default for VectorFilter {
         VectorFilter::Simple {
             document: MetadataFilter::default(),
             field: MetadataFilter::default(),
-        }
-    }
-}
-
-impl VectorFilter {
-    pub(crate) fn is_empty(&self) -> bool {
-        match self {
-            VectorFilter::Simple { document, field } => document.is_empty() && field.is_empty(),
-            // LexicalQuery doesn't have a simple is_empty check exposed here,
-            // but we can assume Advanced filter is usually not empty if intentionally passed.
-            // Or we check MatchAll.
-            VectorFilter::Advanced(q) => matches!(q, LexicalQuery::MatchAll),
         }
     }
 }
