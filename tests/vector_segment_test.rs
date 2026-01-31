@@ -43,8 +43,8 @@ impl Embedder for MockTextEmbedder {
     }
 }
 
-#[tokio::test]
-async fn test_vector_segment_integration() {
+#[test]
+fn test_vector_segment_integration() {
     // 1. Setup storage and config
     let storage_config = MemoryStorageConfig::default();
     let storage = Arc::new(MemoryStorage::new(storage_config));

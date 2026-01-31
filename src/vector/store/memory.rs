@@ -187,6 +187,43 @@ impl InMemoryFieldWriter {
 }
 
 impl VectorFieldWriter for InMemoryFieldWriter {
+    fn add_value(&self, doc_id: u64, value: &crate::data::DataValue, version: u64) -> Result<()> {
+        // If we have a delegate, let it handle embedding (EmbeddingVectorIndexWriter)
+        if let Some(delegate) = &self.delegate {
+            // Get count before to find new vector
+            let before_count = delegate.vectors().len();
+
+            // Delegate handles embedding
+            delegate.add_value(doc_id, value, version)?;
+
+            // Retrieve the newly added vector and store it locally
+            let vectors = delegate.vectors();
+            if vectors.len() > before_count {
+                // Get the last added vector
+                let (_, _, ref vec) = vectors[vectors.len() - 1];
+                let stored = StoredVector::new(vec.data.clone());
+                let converted = self.convert_vector(&stored)?;
+                self.store.replace(
+                    doc_id,
+                    FieldStoreEntry {
+                        vectors: vec![converted],
+                    },
+                );
+            }
+            return Ok(());
+        }
+
+        // No delegate - only accept pre-computed vectors
+        if let crate::data::DataValue::Vector(v) = value {
+            let stored = StoredVector::new(v.clone());
+            self.add_stored_vector(doc_id, &stored, version)
+        } else {
+            Err(IrisError::invalid_argument(
+                "add_value not supported for this field writer (needs embedding helper)",
+            ))
+        }
+    }
+
     fn add_stored_vector(&self, doc_id: u64, vector: &StoredVector, version: u64) -> Result<()> {
         if let Some(delegate) = &self.delegate {
             delegate.add_stored_vector(doc_id, vector, version)?;
