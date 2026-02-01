@@ -32,14 +32,85 @@ Comprehensive documentation is available in the [`docs/`](docs/) directory and o
 - **Flexible Analysis**: Configurable pipelines for tokenization, normalization, and stemming (including CJK support).
 - **Pluggable Storage**: Interfaces for in-memory, file-system, and memory-mapped storage backends.
 
+## Quick Start
+
+```rust
+use iris::{Document, Engine, FusionAlgorithm, IndexConfig, SearchRequestBuilder};
+use iris::analysis::analyzer::standard::StandardAnalyzer;
+use iris::lexical::{FieldOption, TextOption, TermQuery};
+use iris::vector::{FlatOption, VectorOption, VectorSearchRequestBuilder};
+use iris::storage::{StorageConfig, StorageFactory};
+use iris::storage::memory::MemoryStorageConfig;
+use std::sync::Arc;
+
+fn main() -> iris::Result<()> {
+    // 1. Create storage
+    let storage = StorageFactory::create(StorageConfig::Memory(MemoryStorageConfig::default()))?;
+
+    // 2. Configure index with a hybrid field (lexical + vector)
+    let config = IndexConfig::builder()
+        .analyzer(Arc::new(StandardAnalyzer::default()))
+        .embedder(Arc::new(MyEmbedder))  // Your embedder implementation
+        .add_hybrid_field(
+            "content",
+            VectorOption::Flat(FlatOption { dimension: 384, ..Default::default() }),
+            FieldOption::Text(TextOption::default()),
+        )
+        .build();
+
+    // 3. Create engine and index documents
+    let engine = Engine::new(storage, config)?;
+
+    engine.index(Document::new_with_id("doc1").add_text("content", "Rust is a systems programming language"))?;
+    engine.index(Document::new_with_id("doc2").add_text("content", "Python is great for machine learning"))?;
+    engine.commit()?;
+
+    // 4. Hybrid search (combines lexical keyword match + semantic similarity)
+    let results = engine.search(
+        SearchRequestBuilder::new()
+            .with_lexical(Box::new(TermQuery::new("content", "programming")))
+            .with_vector(VectorSearchRequestBuilder::new().add_text("content", "systems language").build())
+            .fusion(FusionAlgorithm::RRF { k: 60.0 })
+            .build()
+    )?;
+
+    // 5. Display results with document content
+    for hit in results {
+        if let Ok(Some(doc)) = engine.get_document(hit.doc_id) {
+            let id = doc.id().unwrap_or("unknown");
+            let content = doc.fields.get("content").and_then(|v| v.as_text()).unwrap_or("");
+            println!("[{}] {} (internal_id={}, score={:.4})", id, content, hit.doc_id, hit.score);
+        }
+    }
+
+    Ok(())
+}
+```
+
 ## Examples
 
-You can find numerous usage examples in the [`examples/`](examples/) directory, covering:
+You can find usage examples in the [`examples/`](examples/) directory:
 
-- [Basic Lexical Search](examples/term_query.rs)
-- [Vector Search & Embeddings](examples/vector_search.rs)
-- [Hybrid Search](examples/hybrid_search.rs)
-- [Multimodal Search](examples/multimodal_search.rs)
+### Search
+
+- [Unified Search](examples/search.rs) - Lexical, Vector, and Hybrid search in one cohesive example
+- [Multimodal Search](examples/multimodal_search.rs) - Text-to-image and image-to-image search
+
+### Query Types
+
+- [Term Query](examples/term_query.rs) - Basic keyword search
+- [Boolean Query](examples/boolean_query.rs) - Complex boolean expressions (AND, OR, NOT)
+- [Phrase Query](examples/phrase_query.rs) - Exact phrase matching
+- [Fuzzy Query](examples/fuzzy_query.rs) - Approximate string matching
+- [Wildcard Query](examples/wildcard_query.rs) - Pattern-based search
+- [Range Query](examples/range_query.rs) - Numeric and date range queries
+- [Geo Query](examples/geo_query.rs) - Geographic search
+- [Span Query](examples/span_query.rs) - Positional queries
+
+### Embeddings
+
+- [Candle Embedder](examples/embedding_with_candle.rs) - Local BERT embeddings
+- [OpenAI Embedder](examples/embedding_with_openai.rs) - Cloud-based embeddings
 
 ## Contributing
 
