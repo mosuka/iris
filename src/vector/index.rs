@@ -20,6 +20,7 @@ pub mod wal;
 
 use std::sync::{Arc, RwLock};
 
+use crate::embedding::embedder::Embedder;
 use crate::error::{IrisError, Result};
 use crate::storage::Storage;
 use crate::vector::core::vector::Vector;
@@ -27,6 +28,7 @@ use crate::vector::index::config::{
     FlatIndexConfig, HnswIndexConfig, IvfIndexConfig, VectorIndexTypeConfig,
 };
 use crate::vector::reader::VectorIndexReader;
+use crate::vector::search::searcher::VectorIndexSearcher;
 use crate::vector::writer::VectorIndexWriter;
 
 /// Trait for vector index implementations.
@@ -76,6 +78,34 @@ pub trait VectorIndex: Send + Sync + std::fmt::Debug {
     /// Performs index optimization to improve query performance.
     /// Uses interior mutability for thread-safe access.
     fn optimize(&self) -> Result<()>;
+
+    /// Refresh the index metadata from storage.
+    ///
+    /// Should be called after external writes (e.g., by a Writer) to ensure
+    /// the index state is up-to-date.
+    fn refresh(&self) -> Result<()> {
+        Ok(())
+    }
+
+    /// Create a searcher tailored for this index implementation.
+    ///
+    /// Returns a boxed [`VectorIndexSearcher`] capable of executing search/count operations.
+    fn searcher(&self) -> Result<Box<dyn VectorIndexSearcher>>;
+
+    /// Get the embedder associated with this index.
+    ///
+    /// Returns the embedder used to convert documents to vectors.
+    fn embedder(&self) -> Arc<dyn Embedder>;
+
+    /// Get the last processed WAL sequence number.
+    fn last_wal_seq(&self) -> u64 {
+        0
+    }
+
+    /// Set the last processed WAL sequence number.
+    fn set_last_wal_seq(&self, _seq: u64) -> Result<()> {
+        Ok(())
+    }
 }
 
 /// Statistics about a vector index.

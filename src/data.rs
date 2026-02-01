@@ -200,7 +200,7 @@ impl From<chrono::DateTime<chrono::Utc>> for DataValue {
 
 impl From<Vec<f32>> for DataValue {
     fn from(v: Vec<f32>) -> Self {
-        DataValue::Vector(v.into())
+        DataValue::Vector(v)
     }
 }
 

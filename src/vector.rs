@@ -19,9 +19,6 @@ pub mod search;
 
 pub mod reader;
 pub mod store;
-// pub mod field;
-// pub mod wal;
-// mod tests_deletion;
 pub mod writer;
 
 // Re-exports

@@ -12,12 +12,17 @@ use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, RwLock};
 
+use crate::embedding::embedder::Embedder;
 use crate::error::{IrisError, Result};
 use crate::storage::Storage;
 use crate::vector::index::config::HnswIndexConfig;
+use crate::vector::index::hnsw::searcher::HnswSearcher;
 use crate::vector::index::hnsw::writer::HnswIndexWriter;
 use crate::vector::index::{VectorIndex, VectorIndexStats};
 use crate::vector::reader::VectorIndexReader;
+use crate::vector::search::searcher::VectorIndexSearcher;
+use crate::vector::store::embedder::EmbedderExecutor;
+use crate::vector::store::embedding_writer::EmbeddingVectorIndexWriter;
 use crate::vector::writer::{VectorIndexWriter, VectorIndexWriterConfig};
 
 /// Metadata for the HNSW index.
@@ -64,6 +69,9 @@ pub struct HnswIndex {
 
     /// Index metadata (thread-safe).
     metadata: RwLock<IndexMetadata>,
+
+    /// Executor for async embedding operations.
+    executor: Arc<EmbedderExecutor>,
 }
 
 impl std::fmt::Debug for HnswIndex {
@@ -86,12 +94,14 @@ impl HnswIndex {
             ..Default::default()
         };
 
+        let executor = Arc::new(EmbedderExecutor::new()?);
         let index = HnswIndex {
             name: name.to_string(),
             storage,
             config,
             closed: AtomicBool::new(false),
             metadata: RwLock::new(metadata),
+            executor,
         };
 
         index.write_metadata()?;
@@ -106,6 +116,7 @@ impl HnswIndex {
         }
 
         let metadata = Self::read_metadata(storage.as_ref(), name)?;
+        let executor = Arc::new(EmbedderExecutor::new()?);
 
         Ok(HnswIndex {
             name: name.to_string(),
@@ -113,6 +124,7 @@ impl HnswIndex {
             config,
             closed: AtomicBool::new(false),
             metadata: RwLock::new(metadata),
+            executor,
         })
     }
 
@@ -203,12 +215,17 @@ impl VectorIndex for HnswIndex {
     fn writer(&self) -> Result<Box<dyn VectorIndexWriter>> {
         self.check_closed()?;
 
-        let writer = HnswIndexWriter::with_storage(
+        let inner_writer = HnswIndexWriter::with_storage(
             self.config.clone(),
             VectorIndexWriterConfig::default(),
             self.name.clone(),
             self.storage.clone(),
         )?;
+
+        // Wrap with EmbeddingVectorIndexWriter for automatic text/image embedding
+        let embedder = self.embedder();
+        let writer =
+            EmbeddingVectorIndexWriter::new(Box::new(inner_writer), embedder, self.executor.clone());
         Ok(Box::new(writer))
     }
 
@@ -245,6 +262,16 @@ impl VectorIndex for HnswIndex {
         self.check_closed()?;
         self.update_metadata()?;
         Ok(())
+    }
+
+    fn searcher(&self) -> Result<Box<dyn VectorIndexSearcher>> {
+        self.check_closed()?;
+        let reader = self.reader()?;
+        Ok(Box::new(HnswSearcher::new(reader)?))
+    }
+
+    fn embedder(&self) -> Arc<dyn Embedder> {
+        Arc::clone(&self.config.embedder)
     }
 }
 mod tests;

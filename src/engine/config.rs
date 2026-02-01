@@ -59,22 +59,12 @@ pub struct FieldConfig {
     pub lexical: Option<LexicalOption>,
 }
 
+#[derive(Default)]
 pub struct IndexConfigBuilder {
     fields: HashMap<String, FieldConfig>,
     default_fields: Vec<String>,
     embedder: Option<Arc<dyn Embedder>>,
     analyzer: Option<Arc<dyn Analyzer>>,
-}
-
-impl Default for IndexConfigBuilder {
-    fn default() -> Self {
-        Self {
-            fields: HashMap::new(),
-            default_fields: Vec::new(),
-            embedder: None,
-            analyzer: None,
-        }
-    }
 }
 
 impl IndexConfigBuilder {

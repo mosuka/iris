@@ -125,10 +125,10 @@ pub trait Query: Send + Sync + Debug {
 
     /// Apply field-level boosts to this query and its sub-queries.
     fn apply_field_boosts(&mut self, boosts: &HashMap<String, f32>) {
-        if let Some(f) = self.field() {
-            if let Some(&b) = boosts.get(f) {
-                self.set_boost(self.boost() * b);
-            }
+        if let Some(f) = self.field()
+            && let Some(&b) = boosts.get(f)
+        {
+            self.set_boost(self.boost() * b);
         }
     }
 }

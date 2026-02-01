@@ -7,6 +7,9 @@ use crate::lexical::index::inverted::query::Query;
 use crate::lexical::index::inverted::query::matcher::Matcher;
 use crate::util::simd;
 
+/// Type alias for boolean scorer clauses.
+type BooleanScorerClauses = std::sync::Mutex<Vec<(Box<dyn Scorer>, Box<dyn Matcher>)>>;
+
 /// Trait for document scorers.
 pub trait Scorer: Send + Debug {
     /// Calculate the score for a document.
@@ -334,7 +337,7 @@ impl Scorer for ConstantScorer {
 pub struct BooleanScorer {
     /// The sub-queries and their scorers/matchers.
     /// We use a Mutex for matchers since they are mutable.
-    clauses: std::sync::Mutex<Vec<(Box<dyn Scorer>, Box<dyn Matcher>)>>,
+    clauses: BooleanScorerClauses,
     /// The boost factor for this scorer.
     boost: f32,
 }
