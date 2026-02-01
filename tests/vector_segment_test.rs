@@ -117,14 +117,13 @@ fn test_vector_segment_integration() {
 
     // We verify stats.
     // Recovery should load segments.
-    // SegmentedVectorField::stats() sums active (new) + managed (sealed).
-    // Sealed should be 3 (one per upsert), or less if mocked?
-    // Assuming upsert flushes each time.
+    // The new VectorStore uses index.stats() which returns vector_count.
+    // After commit, the documents should be persisted.
 
-    let stats = engine_2.field_stats("vector_field").unwrap();
+    let stats = engine_2.stats().unwrap();
 
-    // We use assert!(stats.vector_count > 0) to be safe against flush optimizations.
+    // We use assert!(stats.document_count > 0) to be safe against flush optimizations.
     // But given implementation, it should be 3.
-    println!("Stats vector count: {}", stats.vector_count);
-    assert_eq!(stats.vector_count, 3);
+    println!("Stats document count: {}", stats.document_count);
+    assert_eq!(stats.document_count, 3);
 }

@@ -611,12 +611,6 @@ impl VectorIndexConfigBuilder {
     /// Set the embedder for all fields.
     ///
     /// Use `PerFieldEmbedder` for field-specific embedders.
-    // pub fn embedder(mut self, embedder: impl Embedder + 'static) -> Self {
-    //     self.embedder = Some(Arc::new(embedder));
-    //     self
-    // }
-
-    /// Set the embedder from an Arc.
     pub fn embedder(mut self, embedder: Arc<dyn Embedder>) -> Self {
         self.embedder = Some(embedder);
         self

@@ -14,8 +14,8 @@ use crate::storage::Storage;
 use crate::storage::prefixed::PrefixedStorage;
 use crate::store::document::UnifiedDocumentStore;
 use crate::vector::index::wal::{WalEntry, WalManager};
-use crate::vector::store::VectorStore;
 use crate::vector::store::config::VectorIndexConfig;
+use crate::vector::store::VectorStore;
 use parking_lot::RwLock;
 
 use self::config::IndexConfig;
@@ -108,10 +108,13 @@ impl Engine {
                             vector_doc.id = Some(id.clone());
                         }
                         for (name, val) in &document.fields {
-                            if let Some(field_config) = self.config.fields.get(name) {
-                                if field_config.vector.is_some() {
-                                    vector_doc.fields.insert(name.clone(), val.clone());
-                                }
+                            if self
+                                .config
+                                .fields
+                                .get(name)
+                                .is_some_and(|fc| fc.vector.is_some())
+                            {
+                                vector_doc.fields.insert(name.clone(), val.clone());
                             }
                         }
                         self.vector
@@ -198,10 +201,13 @@ impl Engine {
         vector_doc.id = Some(external_id.clone());
 
         for (name, val) in &doc.fields {
-            if let Some(field_config) = self.config.fields.get(name) {
-                if field_config.vector.is_some() {
-                    vector_doc.fields.insert(name.clone(), val.clone());
-                }
+            if self
+                .config
+                .fields
+                .get(name)
+                .is_some_and(|fc| fc.vector.is_some())
+            {
+                vector_doc.fields.insert(name.clone(), val.clone());
             }
         }
 
@@ -389,10 +395,10 @@ impl Engine {
         let mut lexical_query_to_use =
             lexical_query_override.or_else(|| request.lexical.as_ref().map(|q| q.clone_box()));
 
-        if let Some(query) = &mut lexical_query_to_use {
-            if !request.field_boosts.is_empty() {
-                query.apply_field_boosts(&request.field_boosts);
-            }
+        if let Some(query) = &mut lexical_query_to_use
+            && !request.field_boosts.is_empty()
+        {
+            query.apply_field_boosts(&request.field_boosts);
         }
 
         let lexical_hits = if let Some(query) = &lexical_query_to_use {
@@ -557,10 +563,10 @@ impl Engine {
 
         // Fill missing documents from Lexical Store if needed
         for result in &mut results {
-            if result.document.is_none() {
-                if let Ok(Some(doc)) = self.lexical.get_document_by_internal_id(result.doc_id) {
-                    result.document = Some(doc);
-                }
+            if result.document.is_none()
+                && let Ok(Some(doc)) = self.lexical.get_document_by_internal_id(result.doc_id)
+            {
+                result.document = Some(doc);
             }
         }
 

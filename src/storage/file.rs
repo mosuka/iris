@@ -452,13 +452,11 @@ impl Storage for FileStorage {
 
                 if path.is_dir() {
                     queue.push(path);
-                } else if path.is_file() {
-                    // Get relative path from root
-                    if let Ok(rel) = path.strip_prefix(&self.directory) {
-                        if let Some(name) = rel.to_str() {
-                            files.push(name.to_string());
-                        }
-                    }
+                } else if path.is_file()
+                    && let Ok(rel) = path.strip_prefix(&self.directory)
+                    && let Some(name) = rel.to_str()
+                {
+                    files.push(name.to_string());
                 }
             }
         }

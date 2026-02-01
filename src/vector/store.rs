@@ -1,25 +1,19 @@
-//! VectorStore: Low-level vector storage and retrieval.
+//! VectorStore: Simplified vector storage following LexicalStore pattern.
 //!
-//! This module provides a component for managing vector fields and segments.
-//! It does NOT handle document ID mapping or metadata storage.
+//! This module provides a vector storage component with a simple 4-member structure:
+//! - `index`: The underlying vector index
+//! - `writer_cache`: Cached writer for write operations
+//! - `searcher_cache`: Cached searcher for search operations
+//! - `doc_store`: Document storage
 //!
 //! # Module Structure
 //!
-//! - [`config`] - Configuration types (VectorIndexConfig, VectorFieldConfig, VectorIndexKind)
-//! - [`embedder`] - Embedding utilities
-//! - [`filter`] - Metadata filtering
-//! - [`memory`] - In-memory field implementation
-//! - [`registry`] - Document vector registry
+//! - [`config`] - Configuration types (VectorIndexConfig, VectorFieldConfig)
+//! - [`embedder`] - Embedding utilities (EmbedderExecutor)
+//! - [`embedding_writer`] - Embedding writer wrapper
+//! - [`query`] - Search query builder
 //! - [`request`] - Search request types
 //! - [`response`] - Search response types
-//! - [`snapshot`] - Snapshot persistence
-//! - [`wal`] - Write-Ahead Logging
-//!
-//! # Refactoring: Segmented Document Storage
-//!
-//! VectorStore has been refactored to move from a "single massive documents.json snapshot"
-//! to a "segmented document storage" model. Document data is now stored in binary segments
-//! on disk, and only currently active (uncommitted) documents are kept in memory.
 
 pub mod config;
 pub mod embedder;
@@ -29,921 +23,448 @@ pub mod memory;
 pub mod query;
 pub mod request;
 pub mod response;
-pub mod snapshot;
-#[cfg(test)]
-mod tests;
 
-use std::cmp::Ordering as CmpOrdering;
-use std::collections::{HashMap, HashSet};
-use std::fmt;
-use std::io::{Read, Write};
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, Ordering};
 
 use parking_lot::{Mutex, RwLock};
 
-use crate::data::{DataValue, Document};
+use crate::data::Document;
 use crate::embedding::embedder::Embedder;
-use crate::embedding::per_field::PerFieldEmbedder;
-use crate::error::{IrisError, Result};
-use crate::maintenance::deletion::DeletionManager;
+use crate::error::Result;
 use crate::storage::Storage;
-use crate::storage::prefixed::PrefixedStorage;
-use crate::vector::core::vector::Vector;
-use crate::vector::index::field::{
-    AdapterBackedVectorField, FieldHit, FieldSearchInput, VectorField, VectorFieldReader,
-    VectorFieldStats, VectorFieldWriter,
-};
-use crate::vector::index::field_factory::VectorFieldFactory;
-
-use self::embedder::{EmbedderExecutor, VectorEmbedderRegistry};
-use self::memory::{FieldHandle, FieldRuntime, InMemoryVectorField};
-// use self::segmented_docs::SegmentedDocumentStore;
 use crate::store::document::UnifiedDocumentStore;
+use crate::vector::core::vector::Vector;
+use crate::vector::index::config::VectorIndexTypeConfig;
+use crate::vector::index::factory::VectorIndexFactory;
+use crate::vector::index::VectorIndex;
+use crate::vector::search::searcher::{VectorIndexSearchRequest, VectorIndexSearcher};
+use crate::vector::writer::VectorIndexWriter;
 
-use self::request::{FieldSelector, QueryVector, VectorScoreMode, VectorSearchRequest};
+use self::config::VectorIndexConfig;
+use self::request::VectorSearchRequest;
 use self::response::{VectorHit, VectorSearchResults, VectorStats};
-use self::snapshot::{
-    COLLECTION_MANIFEST_FILE, COLLECTION_MANIFEST_VERSION, CollectionManifest, REGISTRY_NAMESPACE,
-};
 
-use crate::vector::store::config::{VectorFieldConfig, VectorIndexConfig};
-
-/// A vector storage component.
+/// A simplified vector storage component following the LexicalStore pattern.
+///
+/// This structure mirrors `LexicalStore` with only 4 members:
+/// - `index`: The underlying vector index
+/// - `writer_cache`: Cached writer for write operations
+/// - `searcher_cache`: Cached searcher for search operations
+/// - `doc_store`: Document storage
 pub struct VectorStore {
-    config: Arc<VectorIndexConfig>,
-    field_configs: Arc<RwLock<HashMap<String, VectorFieldConfig>>>,
-    fields: Arc<RwLock<HashMap<String, FieldHandle>>>,
-    embedder_registry: Arc<VectorEmbedderRegistry>,
-    embedder_executor: Mutex<Option<Arc<EmbedderExecutor>>>,
-    /// Manager for logical deletions.
-    deletion_manager: Arc<DeletionManager>,
-
-    storage: Arc<dyn Storage>,
+    /// The underlying vector index.
+    index: Box<dyn VectorIndex>,
+    /// Cached writer (created on-demand).
+    writer_cache: Mutex<Option<Box<dyn VectorIndexWriter>>>,
+    /// Cached searcher (invalidated after commit/optimize).
+    searcher_cache: RwLock<Option<Box<dyn VectorIndexSearcher>>>,
+    /// Document storage.
     doc_store: Arc<RwLock<UnifiedDocumentStore>>,
-    snapshot_wal_seq: AtomicU64,
-    closed: AtomicU64, // 0 = open, 1 = closed
 }
 
-impl fmt::Debug for VectorStore {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl std::fmt::Debug for VectorStore {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("VectorStore")
-            .field("config", &self.config)
-            .field("field_count", &self.fields.read().len())
+            .field("index", &self.index)
             .finish()
     }
 }
 
 impl VectorStore {
-    /// Create a new vector store with the given storage and configuration.
+    /// Create a new vector store with the given storage and high-level configuration.
+    ///
+    /// This constructor is compatible with Engine and accepts VectorIndexConfig.
+    /// It extracts the index type configuration from the first field.
+    ///
+    /// # Arguments
+    ///
+    /// * `storage` - The storage backend for persisting index data
+    /// * `config` - High-level configuration (compatible with Engine)
+    /// * `doc_store` - Document storage
+    ///
+    /// # Returns
+    ///
+    /// Returns a new `VectorStore` instance.
     pub fn new(
         storage: Arc<dyn Storage>,
         config: VectorIndexConfig,
         doc_store: Arc<RwLock<UnifiedDocumentStore>>,
     ) -> Result<Self> {
-        let embedder_registry = Arc::new(VectorEmbedderRegistry::new());
-        let field_configs = Arc::new(RwLock::new(config.fields.clone()));
+        // Extract index type config from the first field, or use default
+        let index_type_config = Self::extract_index_type_config(&config);
+        Self::with_index_type_config(storage, index_type_config, doc_store)
+    }
 
-        // Store the embedder from config before moving config into Arc
-        let config_embedder = config.embedder.clone();
-        let deletion_config = config.deletion_config.clone();
-
-        let deletion_manager = Arc::new(DeletionManager::new(deletion_config, storage.clone())?);
-
-        let executor = Arc::new(EmbedderExecutor::new()?);
-
-        let mut store = Self {
-            config: Arc::new(config),
-            field_configs: field_configs.clone(),
-            fields: Arc::new(RwLock::new(HashMap::new())),
-            embedder_registry,
-            embedder_executor: Mutex::new(Some(executor)),
-            deletion_manager,
-            storage: storage.clone(),
+    /// Create a new vector store with explicit index type configuration.
+    ///
+    /// This is a lower-level constructor for when you have a specific
+    /// VectorIndexTypeConfig.
+    ///
+    /// # Arguments
+    ///
+    /// * `storage` - The storage backend for persisting index data
+    /// * `config` - Configuration for the vector index (Flat, HNSW, or IVF)
+    /// * `doc_store` - Document storage
+    ///
+    /// # Returns
+    ///
+    /// Returns a new `VectorStore` instance.
+    pub fn with_index_type_config(
+        storage: Arc<dyn Storage>,
+        config: VectorIndexTypeConfig,
+        doc_store: Arc<RwLock<UnifiedDocumentStore>>,
+    ) -> Result<Self> {
+        let index = VectorIndexFactory::open_or_create(storage, "vector_index", config)?;
+        Ok(Self {
+            index,
+            writer_cache: Mutex::new(None),
+            searcher_cache: RwLock::new(None),
             doc_store,
-            snapshot_wal_seq: AtomicU64::new(0),
-            closed: AtomicU64::new(0),
-        };
-
-        let shard_id = store.config.shard_id;
-        store.deletion_manager.initialize_segment(
-            "global",
-            crate::util::id::create_doc_id(shard_id, 0),
-            crate::util::id::create_doc_id(shard_id, crate::util::id::MAX_LOCAL_ID),
-        )?;
-
-        // Do not load document snapshot anymore as documents are managed by UnifiedDocumentStore.
-        // store.load_persisted_state()?;
-        // We still need load_collection_manifest though!
-        store.load_collection_manifest(storage.clone())?;
-        store.instantiate_configured_fields()?;
-
-        store.register_embedder_from_config(config_embedder)?;
-
-        Ok(store)
+        })
     }
 
-    /// Register embedder instances from the Embedder trait object.
-    fn register_embedder_from_config(&self, embedder: Arc<dyn Embedder>) -> Result<()> {
-        let configs = self.field_configs.read().clone();
-        if let Some(per_field) = embedder.as_any().downcast_ref::<PerFieldEmbedder>() {
-            for field_name in configs.keys() {
-                let field_embedder = per_field.get_embedder(field_name).clone();
-                self.embedder_registry
-                    .register(field_name.clone(), field_embedder.clone());
-            }
-        } else {
-            for field_name in configs.keys() {
-                self.embedder_registry
-                    .register(field_name.clone(), embedder.clone());
-            }
-        }
+    /// Extract VectorIndexTypeConfig from VectorIndexConfig.
+    ///
+    /// Uses the first field's configuration if available, otherwise returns default.
+    fn extract_index_type_config(config: &VectorIndexConfig) -> VectorIndexTypeConfig {
+        use crate::vector::core::field::VectorOption;
+        use crate::vector::index::config::{FlatIndexConfig, HnswIndexConfig, IvfIndexConfig};
 
-        Ok(())
-    }
-
-    /// Register a concrete field implementation. Each field name must be unique.
-    pub fn register_field_impl(&self, field: Arc<dyn VectorField>) -> Result<()> {
-        let name = field.name().to_string();
-        let mut fields = self.fields.write();
-        if fields.contains_key(&name) {
-            return Err(IrisError::invalid_config(format!(
-                "vector field '{name}' is already registered"
-            )));
-        }
-        let runtime = FieldRuntime::from_field(&field);
-        fields.insert(name, FieldHandle { field, runtime });
-        Ok(())
-    }
-
-    /// Convenience helper to register a field backed by legacy adapters.
-    pub fn register_adapter_field(
-        &self,
-        name: impl Into<String>,
-        config: VectorFieldConfig,
-        writer: Arc<dyn VectorFieldWriter>,
-        reader: Arc<dyn VectorFieldReader>,
-    ) -> Result<()> {
-        let field: Arc<dyn VectorField> =
-            Arc::new(AdapterBackedVectorField::new(name, config, writer, reader));
-        self.register_field_impl(field)
-    }
-
-    // =========================================================================
-    // Internal methods
-    // =========================================================================
-
-    fn check_closed(&self) -> Result<()> {
-        if self.closed.load(Ordering::Relaxed) == 1 {
-            return Err(IrisError::index("VectorStore is closed"));
-        }
-        Ok(())
-    }
-
-    fn ensure_embedder_executor(&self) -> Result<Arc<EmbedderExecutor>> {
-        let mut guard = self.embedder_executor.lock();
-        if let Some(executor) = guard.as_ref() {
-            return Ok(executor.clone());
-        }
-        let executor = Arc::new(EmbedderExecutor::new()?);
-        *guard = Some(executor.clone());
-        Ok(executor)
-    }
-
-    fn instantiate_configured_fields(&mut self) -> Result<()> {
-        let configs: Vec<(String, VectorFieldConfig)> = self
-            .field_configs
-            .read()
-            .iter()
-            .map(|(name, config)| (name.clone(), config.clone()))
-            .collect();
-
-        for (name, config) in configs {
-            if self.fields.read().contains_key(&name) {
-                continue;
-            }
-            let field = self.create_vector_field(name, config)?;
-            self.register_field_impl(field)?;
-        }
-        Ok(())
-    }
-
-    fn create_vector_field(
-        &self,
-        name: String,
-        config: VectorFieldConfig,
-    ) -> Result<Arc<dyn VectorField>> {
-        let storage = self.field_storage(&name);
-        let executor = self.ensure_embedder_executor()?;
-        VectorFieldFactory::create_field(
-            name,
-            config,
-            storage,
-            self.deletion_manager.get_bitmap("global"),
-            self.config.embedder.clone(),
-            executor,
-        )
-    }
-
-    fn write_field_delegate_index(
-        &self,
-        field_name: &str,
-        config: &VectorFieldConfig,
-        vectors: Vec<(u64, String, Vector)>,
-    ) -> Result<()> {
-        let vector_option = config.vector.as_ref().ok_or_else(|| {
-            IrisError::invalid_config(format!(
-                "vector field '{field_name}' validation failed: no vector configuration found"
-            ))
-        })?;
-
-        let executor = self.ensure_embedder_executor()?;
-        let storage = self.field_storage(field_name);
-        let writer = VectorFieldFactory::create_writer(
-            field_name,
-            vector_option,
-            storage,
-            self.config.embedder.clone(),
-            executor,
-        )?;
-
-        writer.rebuild(vectors)?;
-        writer.flush()?;
-
-        Ok(())
-    }
-
-    fn load_delegate_reader(
-        &self,
-        field_name: &str,
-        config: &VectorFieldConfig,
-    ) -> Result<Arc<dyn VectorFieldReader>> {
-        let storage = self.field_storage(field_name);
-        let global_bitmap = self.deletion_manager.get_bitmap("global");
-        let vector_option = config.vector.as_ref().ok_or_else(|| {
-            IrisError::invalid_config(format!(
-                "vector field '{field_name}' has no vector configuration"
-            ))
-        })?;
-
-        VectorFieldFactory::create_reader(field_name, vector_option, storage, global_bitmap)
-    }
-
-    fn field_storage(&self, field_name: &str) -> Arc<dyn Storage> {
-        let prefix = Self::field_storage_prefix(field_name);
-        Arc::new(PrefixedStorage::new(prefix, self.storage.clone())) as Arc<dyn Storage>
-    }
-
-    fn registry_storage(&self) -> Arc<dyn Storage> {
-        Arc::new(PrefixedStorage::new(
-            REGISTRY_NAMESPACE,
-            self.storage.clone(),
-        )) as Arc<dyn Storage>
-    }
-
-    fn field_storage_prefix(field_name: &str) -> String {
-        let mut sanitized: String = field_name
-            .chars()
-            .map(|ch| match ch {
-                'a'..='z' | 'A'..='Z' | '0'..='9' | '-' | '_' => ch,
-                _ => '_',
-            })
-            .collect();
-        if sanitized.is_empty() {
-            sanitized.push_str("field");
-        }
-        format!("vector_fields/{sanitized}")
-    }
-
-    fn validate_document_fields(&self, _document: &Document) -> Result<()> {
-        Ok(())
-    }
-
-    fn delete_fields_for_doc(&self, doc_id: u64, doc: &Document) -> Result<()> {
-        let fields = self.fields.read();
-        for field_name in doc.fields.keys() {
-            if let Some(field) = fields.get(field_name) {
-                field.runtime.writer().delete_document(doc_id, 0)?;
+        // Try to get config from the first field with vector configuration
+        for field_config in config.fields.values() {
+            if let Some(ref vector_opt) = field_config.vector {
+                return match vector_opt {
+                    VectorOption::Flat(opt) => VectorIndexTypeConfig::Flat(FlatIndexConfig {
+                        dimension: opt.dimension,
+                        distance_metric: opt.distance,
+                        embedder: config.embedder.clone(),
+                        ..Default::default()
+                    }),
+                    VectorOption::Hnsw(opt) => VectorIndexTypeConfig::HNSW(HnswIndexConfig {
+                        dimension: opt.dimension,
+                        distance_metric: opt.distance,
+                        m: opt.m,
+                        ef_construction: opt.ef_construction,
+                        embedder: config.embedder.clone(),
+                        ..Default::default()
+                    }),
+                    VectorOption::Ivf(opt) => VectorIndexTypeConfig::IVF(IvfIndexConfig {
+                        dimension: opt.dimension,
+                        distance_metric: opt.distance,
+                        n_clusters: opt.n_clusters,
+                        n_probe: opt.n_probe,
+                        embedder: config.embedder.clone(),
+                        ..Default::default()
+                    }),
+                };
             }
         }
 
-        self.deletion_manager
-            .delete_document("global", doc_id, "delete_request")?;
-
-        Ok(())
+        // Default to HNSW with config's embedder
+        VectorIndexTypeConfig::HNSW(HnswIndexConfig {
+            embedder: config.embedder.clone(),
+            ..Default::default()
+        })
     }
 
-    fn apply_field_updates(&self, doc_id: u64, version: u64, document: &Document) -> Result<()> {
-        let fields = self.fields.read();
-        for (field_name, val) in &document.fields {
-            if let Some(field) = fields.get(field_name) {
-                field.runtime.writer().add_value(doc_id, val, version)?;
-            }
-        }
-        Ok(())
-    }
-
-    fn load_collection_manifest(&self, storage: Arc<dyn Storage>) -> Result<()> {
-        if !storage.file_exists(COLLECTION_MANIFEST_FILE) {
-            return Ok(());
-        }
-
-        let mut input = storage.open_input(COLLECTION_MANIFEST_FILE)?;
-        let mut buffer = Vec::new();
-        input.read_to_end(&mut buffer)?;
-        input.close()?;
-        if buffer.is_empty() {
-            return Ok(());
-        }
-
-        let manifest: CollectionManifest = serde_json::from_slice(&buffer)?;
-        if manifest.version != COLLECTION_MANIFEST_VERSION {
-            return Err(IrisError::invalid_config(format!(
-                "collection manifest version mismatch: expected {}, found {}",
-                COLLECTION_MANIFEST_VERSION, manifest.version
-            )));
-        }
-
-        if !manifest.field_configs.is_empty() {
-            *self.field_configs.write() = manifest.field_configs.clone();
-        }
-
-        Ok(())
-    }
-
-    pub fn flush(&self) -> Result<()> {
-        self.check_closed()?;
-
-        // 1. Flush fields
-        let fields = self.fields.read();
-        for field_entry in fields.values() {
-            field_entry.runtime.writer().flush()?;
-        }
-
-        Ok(())
-    }
-
-    fn find_all_internal_ids_by_external_id(&self, external_id: &str) -> Result<Vec<u64>> {
-        let mut results = self.doc_store.read().find_all_by_external_id(external_id)?;
-
-        // Remove duplicates if any
-        results.sort_unstable();
-        results.dedup();
-
-        Ok(results)
-    }
-
-    fn persist_state(&self) -> Result<()> {
-        // documents are persisted in flush() -> add_segment()
-        self.persist_manifest()
-    }
-
-    fn persist_manifest(&self) -> Result<()> {
-        let storage = self.registry_storage();
-        let manifest = CollectionManifest {
-            version: COLLECTION_MANIFEST_VERSION,
-            snapshot_wal_seq: self.snapshot_wal_seq.load(Ordering::SeqCst),
-            wal_last_seq: self.snapshot_wal_seq.load(Ordering::SeqCst),
-            field_configs: self.field_configs.read().clone(),
-        };
-        let serialized = serde_json::to_vec(&manifest)?;
-        self.write_atomic(storage, COLLECTION_MANIFEST_FILE, &serialized)
-    }
-
-    fn write_atomic(&self, storage: Arc<dyn Storage>, name: &str, bytes: &[u8]) -> Result<()> {
-        let tmp_name = format!("{name}.tmp");
-        let mut output = storage.create_output(&tmp_name)?;
-        output.write_all(bytes)?;
-        output.flush_and_sync()?;
-        output.close()?;
-        if storage.file_exists(name) {
-            storage.delete_file(name)?;
-        }
-        storage.rename_file(&tmp_name, name)
-    }
-
-    // =========================================================================
-    // Public API
-    // =========================================================================
-
-    pub fn config(&self) -> &VectorIndexConfig {
-        self.config.as_ref()
-    }
-
-    pub fn embedder(&self) -> Arc<dyn Embedder> {
-        Arc::clone(self.config.get_embedder())
-    }
-
+    /// Add a document to the index.
+    ///
+    /// Changes are not persisted until you call `commit()`.
     pub fn add_document(&self, doc: Document) -> Result<u64> {
-        self.check_closed()?;
+        // Add to document store first
+        let internal_id = self.doc_store.write().add_document(doc.clone())?;
 
-        if doc.id().is_some() {
-            return self.put_document(doc);
+        // Get or create writer
+        let mut guard = self.writer_cache.lock();
+        if guard.is_none() {
+            *guard = Some(self.index.writer()?);
         }
 
-        let doc_id = self.doc_store.write().add_document(doc.clone())?;
-        self.upsert_document_by_internal_id(doc_id, doc)?;
-        Ok(doc_id)
+        // Add values to index (writer handles embedding automatically)
+        let writer = guard.as_mut().unwrap();
+        for (field_name, value) in &doc.fields {
+            writer.add_value(internal_id, field_name.clone(), value.clone())?;
+        }
+
+        Ok(internal_id)
     }
 
-    pub fn add_documents(&self, docs: impl IntoIterator<Item = Document>) -> Result<Vec<u64>> {
-        docs.into_iter().map(|doc| self.add_document(doc)).collect()
-    }
-
-    pub fn put_document(&self, mut doc: Document) -> Result<u64> {
-        self.check_closed()?;
+    /// Put (upsert) a document into the index.
+    ///
+    /// If a document with the same ID exists, it is updated.
+    pub fn put_document(&self, doc: Document) -> Result<u64> {
         let external_id = doc.id().map(|s| s.to_string()).ok_or_else(|| {
-            IrisError::invalid_argument("Document ID is required for put_document")
+            crate::error::IrisError::invalid_argument("Document ID is required for put_document")
         })?;
 
-        if !doc.fields.contains_key("_id") {
-            doc.fields
-                .insert("_id".to_string(), DataValue::Text(external_id.clone()));
-        }
+        // Delete existing documents with same ID
+        let _ = self.delete_documents(&external_id)?;
 
-        let existing_ids = self.find_all_internal_ids_by_external_id(&external_id)?;
-        for &id in &existing_ids {
-            self.delete_document_by_internal_id(id)?;
-        }
-
-        let doc_id = self.doc_store.write().add_document(doc.clone())?;
-        self.upsert_document_by_internal_id(doc_id, doc)?;
-        Ok(doc_id)
+        // Add the new document
+        self.add_document(doc)
     }
 
+    /// Get documents by external ID.
     pub fn get_documents(&self, external_id: &str) -> Result<Vec<Document>> {
-        let ids = self.find_all_internal_ids_by_external_id(external_id)?;
+        let ids = self.doc_store.read().find_all_by_external_id(external_id)?;
         let mut results = Vec::with_capacity(ids.len());
         for id in ids {
-            if let Some(doc) = self.get_document_by_internal_id(id)? {
+            if let Some(doc) = self.doc_store.read().get_document(id)? {
                 results.push(doc);
             }
         }
         Ok(results)
     }
 
+    /// Delete documents by external ID.
     pub fn delete_documents(&self, external_id: &str) -> Result<bool> {
-        let ids = self.find_all_internal_ids_by_external_id(external_id)?;
-        println!(
-            "DEBUG: delete_documents({}) found ids: {:?}",
-            external_id, ids
-        );
+        let ids = self.doc_store.read().find_all_by_external_id(external_id)?;
         if ids.is_empty() {
             return Ok(false);
         }
-        for id in ids {
-            self.delete_document_by_internal_id(id)?;
+
+        let mut guard = self.writer_cache.lock();
+        if guard.is_none() {
+            *guard = Some(self.index.writer()?);
         }
+        let writer = guard.as_mut().unwrap();
+
+        for id in &ids {
+            writer.delete_document(*id)?;
+            self.doc_store.write().delete_document(*id)?;
+        }
+
         Ok(true)
     }
 
-    pub fn index_payload_chunk(&self, payload: Document) -> Result<u64> {
-        self.check_closed()?;
-        let doc_id = self.doc_store.write().add_document(payload.clone())?;
-        self.upsert_document_by_internal_id(doc_id, payload)?;
-        Ok(doc_id)
-    }
+    /// Upsert a document by its internal ID (used for WAL recovery).
+    ///
+    /// This method is primarily used during WAL recovery where the internal ID
+    /// is already known.
+    pub fn upsert_document_by_internal_id(&self, doc_id: u64, doc: Document) -> Result<()> {
+        // Get or create writer
+        let mut guard = self.writer_cache.lock();
+        if guard.is_none() {
+            *guard = Some(self.index.writer()?);
+        }
 
-    // Internal helper for indexing
-    fn upsert_document_with_id(&self, doc_id: u64, document: Document) -> Result<()> {
-        self.check_closed()?;
-        self.validate_document_fields(&document)?;
+        // First, delete any existing vectors for this doc_id
+        let writer = guard.as_mut().unwrap();
+        let _ = writer.delete_document(doc_id);
 
-        // 2. Update In-Memory Structures
-        // NOTE: Document is managed by UnifiedDocumentStore.
-        // We only update field writers here.
-
-        // Update Field Writers
-        self.apply_field_updates(doc_id, 0, &document)?;
+        // Add values to index (writer handles embedding automatically)
+        for (field_name, value) in &doc.fields {
+            writer.add_value(doc_id, field_name.clone(), value.clone())?;
+        }
 
         Ok(())
     }
-    /// Register an external field implementation.
-    pub fn register_field(&self, _name: String, field: Box<dyn VectorField>) -> Result<()> {
-        let field_arc: Arc<dyn VectorField> = Arc::from(field);
-        self.register_field_impl(field_arc)
-    }
 
-    /// Get statistics for a specific field.
-    pub fn field_stats(&self, field_name: &str) -> Result<VectorFieldStats> {
-        let fields = self.fields.read();
-        let field = fields.get(field_name).ok_or_else(|| {
-            IrisError::not_found(format!("vector field '{field_name}' is not registered"))
-        })?;
-        field.runtime.reader().stats()
-    }
+    /// Delete a document by its internal ID.
+    pub fn delete_document_by_internal_id(&self, doc_id: u64) -> Result<()> {
+        let mut guard = self.writer_cache.lock();
+        if guard.is_none() {
+            *guard = Some(self.index.writer()?);
+        }
+        let writer = guard.as_mut().unwrap();
 
-    /// Replace the reader for a specific field.
-    pub fn replace_field_reader(
-        &self,
-        field_name: &str,
-        reader: Box<dyn VectorFieldReader>,
-    ) -> Result<()> {
-        let fields = self.fields.read();
-        let field = fields.get(field_name).ok_or_else(|| {
-            IrisError::not_found(format!("vector field '{field_name}' is not registered"))
-        })?;
-        let reader_arc: Arc<dyn VectorFieldReader> = Arc::from(reader);
-        field.runtime.replace_reader(reader_arc);
-        Ok(())
-    }
-
-    /// Reset the reader for a specific field to default.
-    pub fn reset_field_reader(&self, field_name: &str) -> Result<()> {
-        let fields = self.fields.read();
-        let field = fields.get(field_name).ok_or_else(|| {
-            IrisError::not_found(format!("vector field '{field_name}' is not registered"))
-        })?;
-        field.runtime.reset_reader();
-        Ok(())
-    }
-
-    /// Materialize the delegate reader for a field (build persistent index).
-    pub fn materialize_delegate_reader(&self, field_name: &str) -> Result<()> {
-        let fields = self.fields.read();
-        let handle = fields.get(field_name).ok_or_else(|| {
-            IrisError::not_found(format!("vector field '{field_name}' is not registered"))
-        })?;
-
-        let in_memory = handle
-            .field
-            .as_any()
-            .downcast_ref::<InMemoryVectorField>()
-            .ok_or_else(|| {
-                IrisError::InvalidOperation(format!(
-                    "field '{field_name}' does not support delegate materialization"
-                ))
-            })?;
-
-        let vectors = in_memory.vector_tuples();
-        let config = in_memory.config().clone();
-        drop(fields);
-
-        self.write_field_delegate_index(field_name, &config, vectors)?;
-        let reader = self.load_delegate_reader(field_name, &config)?;
-
-        let fields = self.fields.read();
-        let handle = fields.get(field_name).ok_or_else(|| {
-            IrisError::not_found(format!("vector field '{field_name}' is not registered"))
-        })?;
-        handle.runtime.replace_reader(reader);
-        Ok(())
-    }
-
-    pub(crate) fn upsert_document_by_internal_id(&self, doc_id: u64, doc: Document) -> Result<()> {
-        self.upsert_document_with_id(doc_id, doc)
-    }
-
-    pub(crate) fn get_document_by_internal_id(&self, doc_id: u64) -> Result<Option<Document>> {
-        self.doc_store.read().get_document(doc_id)
-    }
-
-    pub(crate) fn delete_document_by_internal_id(&self, doc_id: u64) -> Result<()> {
-        let doc = self
-            .get_document_by_internal_id(doc_id)?
-            .ok_or_else(|| IrisError::not_found(format!("doc_id {doc_id}")))?;
-
-        self.delete_fields_for_doc(doc_id, &doc)?;
+        writer.delete_document(doc_id)?;
         self.doc_store.write().delete_document(doc_id)?;
-        self.deletion_manager
-            .delete_document("global", doc_id, "user_request")?;
 
-        self.persist_state()?;
         Ok(())
     }
 
-    pub fn searcher(&self) -> Result<Box<dyn crate::vector::search::searcher::VectorSearcher>> {
-        Ok(Box::new(VectorStoreSearcher::from_engine_ref(self)))
-    }
-
-    pub fn search(&self, mut request: VectorSearchRequest) -> Result<VectorSearchResults> {
-        for query_payload in std::mem::take(&mut request.query_payloads) {
-            let mut qv = self.embed_query_payload(&query_payload.field, query_payload.payload)?;
-            qv.weight = query_payload.weight;
-            request.query_vectors.push(qv);
-        }
-
-        let searcher = self.searcher()?;
-        searcher.search(&request)
-    }
-
+    /// Commit any pending changes to the index.
     pub fn commit(&self) -> Result<()> {
-        self.check_closed()?;
-        self.flush()?;
-        self.persist_state()
-    }
-
-    pub fn stats(&self) -> Result<VectorStats> {
-        let fields = self.fields.read();
-        let mut field_stats = HashMap::with_capacity(fields.len());
-        for (name, field) in fields.iter() {
-            let stats = field.runtime.reader().stats()?;
-            field_stats.insert(name.clone(), stats);
+        if let Some(mut writer) = self.writer_cache.lock().take() {
+            // commit() calls finalize() then write() to persist to storage
+            writer.commit()?;
         }
-
-        let mut doc_count = 0;
-        for segment in self.doc_store.read().segments() {
-            doc_count += segment.doc_count as usize;
-        }
-
-        if let Some(bitmap) = self.deletion_manager.get_bitmap("global") {
-            doc_count =
-                doc_count.saturating_sub(bitmap.deleted_count.load(Ordering::SeqCst) as usize);
-        }
-
-        Ok(VectorStats {
-            document_count: doc_count,
-            fields: field_stats,
-        })
-    }
-
-    pub fn storage(&self) -> &Arc<dyn Storage> {
-        &self.storage
-    }
-
-    pub fn close(&self) -> Result<()> {
-        self.closed.store(1, Ordering::SeqCst);
+        self.index.refresh()?;
+        *self.searcher_cache.write() = None;
         Ok(())
     }
 
-    pub fn is_closed(&self) -> bool {
-        self.closed.load(Ordering::SeqCst) == 1
-    }
-
-    pub fn set_last_wal_seq(&self, seq: u64) {
-        self.snapshot_wal_seq.store(seq, Ordering::SeqCst);
-    }
-
-    pub fn last_wal_seq(&self) -> u64 {
-        self.snapshot_wal_seq.load(Ordering::SeqCst)
-    }
-
+    /// Optimize the index.
     pub fn optimize(&self) -> Result<()> {
-        let fields = self.fields.read();
-        for field_entry in fields.values() {
-            field_entry.field.optimize()?;
-        }
+        self.index.optimize()?;
+        *self.searcher_cache.write() = None;
         Ok(())
     }
 
-    fn embed_query_payload(&self, field_name: &str, value: DataValue) -> Result<QueryVector> {
-        let embedder = self.embedder_registry.resolve(field_name)?;
-        let executor = self.ensure_embedder_executor()?;
-
-        let result_vec = match value {
-            DataValue::Text(t) => {
-                let embedder_owned = embedder.clone();
-                executor.run(async move {
-                    let input = crate::embedding::embedder::EmbedInput::Text(&t);
-                    embedder_owned.embed(&input).await
-                })?
-            }
-            DataValue::Bytes(b, m) => {
-                let embedder_owned = embedder.clone();
-                executor.run(async move {
-                    let input = crate::embedding::embedder::EmbedInput::Bytes(&b, m.as_deref());
-                    embedder_owned.embed(&input).await
-                })?
-            }
-            DataValue::Vector(v) => Vector::new(v),
-            _ => {
-                return Err(IrisError::invalid_argument(format!(
-                    "unsupported query data type for field '{field_name}'"
-                )));
-            }
-        };
-
-        Ok(QueryVector {
-            vector: result_vec.data,
-            weight: 1.0,
-            fields: None,
-        })
-    }
-}
-
-/// Searcher implementation for [`VectorStore`].
-#[derive(Debug)]
-pub struct VectorStoreSearcher {
-    config: Arc<VectorIndexConfig>,
-    fields: Arc<RwLock<HashMap<String, FieldHandle>>>,
-    _doc_store: Arc<RwLock<UnifiedDocumentStore>>,
-}
-
-impl VectorStoreSearcher {
-    pub fn from_engine_ref(engine: &VectorStore) -> Self {
-        Self {
-            config: Arc::clone(&engine.config),
-            fields: Arc::clone(&engine.fields),
-            _doc_store: Arc::clone(&engine.doc_store),
-        }
-    }
-
-    fn resolve_fields(&self, request: &VectorSearchRequest) -> Result<Vec<String>> {
-        match &request.fields {
-            Some(selectors) => self.apply_field_selectors(selectors),
-            None => Ok(self.config.default_fields.clone()),
-        }
-    }
-
-    fn apply_field_selectors(&self, selectors: &[FieldSelector]) -> Result<Vec<String>> {
-        let fields = self.fields.read();
-        let mut result = Vec::new();
-
-        for selector in selectors {
-            match selector {
-                FieldSelector::Exact(name) => {
-                    if fields.contains_key(name) {
-                        if !result.contains(name) {
-                            result.push(name.clone());
-                        }
-                    } else {
-                        return Err(IrisError::not_found(format!(
-                            "vector field '{name}' is not registered",
-                        )));
-                    }
-                }
-                FieldSelector::Prefix(prefix) => {
-                    for field_name in fields.keys() {
-                        if field_name.starts_with(prefix) && !result.contains(field_name) {
-                            result.push(field_name.clone());
-                        }
-                    }
-                }
-            }
-        }
-
-        Ok(result)
-    }
-
-    fn build_filter_matches(
-        &self,
-        request: &VectorSearchRequest,
-        _target_fields: &[String],
-    ) -> Result<Option<HashSet<u64>>> {
-        if let Some(ids) = &request.allowed_ids {
-            return Ok(Some(ids.iter().copied().collect()));
-        }
-        Ok(None)
-    }
-
-    fn scaled_field_limit(&self, limit: usize, overfetch: f32) -> usize {
-        ((limit as f32) * overfetch).ceil() as usize
-    }
-
-    fn query_vectors_for_field(
-        &self,
-        field_name: &str,
-        _config: &VectorFieldConfig,
-        request: &VectorSearchRequest,
-    ) -> Vec<QueryVector> {
-        let mut result = Vec::new();
-        for candidate in &request.query_vectors {
-            let include = if let Some(fields) = &candidate.fields {
-                fields.iter().any(|f| f.as_str() == field_name)
-            } else {
-                true
-            };
-
-            if include {
-                result.push(candidate.clone());
-            }
-        }
-        result
-    }
-
-    fn merge_field_hits(
-        &self,
-        doc_hits: &mut HashMap<u64, VectorHit>,
-        hits: Vec<FieldHit>,
-        field_weight: f32,
-        score_mode: VectorScoreMode,
-        allowed_ids: Option<&HashSet<u64>>,
-    ) -> Result<()> {
-        // existence check is skipped for performance, assuming vector index is in sync.
-        for hit in hits {
-            if let Some(allowed) = allowed_ids {
-                if !allowed.contains(&hit.doc_id) {
-                    continue;
-                }
-            }
-
-            let weighted_score = hit.score * field_weight;
-            let entry = doc_hits.entry(hit.doc_id).or_insert_with(|| VectorHit {
-                doc_id: hit.doc_id,
-                score: 0.0,
-                field_hits: Vec::new(),
-            });
-
-            match score_mode {
-                VectorScoreMode::WeightedSum => {
-                    entry.score += weighted_score;
-                }
-                VectorScoreMode::MaxSim => {
-                    entry.score = entry.score.max(weighted_score);
-                }
-                VectorScoreMode::LateInteraction => {
-                    return Err(IrisError::invalid_argument(
-                        "VectorScoreMode::LateInteraction is not supported yet",
-                    ));
-                }
-            }
-            entry.field_hits.push(hit);
-        }
-
+    /// Refresh the searcher cache.
+    pub fn refresh(&self) -> Result<()> {
+        *self.searcher_cache.write() = None;
         Ok(())
     }
-}
 
-impl crate::vector::search::searcher::VectorSearcher for VectorStoreSearcher {
-    fn search(&self, request: &VectorSearchRequest) -> Result<VectorSearchResults> {
-        if request.query_vectors.is_empty() && request.lexical_query.is_none() {
-            return Err(IrisError::invalid_argument(
-                "VectorSearchRequest requires at least one query vector or lexical query",
-            ));
-        }
+    /// Get or create a searcher.
+    fn get_searcher(&self) -> Result<Box<dyn VectorIndexSearcher>> {
+        // For now, always create a new searcher.
+        // The cache can be used for optimization later.
+        self.index.searcher()
+    }
 
-        if request.limit == 0 {
+    /// Execute a low-level vector similarity search.
+    pub fn search_index(
+        &self,
+        request: &VectorIndexSearchRequest,
+    ) -> Result<crate::vector::search::searcher::VectorIndexSearchResults> {
+        let searcher = self.get_searcher()?;
+        searcher.search(request)
+    }
+
+    /// Execute a high-level vector search (compatible with Engine).
+    ///
+    /// This method handles multiple query vectors and aggregates results.
+    /// Note: query_payloads must be pre-embedded before calling this method.
+    pub fn search(&self, request: VectorSearchRequest) -> Result<VectorSearchResults> {
+        if request.query_vectors.is_empty() {
             return Ok(VectorSearchResults::default());
         }
 
-        if request.overfetch < 1.0 {
-            return Err(IrisError::invalid_argument(
-                "VectorSearchRequest overfetch must be >= 1.0",
-            ));
-        }
+        let searcher = self.get_searcher()?;
+        let mut all_hits: std::collections::HashMap<u64, f32> = std::collections::HashMap::new();
 
-        let mut vector_hits_map: HashMap<u64, VectorHit> = HashMap::new();
+        // Process each query vector
+        for qv in &request.query_vectors {
+            let index_request = VectorIndexSearchRequest::new(Vector::new(qv.vector.clone()))
+                .top_k(request.limit * 2); // Overfetch for better results
 
-        if !request.query_vectors.is_empty() {
-            let target_fields = self.resolve_fields(request)?;
-            let allowed_ids = self.build_filter_matches(request, &target_fields)?;
+            let results = searcher.search(&index_request)?;
 
-            if allowed_ids.as_ref().is_some_and(|ids| ids.is_empty())
-                && request.lexical_query.is_none()
-            {
-                return Ok(VectorSearchResults::default());
-            }
-
-            let field_limit = self.scaled_field_limit(request.limit, request.overfetch);
-            let fields = self.fields.read();
-
-            for field_name in target_fields {
-                let field = fields
-                    .get(&field_name)
-                    .ok_or_else(|| IrisError::not_found(format!("vector field '{field_name}'")))?;
-                let matching_vectors =
-                    self.query_vectors_for_field(&field_name, field.field.config(), request);
-                if matching_vectors.is_empty() {
+            // Aggregate scores
+            for result in results.results {
+                // Apply allowed_ids filter if present
+                if request
+                    .allowed_ids
+                    .as_ref()
+                    .is_some_and(|allowed| !allowed.contains(&result.doc_id))
+                {
                     continue;
                 }
 
-                let field_query = FieldSearchInput {
-                    field: field_name.clone(),
-                    query_vectors: matching_vectors,
-                    limit: field_limit,
-                    allowed_ids: allowed_ids.clone(),
-                };
+                // Apply min_score filter
+                if result.similarity < request.min_score {
+                    continue;
+                }
 
-                let field_results = field.runtime.reader().search(field_query)?;
-                let field_weight = field
-                    .field
-                    .config()
-                    .vector
-                    .as_ref()
-                    .map(|v| v.base_weight())
-                    .unwrap_or(1.0);
-
-                self.merge_field_hits(
-                    &mut vector_hits_map,
-                    field_results.hits,
-                    field_weight,
-                    request.score_mode,
-                    allowed_ids.as_ref(),
-                )?;
+                let entry = all_hits.entry(result.doc_id).or_insert(0.0);
+                *entry += result.similarity * qv.weight;
             }
         }
 
-        let mut hits = Vec::with_capacity(vector_hits_map.len());
-        for hit in vector_hits_map.values() {
-            hits.push(hit.clone());
+        // Convert to VectorHit and sort by score
+        let mut hits: Vec<VectorHit> = all_hits
+            .into_iter()
+            .map(|(doc_id, score)| VectorHit {
+                doc_id,
+                score,
+                field_hits: vec![],
+            })
+            .collect();
+
+        hits.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+
+        // Apply limit
+        if hits.len() > request.limit {
+            hits.truncate(request.limit);
         }
-        hits.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(CmpOrdering::Equal));
 
-        let mut final_hits = hits;
-
-        if request.min_score > 0.0 {
-            final_hits.retain(|hit| hit.score >= request.min_score);
-        }
-
-        if final_hits.len() > request.limit {
-            final_hits.truncate(request.limit);
-        }
-
-        Ok(VectorSearchResults { hits: final_hits })
+        Ok(VectorSearchResults { hits })
     }
 
-    fn count(&self, request: &VectorSearchRequest) -> Result<u64> {
-        let results = self.search(request)?;
-        Ok(results.hits.len() as u64)
+    /// Count the number of vectors matching the query.
+    pub fn count(&self, request: VectorIndexSearchRequest) -> Result<u64> {
+        let searcher = self.get_searcher()?;
+        searcher.count(request)
+    }
+
+    /// Get index statistics.
+    pub fn stats(&self) -> Result<VectorStats> {
+        // Use the reader to get accurate vector count
+        let reader = self.index.reader()?;
+        let doc_count = reader.vector_count();
+
+        Ok(VectorStats {
+            document_count: doc_count,
+            fields: std::collections::HashMap::new(), // Simplified - no per-field stats
+        })
+    }
+
+    /// Get the storage backend.
+    pub fn storage(&self) -> &Arc<dyn Storage> {
+        self.index.storage()
+    }
+
+    /// Close the store.
+    pub fn close(&self) -> Result<()> {
+        *self.writer_cache.lock() = None;
+        *self.searcher_cache.write() = None;
+        self.index.close()
+    }
+
+    /// Check if the store is closed.
+    pub fn is_closed(&self) -> bool {
+        self.index.is_closed()
+    }
+
+    /// Get the embedder.
+    pub fn embedder(&self) -> Arc<dyn Embedder> {
+        self.index.embedder()
+    }
+
+    /// Get the last processed WAL sequence number.
+    pub fn last_wal_seq(&self) -> u64 {
+        self.index.last_wal_seq()
+    }
+
+    /// Set the last processed WAL sequence number.
+    ///
+    /// Note: This method doesn't return Result for Engine compatibility.
+    /// Errors are silently ignored.
+    pub fn set_last_wal_seq(&self, seq: u64) {
+        let _ = self.index.set_last_wal_seq(seq);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::storage::memory::{MemoryStorage, MemoryStorageConfig};
+    use crate::storage::prefixed::PrefixedStorage;
+
+    #[test]
+    fn test_vectorstore_creation() {
+        let storage = Arc::new(MemoryStorage::new(MemoryStorageConfig::default()));
+        let doc_storage = Arc::new(PrefixedStorage::new("documents", storage.clone()));
+        let doc_store = Arc::new(RwLock::new(
+            UnifiedDocumentStore::open(doc_storage).unwrap(),
+        ));
+
+        let config = VectorIndexTypeConfig::default();
+        let store = VectorStore::with_index_type_config(storage, config, doc_store).unwrap();
+
+        assert!(!store.is_closed());
+    }
+
+    #[test]
+    fn test_vectorstore_close() {
+        let storage = Arc::new(MemoryStorage::new(MemoryStorageConfig::default()));
+        let doc_storage = Arc::new(PrefixedStorage::new("documents", storage.clone()));
+        let doc_store = Arc::new(RwLock::new(
+            UnifiedDocumentStore::open(doc_storage).unwrap(),
+        ));
+
+        let config = VectorIndexTypeConfig::default();
+        let store = VectorStore::with_index_type_config(storage, config, doc_store).unwrap();
+
+        assert!(!store.is_closed());
+        store.close().unwrap();
+        assert!(store.is_closed());
     }
 }

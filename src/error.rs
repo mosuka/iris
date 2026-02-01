@@ -22,7 +22,6 @@
 
 use std::io;
 
-use anyhow;
 use thiserror::Error;
 
 /// The main error type for Iris operations.

@@ -201,15 +201,14 @@ impl VectorFieldFactory {
                         // If file doesn't exist, we probably shouldn't create a reader yet, OR create an empty one.
                         // But FlatVectorIndexReader doesn't seem to support "empty/new".
 
-                        let reader = match Self::create_reader(
+                        // Assume error means "not found" or similar. Ideally we check specific error.
+                        let reader = Self::create_reader(
                             &name,
                             opt,
                             storage.clone(),
                             deletion_bitmap.clone(),
-                        ) {
-                            Ok(r) => Some(r),
-                            Err(_) => None, // Assume error means "not found" or similar. Ideally we check specific error.
-                        };
+                        )
+                        .ok();
 
                         (Some(writer), reader)
                     } else {

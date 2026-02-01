@@ -380,12 +380,11 @@ impl LexicalStore {
         let mut doc = guard.get_document(internal_id)?;
 
         // If we have an _id field, use it to populate the Document.id property
-        if let Some(d) = &mut doc {
-            if d.id.is_none() {
-                if let Some(id_val) = d.fields.get("_id").and_then(|v| v.as_text()) {
-                    d.id = Some(id_val.to_string());
-                }
-            }
+        if let Some(d) = &mut doc
+            && d.id.is_none()
+            && let Some(id_val) = d.fields.get("_id").and_then(|v| v.as_text())
+        {
+            d.id = Some(id_val.to_string());
         }
 
         Ok(doc)
@@ -699,12 +698,11 @@ impl LexicalStore {
 
         // Hydrate doc.id from _id field
         for hit in &mut results.hits {
-            if let Some(doc) = &mut hit.document {
-                if doc.id.is_none() {
-                    if let Some(id_val) = doc.fields.get("_id").and_then(|v| v.as_text()) {
-                        doc.id = Some(id_val.to_string());
-                    }
-                }
+            if let Some(doc) = &mut hit.document
+                && doc.id.is_none()
+                && let Some(id_val) = doc.fields.get("_id").and_then(|v| v.as_text())
+            {
+                doc.id = Some(id_val.to_string());
             }
         }
 
@@ -816,10 +814,10 @@ impl LexicalStore {
         let analyzer = self.analyzer()?;
         let mut parser = crate::lexical::index::inverted::query::parser::QueryParser::new(analyzer);
 
-        if let Ok(fields) = self.index.default_fields() {
-            if !fields.is_empty() {
-                parser = parser.with_default_fields(fields);
-            }
+        if let Ok(fields) = self.index.default_fields()
+            && !fields.is_empty()
+        {
+            parser = parser.with_default_fields(fields);
         }
 
         Ok(parser)

@@ -52,7 +52,7 @@ impl EmbeddingVectorIndexWriter {
                 )));
             }
             DataValue::Bytes(_, mime) if !self.embedder.supports_image() => {
-                if mime.as_ref().map_or(false, |m| m.starts_with("image/")) {
+                if mime.as_ref().is_some_and(|m| m.starts_with("image/")) {
                     return Err(IrisError::invalid_argument(format!(
                         "Embedder '{}' does not support image input",
                         self.embedder.name()

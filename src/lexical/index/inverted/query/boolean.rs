@@ -408,10 +408,10 @@ impl Query for BooleanQuery {
 
     fn apply_field_boosts(&mut self, boosts: &std::collections::HashMap<String, f32>) {
         // Apply overall boost if targeted (BooleanQuery doesn't target a field usually, but we check anyway)
-        if let Some(f) = self.field() {
-            if let Some(&b) = boosts.get(f) {
-                self.set_boost(self.boost() * b);
-            }
+        if let Some(f) = self.field()
+            && let Some(&b) = boosts.get(f)
+        {
+            self.set_boost(self.boost() * b);
         }
 
         // Recursively apply to all clauses

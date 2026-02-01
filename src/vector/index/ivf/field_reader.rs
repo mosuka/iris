@@ -102,7 +102,7 @@ impl IvfFieldReader {
         let filtered_ids: Vec<(u64, String)> = vector_ids
             .into_iter()
             .filter(|(id, f)| {
-                f == &self.field_name && allowed_ids.map_or(true, |allowed| allowed.contains(id))
+                f == &self.field_name && allowed_ids.is_none_or(|allowed| allowed.contains(id))
             })
             .collect();
 

@@ -5,7 +5,6 @@
 
 pub const LOCAL_ID_BITS: u32 = 48;
 pub const LOCAL_ID_MASK: u64 = (1 << LOCAL_ID_BITS) - 1;
-pub const MAX_LOCAL_ID: u64 = LOCAL_ID_MASK;
 
 /// Create a 64-bit ID from a shard ID and a local ID.
 pub fn create_doc_id(shard_id: u16, local_id: u64) -> u64 {

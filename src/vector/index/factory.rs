@@ -94,6 +94,33 @@ impl VectorIndexFactory {
         }
     }
 
+    /// Open an existing index or create a new one if it doesn't exist.
+    ///
+    /// This is the recommended method for general use, as it handles both
+    /// creation and opening transparently.
+    ///
+    /// # Arguments
+    ///
+    /// * `storage` - Storage backend
+    /// * `name` - Index name
+    /// * `config` - Index configuration
+    ///
+    /// # Returns
+    ///
+    /// A boxed index implementation.
+    pub fn open_or_create(
+        storage: Arc<dyn Storage>,
+        name: &str,
+        config: VectorIndexTypeConfig,
+    ) -> Result<Box<dyn VectorIndex>> {
+        let metadata_file = format!("{}.json", name);
+        if storage.file_exists(&metadata_file) {
+            Self::open(storage, name, config)
+        } else {
+            Self::create(storage, name, config)
+        }
+    }
+
     /// Open an existing vector index with the given storage and configuration.
     ///
     /// # Arguments
