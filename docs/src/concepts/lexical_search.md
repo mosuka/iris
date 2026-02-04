@@ -2,7 +2,7 @@
 
 Lexical search matches documents based on exact or approximate keyword matches. It is the traditional "search engine" functionality found in Lucene or Elasticsearch.
 
-> **Note**: In the unified Iris architecture, Lexical Search is typically handled by the `VectorEngine`, which orchestrates both lexical and vector components concurrently. `LexicalEngine` can still be used as a standalone engine for pure keyword search scenarios.
+> **Note**: In the unified Iris architecture, Lexical Search is handled by the `Engine`, which orchestrates both lexical (LexicalStore) and vector (VectorStore) components concurrently.
 
 ## Document Structure
 
@@ -168,10 +168,10 @@ Iris uses SIMD-accelerated batch scoring for high-throughput ranking. The BM25 s
 
 ## Engine Architecture
 
-### Lexical Engine (`LexicalEngine`)
+### LexicalStore
 
-The engine that manages indexing and searching for text data. It coordinates between `InvertedIndexWriter` and `InvertedIndexSearcher`.
-In the unified architecture, this engine operates as a **sub-component** managed by the `VectorEngine`, handling the inverted index portions of hybrid documents. It handles manifest persistence and consistent ID mapping when run in standalone mode.
+The store component that manages indexing and searching for text data. It coordinates between `LexicalIndexWriter` and `LexicalIndexSearcher`.
+In the unified architecture, LexicalStore operates as a **sub-component** managed by the `Engine`, handling the inverted index portions of hybrid documents.
 
 ### Index Components
 
@@ -248,23 +248,28 @@ Iris uses **Okapi BM25** as its default scoring function. It improves results by
 
 ## Code Examples
 
-### 1. Configuring LexicalEngine
+### 1. Configuring Engine for Lexical Search
 
-Setting up a schema-less engine with a default analyzer.
+Setting up an engine with a lexical field and default analyzer.
 
 ```rust
 use std::sync::Arc;
-use iris::lexical::engine::LexicalEngine;
-use iris::lexical::engine::config::LexicalIndexConfig;
-use iris::storage::memory::{MemoryStorage, MemoryStorageConfig};
+use iris::{Engine, IndexConfig};
+use iris::analysis::analyzer::standard::StandardAnalyzer;
+use iris::lexical::{FieldOption, TextOption};
+use iris::storage::{StorageConfig, StorageFactory};
+use iris::storage::memory::MemoryStorageConfig;
 
-fn setup_engine() -> iris::error::Result<LexicalEngine> {
-    let storage = Arc::new(MemoryStorage::new(MemoryStorageConfig::default()));
-    
-    // Default configuration uses StandardAnalyzer
-    let config = LexicalIndexConfig::default();
-    let engine = LexicalEngine::new(storage, config)?;
-    Ok(engine)
+fn setup_engine() -> iris::Result<Engine> {
+    let storage = StorageFactory::create(StorageConfig::Memory(MemoryStorageConfig::default()))?;
+
+    let config = IndexConfig::builder()
+        .analyzer(Arc::new(StandardAnalyzer::default()))
+        .add_lexical_field("title", FieldOption::Text(TextOption::default()))
+        .add_lexical_field("content", FieldOption::Text(TextOption::default()))
+        .build();
+
+    Engine::new(storage, config)
 }
 ```
 
@@ -273,37 +278,38 @@ fn setup_engine() -> iris::error::Result<LexicalEngine> {
 Creating and indexing documents with various field types.
 
 ```rust
-use iris::lexical::core::document::Document;
-use iris::lexical::core::field::TextOption;
+use iris::{Document, DataValue};
 
-fn add_documents(engine: &LexicalEngine) -> iris::error::Result<()> {
-    let doc = Document::builder()
-        .add_text("title", "Iris Search", TextOption::default())
-        .add_text("content", "Fast and semantic search engine in Rust", TextOption::default())
-        .add_integer("price", 100)
-        .build();
+fn add_documents(engine: &Engine) -> iris::Result<()> {
+    let doc = Document::new_with_id("doc1")
+        .add_text("title", "Iris Search")
+        .add_text("content", "Fast and semantic search engine in Rust")
+        .add_field("price", DataValue::Integer(100));
 
-    engine.add_document(doc)?;
+    engine.index(doc)?;
     engine.commit()?; // Flush and commit to make searchable
     Ok(())
 }
 ```
 
-### 3. Searching via DSL
+### 3. Searching with Term Query
 
-Executing a simple search using the query string parser.
+Executing a simple search using a term query.
 
 ```rust
-use iris::lexical::search::searcher::LexicalSearchRequest;
+use iris::SearchRequestBuilder;
+use iris::lexical::TermQuery;
 
-fn search(engine: &LexicalEngine) -> iris::error::Result<()> {
-    // Search for matches in the default fields
-    let request = LexicalSearchRequest::new("content:rust")
-        .max_docs(10);
+fn search(engine: &Engine) -> iris::Result<()> {
+    let results = engine.search(
+        SearchRequestBuilder::new()
+            .with_lexical(Box::new(TermQuery::new("content", "rust")))
+            .limit(10)
+            .build()
+    )?;
 
-    let results = engine.search(request)?;
-    for hit in results.hits {
-        println!("Doc ID: {}, Score: {}", hit.doc_id, hit.score);
+    for hit in results {
+        println!("Doc ID: {}, Score: {:.4}", hit.doc_id, hit.score);
     }
     Ok(())
 }
@@ -315,18 +321,18 @@ Configuring a Japanese analyzer for specific fields.
 
 ```rust
 use iris::analysis::analyzer::japanese::JapaneseAnalyzer;
-use iris::lexical::engine::config::LexicalIndexConfig;
 
-fn setup_japanese_engine() -> iris::error::Result<LexicalEngine> {
-    let storage = Arc::new(MemoryStorage::new(MemoryStorageConfig::default()));
-    
+fn setup_japanese_engine() -> iris::Result<Engine> {
+    let storage = StorageFactory::create(StorageConfig::Memory(MemoryStorageConfig::default()))?;
+
     // Configure default analyzer to Japanese
     let analyzer = Arc::new(JapaneseAnalyzer::default());
-    let config = LexicalIndexConfig::builder()
+    let config = IndexConfig::builder()
         .analyzer(analyzer)
+        .add_lexical_field("content", FieldOption::Text(TextOption::default()))
         .build();
 
-    LexicalEngine::new(storage, config)
+    Engine::new(storage, config)
 }
 ```
 

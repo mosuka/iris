@@ -1,18 +1,18 @@
-# IRiS
+# Iris : Information Retrieval with Semantics
 
 [![Crates.io](https://img.shields.io/crates/v/iris.svg)](https://crates.io/crates/iris)
 [![Documentation](https://docs.rs/iris/badge.svg)](https://docs.rs/iris)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-IRiS is a **high-performance** search core library written in Rust, designed for **Information Retrieval with Semantics**.
+Iris is a **high-performance** search core library written in Rust, designed for **Information Retrieval with Semantics**.
 
-IRiS provides the foundational mechanisms **essential for** advanced search capabilities:
+Iris provides the foundational mechanisms **essential for** advanced search capabilities:
 
 - **Lexical search primitives** for precise, exact-match retrieval
 - **Vector-based similarity search** for deep semantic understanding
 - **Hybrid scoring and ranking** to synthesize multiple signals into coherent results
 
-Rather than functioning as a monolithic search engine, IRiS is architected as a **composable search core** — a suite of modular building blocks designed to be embedded into applications, extended with custom logic, or orchestrated within distributed systems.
+Rather than functioning as a monolithic search engine, Iris is architected as a **composable search core** — a suite of modular building blocks designed to be embedded into applications, extended with custom logic, or orchestrated within distributed systems.
 
 ## Documentation
 

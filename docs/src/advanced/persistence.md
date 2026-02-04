@@ -18,5 +18,6 @@ Indexes can be split into segments (though currently, the implementation focuses
 
 Currently, explicit commits flush the in-memory state to durable index files.
 
-- `lexical_engine.commit()`
-- `hybrid_engine.commit()`
+```rust
+engine.commit()?;  // Flush and persist all changes
+```

@@ -37,8 +37,8 @@ Iris employs a **Shard-Prefixed Stable ID** scheme designed for multi-node distr
 
 ## ID Lifecycle
 
-1. **Registration (`index_document`)**: User provides a document with an External ID.
-2. **ID Assignment**: The `HybridEngine` combines the current `shard_id` with a new Local ID to issue a Shard-Prefixed Internal ID.
+1. **Registration (`engine.index()`)**: User provides a document with an External ID.
+2. **ID Assignment**: The `Engine` combines the current `shard_id` with a new Local ID to issue a Shard-Prefixed Internal ID.
 3. **Mapping**: The engine maintains the relationship between the External ID and the new Internal ID.
 4. **Search**: Search results return the `u64` Internal ID for efficiency.
 5. **Retrieval/Deletion**: While the user-facing API accepts External IDs for convenience, the engine internally converts them to Internal IDs for near-instant processing.

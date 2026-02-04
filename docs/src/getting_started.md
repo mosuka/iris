@@ -7,7 +7,7 @@ Welcome to the Iris getting started guide. This section is designed to try out I
 Building a search application with Iris typically involves the following steps:
 
 1. **Installation**: Adding `iris` to your project dependencies.
-2. **Configuration**: Setting up the `VectorEngine` (or `LexicalEngine`) and choosing a storage backend (Memory, File, or Mmap).
+2. **Configuration**: Setting up the `Engine` with `IndexConfig` and choosing a storage backend (Memory, File, or Mmap).
 3. **Indexing**: Inserting documents that contain both text (for lexical search) and vectors (for semantic search).
 4. **Searching**: Executing queries to retrieve relevant results.
 
@@ -18,19 +18,56 @@ Learn how to add Iris to your Rust project and configure necessary feature flags
 
 ## Quick Example
 
-For a complete, runnable example of how to set up a Hybrid Search (combining vector and text search), please refer to the **[Hybrid Search Example](https://github.com/mosuka/iris/blob/main/examples/hybrid_search.rs)** in the repository.
+For a complete, runnable example of how to set up a Hybrid Search (combining vector and text search), please refer to the **[Unified Search Example](https://github.com/mosuka/iris/blob/main/examples/search.rs)** in the repository.
 
 ```rust
-// Pseudo-code of a typical setup
-let storage = Arc::new(MemoryStorage::default());
-let config = VectorIndexConfig::builder()
-    .add_field("embedding", 768)?
-    .build()?;
-let engine = VectorEngine::new(storage, config)?;
+use iris::{Document, Engine, FusionAlgorithm, IndexConfig, SearchRequestBuilder};
+use iris::analysis::analyzer::standard::StandardAnalyzer;
+use iris::lexical::{FieldOption, TextOption, TermQuery};
+use iris::vector::{FlatOption, VectorOption, VectorSearchRequestBuilder};
+use iris::storage::{StorageConfig, StorageFactory};
+use iris::storage::memory::MemoryStorageConfig;
+use std::sync::Arc;
 
-// Indexing...
-engine.upsert_vectors(doc_id, document)?;
+fn main() -> iris::Result<()> {
+    // 1. Create storage
+    let storage = StorageFactory::create(StorageConfig::Memory(MemoryStorageConfig::default()))?;
 
-// Searching...
-let results = engine.search(request).await?;
+    // 2. Configure index with a hybrid field (lexical + vector)
+    let config = IndexConfig::builder()
+        .analyzer(Arc::new(StandardAnalyzer::default()))
+        .embedder(Arc::new(MyEmbedder))  // Your embedder implementation
+        .add_hybrid_field(
+            "content",
+            VectorOption::Flat(FlatOption { dimension: 384, ..Default::default() }),
+            FieldOption::Text(TextOption::default()),
+        )
+        .build();
+
+    // 3. Create engine and index documents
+    let engine = Engine::new(storage, config)?;
+
+    engine.index(Document::new_with_id("doc1").add_text("content", "Rust is a systems programming language"))?;
+    engine.index(Document::new_with_id("doc2").add_text("content", "Python is great for machine learning"))?;
+    engine.commit()?;
+
+    // 4. Hybrid search (combines lexical keyword match + semantic similarity)
+    let results = engine.search(
+        SearchRequestBuilder::new()
+            .with_lexical(Box::new(TermQuery::new("content", "programming")))
+            .with_vector(VectorSearchRequestBuilder::new().add_text("content", "systems language").build())
+            .fusion(FusionAlgorithm::RRF { k: 60.0 })
+            .build()
+    )?;
+
+    // 5. Display results
+    for hit in results {
+        if let Ok(Some(doc)) = engine.get_document(hit.doc_id) {
+            let id = doc.id().unwrap_or("unknown");
+            println!("[{}] score={:.4}", id, hit.score);
+        }
+    }
+
+    Ok(())
+}
 ```

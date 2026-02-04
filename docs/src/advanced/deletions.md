@@ -19,5 +19,5 @@ Over time, deleted documents accumulate and waste space.
 
 ```rust
 // Example of triggering manual compaction
-vector_engine.force_merge()?;
+engine.optimize()?;
 ```
