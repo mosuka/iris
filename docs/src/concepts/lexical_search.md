@@ -254,7 +254,7 @@ Setting up an engine with a lexical field and default analyzer.
 
 ```rust
 use std::sync::Arc;
-use iris::{Engine, IndexConfig};
+use iris::{Engine, Schema};
 use iris::analysis::analyzer::standard::StandardAnalyzer;
 use iris::lexical::{FieldOption, TextOption};
 use iris::storage::{StorageConfig, StorageFactory};
@@ -263,13 +263,13 @@ use iris::storage::memory::MemoryStorageConfig;
 fn setup_engine() -> iris::Result<Engine> {
     let storage = StorageFactory::create(StorageConfig::Memory(MemoryStorageConfig::default()))?;
 
-    let config = IndexConfig::builder()
+    let schema = Schema::builder()
         .analyzer(Arc::new(StandardAnalyzer::default()))
         .add_lexical_field("title", FieldOption::Text(TextOption::default()))
         .add_lexical_field("content", FieldOption::Text(TextOption::default()))
         .build();
 
-    Engine::new(storage, config)
+    Engine::new(storage, schema)
 }
 ```
 
@@ -327,12 +327,12 @@ fn setup_japanese_engine() -> iris::Result<Engine> {
 
     // Configure default analyzer to Japanese
     let analyzer = Arc::new(JapaneseAnalyzer::default());
-    let config = IndexConfig::builder()
+    let schema = Schema::builder()
         .analyzer(analyzer)
         .add_lexical_field("content", FieldOption::Text(TextOption::default()))
         .build();
 
-    Engine::new(storage, config)
+    Engine::new(storage, schema)
 }
 ```
 

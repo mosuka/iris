@@ -6,7 +6,7 @@ use iris::storage::prefixed::PrefixedStorage;
 use iris::store::document::UnifiedDocumentStore;
 use iris::vector::DistanceMetric;
 use iris::vector::Vector;
-use iris::vector::{HnswOption, VectorOption};
+use iris::vector::{HnswOption, FieldOption};
 use iris::vector::{VectorFieldConfig, VectorIndexConfig};
 use iris::{DataValue, Document};
 use iris::{EmbedInput, EmbedInputType, Embedder};
@@ -53,7 +53,7 @@ fn test_vector_segment_integration() {
     field_configs.insert(
         "vector_field".to_string(),
         VectorFieldConfig {
-            vector: Some(VectorOption::Hnsw(HnswOption {
+            vector: Some(FieldOption::Hnsw(HnswOption {
                 dimension: 4,
                 distance: DistanceMetric::Euclidean,
                 m: 16,

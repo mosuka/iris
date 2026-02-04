@@ -5,7 +5,7 @@ use iris::vector::VectorFieldConfig;
 use iris::vector::index::field::{VectorFieldReader, VectorFieldWriter};
 use iris::vector::index::hnsw::segment::manager::{SegmentManager, SegmentManagerConfig};
 use iris::vector::index::segmented_field::SegmentedVectorField;
-use iris::vector::{HnswOption, VectorOption};
+use iris::vector::{HnswOption, FieldOption};
 use std::sync::Arc;
 
 #[test]
@@ -22,7 +22,7 @@ fn test_segmented_field_manual_merge() -> Result<(), Box<dyn std::error::Error>>
 
     // 2. Setup Field
     let field_config = VectorFieldConfig {
-        vector: Some(VectorOption::Hnsw(HnswOption {
+        vector: Some(FieldOption::Hnsw(HnswOption {
             dimension: 4,
             distance: DistanceMetric::Euclidean,
             m: 16, // Default or specific to test? Using defaults or standard values

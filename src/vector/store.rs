@@ -127,20 +127,20 @@ impl VectorStore {
     ///
     /// Uses the first field's configuration if available, otherwise returns default.
     fn extract_index_type_config(config: &VectorIndexConfig) -> VectorIndexTypeConfig {
-        use crate::vector::core::field::VectorOption;
+        use crate::vector::core::field::FieldOption;
         use crate::vector::index::config::{FlatIndexConfig, HnswIndexConfig, IvfIndexConfig};
 
         // Try to get config from the first field with vector configuration
         for field_config in config.fields.values() {
             if let Some(ref vector_opt) = field_config.vector {
                 return match vector_opt {
-                    VectorOption::Flat(opt) => VectorIndexTypeConfig::Flat(FlatIndexConfig {
+                    FieldOption::Flat(opt) => VectorIndexTypeConfig::Flat(FlatIndexConfig {
                         dimension: opt.dimension,
                         distance_metric: opt.distance,
                         embedder: config.embedder.clone(),
                         ..Default::default()
                     }),
-                    VectorOption::Hnsw(opt) => VectorIndexTypeConfig::HNSW(HnswIndexConfig {
+                    FieldOption::Hnsw(opt) => VectorIndexTypeConfig::HNSW(HnswIndexConfig {
                         dimension: opt.dimension,
                         distance_metric: opt.distance,
                         m: opt.m,
@@ -148,7 +148,7 @@ impl VectorStore {
                         embedder: config.embedder.clone(),
                         ..Default::default()
                     }),
-                    VectorOption::Ivf(opt) => VectorIndexTypeConfig::IVF(IvfIndexConfig {
+                    FieldOption::Ivf(opt) => VectorIndexTypeConfig::IVF(IvfIndexConfig {
                         dimension: opt.dimension,
                         distance_metric: opt.distance,
                         n_clusters: opt.n_clusters,

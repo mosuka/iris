@@ -6,7 +6,7 @@ use crate::embedding::embedder::Embedder;
 use crate::error::{IrisError, Result};
 use crate::maintenance::deletion::DeletionBitmap;
 use crate::storage::Storage;
-use crate::vector::core::field::VectorOption;
+use crate::vector::core::field::FieldOption;
 use crate::vector::index::config::{FlatIndexConfig, HnswIndexConfig, IvfIndexConfig};
 use crate::vector::index::field::{
     LegacyVectorFieldWriter, VectorField, VectorFieldReader, VectorFieldWriter,
@@ -34,7 +34,7 @@ impl VectorFieldFactory {
     /// Create a writer for a specific vector field configuration.
     pub fn create_writer(
         field_name: &str,
-        vector_option: &VectorOption,
+        vector_option: &FieldOption,
         storage: Arc<dyn Storage>,
         embedder: Arc<dyn Embedder>,
         executor: Arc<EmbedderExecutor>,
@@ -49,7 +49,7 @@ impl VectorFieldFactory {
         use crate::vector::writer::VectorIndexWriter;
 
         let inner_writer: Box<dyn VectorIndexWriter> = match vector_option {
-            VectorOption::Flat(opt) => {
+            FieldOption::Flat(opt) => {
                 let flat = FlatIndexConfig {
                     dimension: opt.dimension,
                     distance_metric: opt.distance,
@@ -63,7 +63,7 @@ impl VectorFieldFactory {
                     storage,
                 )?)
             }
-            VectorOption::Hnsw(opt) => {
+            FieldOption::Hnsw(opt) => {
                 let hnsw = HnswIndexConfig {
                     dimension: opt.dimension,
                     distance_metric: opt.distance,
@@ -79,7 +79,7 @@ impl VectorFieldFactory {
                     storage,
                 )?)
             }
-            VectorOption::Ivf(opt) => {
+            FieldOption::Ivf(opt) => {
                 let ivf = IvfIndexConfig {
                     dimension: opt.dimension,
                     distance_metric: opt.distance,
@@ -107,12 +107,12 @@ impl VectorFieldFactory {
     /// Create a reader for a specific vector field configuration.
     pub fn create_reader(
         field_name: &str,
-        vector_option: &VectorOption,
+        vector_option: &FieldOption,
         storage: Arc<dyn Storage>,
         deletion_bitmap: Option<Arc<DeletionBitmap>>,
     ) -> Result<Arc<dyn VectorFieldReader>> {
         let reader: Arc<dyn VectorFieldReader> = match vector_option {
-            VectorOption::Flat(opt) => {
+            FieldOption::Flat(opt) => {
                 let mut reader = FlatVectorIndexReader::load(
                     storage.as_ref(),
                     FIELD_INDEX_BASENAME,
@@ -123,7 +123,7 @@ impl VectorFieldFactory {
                 }
                 Arc::new(FlatFieldReader::new(field_name, Arc::new(reader)))
             }
-            VectorOption::Hnsw(opt) => {
+            FieldOption::Hnsw(opt) => {
                 let mut reader = HnswVectorIndexReader::load(
                     storage.as_ref(),
                     FIELD_INDEX_BASENAME,
@@ -134,7 +134,7 @@ impl VectorFieldFactory {
                 }
                 Arc::new(HnswFieldReader::new(field_name, Arc::new(reader)))
             }
-            VectorOption::Ivf(opt) => {
+            FieldOption::Ivf(opt) => {
                 let mut reader = IvfVectorIndexReader::load(
                     storage.as_ref(),
                     FIELD_INDEX_BASENAME,
@@ -169,7 +169,7 @@ impl VectorFieldFactory {
 
         let vector_opt = config.vector.clone();
         let field: Arc<dyn VectorField> = match vector_opt {
-            Some(VectorOption::Hnsw(_)) => {
+            Some(FieldOption::Hnsw(_)) => {
                 let manager_config = SegmentManagerConfig::default();
                 let segment_manager =
                     Arc::new(SegmentManager::new(manager_config, storage.clone())?);

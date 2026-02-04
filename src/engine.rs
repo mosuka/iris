@@ -1,4 +1,4 @@
-pub mod config;
+pub mod schema;
 pub mod search;
 
 use std::sync::Arc;
@@ -18,14 +18,14 @@ use crate::vector::store::config::VectorIndexConfig;
 use crate::vector::store::VectorStore;
 use parking_lot::RwLock;
 
-use self::config::IndexConfig;
+use self::schema::Schema;
 
 /// Unified Engine that manages both Lexical and Vector indices.
 ///
 /// This engine acts as a facade, coordinating document ingestion and search
 /// across the underlying specialized engines.
 pub struct Engine {
-    config: IndexConfig,
+    schema: Schema,
     lexical: LexicalStore,
     vector: VectorStore,
     document_store: Arc<RwLock<UnifiedDocumentStore>>,
@@ -41,14 +41,14 @@ impl Engine {
     /// # Arguments
     ///
     /// * `storage` - The root storage for the index.
-    /// * `config` - The unified index configuration.
+    /// * `schema` - The unified index schema.
     ///
     /// The engine will create two namespaces within the storage:
     /// - "lexical" for the inverted index
     /// - "vector" for the vector index
-    pub fn new(storage: Arc<dyn Storage>, config: IndexConfig) -> Result<Self> {
-        // 1. Split configuration
-        let (lexical_config, vector_config) = Self::split_config(&config);
+    pub fn new(storage: Arc<dyn Storage>, schema: Schema) -> Result<Self> {
+        // 1. Split schema
+        let (lexical_config, vector_config) = Self::split_schema(&schema);
 
         // 2. Create namespaced storage
         let lexical_storage = Arc::new(PrefixedStorage::new("lexical", storage.clone()));
@@ -65,7 +65,7 @@ impl Engine {
         let wal = Arc::new(WalManager::new(storage, "engine.wal")?);
 
         let engine = Self {
-            config,
+            schema,
             lexical,
             vector,
             document_store,
@@ -109,10 +109,10 @@ impl Engine {
                         }
                         for (name, val) in &document.fields {
                             if self
-                                .config
+                                .schema
                                 .fields
                                 .get(name)
-                                .is_some_and(|fc| fc.vector.is_some())
+                                .is_some_and(|fc| fc.is_vector())
                             {
                                 vector_doc.fields.insert(name.clone(), val.clone());
                             }
@@ -202,10 +202,10 @@ impl Engine {
 
         for (name, val) in &doc.fields {
             if self
-                .config
+                .schema
                 .fields
                 .get(name)
-                .is_some_and(|fc| fc.vector.is_some())
+                .is_some_and(|fc| fc.is_vector())
             {
                 vector_doc.fields.insert(name.clone(), val.clone());
             }
@@ -254,27 +254,26 @@ impl Engine {
         let doc = self.lexical.get_document_by_internal_id(doc_id)?;
 
         if let Some(mut doc) = doc {
-            use crate::lexical::core::field::FieldOption;
+            use crate::lexical::core::field::FieldOption as LexicalFieldOption;
 
             let fields_to_remove: Vec<String> = doc
                 .fields
                 .keys()
                 .filter(|name| {
-                    if let Some(config) = self.config.fields.get(*name) {
+                    if let Some(field_opt) = self.schema.fields.get(*name) {
                         // If configured, check stored property
-                        if let Some(lexical_opt) = &config.lexical {
+                        if let Some(lexical_opt) = field_opt.as_lexical() {
                             match lexical_opt {
-                                FieldOption::Text(o) => !o.stored,
-                                FieldOption::Integer(o) => !o.stored,
-                                FieldOption::Float(o) => !o.stored,
-                                FieldOption::Boolean(o) => !o.stored,
-                                FieldOption::DateTime(o) => !o.stored,
-                                FieldOption::Geo(o) => !o.stored,
-                                FieldOption::Blob(o) => !o.stored,
+                                LexicalFieldOption::Text(o) => !o.stored,
+                                LexicalFieldOption::Integer(o) => !o.stored,
+                                LexicalFieldOption::Float(o) => !o.stored,
+                                LexicalFieldOption::Boolean(o) => !o.stored,
+                                LexicalFieldOption::DateTime(o) => !o.stored,
+                                LexicalFieldOption::Geo(o) => !o.stored,
+                                LexicalFieldOption::Blob(o) => !o.stored,
                             }
                         } else {
-                            // If only vector or no lexical config, assume stored?
-                            // Default behavior: keep it if in schema
+                            // Vector field - keep it
                             false
                         }
                     } else {
@@ -295,10 +294,10 @@ impl Engine {
         }
     }
 
-    /// Split the unified config into specialized configs.
-    fn split_config(config: &IndexConfig) -> (LexicalIndexConfig, VectorIndexConfig) {
+    /// Split the unified schema into specialized configs.
+    fn split_schema(schema: &Schema) -> (LexicalIndexConfig, VectorIndexConfig) {
         // Construct Lexical Config
-        let default_analyzer = config
+        let default_analyzer = schema
             .analyzer
             .clone()
             .unwrap_or_else(|| Arc::new(StandardAnalyzer::new().unwrap()));
@@ -309,8 +308,8 @@ impl Engine {
         let mut lexical_builder =
             LexicalIndexConfig::builder().analyzer(Arc::new(per_field_analyzer));
 
-        for (name, field_config) in &config.fields {
-            if let Some(lexical_opt) = &field_config.lexical {
+        for (name, field_option) in &schema.fields {
+            if let Some(lexical_opt) = field_option.as_lexical() {
                 lexical_builder = lexical_builder.add_field(name, lexical_opt.clone());
             }
         }
@@ -319,15 +318,12 @@ impl Engine {
 
         // Construct Vector Config
         let mut vector_builder = VectorIndexConfig::builder();
-        if let Some(embedder) = &config.embedder {
+        if let Some(embedder) = &schema.embedder {
             vector_builder = vector_builder.embedder(embedder.clone());
         }
 
-        for (name, field_config) in &config.fields {
-            if let Some(vector_opt) = &field_config.vector {
-                // VectorIndexConfig builder assumes we add fields one by one
-                // But we need to verify how `add_field` works with `VectorOption`
-                // The current API might need adjustment or we use `add_field` with explicit options.
+        for (name, field_option) in &schema.fields {
+            if let Some(vector_opt) = field_option.as_vector() {
                 vector_builder = vector_builder
                     .add_field(name, vector_opt.clone())
                     .unwrap_or_else(|e| panic!("Failed to add field '{}': {}", name, e));

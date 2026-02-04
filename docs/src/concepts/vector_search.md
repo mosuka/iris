@@ -295,7 +295,7 @@ Example of creating an engine with an embedder and vector field configurations.
 
 ```rust
 use std::sync::Arc;
-use iris::{Engine, IndexConfig};
+use iris::{Engine, Schema};
 use iris::vector::{FlatOption, HnswOption, VectorOption, DistanceMetric};
 use iris::storage::{StorageConfig, StorageFactory};
 use iris::storage::memory::MemoryStorageConfig;
@@ -303,7 +303,7 @@ use iris::storage::memory::MemoryStorageConfig;
 fn setup_engine() -> iris::Result<Engine> {
     let storage = StorageFactory::create(StorageConfig::Memory(MemoryStorageConfig::default()))?;
 
-    let config = IndexConfig::builder()
+    let schema = Schema::builder()
         .embedder(Arc::new(MyEmbedder))  // Your embedder implementation
         .add_vector_field(
             "embedding",
@@ -317,7 +317,7 @@ fn setup_engine() -> iris::Result<Engine> {
         )
         .build();
 
-    Engine::new(storage, config)
+    Engine::new(storage, schema)
 }
 ```
 
@@ -371,7 +371,7 @@ fn search(engine: &Engine) -> iris::Result<()> {
 
 ### 4. Hybrid Search
 
-Example of combining vector and keyword search.
+Example of combining vector and keyword search. Note that vector and lexical searches use separate fields.
 
 ```rust
 use iris::{FusionAlgorithm, SearchRequestBuilder};
@@ -381,13 +381,13 @@ use iris::vector::VectorSearchRequestBuilder;
 fn hybrid_search(engine: &Engine) -> iris::Result<()> {
     let results = engine.search(
         SearchRequestBuilder::new()
-            // Vector search (semantic)
+            // Vector search (semantic) on vector field
             .with_vector(
                 VectorSearchRequestBuilder::new()
-                    .add_text("content", "fast semantic search")
+                    .add_text("content_vec", "fast semantic search")
                     .build()
             )
-            // Lexical search (keyword)
+            // Lexical search (keyword) on lexical field
             .with_lexical(Box::new(TermQuery::new("content", "rust")))
             // Fusion strategy
             .fusion(FusionAlgorithm::RRF { k: 60.0 })
@@ -416,7 +416,7 @@ fn weighted_hybrid_search(engine: &Engine) -> iris::Result<()> {
         SearchRequestBuilder::new()
             .with_vector(
                 VectorSearchRequestBuilder::new()
-                    .add_text("content", "machine learning")
+                    .add_text("content_vec", "machine learning")
                     .build()
             )
             .with_lexical(Box::new(TermQuery::new("content", "python")))

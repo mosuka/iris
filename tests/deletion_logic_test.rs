@@ -7,9 +7,9 @@ use iris::lexical::FieldOption as LexicalOption;
 use iris::lexical::TermQuery;
 use iris::storage::file::FileStorageConfig;
 use iris::storage::{StorageConfig, StorageFactory};
-use iris::vector::VectorOption;
+use iris::vector::FieldOption as VectorOption;
 use iris::vector::VectorSearchRequestBuilder;
-use iris::{FieldConfig, IndexConfig};
+use iris::{FieldOption, Schema};
 
 #[test]
 fn test_engine_unified_deletion() -> iris::Result<()> {
@@ -22,21 +22,9 @@ fn test_engine_unified_deletion() -> iris::Result<()> {
     let vector_opt = VectorOption::default(); // dim=128
     let lexical_opt = LexicalOption::default();
 
-    let config = IndexConfig::builder()
-        .add_field(
-            "title",
-            FieldConfig {
-                lexical: Some(lexical_opt.clone()),
-                vector: None,
-            },
-        )
-        .add_field(
-            "embedding",
-            FieldConfig {
-                lexical: None,
-                vector: Some(vector_opt),
-            },
-        )
+    let config = Schema::builder()
+        .add_field("title", FieldOption::Lexical(lexical_opt))
+        .add_field("embedding", FieldOption::Vector(vector_opt))
         .build();
 
     let engine = Engine::new(storage.clone(), config)?;
@@ -109,21 +97,9 @@ fn test_engine_upsert() -> iris::Result<()> {
     });
     let lexical_opt = LexicalOption::default();
 
-    let config = IndexConfig::builder()
-        .add_field(
-            "title",
-            FieldConfig {
-                lexical: Some(lexical_opt.clone()),
-                vector: None,
-            },
-        )
-        .add_field(
-            "embedding",
-            FieldConfig {
-                lexical: None,
-                vector: Some(vector_opt),
-            },
-        )
+    let config = Schema::builder()
+        .add_field("title", FieldOption::Lexical(lexical_opt))
+        .add_field("embedding", FieldOption::Vector(vector_opt))
         .build();
 
     let engine = Engine::new(storage.clone(), config)?;
