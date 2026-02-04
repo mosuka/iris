@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-260429de.js";
+            window.path_to_searchindex_js = "../searchindex-d937b922.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-9d358a08.js"></script>
@@ -440,7 +440,7 @@ In the unified architecture, LexicalStore operates as a <strong>sub-component</s
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>use std::sync::Arc;
-use iris::{Engine, IndexConfig};
+use iris::{Engine, Schema};
 use iris::analysis::analyzer::standard::StandardAnalyzer;
 use iris::lexical::{FieldOption, TextOption};
 use iris::storage::{StorageConfig, StorageFactory};
@@ -449,13 +449,13 @@ use iris::storage::memory::MemoryStorageConfig;
 fn setup_engine() -&gt; iris::Result&lt;Engine&gt; {
     let storage = StorageFactory::create(StorageConfig::Memory(MemoryStorageConfig::default()))?;
 
-    let config = IndexConfig::builder()
+    let schema = Schema::builder()
         .analyzer(Arc::new(StandardAnalyzer::default()))
         .add_lexical_field("title", FieldOption::Text(TextOption::default()))
         .add_lexical_field("content", FieldOption::Text(TextOption::default()))
         .build();
 
-    Engine::new(storage, config)
+    Engine::new(storage, schema)
 }
 <span class="boring">}</span></code></pre>
 <h3 id="2-adding-documents"><a class="header" href="#2-adding-documents">2. Adding Documents</a></h3>
@@ -507,12 +507,12 @@ fn setup_japanese_engine() -&gt; iris::Result&lt;Engine&gt; {
 
     // Configure default analyzer to Japanese
     let analyzer = Arc::new(JapaneseAnalyzer::default());
-    let config = IndexConfig::builder()
+    let schema = Schema::builder()
         .analyzer(analyzer)
         .add_lexical_field("content", FieldOption::Text(TextOption::default()))
         .build();
 
-    Engine::new(storage, config)
+    Engine::new(storage, schema)
 }
 <span class="boring">}</span></code></pre>
 <h2 id="future-outlook"><a class="header" href="#future-outlook">Future Outlook</a></h2>

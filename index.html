@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-260429de.js";
+            window.path_to_searchindex_js = "searchindex-d937b922.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-9d358a08.js"></script>
@@ -207,9 +207,9 @@
 <li><strong>Pluggable Storage</strong>: Interfaces for in-memory, file-system, and memory-mapped storage backends.</li>
 </ul>
 <h2 id="quick-start"><a class="header" href="#quick-start">Quick Start</a></h2>
-<pre class="playground"><code class="language-rust">use iris::{Document, Engine, FusionAlgorithm, IndexConfig, SearchRequestBuilder};
+<pre class="playground"><code class="language-rust">use iris::{Document, Engine, FieldOption, FusionAlgorithm, Schema, SearchRequestBuilder};
 use iris::analysis::analyzer::standard::StandardAnalyzer;
-use iris::lexical::{FieldOption, TextOption, TermQuery};
+use iris::lexical::{FieldOption as LexicalFieldOption, TextOption, TermQuery};
 use iris::vector::{FlatOption, VectorOption, VectorSearchRequestBuilder};
 use iris::storage::{StorageConfig, StorageFactory};
 use iris::storage::memory::MemoryStorageConfig;
@@ -219,29 +219,34 @@ fn main() -&gt; iris::Result&lt;()&gt; {
     // 1. Create storage
     let storage = StorageFactory::create(StorageConfig::Memory(MemoryStorageConfig::default()))?;
 
-    // 2. Configure index with a hybrid field (lexical + vector)
-    let config = IndexConfig::builder()
+    // 2. Define schema with separate lexical and vector fields
+    let schema = Schema::builder()
         .analyzer(Arc::new(StandardAnalyzer::default()))
         .embedder(Arc::new(MyEmbedder))  // Your embedder implementation
-        .add_hybrid_field(
-            "content",
-            VectorOption::Flat(FlatOption { dimension: 384, ..Default::default() }),
-            FieldOption::Text(TextOption::default()),
-        )
+        .add_field("content", FieldOption::Lexical(LexicalFieldOption::Text(TextOption::default())))
+        .add_field("content_vec", FieldOption::Vector(VectorOption::Flat(FlatOption { dimension: 384, ..Default::default() })))
         .build();
 
     // 3. Create engine and index documents
-    let engine = Engine::new(storage, config)?;
+    let engine = Engine::new(storage, schema)?;
 
-    engine.index(Document::new_with_id("doc1").add_text("content", "Rust is a systems programming language"))?;
-    engine.index(Document::new_with_id("doc2").add_text("content", "Python is great for machine learning"))?;
+    engine.index(
+        Document::new_with_id("doc1")
+            .add_text("content", "Rust is a systems programming language")
+            .add_text("content_vec", "Rust is a systems programming language")
+    )?;
+    engine.index(
+        Document::new_with_id("doc2")
+            .add_text("content", "Python is great for machine learning")
+            .add_text("content_vec", "Python is great for machine learning")
+    )?;
     engine.commit()?;
 
     // 4. Hybrid search (combines lexical keyword match + semantic similarity)
     let results = engine.search(
         SearchRequestBuilder::new()
             .with_lexical(Box::new(TermQuery::new("content", "programming")))
-            .with_vector(VectorSearchRequestBuilder::new().add_text("content", "systems language").build())
+            .with_vector(VectorSearchRequestBuilder::new().add_text("content_vec", "systems language").build())
             .fusion(FusionAlgorithm::RRF { k: 60.0 })
             .build()
     )?;
