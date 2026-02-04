@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-d4dd25ad.js";
+            window.path_to_searchindex_js = "searchindex-260429de.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-9d358a08.js"></script>
@@ -183,7 +183,7 @@
 <p>Building a search application with Iris typically involves the following steps:</p>
 <ol>
 <li><strong>Installation</strong>: Adding <code>iris</code> to your project dependencies.</li>
-<li><strong>Configuration</strong>: Setting up the <code>VectorEngine</code> (or <code>LexicalEngine</code>) and choosing a storage backend (Memory, File, or Mmap).</li>
+<li><strong>Configuration</strong>: Setting up the <code>Engine</code> with <code>IndexConfig</code> and choosing a storage backend (Memory, File, or Mmap).</li>
 <li><strong>Indexing</strong>: Inserting documents that contain both text (for lexical search) and vectors (for semantic search).</li>
 <li><strong>Searching</strong>: Executing queries to retrieve relevant results.</li>
 </ol>
@@ -193,22 +193,56 @@
 Learn how to add Iris to your Rust project and configure necessary feature flags (e.g., for different tokenizer support).</li>
 </ul>
 <h2 id="quick-example"><a class="header" href="#quick-example">Quick Example</a></h2>
-<p>For a complete, runnable example of how to set up a Hybrid Search (combining vector and text search), please refer to the <strong><a href="https://github.com/mosuka/iris/blob/main/examples/hybrid_search.rs">Hybrid Search Example</a></strong> in the repository.</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>// Pseudo-code of a typical setup
-let storage = Arc::new(MemoryStorage::default());
-let config = VectorIndexConfig::builder()
-    .add_field("embedding", 768)?
-    .build()?;
-let engine = VectorEngine::new(storage, config)?;
+<p>For a complete, runnable example of how to set up a Hybrid Search (combining vector and text search), please refer to the <strong><a href="https://github.com/mosuka/iris/blob/main/examples/search.rs">Unified Search Example</a></strong> in the repository.</p>
+<pre class="playground"><code class="language-rust">use iris::{Document, Engine, FusionAlgorithm, IndexConfig, SearchRequestBuilder};
+use iris::analysis::analyzer::standard::StandardAnalyzer;
+use iris::lexical::{FieldOption, TextOption, TermQuery};
+use iris::vector::{FlatOption, VectorOption, VectorSearchRequestBuilder};
+use iris::storage::{StorageConfig, StorageFactory};
+use iris::storage::memory::MemoryStorageConfig;
+use std::sync::Arc;
 
-// Indexing...
-engine.upsert_vectors(doc_id, document)?;
+fn main() -&gt; iris::Result&lt;()&gt; {
+    // 1. Create storage
+    let storage = StorageFactory::create(StorageConfig::Memory(MemoryStorageConfig::default()))?;
 
-// Searching...
-let results = engine.search(request).await?;
-<span class="boring">}</span></code></pre>
+    // 2. Configure index with a hybrid field (lexical + vector)
+    let config = IndexConfig::builder()
+        .analyzer(Arc::new(StandardAnalyzer::default()))
+        .embedder(Arc::new(MyEmbedder))  // Your embedder implementation
+        .add_hybrid_field(
+            "content",
+            VectorOption::Flat(FlatOption { dimension: 384, ..Default::default() }),
+            FieldOption::Text(TextOption::default()),
+        )
+        .build();
+
+    // 3. Create engine and index documents
+    let engine = Engine::new(storage, config)?;
+
+    engine.index(Document::new_with_id("doc1").add_text("content", "Rust is a systems programming language"))?;
+    engine.index(Document::new_with_id("doc2").add_text("content", "Python is great for machine learning"))?;
+    engine.commit()?;
+
+    // 4. Hybrid search (combines lexical keyword match + semantic similarity)
+    let results = engine.search(
+        SearchRequestBuilder::new()
+            .with_lexical(Box::new(TermQuery::new("content", "programming")))
+            .with_vector(VectorSearchRequestBuilder::new().add_text("content", "systems language").build())
+            .fusion(FusionAlgorithm::RRF { k: 60.0 })
+            .build()
+    )?;
+
+    // 5. Display results
+    for hit in results {
+        if let Ok(Some(doc)) = engine.get_document(hit.doc_id) {
+            let id = doc.id().unwrap_or("unknown");
+            println!("[{}] score={:.4}", id, hit.score);
+        }
+    }
+
+    Ok(())
+}</code></pre>
 
                     </main>
 

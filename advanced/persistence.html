@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-d4dd25ad.js";
+            window.path_to_searchindex_js = "../searchindex-260429de.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-9d358a08.js"></script>
@@ -192,10 +192,10 @@
 </ul>
 <h2 id="checkpointing"><a class="header" href="#checkpointing">Checkpointing</a></h2>
 <p>Currently, explicit commits flush the in-memory state to durable index files.</p>
-<ul>
-<li><code>lexical_engine.commit()</code></li>
-<li><code>hybrid_engine.commit()</code></li>
-</ul>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>engine.commit()?;  // Flush and persist all changes
+<span class="boring">}</span></code></pre>
 
                     </main>
 

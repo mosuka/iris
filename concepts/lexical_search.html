@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-d4dd25ad.js";
+            window.path_to_searchindex_js = "../searchindex-260429de.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-9d358a08.js"></script>
@@ -180,7 +180,7 @@
                         <h1 id="lexical-search"><a class="header" href="#lexical-search">Lexical Search</a></h1>
 <p>Lexical search matches documents based on exact or approximate keyword matches. It is the traditional “search engine” functionality found in Lucene or Elasticsearch.</p>
 <blockquote>
-<p><strong>Note</strong>: In the unified Iris architecture, Lexical Search is typically handled by the <code>VectorEngine</code>, which orchestrates both lexical and vector components concurrently. <code>LexicalEngine</code> can still be used as a standalone engine for pure keyword search scenarios.</p>
+<p><strong>Note</strong>: In the unified Iris architecture, Lexical Search is handled by the <code>Engine</code>, which orchestrates both lexical (LexicalStore) and vector (VectorStore) components concurrently.</p>
 </blockquote>
 <h2 id="document-structure"><a class="header" href="#document-structure">Document Structure</a></h2>
 <p>In Iris, a <strong>Document</strong> is the fundamental unit of indexing. It follows a <strong>schema-less</strong> design, allowing fields to be added dynamically without defining a schema upfront.</p>
@@ -357,9 +357,9 @@ Unlike an inverted index, a BKD tree is designed for <strong>range search</stron
 <h3 id="simd-optimization"><a class="header" href="#simd-optimization">SIMD Optimization</a></h3>
 <p>Iris uses SIMD-accelerated batch scoring for high-throughput ranking. The BM25 scoring algorithm is optimized to process multiple documents simultaneously, leveraging modern CPU instructions to provide a several-fold increase in performance compared to scalar processing.</p>
 <h2 id="engine-architecture"><a class="header" href="#engine-architecture">Engine Architecture</a></h2>
-<h3 id="lexical-engine-lexicalengine"><a class="header" href="#lexical-engine-lexicalengine">Lexical Engine (<code>LexicalEngine</code>)</a></h3>
-<p>The engine that manages indexing and searching for text data. It coordinates between <code>InvertedIndexWriter</code> and <code>InvertedIndexSearcher</code>.
-In the unified architecture, this engine operates as a <strong>sub-component</strong> managed by the <code>VectorEngine</code>, handling the inverted index portions of hybrid documents. It handles manifest persistence and consistent ID mapping when run in standalone mode.</p>
+<h3 id="lexicalstore"><a class="header" href="#lexicalstore">LexicalStore</a></h3>
+<p>The store component that manages indexing and searching for text data. It coordinates between <code>LexicalIndexWriter</code> and <code>LexicalIndexSearcher</code>.
+In the unified architecture, LexicalStore operates as a <strong>sub-component</strong> managed by the <code>Engine</code>, handling the inverted index portions of hybrid documents.</p>
 <h3 id="index-components"><a class="header" href="#index-components">Index Components</a></h3>
 <ul>
 <li><strong>InvertedIndexWriter</strong>: The primary interface for adding documents. It orchestrates analysis, point extraction, and buffering.</li>
@@ -435,57 +435,63 @@ In the unified architecture, this engine operates as a <strong>sub-component</st
 <h2 id="scoring-bm25"><a class="header" href="#scoring-bm25">Scoring (BM25)</a></h2>
 <p>Iris uses <strong>Okapi BM25</strong> as its default scoring function. It improves results by prioritizing rare terms and normalizing for document length, ensuring that matches in shorter, focused documents are ranked appropriately.</p>
 <h2 id="code-examples"><a class="header" href="#code-examples">Code Examples</a></h2>
-<h3 id="1-configuring-lexicalengine"><a class="header" href="#1-configuring-lexicalengine">1. Configuring LexicalEngine</a></h3>
-<p>Setting up a schema-less engine with a default analyzer.</p>
+<h3 id="1-configuring-engine-for-lexical-search"><a class="header" href="#1-configuring-engine-for-lexical-search">1. Configuring Engine for Lexical Search</a></h3>
+<p>Setting up an engine with a lexical field and default analyzer.</p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>use std::sync::Arc;
-use iris::lexical::engine::LexicalEngine;
-use iris::lexical::engine::config::LexicalIndexConfig;
-use iris::storage::memory::{MemoryStorage, MemoryStorageConfig};
+use iris::{Engine, IndexConfig};
+use iris::analysis::analyzer::standard::StandardAnalyzer;
+use iris::lexical::{FieldOption, TextOption};
+use iris::storage::{StorageConfig, StorageFactory};
+use iris::storage::memory::MemoryStorageConfig;
 
-fn setup_engine() -&gt; iris::error::Result&lt;LexicalEngine&gt; {
-    let storage = Arc::new(MemoryStorage::new(MemoryStorageConfig::default()));
-    
-    // Default configuration uses StandardAnalyzer
-    let config = LexicalIndexConfig::default();
-    let engine = LexicalEngine::new(storage, config)?;
-    Ok(engine)
+fn setup_engine() -&gt; iris::Result&lt;Engine&gt; {
+    let storage = StorageFactory::create(StorageConfig::Memory(MemoryStorageConfig::default()))?;
+
+    let config = IndexConfig::builder()
+        .analyzer(Arc::new(StandardAnalyzer::default()))
+        .add_lexical_field("title", FieldOption::Text(TextOption::default()))
+        .add_lexical_field("content", FieldOption::Text(TextOption::default()))
+        .build();
+
+    Engine::new(storage, config)
 }
 <span class="boring">}</span></code></pre>
 <h3 id="2-adding-documents"><a class="header" href="#2-adding-documents">2. Adding Documents</a></h3>
 <p>Creating and indexing documents with various field types.</p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use iris::lexical::core::document::Document;
-use iris::lexical::core::field::TextOption;
+</span>use iris::{Document, DataValue};
 
-fn add_documents(engine: &amp;LexicalEngine) -&gt; iris::error::Result&lt;()&gt; {
-    let doc = Document::builder()
-        .add_text("title", "Iris Search", TextOption::default())
-        .add_text("content", "Fast and semantic search engine in Rust", TextOption::default())
-        .add_integer("price", 100)
-        .build();
+fn add_documents(engine: &amp;Engine) -&gt; iris::Result&lt;()&gt; {
+    let doc = Document::new_with_id("doc1")
+        .add_text("title", "Iris Search")
+        .add_text("content", "Fast and semantic search engine in Rust")
+        .add_field("price", DataValue::Integer(100));
 
-    engine.add_document(doc)?;
+    engine.index(doc)?;
     engine.commit()?; // Flush and commit to make searchable
     Ok(())
 }
 <span class="boring">}</span></code></pre>
-<h3 id="3-searching-via-dsl"><a class="header" href="#3-searching-via-dsl">3. Searching via DSL</a></h3>
-<p>Executing a simple search using the query string parser.</p>
+<h3 id="3-searching-with-term-query"><a class="header" href="#3-searching-with-term-query">3. Searching with Term Query</a></h3>
+<p>Executing a simple search using a term query.</p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use iris::lexical::search::searcher::LexicalSearchRequest;
+</span>use iris::SearchRequestBuilder;
+use iris::lexical::TermQuery;
 
-fn search(engine: &amp;LexicalEngine) -&gt; iris::error::Result&lt;()&gt; {
-    // Search for matches in the default fields
-    let request = LexicalSearchRequest::new("content:rust")
-        .max_docs(10);
+fn search(engine: &amp;Engine) -&gt; iris::Result&lt;()&gt; {
+    let results = engine.search(
+        SearchRequestBuilder::new()
+            .with_lexical(Box::new(TermQuery::new("content", "rust")))
+            .limit(10)
+            .build()
+    )?;
 
-    let results = engine.search(request)?;
-    for hit in results.hits {
-        println!("Doc ID: {}, Score: {}", hit.doc_id, hit.score);
+    for hit in results {
+        println!("Doc ID: {}, Score: {:.4}", hit.doc_id, hit.score);
     }
     Ok(())
 }
@@ -495,18 +501,18 @@ fn search(engine: &amp;LexicalEngine) -&gt; iris::error::Result&lt;()&gt; {
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>use iris::analysis::analyzer::japanese::JapaneseAnalyzer;
-use iris::lexical::engine::config::LexicalIndexConfig;
 
-fn setup_japanese_engine() -&gt; iris::error::Result&lt;LexicalEngine&gt; {
-    let storage = Arc::new(MemoryStorage::new(MemoryStorageConfig::default()));
-    
+fn setup_japanese_engine() -&gt; iris::Result&lt;Engine&gt; {
+    let storage = StorageFactory::create(StorageConfig::Memory(MemoryStorageConfig::default()))?;
+
     // Configure default analyzer to Japanese
     let analyzer = Arc::new(JapaneseAnalyzer::default());
-    let config = LexicalIndexConfig::builder()
+    let config = IndexConfig::builder()
         .analyzer(analyzer)
+        .add_lexical_field("content", FieldOption::Text(TextOption::default()))
         .build();
 
-    LexicalEngine::new(storage, config)
+    Engine::new(storage, config)
 }
 <span class="boring">}</span></code></pre>
 <h2 id="future-outlook"><a class="header" href="#future-outlook">Future Outlook</a></h2>
