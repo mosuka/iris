@@ -38,7 +38,7 @@ use iris::vector::VectorSearchRequestBuilder;
 #[cfg(feature = "embeddings-multimodal")]
 use iris::vector::VectorStore;
 #[cfg(feature = "embeddings-multimodal")]
-use iris::vector::{FlatOption, VectorOption};
+use iris::vector::{FlatOption, FieldOption};
 use iris::vector::{VectorFieldConfig, VectorIndexConfig};
 #[cfg(feature = "embeddings-multimodal")]
 use iris::{DataValue, Document};
@@ -63,7 +63,7 @@ fn main() -> Result<()> {
     println!("Model loaded: {}", embedder.name());
 
     let field_config = VectorFieldConfig {
-        vector: Some(VectorOption::Flat(FlatOption {
+        vector: Some(FieldOption::Flat(FlatOption {
             dimension: 3,
             distance: DistanceMetric::Cosine,
             base_weight: 1.0,

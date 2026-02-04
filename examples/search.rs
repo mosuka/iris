@@ -1,9 +1,9 @@
 //! Unified Search Example
 //!
 //! This example demonstrates the flexibility of the unified Engine API, showing how to:
-//! 1. Configure a schema where fields can be indexed lexically, vectorially, or both.
-//! 2. Perform purely Lexical Search (keywords only) on a hybrid field.
-//! 3. Perform purely Vector Search (semantic only) on a hybrid field.
+//! 1. Configure a schema where fields can be indexed lexically or vectorially.
+//! 2. Perform purely Lexical Search (keywords only).
+//! 3. Perform purely Vector Search (semantic only).
 //! 4. Perform Hybrid Search (combining both) with different fusion strategies.
 //!
 //! This replaces the separate lexical_search.rs, vector_search.rs, and hybrid_search.rs examples
@@ -15,11 +15,11 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use iris::Document;
 use iris::Engine;
-use iris::IndexConfig;
 use iris::Result;
 use iris::analysis::analyzer::standard::StandardAnalyzer;
-use iris::lexical::{FieldOption, TextOption};
+use iris::lexical::{FieldOption as LexicalFieldOption, TextOption};
 use iris::{EmbedInput, EmbedInputType, Embedder};
+use iris::{FieldOption, Schema};
 use iris::{FusionAlgorithm, SearchRequestBuilder};
 
 use iris::lexical::TermQuery;
@@ -27,7 +27,7 @@ use iris::storage::memory::MemoryStorageConfig;
 use iris::storage::{StorageConfig, StorageFactory};
 use iris::vector::Vector;
 use iris::vector::VectorSearchRequestBuilder;
-use iris::vector::{FlatOption, VectorOption};
+use iris::vector::{FlatOption, FieldOption as VectorOption};
 
 // --- Mock Embedder Setup ---
 // A simple embedder that deterministically converts specific keywords into vectors
@@ -86,23 +86,28 @@ fn main() -> Result<()> {
     // 2. Configure the Engine
     // We define a flexible schema:
     // - "title":       Lexical Only (Keyword search is best for precise title matching)
-    // - "content":     Hybrid (Both Vector and Lexical for full flexibility)
+    // - "content":     Lexical (For keyword search on content)
+    // - "content_vec": Vector (For semantic search on content)
     // - "embedding":   Vector Only (Hidden semantic features)
-    let config = IndexConfig::builder()
+    let config = Schema::builder()
         .embedder(Arc::new(MockEmbedder))
         .analyzer(Arc::new(StandardAnalyzer::default()))
-        // Field 1: Hybrid Field (Vector + Lexical)
-        .add_hybrid_field(
+        // Field 1: Lexical content field
+        .add_field(
             "content",
-            VectorOption::Flat(FlatOption {
+            FieldOption::Lexical(LexicalFieldOption::Text(TextOption::default())),
+        )
+        // Field 2: Vector content field (for semantic search)
+        .add_field(
+            "content_vec",
+            FieldOption::Vector(VectorOption::Flat(FlatOption {
                 dimension: 4,
                 ..Default::default()
-            }),
-            FieldOption::Text(TextOption::default()),
+            })),
         )
-        // Field 2: Lexical Only
-        .add_lexical_field("title", FieldOption::Text(TextOption::default()))
-        // Field 3: Vector Only
+        // Field 3: Lexical Only
+        .add_lexical_field("title", LexicalFieldOption::Text(TextOption::default()))
+        // Field 4: Vector Only
         .add_vector_field(
             "embedding",
             VectorOption::Flat(FlatOption {
@@ -144,9 +149,10 @@ fn main() -> Result<()> {
     for (id, title, content) in docs {
         let doc = Document::new_with_id(id)
             .add_text("title", title)
-            .add_text("content", content)
-            .add_text("embedding", content); // Populate the vector-only field
-        // Note: 'content' and 'embedding' text will be automatically embedded
+            .add_text("content", content) // Lexical field
+            .add_text("content_vec", content) // Vector field (auto-embedded)
+            .add_text("embedding", content); // Separate vector field
+        // Note: 'content_vec' and 'embedding' text will be automatically embedded
         // because they have vector configs and we registered a global embedder.
 
         engine.index(doc)?;
@@ -173,7 +179,7 @@ fn main() -> Result<()> {
         // We only provide .with_vector(), so lexical index is ignored
         .with_vector(
             VectorSearchRequestBuilder::new()
-                .add_text("content", "apple") // Embeds 'apple' to search vector space
+                .add_text("content_vec", "apple") // Embeds 'apple' to search vector space
                 .build(),
         )
         .limit(3)
@@ -192,7 +198,7 @@ fn main() -> Result<()> {
         // Vector part: finds broad "tech" concepts (e.g., 'doc2' and 'doc5')
         .with_vector(
             VectorSearchRequestBuilder::new()
-                .add_text("content", "tech")
+                .add_text("content_vec", "tech")
                 .build(),
         )
         // Lexical part: specifically looks for the word "news" (only in 'doc2')
@@ -212,7 +218,7 @@ fn main() -> Result<()> {
     let request_weighted = SearchRequestBuilder::new()
         .with_vector(
             VectorSearchRequestBuilder::new()
-                .add_text("content", "orange")
+                .add_text("content_vec", "orange")
                 .build(),
         )
         .with_lexical(Box::new(TermQuery::new("content", "juice")))

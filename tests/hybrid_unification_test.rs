@@ -7,13 +7,13 @@ use iris::Engine;
 use iris::IrisError;
 use iris::PerFieldEmbedder;
 use iris::lexical::TermQuery;
-use iris::lexical::{FieldOption, TextOption};
+use iris::lexical::{FieldOption as LexicalFieldOption, TextOption};
 use iris::storage::memory::MemoryStorage;
-use iris::vector::{FlatOption, VectorOption};
+use iris::vector::{FlatOption, FieldOption as VectorOption};
 use iris::vector::{QueryVector, VectorSearchRequest};
 use iris::{DataValue, Document};
 use iris::{EmbedInput, EmbedInputType, Embedder};
-use iris::{FieldConfig, IndexConfig};
+use iris::{FieldOption, Schema};
 use iris::{FusionAlgorithm, SearchRequestBuilder};
 
 #[derive(Debug, Clone)]
@@ -79,27 +79,26 @@ impl Embedder for MockEmbedder {
 }
 
 fn create_hybrid_engine() -> std::result::Result<Engine, Box<dyn std::error::Error>> {
-    // Field "title": Lexical + Vector
-    let title_config = FieldConfig {
-        vector: Some(VectorOption::Flat(FlatOption {
-            dimension: 3,
-            ..Default::default()
-        })),
-        lexical: Some(FieldOption::Text(TextOption::default())),
-    };
-
     // Embedder setup
     let embedder = Arc::new(MockEmbedder::new());
     embedder.add("apple", vec![0.9, 0.1, 0.0]);
     embedder.add("banana", vec![0.0, 1.0, 0.0]);
 
-    // PerFieldEmbedder
+    // PerFieldEmbedder for vector field
     let mut per_field = PerFieldEmbedder::new(embedder.clone());
-    per_field.add_embedder("title", embedder.clone());
+    per_field.add_embedder("title_vec", embedder.clone());
 
-    let config = IndexConfig::builder()
+    // Schema with separate fields for lexical and vector
+    let config = Schema::builder()
         .embedder(Arc::new(per_field))
-        .add_field("title", title_config)
+        .add_field("title", FieldOption::Lexical(LexicalFieldOption::Text(TextOption::default())))
+        .add_field(
+            "title_vec",
+            FieldOption::Vector(VectorOption::Flat(FlatOption {
+                dimension: 3,
+                ..Default::default()
+            })),
+        )
         .build();
 
     let storage = Arc::new(MemoryStorage::new(Default::default()));
@@ -122,16 +121,18 @@ fn test_hybrid_search_unification() -> std::result::Result<(), Box<dyn std::erro
 async fn test_hybrid_search_unification_impl(
     engine: &Engine,
 ) -> std::result::Result<(), Box<dyn std::error::Error>> {
-    // Index Doc 1: "apple"
+    // Index Doc 1: "apple" - both lexical and vector fields
     let payload1 = Document::new()
         .add_field("title", DataValue::Text("apple".into()))
+        .add_field("title_vec", DataValue::Text("apple".into()))
         .add_field("_id", DataValue::Text("1".into()));
 
     engine.index_chunk(payload1)?;
 
-    // Index Doc 2: "banana"
+    // Index Doc 2: "banana" - both lexical and vector fields
     let payload2 = Document::new()
         .add_field("title", DataValue::Text("banana".into()))
+        .add_field("title_vec", DataValue::Text("banana".into()))
         .add_field("_id", DataValue::Text("2".into()));
 
     engine.index_chunk(payload2)?;

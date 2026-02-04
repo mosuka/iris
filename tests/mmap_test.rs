@@ -5,7 +5,7 @@ use iris::storage::{StorageConfig, StorageFactory};
 use iris::vector::DistanceMetric;
 use iris::vector::VectorSearchRequestBuilder;
 use iris::vector::VectorStore;
-use iris::vector::{FlatOption, VectorOption};
+use iris::vector::{FlatOption, FieldOption};
 use iris::vector::{VectorFieldConfig, VectorIndexConfig};
 use iris::{DataValue, Document};
 
@@ -25,7 +25,7 @@ fn test_mmap_mode_basic_search() {
 
     // Configure a fields with Mmap loading
     let field_config = VectorFieldConfig {
-        vector: Some(VectorOption::Flat(FlatOption {
+        vector: Some(FieldOption::Flat(FlatOption {
             dimension: 3,
             distance: DistanceMetric::Cosine,
             base_weight: 1.0,
@@ -81,7 +81,7 @@ fn test_mmap_mode_persistence_reload() {
         let storage = StorageFactory::create(storage_config).unwrap();
 
         let field_config = VectorFieldConfig {
-            vector: Some(VectorOption::Flat(FlatOption {
+            vector: Some(FieldOption::Flat(FlatOption {
                 dimension: 3,
                 distance: DistanceMetric::Cosine,
                 base_weight: 1.0,
@@ -118,7 +118,7 @@ fn test_mmap_mode_persistence_reload() {
         let storage = StorageFactory::create(storage_config).unwrap();
 
         let field_config = VectorFieldConfig {
-            vector: Some(VectorOption::Flat(FlatOption {
+            vector: Some(FieldOption::Flat(FlatOption {
                 dimension: 3,
                 distance: DistanceMetric::Cosine,
                 base_weight: 1.0,

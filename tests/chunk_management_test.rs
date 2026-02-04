@@ -3,26 +3,23 @@ use iris::Result;
 use iris::storage::memory::MemoryStorageConfig;
 use iris::storage::{StorageConfig, StorageFactory};
 use iris::vector::DistanceMetric;
-use iris::vector::{FlatOption, VectorOption};
+use iris::vector::{FlatOption, FieldOption as VectorOption};
 use iris::{DataValue, Document};
-use iris::{FieldConfig, IndexConfig};
+use iris::{FieldOption, Schema};
 
 fn build_test_engine() -> Result<Engine> {
     let storage_config = StorageConfig::Memory(MemoryStorageConfig::default());
     let storage = StorageFactory::create(storage_config)?;
 
-    let field_config = FieldConfig {
-        vector: Some(VectorOption::Flat(FlatOption {
-            dimension: 3,
-            distance: DistanceMetric::Cosine,
-            base_weight: 1.0,
-            quantizer: None,
-        })),
-        lexical: None,
-    };
+    let field_option = FieldOption::Vector(VectorOption::Flat(FlatOption {
+        dimension: 3,
+        distance: DistanceMetric::Cosine,
+        base_weight: 1.0,
+        quantizer: None,
+    }));
 
-    let config = IndexConfig::builder()
-        .add_field("body", field_config)
+    let config = Schema::builder()
+        .add_field("body", field_option)
         .build();
 
     Engine::new(storage, config)

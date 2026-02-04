@@ -3,10 +3,10 @@ use iris::Engine;
 use iris::Result;
 use iris::SearchRequestBuilder;
 use iris::lexical::TermQuery;
-use iris::lexical::{FieldOption, TextOption};
+use iris::lexical::{FieldOption as LexicalFieldOption, TextOption};
 use iris::storage::memory::MemoryStorageConfig;
 use iris::storage::{StorageConfig, StorageFactory};
-use iris::{FieldConfig, IndexConfig};
+use iris::{FieldOption, Schema};
 
 #[test]
 fn test_schema_lexical_guardrails() -> Result<()> {
@@ -15,39 +15,30 @@ fn test_schema_lexical_guardrails() -> Result<()> {
     let storage = StorageFactory::create(storage_config)?;
 
     // 2. Configure Engine with specific schema
-    let config = IndexConfig::builder()
+    let config = Schema::builder()
         .add_field(
             "indexed_and_stored",
-            FieldConfig {
-                lexical: Some(FieldOption::Text(TextOption {
-                    indexed: true,
-                    stored: true,
-                    ..Default::default()
-                })),
-                vector: None,
-            },
+            FieldOption::Lexical(LexicalFieldOption::Text(TextOption {
+                indexed: true,
+                stored: true,
+                ..Default::default()
+            })),
         )
         .add_field(
             "indexed_only",
-            FieldConfig {
-                lexical: Some(FieldOption::Text(TextOption {
-                    indexed: true,
-                    stored: false,
-                    ..Default::default()
-                })),
-                vector: None,
-            },
+            FieldOption::Lexical(LexicalFieldOption::Text(TextOption {
+                indexed: true,
+                stored: false,
+                ..Default::default()
+            })),
         )
         .add_field(
             "stored_only",
-            FieldConfig {
-                lexical: Some(FieldOption::Text(TextOption {
-                    indexed: false,
-                    stored: true,
-                    ..Default::default()
-                })),
-                vector: None,
-            },
+            FieldOption::Lexical(LexicalFieldOption::Text(TextOption {
+                indexed: false,
+                stored: true,
+                ..Default::default()
+            })),
         )
         .build();
 

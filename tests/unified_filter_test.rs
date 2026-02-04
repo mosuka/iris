@@ -7,9 +7,9 @@ use iris::lexical::FieldOption as LexicalOption;
 use iris::lexical::TermQuery;
 use iris::storage::file::FileStorageConfig;
 use iris::storage::{StorageConfig, StorageFactory};
-use iris::vector::VectorOption;
+use iris::vector::FieldOption as VectorOption;
 use iris::vector::VectorSearchRequestBuilder;
-use iris::{FieldConfig, IndexConfig};
+use iris::{FieldOption, Schema};
 
 #[test]
 fn test_unified_filtering() -> iris::Result<()> {
@@ -23,28 +23,10 @@ fn test_unified_filtering() -> iris::Result<()> {
     let vector_opt: VectorOption = FlatOption::default().dimension(2).into();
     let lexical_opt = LexicalOption::default();
 
-    let config = IndexConfig::builder()
-        .add_field(
-            "name",
-            FieldConfig {
-                lexical: Some(lexical_opt.clone()),
-                vector: None,
-            },
-        )
-        .add_field(
-            "category",
-            FieldConfig {
-                lexical: Some(lexical_opt),
-                vector: None,
-            },
-        )
-        .add_field(
-            "embedding",
-            FieldConfig {
-                lexical: None,
-                vector: Some(vector_opt),
-            },
-        )
+    let config = Schema::builder()
+        .add_field("name", FieldOption::Lexical(lexical_opt.clone()))
+        .add_field("category", FieldOption::Lexical(lexical_opt))
+        .add_field("embedding", FieldOption::Vector(vector_opt))
         .build();
 
     let engine = Engine::new(storage.clone(), config)?;
@@ -137,28 +119,10 @@ fn test_unified_filtering_hnsw() -> iris::Result<()> {
     let vector_opt: VectorOption = HnswOption::default().dimension(2).into();
     let lexical_opt = LexicalOption::default();
 
-    let config = IndexConfig::builder()
-        .add_field(
-            "name",
-            FieldConfig {
-                lexical: Some(lexical_opt.clone()),
-                vector: None,
-            },
-        )
-        .add_field(
-            "category",
-            FieldConfig {
-                lexical: Some(lexical_opt),
-                vector: None,
-            },
-        )
-        .add_field(
-            "embedding",
-            FieldConfig {
-                lexical: None,
-                vector: Some(vector_opt),
-            },
-        )
+    let config = Schema::builder()
+        .add_field("name", FieldOption::Lexical(lexical_opt.clone()))
+        .add_field("category", FieldOption::Lexical(lexical_opt))
+        .add_field("embedding", FieldOption::Vector(vector_opt))
         .build();
 
     let engine = Engine::new(storage.clone(), config)?;
@@ -221,28 +185,10 @@ fn test_unified_filtering_ivf() -> iris::Result<()> {
     let vector_opt: VectorOption = IvfOption::default().dimension(2).n_clusters(1).into();
     let lexical_opt = LexicalOption::default();
 
-    let config = IndexConfig::builder()
-        .add_field(
-            "name",
-            FieldConfig {
-                lexical: Some(lexical_opt.clone()),
-                vector: None,
-            },
-        )
-        .add_field(
-            "category",
-            FieldConfig {
-                lexical: Some(lexical_opt),
-                vector: None,
-            },
-        )
-        .add_field(
-            "embedding",
-            FieldConfig {
-                lexical: None,
-                vector: Some(vector_opt),
-            },
-        )
+    let config = Schema::builder()
+        .add_field("name", FieldOption::Lexical(lexical_opt.clone()))
+        .add_field("category", FieldOption::Lexical(lexical_opt))
+        .add_field("embedding", FieldOption::Vector(vector_opt))
         .build();
 
     let engine = Engine::new(storage.clone(), config)?;

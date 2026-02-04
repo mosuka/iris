@@ -9,13 +9,13 @@ use async_trait::async_trait;
 use iris::Document;
 use iris::Engine;
 use iris::Result;
-use iris::lexical::{FieldOption, TextOption};
+use iris::lexical::{FieldOption as LexicalFieldOption, TextOption};
 use iris::storage::memory::MemoryStorageConfig;
 use iris::storage::{StorageConfig, StorageFactory};
 use iris::vector::Vector;
-use iris::vector::{FlatOption, VectorOption};
+use iris::vector::{FlatOption, FieldOption as VectorOption};
 use iris::{EmbedInput, EmbedInputType, Embedder};
-use iris::{FieldConfig, IndexConfig};
+use iris::{FieldOption, Schema};
 use std::any::Any;
 
 // Simple Mock Embedder
@@ -52,17 +52,18 @@ fn main() -> Result<()> {
     let storage_config = StorageConfig::Memory(MemoryStorageConfig::default());
     let storage = StorageFactory::create(storage_config)?;
 
-    let config = IndexConfig::builder()
+    let config = Schema::builder()
         .embedder(Arc::new(SimpleEmbedder))
         .add_field(
             "description",
-            FieldConfig {
-                vector: Some(VectorOption::Flat(FlatOption {
-                    dimension: 3,
-                    ..Default::default()
-                })),
-                lexical: Some(FieldOption::Text(TextOption::default())),
-            },
+            FieldOption::Lexical(LexicalFieldOption::Text(TextOption::default())),
+        )
+        .add_field(
+            "description_vec",
+            FieldOption::Vector(VectorOption::Flat(FlatOption {
+                dimension: 3,
+                ..Default::default()
+            })),
         )
         .build();
 
@@ -71,12 +72,16 @@ fn main() -> Result<()> {
     // 2. Index Documents
     // "product-A": "Green Apple"
     println!("-> Indexing 'product-A'...");
-    let doc_a = Document::new_with_id("product-A").add_field("description", "Green Apple");
+    let doc_a = Document::new_with_id("product-A")
+        .add_field("description", "Green Apple")
+        .add_field("description_vec", "Green Apple");
     engine.index(doc_a)?;
 
     // "product-B": "Yellow Banana"
     println!("-> Indexing 'product-B'...");
-    let doc_b = Document::new_with_id("product-B").add_field("description", "Yellow Banana");
+    let doc_b = Document::new_with_id("product-B")
+        .add_field("description", "Yellow Banana")
+        .add_field("description_vec", "Yellow Banana");
     engine.index(doc_b)?;
 
     engine.commit()?;
@@ -85,7 +90,9 @@ fn main() -> Result<()> {
     // Change product-A to "Red Apple" (same ID)
     // The Engine will automatically detect the same ID and replace the old document.
     println!("\n-> Updating 'product-A' to 'Red Apple'...");
-    let doc_a_new = Document::new_with_id("product-A").add_field("description", "Red Apple");
+    let doc_a_new = Document::new_with_id("product-A")
+        .add_field("description", "Red Apple")
+        .add_field("description_vec", "Red Apple");
     engine.index(doc_a_new)?;
     engine.commit()?;
 

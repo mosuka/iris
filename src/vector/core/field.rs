@@ -11,7 +11,7 @@ use crate::vector::core::quantization;
 /// Options for vector fields.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", content = "options", rename_all = "snake_case")]
-pub enum VectorOption {
+pub enum FieldOption {
     /// Flat index options.
     Flat(FlatOption),
     /// HNSW index options.
@@ -20,46 +20,46 @@ pub enum VectorOption {
     Ivf(IvfOption),
 }
 
-impl Default for VectorOption {
+impl Default for FieldOption {
     fn default() -> Self {
-        VectorOption::Hnsw(HnswOption::default())
+        FieldOption::Hnsw(HnswOption::default())
     }
 }
 
-impl VectorOption {
+impl FieldOption {
     /// Get the dimension of the vector field.
     pub fn dimension(&self) -> usize {
         match self {
-            VectorOption::Flat(opt) => opt.dimension,
-            VectorOption::Hnsw(opt) => opt.dimension,
-            VectorOption::Ivf(opt) => opt.dimension,
+            FieldOption::Flat(opt) => opt.dimension,
+            FieldOption::Hnsw(opt) => opt.dimension,
+            FieldOption::Ivf(opt) => opt.dimension,
         }
     }
 
     /// Get the distance metric.
     pub fn distance(&self) -> DistanceMetric {
         match self {
-            VectorOption::Flat(opt) => opt.distance,
-            VectorOption::Hnsw(opt) => opt.distance,
-            VectorOption::Ivf(opt) => opt.distance,
+            FieldOption::Flat(opt) => opt.distance,
+            FieldOption::Hnsw(opt) => opt.distance,
+            FieldOption::Ivf(opt) => opt.distance,
         }
     }
 
     /// Get the base weight.
     pub fn base_weight(&self) -> f32 {
         match self {
-            VectorOption::Flat(opt) => opt.base_weight,
-            VectorOption::Hnsw(opt) => opt.base_weight,
-            VectorOption::Ivf(opt) => opt.base_weight,
+            FieldOption::Flat(opt) => opt.base_weight,
+            FieldOption::Hnsw(opt) => opt.base_weight,
+            FieldOption::Ivf(opt) => opt.base_weight,
         }
     }
 
     /// Get the index kind.
     pub fn index_kind(&self) -> VectorIndexKind {
         match self {
-            VectorOption::Flat(_) => VectorIndexKind::Flat,
-            VectorOption::Hnsw(_) => VectorIndexKind::Hnsw,
-            VectorOption::Ivf(_) => VectorIndexKind::Ivf,
+            FieldOption::Flat(_) => VectorIndexKind::Flat,
+            FieldOption::Hnsw(_) => VectorIndexKind::Hnsw,
+            FieldOption::Ivf(_) => VectorIndexKind::Ivf,
         }
     }
 }
@@ -174,21 +174,21 @@ pub enum VectorIndexKind {
 }
 
 // From implementations for VectorOption
-impl From<FlatOption> for VectorOption {
+impl From<FlatOption> for FieldOption {
     fn from(opt: FlatOption) -> Self {
-        VectorOption::Flat(opt)
+        FieldOption::Flat(opt)
     }
 }
 
-impl From<HnswOption> for VectorOption {
+impl From<HnswOption> for FieldOption {
     fn from(opt: HnswOption) -> Self {
-        VectorOption::Hnsw(opt)
+        FieldOption::Hnsw(opt)
     }
 }
 
-impl From<IvfOption> for VectorOption {
+impl From<IvfOption> for FieldOption {
     fn from(opt: IvfOption) -> Self {
-        VectorOption::Ivf(opt)
+        FieldOption::Ivf(opt)
     }
 }
 

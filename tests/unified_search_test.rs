@@ -7,10 +7,10 @@ use iris::lexical::Query;
 use iris::lexical::TermQuery;
 use iris::storage::file::FileStorageConfig;
 use iris::storage::{StorageConfig, StorageFactory};
-use iris::vector::VectorOption;
+use iris::vector::FieldOption as VectorOption;
 use iris::vector::VectorSearchRequestBuilder;
 use iris::{DataValue, Document};
-use iris::{FieldConfig, IndexConfig};
+use iris::{FieldOption, Schema};
 
 #[test]
 fn test_unified_search_hybrid() -> iris::Result<()> {
@@ -24,21 +24,9 @@ fn test_unified_search_hybrid() -> iris::Result<()> {
     let vector_opt: VectorOption = FlatOption::default().dimension(3).into();
     let lexical_opt = LexicalOption::default();
 
-    let config = IndexConfig::builder()
-        .add_field(
-            "title",
-            FieldConfig {
-                lexical: Some(lexical_opt),
-                vector: None,
-            },
-        )
-        .add_field(
-            "embedding",
-            FieldConfig {
-                lexical: None,
-                vector: Some(vector_opt),
-            },
-        )
+    let config = Schema::builder()
+        .add_field("title", FieldOption::Lexical(lexical_opt))
+        .add_field("embedding", FieldOption::Vector(vector_opt))
         .build();
 
     let engine = Engine::new(storage.clone(), config)?;
@@ -68,12 +56,6 @@ fn test_unified_search_hybrid() -> iris::Result<()> {
         results.iter().any(|r| r.score > 0.0),
         "Should match doc1 lexically"
     );
-    // Note: doc_id is internal, but since we indexed sequentially:
-    // doc1 = 0, doc2 = 1 likely.
-    // However, VectorStore and LexicalStore might assign different IDs!
-    // Since we didn't solve ID mapping yet, results.doc_id corresponds to the engine that returned it.
-    // If Vector returned it, it's VectorID. If Lexical, LexicalID.
-    // They are synchronized by insertion order IF both succeed.
 
     // 5. Test Vector Search (should find "doc2" which is closer to [0, 1, 0])
     let vector_req = VectorSearchRequestBuilder::new()
@@ -85,7 +67,6 @@ fn test_unified_search_hybrid() -> iris::Result<()> {
     let results = engine.search(req)?;
     println!("Vector Results: {:?}", results);
     assert!(!results.is_empty(), "Should return vector results");
-    // doc2 (vec [0,1,0]) should match perfectly with query [0,1,0].
 
     Ok(())
 }
@@ -96,20 +77,11 @@ fn test_unified_search_hybrid_fusion() -> iris::Result<()> {
     let storage_config = StorageConfig::File(FileStorageConfig::new(temp_dir.path()));
     let storage = StorageFactory::create(storage_config)?;
 
-    let config = IndexConfig::builder()
-        .add_field(
-            "title",
-            FieldConfig {
-                lexical: Some(Default::default()),
-                vector: None,
-            },
-        )
+    let config = Schema::builder()
+        .add_field("title", FieldOption::Lexical(Default::default()))
         .add_field(
             "embedding",
-            FieldConfig {
-                lexical: None,
-                vector: Some(iris::vector::FlatOption::default().dimension(3).into()),
-            },
+            FieldOption::Vector(iris::vector::FlatOption::default().dimension(3).into()),
         )
         .build();
 

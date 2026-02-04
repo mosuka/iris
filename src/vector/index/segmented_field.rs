@@ -6,7 +6,7 @@ use std::sync::Arc;
 use crate::error::{IrisError, Result};
 use crate::maintenance::deletion::DeletionBitmap;
 use crate::storage::Storage;
-use crate::vector::core::field::VectorOption;
+use crate::vector::core::field::FieldOption;
 use crate::vector::core::vector::Vector;
 use crate::vector::core::vector::{METADATA_WEIGHT, StoredVector};
 use crate::vector::index::VectorIndexWriter;
@@ -64,7 +64,7 @@ impl SegmentedVectorField {
 
         // Validate config
         match &config.vector {
-            Some(VectorOption::Hnsw(_)) => {}
+            Some(FieldOption::Hnsw(_)) => {}
             _ => {
                 return Err(IrisError::invalid_config(
                     "SegmentedVectorField requires HNSW configuration",
@@ -102,7 +102,7 @@ impl SegmentedVectorField {
 
         // Get HNSW parameters from config
         let (dimension, distance, m, ef_construction) = match &self.config.vector {
-            Some(VectorOption::Hnsw(opt)) => {
+            Some(FieldOption::Hnsw(opt)) => {
                 (opt.dimension, opt.distance, opt.m, opt.ef_construction)
             }
             _ => {
@@ -149,7 +149,7 @@ impl SegmentedVectorField {
     ) -> Result<()> {
         if let Some(candidate) = self.segment_manager.check_merge(policy) {
             let (dimension, m, ef_construction) = match &self.config.vector {
-                Some(VectorOption::Hnsw(opt)) => (opt.dimension, opt.m, opt.ef_construction),
+                Some(FieldOption::Hnsw(opt)) => (opt.dimension, opt.m, opt.ef_construction),
                 _ => {
                     return Err(IrisError::invalid_config(
                         "SegmentedVectorField requires HNSW configuration".to_string(),
@@ -303,7 +303,7 @@ impl SegmentedVectorField {
 
         // Safe unwrap because verified in create()
         let distance_metric = match &self.config.vector {
-            Some(VectorOption::Hnsw(opt)) => opt.distance,
+            Some(FieldOption::Hnsw(opt)) => opt.distance,
             _ => return Ok(Vec::new()), // Should not happen
         };
 
@@ -358,7 +358,7 @@ impl SegmentedVectorField {
 
         // Safe unwrap because verified in create()
         let distance_metric = match &self.config.vector {
-            Some(VectorOption::Hnsw(opt)) => opt.distance,
+            Some(FieldOption::Hnsw(opt)) => opt.distance,
             _ => return Ok(Vec::new()),
         };
 
@@ -375,7 +375,7 @@ impl SegmentedVectorField {
             let mut searcher = HnswSearcher::new(Arc::new(reader))?;
 
             // Set ef_search based on config if available
-            if let Some(VectorOption::Hnsw(opt)) = &self.config.vector {
+            if let Some(FieldOption::Hnsw(opt)) = &self.config.vector {
                 // Use a higher ef_search for better recall (increase search effort relative to construction)
                 searcher.set_ef_search(opt.ef_construction.max(50) * 2);
             }
@@ -479,7 +479,7 @@ impl VectorFieldReader for SegmentedVectorField {
 
         // Safe unwrap because verified in create()
         let dimension = match &self.config.vector {
-            Some(VectorOption::Hnsw(opt)) => opt.dimension,
+            Some(FieldOption::Hnsw(opt)) => opt.dimension,
             _ => 0,
         };
 

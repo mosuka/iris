@@ -4,9 +4,9 @@ use iris::Engine;
 use iris::lexical::FieldOption as LexicalOption;
 use iris::storage::file::FileStorageConfig;
 use iris::storage::{StorageConfig, StorageFactory};
-use iris::vector::VectorOption;
+use iris::vector::FieldOption as VectorOption;
 use iris::{DataValue, Document};
-use iris::{FieldConfig, IndexConfig};
+use iris::{FieldOption, Schema};
 
 #[test]
 fn test_unified_engine_indexing() -> iris::Result<()> {
@@ -19,34 +19,16 @@ fn test_unified_engine_indexing() -> iris::Result<()> {
     // We define a schema with:
     // - "title": Lexical only
     // - "embedding": Vector only
-    // - "description": Both (Hybrid)
+    // - "description": Lexical only
 
     // Note: VectorOption default uses Cosine, dim=128
     let vector_opt = VectorOption::default();
     let lexical_opt = LexicalOption::default();
 
-    let config = IndexConfig::builder()
-        .add_field(
-            "title",
-            FieldConfig {
-                lexical: Some(lexical_opt.clone()),
-                vector: None,
-            },
-        )
-        .add_field(
-            "embedding",
-            FieldConfig {
-                lexical: None,
-                vector: Some(vector_opt.clone()),
-            },
-        )
-        .add_field(
-            "description",
-            FieldConfig {
-                lexical: Some(lexical_opt),
-                vector: None, // No embedder configured, so lexical-only for this test
-            },
-        )
+    let config = Schema::builder()
+        .add_field("title", FieldOption::Lexical(lexical_opt.clone()))
+        .add_field("embedding", FieldOption::Vector(vector_opt.clone()))
+        .add_field("description", FieldOption::Lexical(lexical_opt))
         .build();
 
     // 3. Initialize Engine

@@ -44,7 +44,7 @@ use crate::error::{IrisError, Result};
 use crate::lexical::store::config::LexicalIndexConfig;
 use crate::maintenance::deletion::DeletionConfig;
 use crate::vector::core::distance::DistanceMetric;
-use crate::vector::core::field::VectorOption;
+use crate::vector::core::field::FieldOption;
 use crate::vector::core::quantization;
 use crate::vector::core::vector::Vector;
 
@@ -643,7 +643,7 @@ impl VectorIndexConfigBuilder {
     pub fn add_field(
         mut self,
         name: impl Into<String>,
-        option: impl Into<VectorOption>,
+        option: impl Into<FieldOption>,
     ) -> Result<Self> {
         let name = name.into();
         let config = VectorFieldConfig {
@@ -664,7 +664,7 @@ impl VectorIndexConfigBuilder {
     pub fn image_field(
         self,
         name: impl Into<String>,
-        option: impl Into<VectorOption>,
+        option: impl Into<FieldOption>,
     ) -> Result<Self> {
         self.add_field(name, option)
     }
@@ -795,7 +795,7 @@ pub struct VectorFieldConfig {
     /// Vector index configuration (optional).
     #[serde(default)]
     /// Configuration options for the vector field.
-    pub vector: Option<VectorOption>,
+    pub vector: Option<FieldOption>,
     /// Configuration options for the lexical field.
     pub lexical: Option<crate::lexical::core::field::FieldOption>,
 }
@@ -803,7 +803,7 @@ pub struct VectorFieldConfig {
 impl Default for VectorFieldConfig {
     fn default() -> Self {
         Self {
-            vector: Some(VectorOption::default()),
+            vector: Some(FieldOption::default()),
             lexical: Some(crate::lexical::core::field::FieldOption::default()),
         }
     }
