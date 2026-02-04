@@ -1,6 +1,6 @@
-# Unified Vector Search
+# Vector Search
 
-Vector search (finding "nearest neighbors") enables semantic retrieval where matches are based on meaning rather than exact keywords. Iris provides a **Unified Vector Engine** that combines this semantic search with traditional lexical (keyword) search capabilities.
+Vector search (finding "nearest neighbors") enables semantic retrieval where matches are based on meaning rather than exact keywords. Iris provides a **Unified Engine** that combines this semantic search with traditional lexical (keyword) search capabilities.
 
 ## Document Structure
 
@@ -186,15 +186,21 @@ To reduce memory usage and improve search speed, Iris supports several quantizat
 
 ## Engine Architecture
 
-### Vector Engine (`VectorEngine`)
+### VectorStore
 
-The high-level orchestrator that manages multiple vector fields, handles persistence via WAL (Write-Ahead Log), and coordinates aggregated searches across fields.
+The store component that manages vector indexing and searching. It follows a simplified 4-member structure:
+
+- **index**: The underlying vector index (HNSW, IVF, or Flat)
+- **writer_cache**: Cached writer for write operations
+- **searcher_cache**: Cached searcher for search operations
+- **doc_store**: Shared document storage
 
 ### Index Components
 
-- **VectorField**: Abstracts individual field implementations (e.g., `InMemoryVectorField`, `SegmentedVectorField`).
-- **Index Writers/Readers**: Specific implementations for each algorithm (e.g., `HnswIndexWriter`, `FlatVectorIndexReader`, `IvfIndexReader`).
-- **VectorEngineSearcher**: Integrates results from multiple fields based on specified score modes (WeightedSum, MaxSim).
+- **VectorIndex**: Trait for vector index implementations (HnswIndex, IvfIndex, FlatIndex).
+- **VectorIndexWriter**: Handles vector insertion and embedding.
+- **VectorIndexSearcher**: Performs nearest neighbor search.
+- **EmbeddingVectorIndexWriter**: Wrapper that automatically embeds text/images before indexing.
 
 ## Index Segment Files
 
@@ -267,174 +273,161 @@ Results from the vector and lexical searches are combined using fusion strategie
 
 ```mermaid
 graph TD
-    Query["Search Request"] --> Engine["VectorEngine"]
-    Engine -->|Text Query| LexSearch["Lexical Component"]
-    Engine -->|Vector Query| VecSearch["Vector Component"]
-    
+    Query["SearchRequest"] --> Engine["Engine"]
+    Engine -->|Lexical Query| LexSearch["LexicalStore"]
+    Engine -->|Vector Query| VecSearch["VectorStore"]
+
     LexSearch --> LexHits["Lexical Hits"]
     VecSearch --> VecHits["Vector Hits"]
-    
+
     LexHits --> Fusion["Result Fusion"]
     VecHits --> Fusion
-    
+
     Fusion --> Combine["Score Combination"]
     Combine --> TopDocs["Final Top Results"]
 ```
 
 ## Code Examples
 
-### 1. Configuring VectorEngine
+### 1. Configuring Engine for Vector Search
 
-Example of creating an engine with an embedder and field configurations.
+Example of creating an engine with an embedder and vector field configurations.
 
 ```rust
 use std::sync::Arc;
-use iris::vector::engine::VectorEngine;
-use iris::vector::engine::config::{VectorIndexConfig, VectorFieldConfig, VectorIndexKind};
-use iris::vector::core::distance::DistanceMetric;
-use iris::embedding::precomputed::PrecomputedEmbedder;
-use iris::storage::memory::{MemoryStorage, MemoryStorageConfig};
+use iris::{Engine, IndexConfig};
+use iris::vector::{FlatOption, HnswOption, VectorOption, DistanceMetric};
+use iris::storage::{StorageConfig, StorageFactory};
+use iris::storage::memory::MemoryStorageConfig;
 
-fn setup_engine() -> iris::error::Result<VectorEngine> {
-    let storage = Arc::new(MemoryStorage::new(MemoryStorageConfig::default()));
-    
-    // Create configuration
-    let config = VectorIndexConfig::builder()
-        .add_field("title_embedding", 384)? // 384-dimensional field
-        .add_field("body_embedding", 384)?
-        .default_distance(DistanceMetric::Cosine)
-        .build()?;
+fn setup_engine() -> iris::Result<Engine> {
+    let storage = StorageFactory::create(StorageConfig::Memory(MemoryStorageConfig::default()))?;
 
-    let engine = VectorEngine::new(storage, config)?;
-    Ok(engine)
+    let config = IndexConfig::builder()
+        .embedder(Arc::new(MyEmbedder))  // Your embedder implementation
+        .add_vector_field(
+            "embedding",
+            VectorOption::Hnsw(HnswOption {
+                dimension: 384,
+                distance: DistanceMetric::Cosine,
+                m: 16,
+                ef_construction: 200,
+                ..Default::default()
+            }),
+        )
+        .build();
+
+    Engine::new(storage, config)
 }
 ```
 
 ### 2. Adding Documents
 
-Example of indexing a document with vector data.
+Example of indexing a document with text that gets automatically embedded.
 
 ```rust
-use iris::vector::core::document::{DocumentVector, StoredVector};
+use iris::{Document, DataValue};
 
-fn add_document(engine: &VectorEngine) -> iris::error::Result<()> {
-    let mut doc = DocumentVector::new();
-    
-    // Create vector data
-    let vector_data = Arc::from(vec![0.1; 384]);
-    doc.set_field("title_embedding", StoredVector::new(vector_data));
-    
-    // Add metadata for filtering and hybrid search
-    doc.set_metadata("category", "technology");
-    doc.set_metadata("description", "Fast semantic search in Rust");
+fn add_document(engine: &Engine) -> iris::Result<()> {
+    // Text is automatically embedded by the configured embedder
+    let doc = Document::new_with_id("doc_001")
+        .add_text("embedding", "Fast semantic search in Rust")
+        .add_field("category", DataValue::Text("technology".into()));
 
-    // Add document with specific ID
-    // Note: index_vectors triggers metadata indexing in the underlying LexicalEngine
-    engine.index_vectors("doc_001", doc)?;
-    engine.commit()?; // Persist data
-    
+    engine.index(doc)?;
+    engine.commit()?;
+
     Ok(())
 }
 ```
 
 ### 3. Executing Vector Search
 
-Example of performing a search using `VectorSearchRequest`.
+Example of performing a search using `VectorSearchRequestBuilder`.
 
 ```rust
-use iris::vector::engine::request::{VectorSearchRequest, QueryVector};
-use iris::vector::core::document::StoredVector;
+use iris::SearchRequestBuilder;
+use iris::vector::VectorSearchRequestBuilder;
 
-fn search(engine: &VectorEngine) -> iris::error::Result<()> {
-    // Prepare query vector
-    let query_data = Arc::from(vec![0.1; 384]);
-    let query_vector = QueryVector {
-        vector: StoredVector::new(query_data),
-        weight: 1.0,
-        fields: None,
-    };
+fn search(engine: &Engine) -> iris::Result<()> {
+    let results = engine.search(
+        SearchRequestBuilder::new()
+            .with_vector(
+                VectorSearchRequestBuilder::new()
+                    .add_text("embedding", "semantic search")
+                    .build()
+            )
+            .limit(10)
+            .build()
+    )?;
 
-    let request = VectorSearchRequest {
-        query_vectors: vec![query_vector],
-        limit: 10,
-        min_score: 0.7,
-        ..Default::default()
-    };
-
-    let results = engine.search(request)?;
-    for hit in results.hits {
-        println!("Doc ID: {}, Score: {}", hit.doc_id, hit.score);
+    for hit in results {
+        println!("Doc ID: {}, Score: {:.4}", hit.doc_id, hit.score);
     }
-    
+
     Ok(())
 }
 ```
 
-### 4. Filtered Search
-
-Example of a search restricted to a specific category.
-
-```rust
-use iris::vector::engine::filter::{VectorFilter, FilterCondition};
-
-fn filtered_search(engine: &VectorEngine) -> iris::error::Result<()> {
-    let mut filter = VectorFilter::default();
-    filter.document.equals.insert("category".to_string(), "technology".into());
-
-    let request = VectorSearchRequest {
-        query_vectors: vec![/* query vector */],
-        filter: Some(filter),
-        limit: 5,
-        ..Default::default()
-    };
-
-    let results = engine.search(request)?;
-    Ok(())
-}
-```
-
-### 5. Hybrid Search
+### 4. Hybrid Search
 
 Example of combining vector and keyword search.
 
 ```rust
-use iris::vector::engine::request::{
-    VectorSearchRequest, LexicalQuery, MatchQueryOptions, FusionConfig, VectorScoreMode
-};
+use iris::{FusionAlgorithm, SearchRequestBuilder};
+use iris::lexical::TermQuery;
+use iris::vector::VectorSearchRequestBuilder;
 
-fn hybrid_search(engine: &VectorEngine, query_vector: Vec<f32>) -> iris::error::Result<()> {
-    // Prepare query vector
-    let q_vec = QueryVector {
-        vector: StoredVector::new(Arc::from(query_vector.as_slice())),
-        weight: 1.0,
-        fields: None,
-    };
+fn hybrid_search(engine: &Engine) -> iris::Result<()> {
+    let results = engine.search(
+        SearchRequestBuilder::new()
+            // Vector search (semantic)
+            .with_vector(
+                VectorSearchRequestBuilder::new()
+                    .add_text("content", "fast semantic search")
+                    .build()
+            )
+            // Lexical search (keyword)
+            .with_lexical(Box::new(TermQuery::new("content", "rust")))
+            // Fusion strategy
+            .fusion(FusionAlgorithm::RRF { k: 60.0 })
+            .limit(10)
+            .build()
+    )?;
 
-    // Define Hybrid Query
-    let request = VectorSearchRequest {
-        query_vectors: vec![q_vec],
-        limit: 10,
-        // Add Lexical Query (Keyword Search)
-        lexical_query: Some(LexicalQuery::Match(MatchQueryOptions {
-            field: "description".to_string(),
-            query: "fast rust search".to_string(),
-            operator: Default::default(),
-            boost: 1.0,
-        })),
-        // Configure Fusion Strategy
-        fusion_config: Some(FusionConfig::WeightedSum {
-            vector_weight: 0.5,
-            lexical_weight: 0.5,
-        }),
-        score_mode: VectorScoreMode::WeightedSum,
-        ..Default::default()
-    };
-
-    let results = engine.search(request)?;
-    
-    for res in results.hits {
-        println!("Doc ID: {}, Score: {}", res.doc_id, res.score);
+    for hit in results {
+        if let Ok(Some(doc)) = engine.get_document(hit.doc_id) {
+            let id = doc.id().unwrap_or("unknown");
+            println!("[{}] score={:.4}", id, hit.score);
+        }
     }
+
+    Ok(())
+}
+```
+
+### 5. Weighted Sum Fusion
+
+Example using weighted sum fusion for fine-grained control.
+
+```rust
+fn weighted_hybrid_search(engine: &Engine) -> iris::Result<()> {
+    let results = engine.search(
+        SearchRequestBuilder::new()
+            .with_vector(
+                VectorSearchRequestBuilder::new()
+                    .add_text("content", "machine learning")
+                    .build()
+            )
+            .with_lexical(Box::new(TermQuery::new("content", "python")))
+            .fusion(FusionAlgorithm::WeightedSum {
+                vector_weight: 0.7,  // 70% semantic
+                lexical_weight: 0.3, // 30% keyword
+            })
+            .limit(10)
+            .build()
+    )?;
+
     Ok(())
 }
 ```
