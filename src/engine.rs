@@ -3,10 +3,12 @@ pub mod search;
 
 use std::sync::Arc;
 
+use crate::analysis::analyzer::analyzer::Analyzer;
 use crate::analysis::analyzer::keyword::KeywordAnalyzer;
 use crate::analysis::analyzer::per_field::PerFieldAnalyzer;
 use crate::analysis::analyzer::standard::StandardAnalyzer;
 use crate::data::Document;
+use crate::embedding::embedder::Embedder;
 use crate::error::Result;
 use crate::lexical::store::LexicalStore;
 use crate::lexical::store::config::LexicalIndexConfig;
@@ -36,46 +38,25 @@ use crate::engine::search::{FusionAlgorithm, SearchResult};
 use std::collections::HashMap;
 
 impl Engine {
-    /// Create a new Unified Engine.
+    /// Create a new Unified Engine with default analyzer and no embedder.
     ///
-    /// # Arguments
-    ///
-    /// * `storage` - The root storage for the index.
-    /// * `schema` - The unified index schema.
-    ///
-    /// The engine will create two namespaces within the storage:
-    /// - "lexical" for the inverted index
-    /// - "vector" for the vector index
+    /// For custom analyzer or embedder configuration, use [`Engine::builder`].
     pub fn new(storage: Arc<dyn Storage>, schema: Schema) -> Result<Self> {
-        // 1. Split schema
-        let (lexical_config, vector_config) = Self::split_schema(&schema);
+        EngineBuilder::new(storage, schema).build()
+    }
 
-        // 2. Create namespaced storage
-        let lexical_storage = Arc::new(PrefixedStorage::new("lexical", storage.clone()));
-        let vector_storage = Arc::new(PrefixedStorage::new("vector", storage.clone()));
-        let document_storage = Arc::new(PrefixedStorage::new("documents", storage.clone()));
-
-        // 3. Initialize engines
-        let document_store = Arc::new(RwLock::new(UnifiedDocumentStore::open(document_storage)?));
-
-        let lexical = LexicalStore::new(lexical_storage, lexical_config, document_store.clone())?;
-        let vector = VectorStore::new(vector_storage, vector_config, document_store.clone())?;
-
-        // 4. Initialize Unified WAL (at root)
-        let wal = Arc::new(WalManager::new(storage, "engine.wal")?);
-
-        let engine = Self {
-            schema,
-            lexical,
-            vector,
-            document_store,
-            wal,
-        };
-
-        // 5. Recover state from WAL
-        engine.recover()?;
-
-        Ok(engine)
+    /// Create an [`EngineBuilder`] for custom configuration.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let engine = Engine::builder(storage, schema)
+    ///     .analyzer(Arc::new(StandardAnalyzer::default()))
+    ///     .embedder(Arc::new(MyEmbedder))
+    ///     .build()?;
+    /// ```
+    pub fn builder(storage: Arc<dyn Storage>, schema: Schema) -> EngineBuilder {
+        EngineBuilder::new(storage, schema)
     }
 
     /// Recover index state from the Write-Ahead Log.
@@ -295,12 +276,14 @@ impl Engine {
     }
 
     /// Split the unified schema into specialized configs.
-    fn split_schema(schema: &Schema) -> (LexicalIndexConfig, VectorIndexConfig) {
+    fn split_schema(
+        schema: &Schema,
+        analyzer: Option<Arc<dyn Analyzer>>,
+        embedder: Option<Arc<dyn Embedder>>,
+    ) -> (LexicalIndexConfig, VectorIndexConfig) {
         // Construct Lexical Config
-        let default_analyzer = schema
-            .analyzer
-            .clone()
-            .unwrap_or_else(|| Arc::new(StandardAnalyzer::new().unwrap()));
+        let default_analyzer =
+            analyzer.unwrap_or_else(|| Arc::new(StandardAnalyzer::new().unwrap()));
 
         let mut per_field_analyzer = PerFieldAnalyzer::new(default_analyzer);
         per_field_analyzer.add_analyzer("_id", Arc::new(KeywordAnalyzer::new()));
@@ -318,7 +301,7 @@ impl Engine {
 
         // Construct Vector Config
         let mut vector_builder = VectorIndexConfig::builder();
-        if let Some(embedder) = &schema.embedder {
+        if let Some(embedder) = &embedder {
             vector_builder = vector_builder.embedder(embedder.clone());
         }
 
@@ -330,11 +313,9 @@ impl Engine {
             }
         }
 
-        // For now, return default/partial configs.
-        // Real implementation requires more detailed mapping.
         let vector_config = vector_builder
             .build()
-            .unwrap_or_else(|_| VectorIndexConfig::default()); // Fallback
+            .unwrap_or_else(|_| VectorIndexConfig::default());
 
         (lexical_config, vector_config)
     }
@@ -567,5 +548,87 @@ impl Engine {
         }
 
         Ok(results)
+    }
+}
+
+/// Builder for constructing an [`Engine`] with custom configuration.
+///
+/// Use this when you need to specify a custom analyzer or embedder.
+/// For simple cases with default settings, use [`Engine::new`] directly.
+///
+/// # Example
+///
+/// ```ignore
+/// let schema = Schema::builder()
+///     .add_field("content", FieldOption::Lexical(LexicalFieldOption::Text(TextOption::default())))
+///     .add_field("content_vec", FieldOption::Vector(VectorOption::Flat(FlatOption { dimension: 384, ..Default::default() })))
+///     .build();
+///
+/// let engine = Engine::builder(storage, schema)
+///     .analyzer(Arc::new(StandardAnalyzer::default()))
+///     .embedder(Arc::new(MyEmbedder))
+///     .build()?;
+/// ```
+pub struct EngineBuilder {
+    storage: Arc<dyn Storage>,
+    schema: Schema,
+    analyzer: Option<Arc<dyn Analyzer>>,
+    embedder: Option<Arc<dyn Embedder>>,
+}
+
+impl EngineBuilder {
+    /// Create a new builder with the given storage and schema.
+    pub fn new(storage: Arc<dyn Storage>, schema: Schema) -> Self {
+        Self {
+            storage,
+            schema,
+            analyzer: None,
+            embedder: None,
+        }
+    }
+
+    /// Set the global analyzer (fallback if not specified per field).
+    ///
+    /// If not set, [`StandardAnalyzer`] is used as the default.
+    pub fn analyzer(mut self, analyzer: Arc<dyn Analyzer>) -> Self {
+        self.analyzer = Some(analyzer);
+        self
+    }
+
+    /// Set the global embedder (fallback if not specified per field).
+    ///
+    /// If not set, no embedder is configured.
+    pub fn embedder(mut self, embedder: Arc<dyn Embedder>) -> Self {
+        self.embedder = Some(embedder);
+        self
+    }
+
+    /// Build the [`Engine`].
+    pub fn build(self) -> Result<Engine> {
+        let (lexical_config, vector_config) =
+            Engine::split_schema(&self.schema, self.analyzer, self.embedder);
+
+        let lexical_storage = Arc::new(PrefixedStorage::new("lexical", self.storage.clone()));
+        let vector_storage = Arc::new(PrefixedStorage::new("vector", self.storage.clone()));
+        let document_storage = Arc::new(PrefixedStorage::new("documents", self.storage.clone()));
+
+        let document_store = Arc::new(RwLock::new(UnifiedDocumentStore::open(document_storage)?));
+
+        let lexical = LexicalStore::new(lexical_storage, lexical_config, document_store.clone())?;
+        let vector = VectorStore::new(vector_storage, vector_config, document_store.clone())?;
+
+        let wal = Arc::new(WalManager::new(self.storage, "engine.wal")?);
+
+        let engine = Engine {
+            schema: self.schema,
+            lexical,
+            vector,
+            document_store,
+            wal,
+        };
+
+        engine.recover()?;
+
+        Ok(engine)
     }
 }

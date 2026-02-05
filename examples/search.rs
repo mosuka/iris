@@ -89,9 +89,7 @@ fn main() -> Result<()> {
     // - "content":     Lexical (For keyword search on content)
     // - "content_vec": Vector (For semantic search on content)
     // - "embedding":   Vector Only (Hidden semantic features)
-    let config = Schema::builder()
-        .embedder(Arc::new(MockEmbedder))
-        .analyzer(Arc::new(StandardAnalyzer::default()))
+    let schema = Schema::builder()
         // Field 1: Lexical content field
         .add_field(
             "content",
@@ -117,7 +115,10 @@ fn main() -> Result<()> {
         )
         .build();
 
-    let engine = Engine::new(storage, config)?;
+    let engine = Engine::builder(storage, schema)
+        .analyzer(Arc::new(StandardAnalyzer::default()))
+        .embedder(Arc::new(MockEmbedder))
+        .build()?;
 
     // 3. Index Data
     let docs = vec![

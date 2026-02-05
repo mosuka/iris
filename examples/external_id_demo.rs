@@ -52,8 +52,7 @@ fn main() -> Result<()> {
     let storage_config = StorageConfig::Memory(MemoryStorageConfig::default());
     let storage = StorageFactory::create(storage_config)?;
 
-    let config = Schema::builder()
-        .embedder(Arc::new(SimpleEmbedder))
+    let schema = Schema::builder()
         .add_field(
             "description",
             FieldOption::Lexical(LexicalFieldOption::Text(TextOption::default())),
@@ -67,7 +66,9 @@ fn main() -> Result<()> {
         )
         .build();
 
-    let engine = Engine::new(storage, config)?;
+    let engine = Engine::builder(storage, schema)
+        .embedder(Arc::new(SimpleEmbedder))
+        .build()?;
 
     // 2. Index Documents
     // "product-A": "Green Apple"
