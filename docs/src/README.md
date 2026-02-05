@@ -49,14 +49,15 @@ fn main() -> iris::Result<()> {
 
     // 2. Define schema with separate lexical and vector fields
     let schema = Schema::builder()
-        .analyzer(Arc::new(StandardAnalyzer::default()))
-        .embedder(Arc::new(MyEmbedder))  // Your embedder implementation
         .add_field("content", FieldOption::Lexical(LexicalFieldOption::Text(TextOption::default())))
         .add_field("content_vec", FieldOption::Vector(VectorOption::Flat(FlatOption { dimension: 384, ..Default::default() })))
         .build();
 
-    // 3. Create engine and index documents
-    let engine = Engine::new(storage, schema)?;
+    // 3. Create engine with analyzer and embedder
+    let engine = Engine::builder(storage, schema)
+        .analyzer(Arc::new(StandardAnalyzer::default()))
+        .embedder(Arc::new(MyEmbedder))  // Your embedder implementation
+        .build()?;
 
     engine.index(
         Document::new_with_id("doc1")

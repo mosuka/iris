@@ -1,14 +1,14 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::Arc;
 
-use crate::analysis::analyzer::analyzer::Analyzer;
 use crate::lexical::core::field::FieldOption as LexicalOption;
 use crate::vector::core::field::FieldOption as VectorOption;
 
-use crate::embedding::embedder::Embedder;
-
 /// Schema for the unified engine.
+///
+/// Declares what fields exist and their index types (lexical or vector).
+/// Runtime configuration such as analyzers and embedders are provided
+/// separately via [`super::EngineBuilder`].
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Schema {
     /// Options for each field.
@@ -16,12 +16,6 @@ pub struct Schema {
     /// Default fields for search.
     #[serde(default)]
     pub default_fields: Vec<String>,
-    /// Global analyzer (fallback if not specified per field).
-    #[serde(skip)]
-    pub analyzer: Option<Arc<dyn Analyzer>>,
-    /// Global embedder (fallback if not specified per field).
-    #[serde(skip)]
-    pub embedder: Option<Arc<dyn Embedder>>,
 }
 
 impl Schema {
@@ -29,8 +23,6 @@ impl Schema {
         Self {
             fields: HashMap::new(),
             default_fields: Vec::new(),
-            analyzer: None,
-            embedder: None,
         }
     }
 
@@ -90,8 +82,6 @@ impl FieldOption {
 pub struct SchemaBuilder {
     fields: HashMap<String, FieldOption>,
     default_fields: Vec<String>,
-    embedder: Option<Arc<dyn Embedder>>,
-    analyzer: Option<Arc<dyn Analyzer>>,
 }
 
 impl SchemaBuilder {
@@ -122,22 +112,10 @@ impl SchemaBuilder {
         self
     }
 
-    pub fn embedder(mut self, embedder: Arc<dyn Embedder>) -> Self {
-        self.embedder = Some(embedder);
-        self
-    }
-
-    pub fn analyzer(mut self, analyzer: Arc<dyn Analyzer>) -> Self {
-        self.analyzer = Some(analyzer);
-        self
-    }
-
     pub fn build(self) -> Schema {
         Schema {
             fields: self.fields,
             default_fields: self.default_fields,
-            analyzer: self.analyzer,
-            embedder: self.embedder,
         }
     }
 }

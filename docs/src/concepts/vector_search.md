@@ -304,7 +304,6 @@ fn setup_engine() -> iris::Result<Engine> {
     let storage = StorageFactory::create(StorageConfig::Memory(MemoryStorageConfig::default()))?;
 
     let schema = Schema::builder()
-        .embedder(Arc::new(MyEmbedder))  // Your embedder implementation
         .add_vector_field(
             "embedding",
             VectorOption::Hnsw(HnswOption {
@@ -317,7 +316,9 @@ fn setup_engine() -> iris::Result<Engine> {
         )
         .build();
 
-    Engine::new(storage, schema)
+    Engine::builder(storage, schema)
+        .embedder(Arc::new(MyEmbedder))  // Your embedder implementation
+        .build()
 }
 ```
 

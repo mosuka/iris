@@ -89,8 +89,7 @@ fn create_hybrid_engine() -> std::result::Result<Engine, Box<dyn std::error::Err
     per_field.add_embedder("title_vec", embedder.clone());
 
     // Schema with separate fields for lexical and vector
-    let config = Schema::builder()
-        .embedder(Arc::new(per_field))
+    let schema = Schema::builder()
         .add_field("title", FieldOption::Lexical(LexicalFieldOption::Text(TextOption::default())))
         .add_field(
             "title_vec",
@@ -103,7 +102,9 @@ fn create_hybrid_engine() -> std::result::Result<Engine, Box<dyn std::error::Err
 
     let storage = Arc::new(MemoryStorage::new(Default::default()));
 
-    let engine = Engine::new(storage, config)?;
+    let engine = Engine::builder(storage, schema)
+        .embedder(Arc::new(per_field))
+        .build()?;
     Ok(engine)
 }
 

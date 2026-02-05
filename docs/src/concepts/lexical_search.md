@@ -264,12 +264,13 @@ fn setup_engine() -> iris::Result<Engine> {
     let storage = StorageFactory::create(StorageConfig::Memory(MemoryStorageConfig::default()))?;
 
     let schema = Schema::builder()
-        .analyzer(Arc::new(StandardAnalyzer::default()))
         .add_lexical_field("title", FieldOption::Text(TextOption::default()))
         .add_lexical_field("content", FieldOption::Text(TextOption::default()))
         .build();
 
-    Engine::new(storage, schema)
+    Engine::builder(storage, schema)
+        .analyzer(Arc::new(StandardAnalyzer::default()))
+        .build()
 }
 ```
 
@@ -328,11 +329,12 @@ fn setup_japanese_engine() -> iris::Result<Engine> {
     // Configure default analyzer to Japanese
     let analyzer = Arc::new(JapaneseAnalyzer::default());
     let schema = Schema::builder()
-        .analyzer(analyzer)
         .add_lexical_field("content", FieldOption::Text(TextOption::default()))
         .build();
 
-    Engine::new(storage, schema)
+    Engine::builder(storage, schema)
+        .analyzer(analyzer)
+        .build()
 }
 ```
 

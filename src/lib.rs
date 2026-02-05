@@ -38,6 +38,7 @@ pub use embedding::openai_embedder::OpenAIEmbedder;
 pub use embedding::per_field::PerFieldEmbedder;
 pub use embedding::precomputed::PrecomputedEmbedder;
 pub use engine::Engine;
+pub use engine::EngineBuilder;
 pub use engine::schema::{FieldOption, Schema};
 pub use engine::search::{FusionAlgorithm, SearchRequest, SearchRequestBuilder, SearchResult};
 pub use error::{IrisError, Result};
