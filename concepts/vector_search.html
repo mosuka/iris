@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-d937b922.js";
+            window.path_to_searchindex_js = "../searchindex-3892ee8a.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-9d358a08.js"></script>
@@ -467,7 +467,6 @@ fn setup_engine() -&gt; iris::Result&lt;Engine&gt; {
     let storage = StorageFactory::create(StorageConfig::Memory(MemoryStorageConfig::default()))?;
 
     let schema = Schema::builder()
-        .embedder(Arc::new(MyEmbedder))  // Your embedder implementation
         .add_vector_field(
             "embedding",
             VectorOption::Hnsw(HnswOption {
@@ -480,7 +479,9 @@ fn setup_engine() -&gt; iris::Result&lt;Engine&gt; {
         )
         .build();
 
-    Engine::new(storage, schema)
+    Engine::builder(storage, schema)
+        .embedder(Arc::new(MyEmbedder))  // Your embedder implementation
+        .build()
 }
 <span class="boring">}</span></code></pre>
 <h3 id="2-adding-documents"><a class="header" href="#2-adding-documents">2. Adding Documents</a></h3>

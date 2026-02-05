@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-d937b922.js";
+            window.path_to_searchindex_js = "searchindex-3892ee8a.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-9d358a08.js"></script>
@@ -221,14 +221,15 @@ fn main() -&gt; iris::Result&lt;()&gt; {
 
     // 2. Define schema with separate lexical and vector fields
     let schema = Schema::builder()
-        .analyzer(Arc::new(StandardAnalyzer::default()))
-        .embedder(Arc::new(MyEmbedder))  // Your embedder implementation
         .add_field("content", FieldOption::Lexical(LexicalFieldOption::Text(TextOption::default())))
         .add_field("content_vec", FieldOption::Vector(VectorOption::Flat(FlatOption { dimension: 384, ..Default::default() })))
         .build();
 
-    // 3. Create engine and index documents
-    let engine = Engine::new(storage, schema)?;
+    // 3. Create engine with analyzer and embedder
+    let engine = Engine::builder(storage, schema)
+        .analyzer(Arc::new(StandardAnalyzer::default()))
+        .embedder(Arc::new(MyEmbedder))  // Your embedder implementation
+        .build()?;
 
     engine.index(
         Document::new_with_id("doc1")
