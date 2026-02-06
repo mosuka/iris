@@ -8,6 +8,7 @@ use std::sync::Arc;
 
 use crate::data::DataValue;
 use crate::embedding::embedder::{EmbedInput, Embedder};
+use crate::embedding::per_field::PerFieldEmbedder;
 use crate::error::{IrisError, Result};
 use crate::vector::core::vector::Vector;
 use crate::vector::store::embedder::EmbedderExecutor;
@@ -76,6 +77,7 @@ impl EmbeddingVectorIndexWriter {
         };
 
         let embedder = self.embedder.clone();
+        let field_name_for_embed = field_name.clone();
 
         // Run embedding in the executor
         // We construct EmbedInput inside the closure to manage lifetimes
@@ -88,7 +90,12 @@ impl EmbeddingVectorIndexWriter {
                 return Err(IrisError::internal("Unreachable state in embedding writer"));
             };
 
-            embedder.embed(&input).await
+            // Use field-specific embedder if PerFieldEmbedder, otherwise use default.
+            if let Some(per_field) = embedder.as_any().downcast_ref::<PerFieldEmbedder>() {
+                per_field.embed_field(&field_name_for_embed, &input).await
+            } else {
+                embedder.embed(&input).await
+            }
         })?;
 
         // Add the resulting vector to the underlying writer
