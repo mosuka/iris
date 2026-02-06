@@ -35,12 +35,12 @@ fn test_unified_engine_indexing() -> iris::Result<()> {
     let engine = Engine::new(storage.clone(), config)?;
 
     // 4. Index Documents
-    let doc1 = Document::new_with_id("doc1")
+    let doc1 = Document::new()
         .add_field("title", DataValue::Text("Rust Programming".into()))
         .add_field("description", DataValue::Text("A systems language".into()))
         .add_field("embedding", DataValue::Vector(vec![0.1; 128])); // Valid vector
 
-    let doc2 = Document::new_with_id("doc2")
+    let doc2 = Document::new()
         .add_field("title", DataValue::Text("Vector Search".into()))
         .add_field(
             "description",
@@ -48,8 +48,8 @@ fn test_unified_engine_indexing() -> iris::Result<()> {
         )
         .add_field("embedding", DataValue::Vector(vec![0.2; 128]));
 
-    engine.index(doc1)?;
-    engine.index(doc2)?;
+    engine.put_document("doc1", doc1)?;
+    engine.put_document("doc2", doc2)?;
 
     // 5. Commit
     engine.commit()?;

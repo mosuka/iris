@@ -45,13 +45,13 @@ fn main() -> iris::Result<()> {
         .embedder(Arc::new(MyEmbedder))  // Your embedder implementation
         .build()?;
 
-    engine.index(
-        Document::new_with_id("doc1")
+    engine.put_document("doc1",
+        Document::new()
             .add_text("content", "Rust is a systems programming language")
             .add_text("content_vec", "Rust is a systems programming language")
     )?;
-    engine.index(
-        Document::new_with_id("doc2")
+    engine.put_document("doc2",
+        Document::new()
             .add_text("content", "Python is great for machine learning")
             .add_text("content_vec", "Python is great for machine learning")
     )?;
@@ -68,10 +68,7 @@ fn main() -> iris::Result<()> {
 
     // 5. Display results
     for hit in results {
-        if let Ok(Some(doc)) = engine.get_document(hit.doc_id) {
-            let id = doc.id().unwrap_or("unknown");
-            println!("[{}] score={:.4}", id, hit.score);
-        }
+        println!("[{}] score={:.4}", hit.id, hit.score);
     }
 
     Ok(())

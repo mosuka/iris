@@ -124,18 +124,16 @@ async fn test_hybrid_search_unification_impl(
     // Index Doc 1: "apple" - both lexical and vector fields
     let payload1 = Document::new()
         .add_field("title", DataValue::Text("apple".into()))
-        .add_field("title_vec", DataValue::Text("apple".into()))
-        .add_field("_id", DataValue::Text("1".into()));
+        .add_field("title_vec", DataValue::Text("apple".into()));
 
-    engine.index_chunk(payload1)?;
+    engine.add_document("1", payload1)?;
 
     // Index Doc 2: "banana" - both lexical and vector fields
     let payload2 = Document::new()
         .add_field("title", DataValue::Text("banana".into()))
-        .add_field("title_vec", DataValue::Text("banana".into()))
-        .add_field("_id", DataValue::Text("2".into()));
+        .add_field("title_vec", DataValue::Text("banana".into()));
 
-    engine.index_chunk(payload2)?;
+    engine.add_document("2", payload2)?;
 
     engine.commit()?;
 
@@ -155,7 +153,7 @@ async fn test_hybrid_search_unification_impl(
 
     let res_vector = engine.search(req_vector)?;
     assert!(!res_vector.is_empty(), "Vector search should return hits");
-    let top_doc = res_vector[0].doc_id;
+    let top_id = res_vector[0].id.clone();
 
     // Test 2: Lexical Search ("banana")
     let req_lexical = SearchRequestBuilder::new()
@@ -166,7 +164,7 @@ async fn test_hybrid_search_unification_impl(
     let res_lexical = engine.search(req_lexical)?;
     assert!(!res_lexical.is_empty(), "Lexical search should return hits");
     assert_ne!(
-        res_lexical[0].doc_id, top_doc,
+        res_lexical[0].id, top_id,
         "Banana should be different from Apple"
     );
 
@@ -190,7 +188,7 @@ async fn test_hybrid_search_unification_impl(
     assert!(!res_hybrid.is_empty());
 
     assert_eq!(
-        res_hybrid[0].doc_id, res_lexical[0].doc_id,
+        res_hybrid[0].id, res_lexical[0].id,
         "Banana should win in hybrid search"
     );
 

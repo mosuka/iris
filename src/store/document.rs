@@ -134,7 +134,7 @@ impl DocumentSegmentReader {
             let json = reader.read_bytes()?;
             let doc: Document = serde_json::from_slice(&json)
                 .map_err(|e| IrisError::index(format!("failed to deserialize document: {e}")))?;
-            if doc.id() == Some(external_id) {
+            if doc.fields.get("_id").and_then(|v| v.as_text()) == Some(external_id) {
                 return Ok(Some(current_id));
             }
         }
@@ -153,7 +153,7 @@ impl DocumentSegmentReader {
             let json = reader.read_bytes()?;
             let doc: Document = serde_json::from_slice(&json)
                 .map_err(|e| IrisError::index(format!("failed to deserialize document: {e}")))?;
-            if doc.id() == Some(external_id) {
+            if doc.fields.get("_id").and_then(|v| v.as_text()) == Some(external_id) {
                 results.push(current_id);
             }
         }
@@ -284,7 +284,7 @@ impl UnifiedDocumentStore {
     pub fn find_by_external_id(&self, external_id: &str) -> Result<Option<u64>> {
         // Check pending docs first
         for (id, doc) in &self.pending_docs {
-            if doc.id() == Some(external_id) {
+            if doc.fields.get("_id").and_then(|v| v.as_text()) == Some(external_id) {
                 return Ok(Some(*id));
             }
         }
@@ -303,7 +303,7 @@ impl UnifiedDocumentStore {
 
         // Check pending docs
         for (id, doc) in &self.pending_docs {
-            if doc.id() == Some(external_id) {
+            if doc.fields.get("_id").and_then(|v| v.as_text()) == Some(external_id) {
                 results.push(*id);
             }
         }

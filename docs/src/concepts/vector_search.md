@@ -331,11 +331,11 @@ use iris::{Document, DataValue};
 
 fn add_document(engine: &Engine) -> iris::Result<()> {
     // Text is automatically embedded by the configured embedder
-    let doc = Document::new_with_id("doc_001")
+    let doc = Document::new()
         .add_text("embedding", "Fast semantic search in Rust")
         .add_field("category", DataValue::Text("technology".into()));
 
-    engine.index(doc)?;
+    engine.put_document("doc_001", doc)?;
     engine.commit()?;
 
     Ok(())
@@ -363,7 +363,7 @@ fn search(engine: &Engine) -> iris::Result<()> {
     )?;
 
     for hit in results {
-        println!("Doc ID: {}, Score: {:.4}", hit.doc_id, hit.score);
+        println!("[{}] Score: {:.4}", hit.id, hit.score);
     }
 
     Ok(())
@@ -397,10 +397,7 @@ fn hybrid_search(engine: &Engine) -> iris::Result<()> {
     )?;
 
     for hit in results {
-        if let Ok(Some(doc)) = engine.get_document(hit.doc_id) {
-            let id = doc.id().unwrap_or("unknown");
-            println!("[{}] score={:.4}", id, hit.score);
-        }
+        println!("[{}] score={:.4}", hit.id, hit.score);
     }
 
     Ok(())

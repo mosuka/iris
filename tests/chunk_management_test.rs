@@ -25,10 +25,8 @@ fn build_test_engine() -> Result<Engine> {
     Engine::new(storage, config)
 }
 
-fn create_payload(id: &str, vector: Vec<f32>) -> Document {
-    Document::new()
-        .add_field("_id", DataValue::Text(id.into()))
-        .add_field("body", DataValue::Vector(vector))
+fn create_payload(vector: Vec<f32>) -> Document {
+    Document::new().add_field("body", DataValue::Vector(vector))
 }
 
 #[test]
@@ -36,15 +34,12 @@ fn test_chunk_addition() -> Result<()> {
     let engine = build_test_engine()?;
 
     // 1. Add first chunk for "doc_A"
-    let p1 = create_payload("doc_A", vec![1.0, 0.0, 0.0]);
-    let id1 = engine.index_chunk(p1)?;
+    let p1 = create_payload(vec![1.0, 0.0, 0.0]);
+    engine.add_document("doc_A", p1)?;
 
     // 2. Add second chunk for "doc_A"
-    let p2 = create_payload("doc_A", vec![0.0, 1.0, 0.0]);
-    let id2 = engine.index_chunk(p2)?;
-
-    // Verify IDs are different
-    assert_ne!(id1, id2, "Internal IDs should be different for chunks");
+    let p2 = create_payload(vec![0.0, 1.0, 0.0]);
+    engine.add_document("doc_A", p2)?;
 
     engine.commit()?;
 
@@ -59,11 +54,11 @@ fn test_chunk_deletion() -> Result<()> {
     let engine = build_test_engine()?;
 
     // Add 2 chunks
-    let p1 = create_payload("doc_A", vec![1.0, 0.0, 0.0]);
-    engine.index_chunk(p1)?;
+    let p1 = create_payload(vec![1.0, 0.0, 0.0]);
+    engine.add_document("doc_A", p1)?;
 
-    let p2 = create_payload("doc_A", vec![0.0, 1.0, 0.0]);
-    engine.index_chunk(p2)?;
+    let p2 = create_payload(vec![0.0, 1.0, 0.0]);
+    engine.add_document("doc_A", p2)?;
 
     engine.commit()?;
 
@@ -71,7 +66,7 @@ fn test_chunk_deletion() -> Result<()> {
     assert_eq!(stats_before.document_count, 2);
 
     // Delete "doc_A"
-    engine.delete("doc_A")?;
+    engine.delete_documents("doc_A")?;
     engine.commit()?;
 
     // Verify deletion
@@ -89,23 +84,23 @@ fn test_mixed_mode_behavior() -> Result<()> {
     let engine = build_test_engine()?;
 
     // Add chunk 1
-    engine.index_chunk(create_payload("doc_B", vec![1.0, 0.0, 0.0]))?;
+    engine.add_document("doc_B", create_payload(vec![1.0, 0.0, 0.0]))?;
 
     // Add chunk 2
-    engine.index_chunk(create_payload("doc_B", vec![0.0, 1.0, 0.0]))?;
+    engine.add_document("doc_B", create_payload(vec![0.0, 1.0, 0.0]))?;
 
     engine.commit()?;
     assert_eq!(engine.stats()?.document_count, 2);
 
-    // Now index (upsert) "doc_B" (should overwrite ALL of them)
-    engine.index(create_payload("doc_B", vec![0.0, 0.0, 1.0]))?;
+    // Now put_document (upsert) "doc_B" (should overwrite ALL of them)
+    engine.put_document("doc_B", create_payload(vec![0.0, 0.0, 1.0]))?;
     engine.commit()?;
 
     // All chunks replaced by a single doc. Total should be 1.
     assert_eq!(engine.stats()?.document_count, 1);
 
     // Delete "doc_B" -> Should delete the remaining doc.
-    engine.delete("doc_B")?;
+    engine.delete_documents("doc_B")?;
     engine.commit()?;
     assert_eq!(engine.stats()?.document_count, 0);
 

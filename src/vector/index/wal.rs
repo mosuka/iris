@@ -19,7 +19,11 @@ pub type SeqNumber = u64;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum WalEntry {
     /// Insert or update a document.
-    Upsert { doc_id: u64, document: Document },
+    Upsert {
+        doc_id: u64,
+        external_id: String,
+        document: Document,
+    },
     /// Delete a document.
     Delete { doc_id: u64 },
 }
@@ -183,6 +187,7 @@ mod tests {
         let seq1 = wal
             .append(&WalEntry::Upsert {
                 doc_id: 1,
+                external_id: "ext_1".to_string(),
                 document: doc.clone(),
             })
             .unwrap();
@@ -197,8 +202,13 @@ mod tests {
 
         assert_eq!(records[0].seq, 1);
         match &records[0].entry {
-            WalEntry::Upsert { doc_id, document } => {
+            WalEntry::Upsert {
+                doc_id,
+                external_id,
+                document,
+            } => {
                 assert_eq!(*doc_id, 1);
+                assert_eq!(external_id, "ext_1");
                 assert_eq!(document.fields.len(), doc.fields.len());
             }
             _ => panic!("Expected Upsert"),

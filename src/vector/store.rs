@@ -193,9 +193,16 @@ impl VectorStore {
     ///
     /// If a document with the same ID exists, it is updated.
     pub fn put_document(&self, doc: Document) -> Result<u64> {
-        let external_id = doc.id().map(|s| s.to_string()).ok_or_else(|| {
-            crate::error::IrisError::invalid_argument("Document ID is required for put_document")
-        })?;
+        let external_id = doc
+            .fields
+            .get("_id")
+            .and_then(|v| v.as_text())
+            .map(|s| s.to_string())
+            .ok_or_else(|| {
+                crate::error::IrisError::invalid_argument(
+                    "_id field is required for put_document",
+                )
+            })?;
 
         // Delete existing documents with same ID
         let _ = self.delete_documents(&external_id)?;

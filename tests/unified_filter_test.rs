@@ -33,24 +33,27 @@ fn test_unified_filtering() -> iris::Result<()> {
 
     // 3. Index Documents
     // Doc 1: Apple (Fruit), Vector [1.0, 0.0]
-    engine.index(
-        Document::new_with_id("doc1")
+    engine.put_document(
+        "doc1",
+        Document::new()
             .add_field("name", "Apple")
             .add_field("category", "fruit")
             .add_field("embedding", vec![1.0, 0.0]),
     )?;
 
     // Doc 2: Banana (Fruit), Vector [0.9, 0.1]
-    engine.index(
-        Document::new_with_id("doc2")
+    engine.put_document(
+        "doc2",
+        Document::new()
             .add_field("name", "Banana")
             .add_field("category", "fruit")
             .add_field("embedding", vec![0.9, 0.1]),
     )?;
 
     // Doc 3: Carrot (Vegetable), Vector [1.0, 0.0] -> Identical vector to Apple!
-    engine.index(
-        Document::new_with_id("doc3")
+    engine.put_document(
+        "doc3",
+        Document::new()
             .add_field("name", "Carrot")
             .add_field("category", "vegetable")
             .add_field("embedding", vec![1.0, 0.0]),
@@ -80,8 +83,7 @@ fn test_unified_filtering() -> iris::Result<()> {
     // Check it's Carrot (doc_id is internal, but logic holds)
     // We should load document to verify content if possible, but SearchResult has document loaded?
     // Engine search loads documents for lexical hits, but for purely vector hits?
-    // Engine search returns SearchResult without loading doc content for vector hits unless fusion?
-    // Wait, Engine search vector hits mapping uses `document: None`.
+    // Engine search vector hits mapping uses `document: None`.
     // I need to verify which doc it is. Based on ID?
     // Or I can check scores.
 
@@ -128,23 +130,23 @@ fn test_unified_filtering_hnsw() -> iris::Result<()> {
     let engine = Engine::new(storage.clone(), config)?;
 
     // 3. Index Documents
-    engine.index(
+    engine.put_document(
+        "doc1",
         Document::new()
-            .set_id("doc1")
             .add_field("name", "Apple")
             .add_field("category", "fruit")
             .add_field("embedding", vec![1.0, 0.0]),
     )?;
-    engine.index(
+    engine.put_document(
+        "doc2",
         Document::new()
-            .set_id("doc2")
             .add_field("name", "Banana")
             .add_field("category", "fruit")
             .add_field("embedding", vec![0.9, 0.1]),
     )?;
-    engine.index(
+    engine.put_document(
+        "doc3",
         Document::new()
-            .set_id("doc3")
             .add_field("name", "Carrot")
             .add_field("category", "vegetable")
             .add_field("embedding", vec![1.0, 0.0]),
@@ -194,23 +196,23 @@ fn test_unified_filtering_ivf() -> iris::Result<()> {
     let engine = Engine::new(storage.clone(), config)?;
 
     // 3. Index Documents
-    engine.index(
+    engine.put_document(
+        "doc1",
         Document::new()
-            .set_id("doc1")
             .add_field("name", "Apple")
             .add_field("category", "fruit")
             .add_field("embedding", vec![1.0, 0.0]),
     )?;
-    engine.index(
+    engine.put_document(
+        "doc2",
         Document::new()
-            .set_id("doc2")
             .add_field("name", "Banana")
             .add_field("category", "fruit")
             .add_field("embedding", vec![0.9, 0.1]),
     )?;
-    engine.index(
+    engine.put_document(
+        "doc3",
         Document::new()
-            .set_id("doc3")
             .add_field("name", "Carrot")
             .add_field("category", "vegetable")
             .add_field("embedding", vec![1.0, 0.0]),

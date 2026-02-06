@@ -32,16 +32,16 @@ fn test_unified_search_hybrid() -> iris::Result<()> {
     let engine = Engine::new(storage.clone(), config)?;
 
     // 3. Index Documents
-    let doc1 = Document::new_with_id("doc1")
+    let doc1 = Document::new()
         .add_field("title", DataValue::Text("Rust Programming".into()))
         .add_field("embedding", DataValue::Vector(vec![1.0, 0.0, 0.0]));
 
-    let doc2 = Document::new_with_id("doc2")
+    let doc2 = Document::new()
         .add_field("title", DataValue::Text("Vector Search".into()))
         .add_field("embedding", DataValue::Vector(vec![0.0, 1.0, 0.0]));
 
-    engine.index(doc1)?;
-    engine.index(doc2)?;
+    engine.put_document("doc1", doc1)?;
+    engine.put_document("doc2", doc2)?;
     engine.commit()?;
 
     // 4. Test Lexical Search (should find "doc1")
@@ -90,13 +90,15 @@ fn test_unified_search_hybrid_fusion() -> iris::Result<()> {
     // Index documents where Lexical and Vector favorites differ
     // Doc 1: "Rust" in title, Vector [1, 0, 0]
     // Doc 2: "C++" in title, Vector [0, 1, 0]
-    engine.index(
-        Document::new_with_id("1")
+    engine.put_document(
+        "1",
+        Document::new()
             .add_field("title", "Rust")
             .add_field("embedding", vec![1.0, 0.0, 0.0]),
     )?;
-    engine.index(
-        Document::new_with_id("2")
+    engine.put_document(
+        "2",
+        Document::new()
             .add_field("title", "C++")
             .add_field("embedding", vec![0.0, 1.0, 0.0]),
     )?;

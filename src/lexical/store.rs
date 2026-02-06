@@ -241,16 +241,17 @@ impl LexicalStore {
     ///
     /// Returns the internal document ID on success.
     /// Returns an error if `doc.id` is missing.
-    pub fn put_document(&self, mut doc: Document) -> Result<u64> {
-        let external_id = doc.id.clone().ok_or_else(|| {
-            crate::error::IrisError::invalid_argument("Document ID is required for put_document")
-        })?;
-
-        use crate::data::DataValue;
-        if !doc.fields.contains_key("_id") {
-            doc.fields
-                .insert("_id".to_string(), DataValue::Text(external_id.clone()));
-        }
+    pub fn put_document(&self, doc: Document) -> Result<u64> {
+        let external_id = doc
+            .fields
+            .get("_id")
+            .and_then(|v| v.as_text())
+            .map(|s| s.to_string())
+            .ok_or_else(|| {
+                crate::error::IrisError::invalid_argument(
+                    "_id field is required for put_document",
+                )
+            })?;
 
         if let Some(internal_id) = self.find_doc_id_by_term("_id", &external_id)? {
             // Document Store is append-only, so we must delete the old mapping and add new one.
@@ -375,19 +376,8 @@ impl LexicalStore {
     ///
     /// This uses the system-reserved `_id` field to find the internal ID first.
     pub(crate) fn get_document_by_internal_id(&self, internal_id: u64) -> Result<Option<Document>> {
-        // Use UnifiedDocumentStore
         let guard = self.doc_store.read();
-        let mut doc = guard.get_document(internal_id)?;
-
-        // If we have an _id field, use it to populate the Document.id property
-        if let Some(d) = &mut doc
-            && d.id.is_none()
-            && let Some(id_val) = d.fields.get("_id").and_then(|v| v.as_text())
-        {
-            d.id = Some(id_val.to_string());
-        }
-
-        Ok(doc)
+        guard.get_document(internal_id)
     }
 
     /// Find all internal document IDs for a given term (field:value).
@@ -682,7 +672,7 @@ impl LexicalStore {
     /// let results = engine.search(LexicalSearchRequest::new(query)).unwrap();
     /// ```
     pub fn search(&self, request: LexicalSearchRequest) -> Result<LexicalSearchResults> {
-        let mut results = {
+        let results = {
             let guard = self.searcher_cache.read();
             if let Some(ref searcher) = *guard {
                 searcher.search(request)?
@@ -695,16 +685,6 @@ impl LexicalStore {
                 guard.as_ref().unwrap().search(request)?
             }
         };
-
-        // Hydrate doc.id from _id field
-        for hit in &mut results.hits {
-            if let Some(doc) = &mut hit.document
-                && doc.id.is_none()
-                && let Some(id_val) = doc.fields.get("_id").and_then(|v| v.as_text())
-            {
-                doc.id = Some(id_val.to_string());
-            }
-        }
 
         Ok(results)
     }
@@ -1257,8 +1237,9 @@ mod tests {
         let engine = LexicalStore::new(storage.clone(), config, doc_store.clone()).unwrap();
 
         // 1. Index document with external ID
-        let mut doc = Document::new().add_text("title", "Test Doc");
-        doc.id = Some("ext_1".to_string());
+        let doc = Document::new()
+            .add_text("title", "Test Doc")
+            .add_text("_id", "ext_1");
         let internal_id = engine.put_document(doc).unwrap();
         engine.commit().unwrap();
         doc_store.write().commit().unwrap();
@@ -1272,8 +1253,9 @@ mod tests {
         );
 
         // 3. Index with external ID
-        let mut doc = Document::new().add_text("title", "Test Doc");
-        doc.id = Some("ext_1".to_string());
+        let doc = Document::new()
+            .add_text("title", "Test Doc")
+            .add_text("_id", "ext_1");
         let internal_id = engine.put_document(doc).unwrap();
 
         // Verify ID search
@@ -1282,8 +1264,9 @@ mod tests {
         engine.commit().unwrap();
 
         // 4. Update existing by put_document
-        let mut doc_v2 = Document::new().add_text("title", "Test Doc Updated");
-        doc_v2.id = Some("ext_1".to_string());
+        let doc_v2 = Document::new()
+            .add_text("title", "Test Doc Updated")
+            .add_text("_id", "ext_1");
         let internal_id_v2 = engine.put_document(doc_v2).unwrap();
         // Since UnifiedDocumentStore is append-only, update results in a new internal ID.
         assert_ne!(internal_id, internal_id_v2);
