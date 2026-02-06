@@ -9,8 +9,7 @@ use crate::analysis::analyzer::per_field::PerFieldAnalyzer;
 use crate::analysis::analyzer::standard::StandardAnalyzer;
 use crate::data::Document;
 use crate::embedding::embedder::Embedder;
-use crate::embedding::per_field::PerFieldEmbedder;
-use crate::error::{IrisError, Result};
+use crate::error::Result;
 use crate::lexical::store::LexicalStore;
 use crate::lexical::store::config::LexicalIndexConfig;
 use crate::storage::Storage;
@@ -283,11 +282,20 @@ impl Engine {
         embedder: Option<Arc<dyn Embedder>>,
     ) -> (LexicalIndexConfig, VectorIndexConfig) {
         // Construct Lexical Config
-        let default_analyzer =
-            analyzer.unwrap_or_else(|| Arc::new(StandardAnalyzer::new().unwrap()));
+        let analyzer = analyzer.unwrap_or_else(|| Arc::new(StandardAnalyzer::new().unwrap()));
 
-        let mut per_field_analyzer = PerFieldAnalyzer::new(default_analyzer);
-        per_field_analyzer.add_analyzer("_id", Arc::new(KeywordAnalyzer::new()));
+        // If the user passed a PerFieldAnalyzer, clone it and ensure _id uses KeywordAnalyzer.
+        // Otherwise, wrap the simple analyzer in a new PerFieldAnalyzer.
+        let per_field_analyzer =
+            if let Some(existing) = analyzer.as_any().downcast_ref::<PerFieldAnalyzer>() {
+                let mut pfa = existing.clone();
+                pfa.add_analyzer("_id", Arc::new(KeywordAnalyzer::new()));
+                pfa
+            } else {
+                let mut pfa = PerFieldAnalyzer::new(analyzer);
+                pfa.add_analyzer("_id", Arc::new(KeywordAnalyzer::new()));
+                pfa
+            };
 
         let mut lexical_builder =
             LexicalIndexConfig::builder().analyzer(Arc::new(per_field_analyzer));
@@ -588,7 +596,11 @@ impl EngineBuilder {
         }
     }
 
-    /// Set the global analyzer (fallback if not specified per field).
+    /// Set the analyzer for text fields.
+    ///
+    /// Both simple analyzers (e.g., [`StandardAnalyzer`]) and [`PerFieldAnalyzer`] are
+    /// supported. When a `PerFieldAnalyzer` is passed, it is used directly (with `_id`
+    /// automatically set to `KeywordAnalyzer` if not already configured).
     ///
     /// If not set, [`StandardAnalyzer`] is used as the default.
     pub fn analyzer(mut self, analyzer: Arc<dyn Analyzer>) -> Self {
@@ -596,7 +608,11 @@ impl EngineBuilder {
         self
     }
 
-    /// Set the global embedder (fallback if not specified per field).
+    /// Set the embedder for vector fields.
+    ///
+    /// Both simple embedders and [`PerFieldEmbedder`](crate::embedding::per_field::PerFieldEmbedder)
+    /// are supported. When a `PerFieldEmbedder` is passed, each vector field will use
+    /// the embedder registered for that field name, falling back to the default.
     ///
     /// If not set, no embedder is configured.
     pub fn embedder(mut self, embedder: Arc<dyn Embedder>) -> Self {
@@ -608,30 +624,8 @@ impl EngineBuilder {
     ///
     /// # Errors
     ///
-    /// Returns an error if:
-    /// - `PerFieldAnalyzer` is passed to `analyzer()`. Use a simple analyzer instead.
-    /// - `PerFieldEmbedder` is passed to `embedder()`. Use a simple embedder instead.
+    /// Returns an error if the storage or index initialization fails.
     pub fn build(self) -> Result<Engine> {
-        // Validate: PerFieldAnalyzer is not supported as the default analyzer
-        if let Some(ref analyzer) = self.analyzer
-            && analyzer.as_any().downcast_ref::<PerFieldAnalyzer>().is_some()
-        {
-            return Err(IrisError::invalid_argument(
-                "PerFieldAnalyzer is not supported as the default analyzer. \
-                 Pass a simple analyzer (e.g., StandardAnalyzer) instead.",
-            ));
-        }
-
-        // Validate: PerFieldEmbedder is not supported as the default embedder
-        if let Some(ref embedder) = self.embedder
-            && embedder.as_any().downcast_ref::<PerFieldEmbedder>().is_some()
-        {
-            return Err(IrisError::invalid_argument(
-                "PerFieldEmbedder is not supported as the default embedder. \
-                 Pass a simple embedder instead.",
-            ));
-        }
-
         let (lexical_config, vector_config) =
             Engine::split_schema(&self.schema, self.analyzer, self.embedder);
 
@@ -663,11 +657,12 @@ impl EngineBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::embedding::per_field::PerFieldEmbedder;
     use crate::embedding::precomputed::PrecomputedEmbedder;
     use crate::storage::memory::MemoryStorage;
 
     #[test]
-    fn test_rejects_per_field_analyzer() {
+    fn test_accepts_per_field_analyzer() {
         let storage: Arc<dyn Storage> = Arc::new(MemoryStorage::new(Default::default()));
         let schema = Schema::new();
 
@@ -677,20 +672,11 @@ mod tests {
             .analyzer(Arc::new(per_field))
             .build();
 
-        match result {
-            Err(err) => {
-                assert!(
-                    err.to_string().contains("PerFieldAnalyzer"),
-                    "Error should mention PerFieldAnalyzer: {}",
-                    err
-                );
-            }
-            Ok(_) => panic!("Should reject PerFieldAnalyzer"),
-        }
+        assert!(result.is_ok(), "Should accept PerFieldAnalyzer");
     }
 
     #[test]
-    fn test_rejects_per_field_embedder() {
+    fn test_accepts_per_field_embedder() {
         let storage: Arc<dyn Storage> = Arc::new(MemoryStorage::new(Default::default()));
         let schema = Schema::new();
 
@@ -701,16 +687,7 @@ mod tests {
             .embedder(Arc::new(per_field))
             .build();
 
-        match result {
-            Err(err) => {
-                assert!(
-                    err.to_string().contains("PerFieldEmbedder"),
-                    "Error should mention PerFieldEmbedder: {}",
-                    err
-                );
-            }
-            Ok(_) => panic!("Should reject PerFieldEmbedder"),
-        }
+        assert!(result.is_ok(), "Should accept PerFieldEmbedder");
     }
 
     #[test]
