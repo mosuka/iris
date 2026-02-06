@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-3892ee8a.js";
+            window.path_to_searchindex_js = "searchindex-65e5f2e4.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-9d358a08.js"></script>
@@ -218,13 +218,13 @@ fn main() -&gt; iris::Result&lt;()&gt; {
         .embedder(Arc::new(MyEmbedder))  // Your embedder implementation
         .build()?;
 
-    engine.index(
-        Document::new_with_id("doc1")
+    engine.put_document("doc1",
+        Document::new()
             .add_text("content", "Rust is a systems programming language")
             .add_text("content_vec", "Rust is a systems programming language")
     )?;
-    engine.index(
-        Document::new_with_id("doc2")
+    engine.put_document("doc2",
+        Document::new()
             .add_text("content", "Python is great for machine learning")
             .add_text("content_vec", "Python is great for machine learning")
     )?;
@@ -241,10 +241,7 @@ fn main() -&gt; iris::Result&lt;()&gt; {
 
     // 5. Display results
     for hit in results {
-        if let Ok(Some(doc)) = engine.get_document(hit.doc_id) {
-            let id = doc.id().unwrap_or("unknown");
-            println!("[{}] score={:.4}", id, hit.score);
-        }
+        println!("[{}] score={:.4}", hit.id, hit.score);
     }
 
     Ok(())

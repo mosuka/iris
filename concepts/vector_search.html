@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-3892ee8a.js";
+            window.path_to_searchindex_js = "../searchindex-65e5f2e4.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-9d358a08.js"></script>
@@ -492,11 +492,11 @@ fn setup_engine() -&gt; iris::Result&lt;Engine&gt; {
 
 fn add_document(engine: &amp;Engine) -&gt; iris::Result&lt;()&gt; {
     // Text is automatically embedded by the configured embedder
-    let doc = Document::new_with_id("doc_001")
+    let doc = Document::new()
         .add_text("embedding", "Fast semantic search in Rust")
         .add_field("category", DataValue::Text("technology".into()));
 
-    engine.index(doc)?;
+    engine.put_document("doc_001", doc)?;
     engine.commit()?;
 
     Ok(())
@@ -522,7 +522,7 @@ fn search(engine: &amp;Engine) -&gt; iris::Result&lt;()&gt; {
     )?;
 
     for hit in results {
-        println!("Doc ID: {}, Score: {:.4}", hit.doc_id, hit.score);
+        println!("[{}] Score: {:.4}", hit.id, hit.score);
     }
 
     Ok(())
@@ -554,10 +554,7 @@ fn hybrid_search(engine: &amp;Engine) -&gt; iris::Result&lt;()&gt; {
     )?;
 
     for hit in results {
-        if let Ok(Some(doc)) = engine.get_document(hit.doc_id) {
-            let id = doc.id().unwrap_or("unknown");
-            println!("[{}] score={:.4}", id, hit.score);
-        }
+        println!("[{}] score={:.4}", hit.id, hit.score);
     }
 
     Ok(())

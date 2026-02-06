@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-3892ee8a.js";
+            window.path_to_searchindex_js = "../searchindex-65e5f2e4.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-9d358a08.js"></script>
@@ -466,12 +466,12 @@ fn setup_engine() -&gt; iris::Result&lt;Engine&gt; {
 </span>use iris::{Document, DataValue};
 
 fn add_documents(engine: &amp;Engine) -&gt; iris::Result&lt;()&gt; {
-    let doc = Document::new_with_id("doc1")
+    let doc = Document::new()
         .add_text("title", "Iris Search")
         .add_text("content", "Fast and semantic search engine in Rust")
         .add_field("price", DataValue::Integer(100));
 
-    engine.index(doc)?;
+    engine.put_document("doc1", doc)?;
     engine.commit()?; // Flush and commit to make searchable
     Ok(())
 }
@@ -492,7 +492,7 @@ fn search(engine: &amp;Engine) -&gt; iris::Result&lt;()&gt; {
     )?;
 
     for hit in results {
-        println!("Doc ID: {}, Score: {:.4}", hit.doc_id, hit.score);
+        println!("[{}] Score: {:.4}", hit.id, hit.score);
     }
     Ok(())
 }
