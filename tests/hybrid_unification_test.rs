@@ -5,7 +5,6 @@ use std::sync::{Arc, Mutex};
 
 use iris::Engine;
 use iris::IrisError;
-use iris::PerFieldEmbedder;
 use iris::lexical::TermQuery;
 use iris::lexical::{FieldOption as LexicalFieldOption, TextOption};
 use iris::storage::memory::MemoryStorage;
@@ -84,13 +83,12 @@ fn create_hybrid_engine() -> std::result::Result<Engine, Box<dyn std::error::Err
     embedder.add("apple", vec![0.9, 0.1, 0.0]);
     embedder.add("banana", vec![0.0, 1.0, 0.0]);
 
-    // PerFieldEmbedder for vector field
-    let mut per_field = PerFieldEmbedder::new(embedder.clone());
-    per_field.add_embedder("title_vec", embedder.clone());
-
     // Schema with separate fields for lexical and vector
     let schema = Schema::builder()
-        .add_field("title", FieldOption::Lexical(LexicalFieldOption::Text(TextOption::default())))
+        .add_field(
+            "title",
+            FieldOption::Lexical(LexicalFieldOption::Text(TextOption::default())),
+        )
         .add_field(
             "title_vec",
             FieldOption::Vector(VectorOption::Flat(FlatOption {
@@ -102,8 +100,9 @@ fn create_hybrid_engine() -> std::result::Result<Engine, Box<dyn std::error::Err
 
     let storage = Arc::new(MemoryStorage::new(Default::default()));
 
+    // Use simple embedder directly (PerFieldEmbedder is not supported)
     let engine = Engine::builder(storage, schema)
-        .embedder(Arc::new(per_field))
+        .embedder(embedder)
         .build()?;
     Ok(engine)
 }

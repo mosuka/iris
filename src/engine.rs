@@ -9,15 +9,16 @@ use crate::analysis::analyzer::per_field::PerFieldAnalyzer;
 use crate::analysis::analyzer::standard::StandardAnalyzer;
 use crate::data::Document;
 use crate::embedding::embedder::Embedder;
-use crate::error::Result;
+use crate::embedding::per_field::PerFieldEmbedder;
+use crate::error::{IrisError, Result};
 use crate::lexical::store::LexicalStore;
 use crate::lexical::store::config::LexicalIndexConfig;
 use crate::storage::Storage;
 use crate::storage::prefixed::PrefixedStorage;
 use crate::store::document::UnifiedDocumentStore;
 use crate::vector::index::wal::{WalEntry, WalManager};
-use crate::vector::store::config::VectorIndexConfig;
 use crate::vector::store::VectorStore;
+use crate::vector::store::config::VectorIndexConfig;
 use parking_lot::RwLock;
 
 use self::schema::Schema;
@@ -604,7 +605,33 @@ impl EngineBuilder {
     }
 
     /// Build the [`Engine`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - `PerFieldAnalyzer` is passed to `analyzer()`. Use a simple analyzer instead.
+    /// - `PerFieldEmbedder` is passed to `embedder()`. Use a simple embedder instead.
     pub fn build(self) -> Result<Engine> {
+        // Validate: PerFieldAnalyzer is not supported as the default analyzer
+        if let Some(ref analyzer) = self.analyzer
+            && analyzer.as_any().downcast_ref::<PerFieldAnalyzer>().is_some()
+        {
+            return Err(IrisError::invalid_argument(
+                "PerFieldAnalyzer is not supported as the default analyzer. \
+                 Pass a simple analyzer (e.g., StandardAnalyzer) instead.",
+            ));
+        }
+
+        // Validate: PerFieldEmbedder is not supported as the default embedder
+        if let Some(ref embedder) = self.embedder
+            && embedder.as_any().downcast_ref::<PerFieldEmbedder>().is_some()
+        {
+            return Err(IrisError::invalid_argument(
+                "PerFieldEmbedder is not supported as the default embedder. \
+                 Pass a simple embedder instead.",
+            ));
+        }
+
         let (lexical_config, vector_config) =
             Engine::split_schema(&self.schema, self.analyzer, self.embedder);
 
@@ -630,5 +657,85 @@ impl EngineBuilder {
         engine.recover()?;
 
         Ok(engine)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::embedding::precomputed::PrecomputedEmbedder;
+    use crate::storage::memory::MemoryStorage;
+
+    #[test]
+    fn test_rejects_per_field_analyzer() {
+        let storage: Arc<dyn Storage> = Arc::new(MemoryStorage::new(Default::default()));
+        let schema = Schema::new();
+
+        let per_field = PerFieldAnalyzer::new(Arc::new(StandardAnalyzer::default()));
+
+        let result = Engine::builder(storage, schema)
+            .analyzer(Arc::new(per_field))
+            .build();
+
+        match result {
+            Err(err) => {
+                assert!(
+                    err.to_string().contains("PerFieldAnalyzer"),
+                    "Error should mention PerFieldAnalyzer: {}",
+                    err
+                );
+            }
+            Ok(_) => panic!("Should reject PerFieldAnalyzer"),
+        }
+    }
+
+    #[test]
+    fn test_rejects_per_field_embedder() {
+        let storage: Arc<dyn Storage> = Arc::new(MemoryStorage::new(Default::default()));
+        let schema = Schema::new();
+
+        let dummy_embedder = Arc::new(PrecomputedEmbedder::new());
+        let per_field = PerFieldEmbedder::new(dummy_embedder);
+
+        let result = Engine::builder(storage, schema)
+            .embedder(Arc::new(per_field))
+            .build();
+
+        match result {
+            Err(err) => {
+                assert!(
+                    err.to_string().contains("PerFieldEmbedder"),
+                    "Error should mention PerFieldEmbedder: {}",
+                    err
+                );
+            }
+            Ok(_) => panic!("Should reject PerFieldEmbedder"),
+        }
+    }
+
+    #[test]
+    fn test_accepts_simple_analyzer() {
+        let storage: Arc<dyn Storage> = Arc::new(MemoryStorage::new(Default::default()));
+        let schema = Schema::new();
+
+        let result = Engine::builder(storage, schema)
+            .analyzer(Arc::new(StandardAnalyzer::default()))
+            .build();
+
+        assert!(result.is_ok(), "Should accept StandardAnalyzer");
+    }
+
+    #[test]
+    fn test_accepts_simple_embedder() {
+        let storage: Arc<dyn Storage> = Arc::new(MemoryStorage::new(Default::default()));
+        let schema = Schema::new();
+
+        let dummy_embedder = Arc::new(PrecomputedEmbedder::new());
+
+        let result = Engine::builder(storage, schema)
+            .embedder(dummy_embedder)
+            .build();
+
+        assert!(result.is_ok(), "Should accept simple embedder");
     }
 }
