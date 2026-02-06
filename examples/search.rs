@@ -148,7 +148,7 @@ fn main() -> Result<()> {
 
     println!("Indexing {} documents...", docs.len());
     for (id, title, content) in docs {
-        let doc = Document::new_with_id(id)
+        let doc = Document::new()
             .add_text("title", title)
             .add_text("content", content) // Lexical field
             .add_text("content_vec", content) // Vector field (auto-embedded)
@@ -156,7 +156,7 @@ fn main() -> Result<()> {
         // Note: 'content_vec' and 'embedding' text will be automatically embedded
         // because they have vector configs and we registered a global embedder.
 
-        engine.index(doc)?;
+        engine.put_document(id, doc)?;
     }
     engine.commit()?;
 
@@ -170,7 +170,7 @@ fn main() -> Result<()> {
         .build();
 
     let results = engine.search(request_lexical)?;
-    print_results(&engine, &results);
+    print_results(&results);
 
     // 5. Case B: Vector Search Only (Semantic Match)
     // Scenario: User searches for 'fruit' (concept), but 'apple' doc doesn't contain the word 'fruit'.
@@ -187,7 +187,7 @@ fn main() -> Result<()> {
         .build();
 
     let results = engine.search(request_vector)?;
-    print_results(&engine, &results);
+    print_results(&results);
 
     // 6. Case C: Hybrid Search (RRF Fusion)
     // Scenario: Provide the best of both worlds.
@@ -210,7 +210,7 @@ fn main() -> Result<()> {
         .build();
 
     let results = engine.search(request_hybrid)?;
-    print_results(&engine, &results);
+    print_results(&results);
 
     // 7. Case D: Hybrid Search (Weighted Sum)
     // Scenario: We trust Semantic search more (70%) than keyword search (30%).
@@ -231,7 +231,7 @@ fn main() -> Result<()> {
         .build();
 
     let results = engine.search(request_weighted)?;
-    print_results(&engine, &results);
+    print_results(&results);
 
     // 8. Case E: Search on "embedding" field (Vector Only)
     // Scenario: We explicitly search the "embedding" field, which is separate from "content".
@@ -246,26 +246,25 @@ fn main() -> Result<()> {
         .build();
 
     let results = engine.search(request_embedding)?;
-    print_results(&engine, &results);
+    print_results(&results);
 
     Ok(())
 }
 
 // Helper to print results cleanly
-fn print_results(engine: &Engine, results: &[iris::SearchResult]) {
+fn print_results(results: &[iris::SearchResult]) {
     if results.is_empty() {
         println!("  (No results found)");
         return;
     }
     for (i, hit) in results.iter().enumerate() {
-        if let Ok(Some(doc)) = engine.get_document(hit.doc_id) {
-            let id = doc.id.as_deref().unwrap_or("unknown");
-            let title = doc
-                .fields
-                .get("title")
-                .and_then(|v| v.as_text())
-                .unwrap_or("No Title");
-            println!("  {}. [{}] {} (Score: {:.4})", i + 1, id, title, hit.score);
-        }
+        let id = &hit.id;
+        let title = hit
+            .document
+            .as_ref()
+            .and_then(|doc| doc.fields.get("title"))
+            .and_then(|v| v.as_text())
+            .unwrap_or("No Title");
+        println!("  {}. [{}] {} (Score: {:.4})", i + 1, id, title, hit.score);
     }
 }

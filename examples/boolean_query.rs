@@ -59,7 +59,7 @@ fn main() -> Result<()> {
             .add_float("price", 59.99)
             .add_float("rating", 4.7)
             .add_text("tags", "python advanced programming")
-            .set_id("book001"),
+            .add_text("_id", "book001"),
         Document::new()
             .add_text("title", "JavaScript for Web Development")
             .add_text("body", "Modern JavaScript techniques for frontend and backend web development")
@@ -68,7 +68,7 @@ fn main() -> Result<()> {
             .add_float("price", 45.50)
             .add_float("rating", 4.3)
             .add_text("tags", "javascript web frontend backend")
-            .set_id("book002"),
+            .add_text("_id", "book002"),
         Document::new()
             .add_text("title", "Machine Learning with Python")
             .add_text("body", "Practical machine learning algorithms implemented in Python")
@@ -77,7 +77,7 @@ fn main() -> Result<()> {
             .add_float("price", 72.99)
             .add_float("rating", 4.8)
             .add_text("tags", "python machine-learning data-science")
-            .set_id("book003"),
+            .add_text("_id", "book003"),
         Document::new()
             .add_text("title", "Web Design Fundamentals")
             .add_text("body", "Learn the basics of web design including HTML, CSS, and responsive design")
@@ -86,7 +86,7 @@ fn main() -> Result<()> {
             .add_float("price", 39.99)
             .add_float("rating", 4.1)
             .add_text("tags", "web design html css")
-            .set_id("book004"),
+            .add_text("_id", "book004"),
         Document::new()
             .add_text("title", "Data Science with R")
             .add_text("body", "Statistical computing and data analysis using the R programming language")
@@ -95,7 +95,7 @@ fn main() -> Result<()> {
             .add_float("price", 65.00)
             .add_float("rating", 4.5)
             .add_text("tags", "r data-science statistics")
-            .set_id("book005"),
+            .add_text("_id", "book005"),
         Document::new()
             .add_text("title", "Advanced JavaScript Patterns")
             .add_text("body", "Design patterns and advanced programming techniques in JavaScript")
@@ -104,7 +104,7 @@ fn main() -> Result<()> {
             .add_float("price", 54.99)
             .add_float("rating", 4.6)
             .add_text("tags", "javascript advanced patterns")
-            .set_id("book006"),
+            .add_text("_id", "book006"),
     ];
 
     println!("Adding {} documents to the index...", documents.len());
@@ -137,7 +137,7 @@ fn main() -> Result<()> {
             hit.doc_id
         );
         if let Some(doc) = &hit.document {
-            if let Some(id) = doc.id() {
+            if let Some(id) = doc.fields.get("_id").and_then(|v| v.as_text()) {
                 println!("      ID: {id}");
             }
             if let Some(field) = doc.get_field("title")
@@ -165,7 +165,7 @@ fn main() -> Result<()> {
             hit.doc_id
         );
         if let Some(doc) = &hit.document {
-            if let Some(id) = doc.id() {
+            if let Some(id) = doc.fields.get("_id").and_then(|v| v.as_text()) {
                 println!("      ID: {id}");
             }
             if let Some(field) = doc.get_field("title")
@@ -193,7 +193,7 @@ fn main() -> Result<()> {
             hit.doc_id
         );
         if let Some(doc) = &hit.document {
-            if let Some(id) = doc.id() {
+            if let Some(id) = doc.fields.get("_id").and_then(|v| v.as_text()) {
                 println!("      ID: {id}");
             }
             if let Some(field) = doc.get_field("title")
@@ -230,7 +230,7 @@ fn main() -> Result<()> {
             hit.doc_id
         );
         if let Some(doc) = &hit.document {
-            if let Some(id) = doc.id() {
+            if let Some(id) = doc.fields.get("_id").and_then(|v| v.as_text()) {
                 println!("      ID: {id}");
             }
             if let Some(field) = doc.get_field("title")
@@ -271,7 +271,7 @@ fn main() -> Result<()> {
             hit.doc_id
         );
         if let Some(doc) = &hit.document {
-            if let Some(id) = doc.id() {
+            if let Some(id) = doc.fields.get("_id").and_then(|v| v.as_text()) {
                 println!("      ID: {id}");
             }
             if let Some(field) = doc.get_field("title")
@@ -304,7 +304,7 @@ fn main() -> Result<()> {
             hit.doc_id
         );
         if let Some(doc) = &hit.document {
-            if let Some(id) = doc.id() {
+            if let Some(id) = doc.fields.get("_id").and_then(|v| v.as_text()) {
                 println!("      ID: {id}");
             }
             if let Some(field) = doc.get_field("title")
@@ -336,7 +336,7 @@ fn main() -> Result<()> {
             hit.doc_id
         );
         if let Some(doc) = &hit.document {
-            if let Some(id) = doc.id() {
+            if let Some(id) = doc.fields.get("_id").and_then(|v| v.as_text()) {
                 println!("      ID: {id}");
             }
             if let Some(field) = doc.get_field("title")
@@ -374,7 +374,7 @@ fn main() -> Result<()> {
             hit.doc_id
         );
         if let Some(doc) = &hit.document {
-            if let Some(id) = doc.id() {
+            if let Some(id) = doc.fields.get("_id").and_then(|v| v.as_text()) {
                 println!("      ID: {id}");
             }
             if let Some(field) = doc.get_field("title")
@@ -433,7 +433,7 @@ fn main() -> Result<()> {
             hit.doc_id
         );
         if let Some(doc) = &hit.document {
-            if let Some(id) = doc.id() {
+            if let Some(id) = doc.fields.get("_id").and_then(|v| v.as_text()) {
                 println!("      ID: {id}");
             }
             if let Some(field) = doc.get_field("title")
@@ -496,7 +496,7 @@ fn main() -> Result<()> {
             hit.doc_id
         );
         if let Some(doc) = &hit.document {
-            if let Some(id) = doc.id() {
+            if let Some(id) = doc.fields.get("_id").and_then(|v| v.as_text()) {
                 println!("      ID: {id}");
             }
             if let Some(field) = doc.get_field("title")

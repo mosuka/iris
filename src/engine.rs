@@ -75,7 +75,11 @@ impl Engine {
             }
 
             match record.entry {
-                WalEntry::Upsert { doc_id, document } => {
+                WalEntry::Upsert {
+                    doc_id,
+                    external_id: _,
+                    document,
+                } => {
                     // Re-index into both stores using the recorded doc_id
                     if record.seq > lexical_last_seq {
                         self.lexical.upsert_document(doc_id, document.clone())?;
@@ -85,9 +89,6 @@ impl Engine {
                     if record.seq > vector_last_seq {
                         // Filter for vector fields
                         let mut vector_doc = Document::new();
-                        if let Some(id) = &document.id {
-                            vector_doc.id = Some(id.clone());
-                        }
                         for (name, val) in &document.fields {
                             if self
                                 .schema
@@ -118,58 +119,45 @@ impl Engine {
         Ok(())
     }
 
-    /// Index a document.
+    /// Put (upsert) a document.
     ///
-    /// The document will be routed to the appropriate underlying engines based on
-    /// the field configuration.
-    ///
-    /// - Fields with `lexical` config are added to the LexicalStore.
-    /// - Fields with `vector` config are added to the VectorStore.
-    /// - The document ID is preserved across both engines.
-    pub fn index(&self, doc: Document) -> Result<()> {
-        let _ = self.index_internal(doc, false)?;
+    /// If a document with the same external ID exists, it is replaced.
+    /// The document will be routed to the appropriate underlying engines
+    /// based on the schema field configuration.
+    pub fn put_document(&self, id: &str, doc: Document) -> Result<()> {
+        let _ = self.index_internal(id, doc, false)?;
         Ok(())
     }
 
-    /// Index a document as a new chunk (always appends).
+    /// Add a document as a new chunk (always appends).
     ///
-    /// This allows multiple internal documents (chunks) to share the same external ID.
-    pub fn index_chunk(&self, doc: Document) -> Result<u64> {
-        self.index_internal(doc, true)
+    /// This allows multiple documents (chunks) to share the same external ID.
+    pub fn add_document(&self, id: &str, doc: Document) -> Result<()> {
+        let _ = self.index_internal(id, doc, true)?;
+        Ok(())
     }
 
-    fn index_internal(&self, doc: Document, as_chunk: bool) -> Result<u64> {
-        // 1. Extract External ID
-        let external_id = doc
-            .id
-            .clone()
-            .or_else(|| {
-                doc.fields
-                    .get("_id")
-                    .and_then(|v| v.as_text())
-                    .map(|s| s.to_string())
-            })
-            .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
+    fn index_internal(&self, id: &str, mut doc: Document, as_chunk: bool) -> Result<u64> {
+        // 1. Inject _id field
+        use crate::data::DataValue;
+        doc.fields
+            .insert("_id".to_string(), DataValue::Text(id.to_string()));
 
         if !as_chunk {
-            self.delete(&external_id)?;
+            self.delete_documents(id)?;
         }
 
         // 2. Index into Lexical Store
         let doc_id = if as_chunk {
             self.lexical.add_document(doc.clone())?
         } else {
-            // New API: put_document handles upsert based on doc.id
-            let mut doc_to_put = doc.clone();
-            if doc_to_put.id.is_none() {
-                doc_to_put.id = Some(external_id.clone());
-            }
-            self.lexical.put_document(doc_to_put)?
+            self.lexical.put_document(doc.clone())?
         };
 
         // 3. Write to Centralized WAL
         let seq = self.wal.append(&WalEntry::Upsert {
             doc_id,
+            external_id: id.to_string(),
             document: doc.clone(),
         })?;
 
@@ -177,9 +165,8 @@ impl Engine {
         self.lexical.set_last_wal_seq(seq)?;
         self.vector.set_last_wal_seq(seq);
 
-        // 4. Index into Vector Store
+        // 5. Index into Vector Store (vector fields only)
         let mut vector_doc = Document::new();
-        vector_doc.id = Some(external_id.clone());
 
         for (name, val) in &doc.fields {
             if self
@@ -198,9 +185,9 @@ impl Engine {
         Ok(doc_id)
     }
 
-    /// Delete a document by its external ID.
-    pub fn delete(&self, external_id: &str) -> Result<()> {
-        let doc_ids = self.lexical.find_doc_ids_by_term("_id", external_id)?;
+    /// Delete all documents (including chunks) by external ID.
+    pub fn delete_documents(&self, id: &str) -> Result<()> {
+        let doc_ids = self.lexical.find_doc_ids_by_term("_id", id)?;
         for doc_id in doc_ids {
             // 1. Write to WAL
             let seq = self.wal.append(&WalEntry::Delete { doc_id })?;
@@ -230,8 +217,22 @@ impl Engine {
         self.vector.stats()
     }
 
-    /// Get a document by its internal ID.
-    pub fn get_document(&self, doc_id: u64) -> Result<Option<Document>> {
+    /// Get all documents (including chunks) by external ID.
+    pub fn get_documents(&self, id: &str) -> Result<Vec<Document>> {
+        let doc_ids = self.lexical.find_doc_ids_by_term("_id", id)?;
+        let mut docs = Vec::with_capacity(doc_ids.len());
+        for doc_id in doc_ids {
+            if let Some(doc) = self.get_document_by_internal_id(doc_id)? {
+                docs.push(doc);
+            }
+        }
+        Ok(docs)
+    }
+
+    /// Get a document by its internal ID (private helper).
+    ///
+    /// Filters out non-stored fields based on the schema.
+    fn get_document_by_internal_id(&self, doc_id: u64) -> Result<Option<Document>> {
         let doc = self.lexical.get_document_by_internal_id(doc_id)?;
 
         if let Some(mut doc) = doc {
@@ -259,8 +260,8 @@ impl Engine {
                         }
                     } else {
                         // Not in schema -> Remove (strict schema enforcement on retrieval)
-                        // Valid for "unknown_field" test case
-                        true
+                        // Exception: _id is a system field, always keep it
+                        *name != "_id"
                     }
                 })
                 .cloned()
@@ -273,6 +274,16 @@ impl Engine {
         } else {
             Ok(None)
         }
+    }
+
+    /// Resolve external ID from internal doc_id.
+    fn resolve_external_id(&self, internal_id: u64) -> Result<String> {
+        if let Some(doc) = self.lexical.get_document_by_internal_id(internal_id)? {
+            if let Some(id) = doc.fields.get("_id").and_then(|v| v.as_text()) {
+                return Ok(id.to_string());
+            }
+        }
+        Ok(format!("unknown_{}", internal_id))
     }
 
     /// Split the unified schema into specialized configs.
@@ -338,9 +349,7 @@ impl Engine {
     ) -> Result<Vec<self::search::SearchResult>> {
         // 0. Pre-process Filter
         let (allowed_ids, lexical_query_override) = if let Some(filter_query) = &request.filter {
-            // A. Execute filter query to get allowed IDs for Vector Store
             use crate::lexical::search::searcher::LexicalSearchRequest;
-            // Use a large limit for filtering. In production, this should be streaming or bitset-based.
             let req = LexicalSearchRequest::new(filter_query.clone_box())
                 .max_docs(1_000_000)
                 .load_documents(false);
@@ -348,27 +357,19 @@ impl Engine {
             let filter_hits = self.lexical.search(req)?.hits;
             let ids: Vec<u64> = filter_hits.into_iter().map(|h| h.doc_id).collect();
 
-            // If filter matches nothing, we can early return empty results?
-            // Unless we want to return empty vector results but lexical results might vary? No, filter applies to everything.
             if ids.is_empty() {
                 return Ok(Vec::new());
             }
 
-            // B. Combine filter with lexical query if present
             let new_lexical_query: Option<Box<dyn crate::lexical::index::inverted::query::Query>> =
                 if let Some(user_query) = &request.lexical {
                     use crate::lexical::index::inverted::query::boolean::BooleanQueryBuilder;
-                    // Use builder for chaining
                     let bool_query = BooleanQueryBuilder::new()
                         .must(user_query.clone_box())
                         .must(filter_query.clone_box())
                         .build();
                     Some(Box::new(bool_query))
                 } else {
-                    // If only filter is present, we don't necessarily want to run lexical search
-                    // unless explicitly requested (lexical=None means no lexical search).
-                    // But wait, if filter is present, it acts as a constraint.
-                    // If lexical is None, we just do Vector Search with filter.
                     None
                 };
 
@@ -390,7 +391,6 @@ impl Engine {
         let lexical_hits = if let Some(query) = &lexical_query_to_use {
             use crate::lexical::search::searcher::LexicalSearchRequest;
             let q = query.clone_box();
-            // Fetch up to limit * 2 to give fusion more data if both queries are present
             let overfetch_limit = if request.vector.is_some() {
                 request.limit * 2
             } else {
@@ -405,12 +405,10 @@ impl Engine {
 
         // 2. Execute Vector Search
         let vector_hits = if let Some(vector_req) = &request.vector {
-            // Similarly overfetch for vector if lexical is present
             let mut vreq = vector_req.clone();
             if request.lexical.is_some() && vreq.limit < request.limit * 2 {
                 vreq.limit = request.limit * 2;
             }
-            // Inject allowed_ids
             if let Some(ids) = &allowed_ids {
                 vreq.allowed_ids = Some(ids.clone());
             }
@@ -424,27 +422,30 @@ impl Engine {
             let algorithm = request.fusion.unwrap_or(FusionAlgorithm::RRF { k: 60.0 });
             self.fuse_results(lexical_hits, vector_hits, algorithm, request.limit)
         } else if !vector_hits.is_empty() {
-            // Only vector results
-            Ok(vector_hits
-                .into_iter()
-                .take(request.limit)
-                .map(|hit| SearchResult {
-                    doc_id: hit.doc_id,
+            // Only vector results — resolve external IDs and load documents
+            let mut results = Vec::with_capacity(vector_hits.len().min(request.limit));
+            for hit in vector_hits.into_iter().take(request.limit) {
+                let external_id = self.resolve_external_id(hit.doc_id)?;
+                let document = self.get_document_by_internal_id(hit.doc_id)?;
+                results.push(SearchResult {
+                    id: external_id,
                     score: hit.score,
-                    document: None,
-                })
-                .collect())
+                    document,
+                });
+            }
+            Ok(results)
         } else {
             // Only lexical results (or both empty)
-            Ok(lexical_hits
-                .into_iter()
-                .take(request.limit)
-                .map(|hit| SearchResult {
-                    doc_id: hit.doc_id,
+            let mut results = Vec::with_capacity(lexical_hits.len().min(request.limit));
+            for hit in lexical_hits.into_iter().take(request.limit) {
+                let external_id = self.resolve_external_id(hit.doc_id)?;
+                results.push(SearchResult {
+                    id: external_id,
                     score: hit.score,
                     document: hit.document,
-                })
-                .collect())
+                });
+            }
+            Ok(results)
         }
     }
 
@@ -460,8 +461,6 @@ impl Engine {
 
         match fusion {
             FusionAlgorithm::RRF { k } => {
-                // RRF: score = sum(1.0 / (k + rank))
-                // Lexical ranks
                 for (rank, hit) in lexical_hits.into_iter().enumerate() {
                     let rrf_score = 1.0 / (k + (rank + 1) as f64);
                     let entry = fused_scores
@@ -469,7 +468,6 @@ impl Engine {
                         .or_insert((0.0, hit.document));
                     entry.0 += rrf_score as f32;
                 }
-                // Vector ranks
                 for (rank, hit) in vector_hits.into_iter().enumerate() {
                     let rrf_score = 1.0 / (k + (rank + 1) as f64);
                     let entry = fused_scores.entry(hit.doc_id).or_insert((0.0, None));
@@ -480,9 +478,6 @@ impl Engine {
                 lexical_weight,
                 vector_weight,
             } => {
-                // Weighted Sum: normalized_lexical * w1 + normalized_vector * w2
-
-                // 1. Normalize Lexical Scores
                 let lexical_min = lexical_hits
                     .iter()
                     .map(|h| h.score)
@@ -496,7 +491,7 @@ impl Engine {
                     let norm_score = if lexical_max > lexical_min {
                         (hit.score - lexical_min) / (lexical_max - lexical_min)
                     } else {
-                        1.0 // If all scores are same, treat as 1.0 (or 0.0? 1.0 is more common for single hits)
+                        1.0
                     };
                     let entry = fused_scores
                         .entry(hit.doc_id)
@@ -504,7 +499,6 @@ impl Engine {
                     entry.0 += norm_score * lexical_weight;
                 }
 
-                // 2. Normalize Vector Scores
                 let vector_min = vector_hits
                     .iter()
                     .map(|h| h.score)
@@ -526,34 +520,36 @@ impl Engine {
             }
         }
 
-        let mut results: Vec<SearchResult> = fused_scores
+        let mut intermediate: Vec<(u64, f32, Option<crate::data::Document>)> = fused_scores
             .into_iter()
-            .map(|(doc_id, (score, document))| SearchResult {
-                doc_id,
-                score,
-                document,
-            })
+            .map(|(doc_id, (score, document))| (doc_id, score, document))
             .collect();
 
         // Sort by fused score descending
-        results.sort_by(|a, b| {
-            b.score
-                .partial_cmp(&a.score)
+        intermediate.sort_by(|a, b| {
+            b.1.partial_cmp(&a.1)
                 .unwrap_or(std::cmp::Ordering::Equal)
         });
 
         // Limit results
-        if results.len() > limit {
-            results.truncate(limit);
+        if intermediate.len() > limit {
+            intermediate.truncate(limit);
         }
 
-        // Fill missing documents from Lexical Store if needed
-        for result in &mut results {
-            if result.document.is_none()
-                && let Ok(Some(doc)) = self.lexical.get_document_by_internal_id(result.doc_id)
-            {
-                result.document = Some(doc);
-            }
+        // Resolve external IDs and fill missing documents
+        let mut results = Vec::with_capacity(intermediate.len());
+        for (doc_id, score, document) in intermediate {
+            let external_id = self.resolve_external_id(doc_id)?;
+            let document = if document.is_some() {
+                document
+            } else {
+                self.get_document_by_internal_id(doc_id)?
+            };
+            results.push(SearchResult {
+                id: external_id,
+                score,
+                document,
+            });
         }
 
         Ok(results)

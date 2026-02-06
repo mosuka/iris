@@ -110,7 +110,8 @@ impl SearchRequestBuilder {
 
 #[derive(Debug, Clone)]
 pub struct SearchResult {
-    pub doc_id: u64,
+    /// External document ID.
+    pub id: String,
     pub score: f32,
     pub document: Option<crate::data::Document>,
 }

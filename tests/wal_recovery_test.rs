@@ -37,11 +37,11 @@ fn test_wal_recovery_uncommitted() -> iris::Result<()> {
         let search_results = engine.search(search_request)?;
         assert_eq!(search_results.len(), 0);
 
-        let doc1 = Document::new_with_id("doc1")
+        let doc1 = Document::new()
             .add_field("title", DataValue::Text("Rust Programming".into()))
             .add_field("embedding", DataValue::Vector(vec![0.1; 128]));
 
-        engine.index(doc1)?;
+        engine.put_document("doc1", doc1)?;
 
         // Verify it's searchable in memory - SKIPPED because NRT might not be active without commit
         // let query = Box::new(TermQuery::new("title", "rust"));

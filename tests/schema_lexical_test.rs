@@ -45,13 +45,13 @@ fn test_schema_lexical_guardrails() -> Result<()> {
     let engine = Engine::new(storage, config)?;
 
     // 3. Index a document with various fields (including one NOT in schema)
-    let doc = Document::new_with_id("test1")
+    let doc = Document::new()
         .add_field("indexed_and_stored", "value1")
         .add_field("indexed_only", "value2")
         .add_field("stored_only", "value3")
         .add_field("unknown_field", "should be ignored");
 
-    engine.index(doc)?;
+    engine.put_document("test1", doc)?;
     engine.commit()?;
 
     // 4. Verify Searching
@@ -62,7 +62,8 @@ fn test_schema_lexical_guardrails() -> Result<()> {
         .build();
     let res_a = engine.search(req_a)?;
     assert_eq!(res_a.len(), 1, "Should find 'indexed_and_stored' field");
-    let doc_a = engine.get_document(res_a[0].doc_id)?.unwrap();
+    let docs_a = engine.get_documents(&res_a[0].id)?;
+    let doc_a = &docs_a[0];
     assert_eq!(
         doc_a
             .get_field("indexed_and_stored")
@@ -70,13 +71,14 @@ fn test_schema_lexical_guardrails() -> Result<()> {
         Some("value1")
     );
 
-    // Case B: Search "indexed_only" -> Should find it but value should NOT be in get_document results
+    // Case B: Search "indexed_only" -> Should find it but value should NOT be in get_documents results
     let req_b = SearchRequestBuilder::new()
         .with_lexical(Box::new(TermQuery::new("indexed_only", "value2")))
         .build();
     let res_b = engine.search(req_b)?;
     assert_eq!(res_b.len(), 1, "Should find 'indexed_only' field");
-    let doc_b = engine.get_document(res_b[0].doc_id)?.unwrap();
+    let docs_b = engine.get_documents(&res_b[0].id)?;
+    let doc_b = &docs_b[0];
     assert!(
         doc_b.get_field("indexed_only").is_none(),
         "Field 'indexed_only' should NOT be stored"
@@ -93,7 +95,8 @@ fn test_schema_lexical_guardrails() -> Result<()> {
         "Should NOT find 'stored_only' field via search"
     );
     // But it should be present in retrieval if we get by ID
-    let doc_c = engine.get_document(res_a[0].doc_id)?.unwrap(); // use ID from earlier
+    let docs_c = engine.get_documents(&res_a[0].id)?; // use ID from earlier
+    let doc_c = &docs_c[0];
     assert_eq!(
         doc_c.get_field("stored_only").and_then(|v| v.as_text()),
         Some("value3"),
@@ -110,7 +113,8 @@ fn test_schema_lexical_guardrails() -> Result<()> {
         0,
         "Should NOT find 'unknown_field' because it's not in schema"
     );
-    let doc_d = engine.get_document(res_a[0].doc_id)?.unwrap();
+    let docs_d = engine.get_documents(&res_a[0].id)?;
+    let doc_d = &docs_d[0];
     assert!(
         doc_d.get_field("unknown_field").is_none(),
         "Field 'unknown_field' should NOT be stored because it's not in schema"

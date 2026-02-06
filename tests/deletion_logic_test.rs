@@ -30,11 +30,11 @@ fn test_engine_unified_deletion() -> iris::Result<()> {
     let engine = Engine::new(storage.clone(), config)?;
 
     // 3. Index Document with ID "doc1"
-    let doc1 = Document::new_with_id("doc1")
+    let doc1 = Document::new()
         .add_field("title", "Hello Iris")
         .add_field("embedding", vec![0.1; 128]);
 
-    engine.index(doc1)?;
+    engine.put_document("doc1", doc1)?;
     engine.commit()?;
 
     // 4. Verify it exists in both
@@ -57,7 +57,7 @@ fn test_engine_unified_deletion() -> iris::Result<()> {
     assert_eq!(res_vector.len(), 1, "Should be found via vector");
 
     // 5. Delete by ID
-    engine.delete("doc1")?;
+    engine.delete_documents("doc1")?;
     engine.commit()?;
 
     // 6. Verify it is GONE from both
@@ -105,11 +105,11 @@ fn test_engine_upsert() -> iris::Result<()> {
     let engine = Engine::new(storage.clone(), config)?;
 
     // 3. Index Document with ID "doc1"
-    let doc1 = Document::new_with_id("doc1")
+    let doc1 = Document::new()
         .add_field("title", "Initial Version")
         .add_field("embedding", vec![1.0, 0.0]);
 
-    engine.index(doc1)?;
+    engine.put_document("doc1", doc1)?;
     engine.commit()?;
 
     // 4. Verify initial version exists
@@ -121,11 +121,11 @@ fn test_engine_upsert() -> iris::Result<()> {
     assert_eq!(res.len(), 1);
 
     // 5. Index updated document with SAME ID "doc1"
-    let doc1_v2 = Document::new_with_id("doc1")
+    let doc1_v2 = Document::new()
         .add_field("title", "Updated Version")
         .add_field("embedding", vec![0.0, 1.0]);
 
-    engine.index(doc1_v2)?;
+    engine.put_document("doc1", doc1_v2)?;
     engine.commit()?;
 
     // 6. Verify update
