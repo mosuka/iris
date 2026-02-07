@@ -143,12 +143,12 @@ impl SchemaBuilder {
         self.add_lexical_field(name, LexicalOption::Geo(option.into()))
     }
 
-    pub fn add_blob_field(
+    pub fn add_bytes_field(
         self,
         name: impl Into<String>,
-        option: impl Into<crate::lexical::core::field::BlobOption>,
+        option: impl Into<crate::lexical::core::field::BytesOption>,
     ) -> Self {
-        self.add_lexical_field(name, LexicalOption::Blob(option.into()))
+        self.add_lexical_field(name, LexicalOption::Bytes(option.into()))
     }
 
     pub fn add_vector_field(
@@ -177,6 +177,12 @@ impl SchemaBuilder {
         option: impl Into<crate::vector::IvfOption>,
     ) -> Self {
         self.add_vector_field(name, VectorOption::Ivf(option.into()))
+    }
+
+    pub fn add_default_field(mut self, name: impl Into<String>) -> Self {
+        let name = name.into();
+        self.default_fields.push(name);
+        self
     }
 
     pub fn build(self) -> Schema {

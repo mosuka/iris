@@ -26,7 +26,7 @@ fn build_test_engine() -> Result<Engine> {
 }
 
 fn create_payload(vector: Vec<f32>) -> Document {
-    Document::new().add_field("body", DataValue::Vector(vector))
+    Document::builder().add_field("body", DataValue::Vector(vector)).build()
 }
 
 #[test]

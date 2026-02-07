@@ -402,9 +402,10 @@ mod tests {
 
     #[allow(dead_code)]
     fn create_test_document(title: &str, body: &str) -> Document {
-        Document::new()
+        Document::builder()
             .add_text("title", title)
             .add_text("body", body)
+            .build()
     }
 
     #[test]
@@ -506,10 +507,11 @@ mod tests {
 
         let mut writer = InvertedIndexWriter::new(storage, config).unwrap();
 
-        let doc = Document::new()
+        let doc = Document::builder()
             .add_text("title", "Test Document")
             .add_text("id", "doc1")
-            .add_float("count", 42.0);
+            .add_float("count", 42.0)
+            .build();
 
         writer.add_document(doc).unwrap();
         writer.commit().unwrap();

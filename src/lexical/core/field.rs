@@ -15,7 +15,7 @@
 //! # Supported Types
 //!
 //! - **Text** - String data for full-text search
-//! - **Blob** - Raw byte data or vectors
+//! - **Bytes** - Raw byte data or vectors
 //! - **DateTime** - UTC timestamps with timezone
 //! - **Geo** - Geographic coordinates (latitude/longitude)
 //! - **Null** - Explicit null values
@@ -41,6 +41,7 @@
 //! let text = FieldValue::Text("true".to_string());
 //! assert_eq!(text.as_boolean(), None);
 
+use candle_transformers::models::whisper::audio::Float;
 use rkyv::{Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize};
 use serde::{Deserialize, Serialize};
 
@@ -164,6 +165,10 @@ pub enum NumericType {
 /// For backward compatibility, `FieldValue` is preserved as an alias.
 pub type FieldValue = crate::data::DataValue;
 
+fn default_true() -> bool {
+    true
+}
+
 // FieldValue (alias to DataValue) methods moved to src/data.rs
 
 // ============================================================================
@@ -186,8 +191,25 @@ pub struct TextOption {
     pub stored: bool,
 
     /// Whether to store term vectors (enables highlighting, more-like-this).
-    #[serde(default)]
+    #[serde(default = "default_true")]
     pub term_vectors: bool,
+}
+
+impl TextOption {
+    pub fn indexed(mut self, indexed: bool) -> Self {
+        self.indexed = indexed;
+        self
+    }
+
+    pub fn stored(mut self, stored: bool) -> Self {
+        self.stored = stored;
+        self
+    }
+
+    pub fn term_vectors(mut self, term_vectors: bool) -> Self {
+        self.term_vectors = term_vectors;
+        self
+    }
 }
 
 impl Default for TextOption {
@@ -200,28 +222,33 @@ impl Default for TextOption {
     }
 }
 
-fn default_true() -> bool {
-    true
-}
-
-/// Option for Blob field.
+/// Option for Bytes field.
 #[derive(
     Debug, Clone, PartialEq, Serialize, Deserialize, Archive, RkyvSerialize, RkyvDeserialize,
 )]
 
-pub struct BlobOption {
+pub struct BytesOption {
     /// If true, the value is stored.
+    #[serde(default = "default_true")]
     pub stored: bool,
 }
 
-impl Default for BlobOption {
+impl BytesOption {
+    /// Set whether the field is stored.
+    pub fn stored(mut self, stored: bool) -> Self {
+        self.stored = stored;
+        self
+    }
+}
+
+impl Default for BytesOption {
     fn default() -> Self {
         Self { stored: true }
     }
 }
 
-impl BlobOption {
-    /// Create a new blob option.
+impl BytesOption {
+    /// Create a new bytes option.
     pub fn new() -> Self {
         Self::default()
     }
@@ -239,6 +266,20 @@ pub struct IntegerOption {
     /// Whether to store the original value.
     #[serde(default = "default_true")]
     pub stored: bool,
+}
+
+impl IntegerOption {
+    /// Set whether the field is indexed.
+    pub fn indexed(mut self, indexed: bool) -> Self {
+        self.indexed = indexed;
+        self
+    }
+
+    /// Set whether the field is stored.
+    pub fn stored(mut self, stored: bool) -> Self {
+        self.stored = stored;
+        self
+    }
 }
 
 impl Default for IntegerOption {
@@ -264,6 +305,20 @@ pub struct FloatOption {
     pub stored: bool,
 }
 
+impl FloatOption {
+    /// Set whether the field is indexed.
+    pub fn indexed(mut self, indexed: bool) -> Self {
+        self.indexed = indexed;
+        self
+    }
+
+    /// Set whether the field is stored.
+    pub fn stored(mut self, stored: bool) -> Self {
+        self.stored = stored;
+        self
+    }
+}
+
 impl Default for FloatOption {
     fn default() -> Self {
         Self {
@@ -285,6 +340,20 @@ pub struct BooleanOption {
     /// Whether to store the original value.
     #[serde(default = "default_true")]
     pub stored: bool,
+}
+
+impl BooleanOption {
+    /// Set whether the field is indexed.
+    pub fn indexed(mut self, indexed: bool) -> Self {
+        self.indexed = indexed;
+        self
+    }
+
+    /// Set whether the field is stored.
+    pub fn stored(mut self, stored: bool) -> Self {
+        self.stored = stored;
+        self
+    }
 }
 
 impl Default for BooleanOption {
@@ -310,6 +379,20 @@ pub struct DateTimeOption {
     pub stored: bool,
 }
 
+impl DateTimeOption {
+    /// Set whether the field is indexed.
+    pub fn indexed(mut self, indexed: bool) -> Self {
+        self.indexed = indexed;
+        self
+    }
+
+    /// Set whether the field is stored.
+    pub fn stored(mut self, stored: bool) -> Self {
+        self.stored = stored;
+        self
+    }
+}
+
 impl Default for DateTimeOption {
     fn default() -> Self {
         Self {
@@ -333,6 +416,20 @@ pub struct GeoOption {
     pub stored: bool,
 }
 
+impl GeoOption {
+    /// Set whether the field is indexed.
+    pub fn indexed(mut self, indexed: bool) -> Self {
+        self.indexed = indexed;
+        self
+    }
+
+    /// Set whether the field is stored.
+    pub fn stored(mut self, stored: bool) -> Self {
+        self.stored = stored;
+        self
+    }
+}
+
 /// Unified field option type that wraps all field-specific options.
 ///
 /// This enum provides a type-safe way to store configuration options
@@ -341,7 +438,7 @@ pub struct GeoOption {
 /// # Examples
 ///
 /// ```
-/// use iris::lexical::core::field::{FieldOption, TextOption, BlobOption};
+/// use iris::lexical::core::field::{FieldOption, TextOption, BytesOption};
 ///
 /// // Text field with custom options
 /// let text_opt = FieldOption::Text(TextOption {
@@ -350,8 +447,8 @@ pub struct GeoOption {
 ///     term_vectors: true,
 /// });
 ///
-/// // Blob field (e.g. for vector source)
-/// let blob_opt = FieldOption::Blob(BlobOption::default());
+/// // Bytes field (e.g. for binary data)
+/// let bytes_opt = FieldOption::Bytes(BytesOption::default());
 /// ```
 #[derive(
     Debug, Clone, PartialEq, Serialize, Deserialize, Archive, RkyvSerialize, RkyvDeserialize,
@@ -369,8 +466,8 @@ pub enum FieldOption {
     /// Options for boolean fields.
     Boolean(BooleanOption),
 
-    /// Options for blob fields (binary data and vectors).
-    Blob(BlobOption),
+    /// Options for bytes fields (binary data and vectors).
+    Bytes(BytesOption),
 
     /// Options for datetime fields.
     DateTime(DateTimeOption),
@@ -397,7 +494,7 @@ impl FieldOption {
             FieldValue::Float64(_) => FieldOption::Float(FloatOption::default()),
             FieldValue::Bool(_) => FieldOption::Boolean(BooleanOption::default()),
             FieldValue::Vector(_) | FieldValue::Bytes(_, _) => {
-                FieldOption::Blob(BlobOption::default())
+                FieldOption::Bytes(BytesOption::default())
             }
             FieldValue::DateTime(_) => FieldOption::DateTime(DateTimeOption::default()),
             FieldValue::Geo(_, _) => FieldOption::Geo(GeoOption::default()),

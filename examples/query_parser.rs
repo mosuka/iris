@@ -59,36 +59,41 @@ fn main() -> Result<()> {
 
     // Add sample documents
     let documents = vec![
-        Document::new()
+        Document::builder()
             .add_field("title", DataValue::Text("The Great Gatsby".into()))
             .add_field("body", DataValue::Text("In my younger and more vulnerable years my father gave me some advice".into()))
             .add_field("author", DataValue::Text("F. Scott Fitzgerald".into()))
             .add_field("year", DataValue::Float64(1925.0))
-            .add_field("id", DataValue::Text("doc001".into())),
-        Document::new()
+            .add_field("id", DataValue::Text("doc001".into()))
+            .build(),
+        Document::builder()
             .add_field("title", DataValue::Text("To Kill a Mockingbird".into()))
             .add_field("body", DataValue::Text("When I was almost six years old, I heard my brother arguing with my father".into()))
             .add_field("author", DataValue::Text("Harper Lee".into()))
             .add_field("year", DataValue::Float64(1960.0))
-            .add_field("id", DataValue::Text("doc002".into())),
-        Document::new()
+            .add_field("id", DataValue::Text("doc002".into()))
+            .build(),
+        Document::builder()
             .add_field("title", DataValue::Text("1984".into()))
             .add_field("body", DataValue::Text("It was a bright cold day in April, and the clocks were striking thirteen".into()))
             .add_field("author", DataValue::Text("George Orwell".into()))
             .add_field("year", DataValue::Float64(1949.0))
-            .add_field("id", DataValue::Text("doc003".into())),
-        Document::new()
+            .add_field("id", DataValue::Text("doc003".into()))
+            .build(),
+        Document::builder()
             .add_field("title", DataValue::Text("Pride and Prejudice".into()))
             .add_field("body", DataValue::Text("It is a truth universally acknowledged, that a single many in possession of a good fortune".into()))
             .add_field("author", DataValue::Text("Jane Austen".into()))
             .add_field("year", DataValue::Float64(1813.0))
-            .add_field("id", DataValue::Text("doc004".into())),
-        Document::new()
+            .add_field("id", DataValue::Text("doc004".into()))
+            .build(),
+        Document::builder()
             .add_field("title", DataValue::Text("The Catcher in the Rye".into()))
             .add_field("body", DataValue::Text("If you really want to hear about it, the first thing you'll probably want to know".into()))
             .add_field("author", DataValue::Text("J.D. Salinger".into()))
             .add_field("year", DataValue::Float64(1951.0))
-            .add_field("id", DataValue::Text("doc005".into())),
+            .add_field("id", DataValue::Text("doc005".into()))
+            .build(),
     ];
 
     println!("Adding {} documents to the index...", documents.len());

@@ -110,10 +110,11 @@ fn main() -> Result<()> {
                     // Read image file into bytes
                     let bytes = std::fs::read(&path)?;
 
-                    let doc = Document::new()
+                    let doc = Document::builder()
                         .add_field("content", DataValue::Bytes(bytes, None))
                         .add_field("filename", DataValue::Text(filename.clone()))
-                        .add_field("type", DataValue::Text("image".into()));
+                        .add_field("type", DataValue::Text("image".into()))
+                        .build();
 
                     engine.add_document(doc)?;
                     indexed_count += 1;
@@ -135,10 +136,11 @@ fn main() -> Result<()> {
 
     for text in &texts {
         println!("Indexing text: \"{}\"", text);
-        let doc = Document::new()
+        let doc = Document::builder()
             .add_field("content", DataValue::Text((*text).into()))
             .add_field("text", DataValue::Text((*text).into()))
-            .add_field("type", DataValue::Text("text".into()));
+            .add_field("type", DataValue::Text("text".into()))
+            .build();
         engine.add_document(doc)?;
     }
 

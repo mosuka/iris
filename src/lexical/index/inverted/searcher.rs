@@ -9,7 +9,7 @@ use rayon::prelude::*;
 
 use crate::analysis::analyzer::standard::StandardAnalyzer;
 use crate::data::DataValue::{
-    Bool as Boolean, Bytes as Blob, DateTime, Float64 as Float, Geo, Int64 as Integer, Null, Text,
+    Bool as Boolean, Bytes, DateTime, Float64 as Float, Geo, Int64 as Integer, Null, Text,
 };
 use crate::error::{IrisError, Result};
 // Note: Geo and DateTime were removed from FieldValue definition implicitly by switching to DataValue.
@@ -462,11 +462,11 @@ impl InvertedIndexSearcher {
                 .partial_cmp(b_lat)
                 .unwrap_or(Ordering::Equal)
                 .then_with(|| a_lon.partial_cmp(b_lon).unwrap_or(Ordering::Equal)),
-            (Blob(_, a_blob), Blob(_, b_blob)) => a_blob.cmp(b_blob),
+            (Bytes(_, a_bytes), Bytes(_, b_bytes)) => a_bytes.cmp(b_bytes),
             (Null, Null) => Ordering::Equal,
 
             // Mixed types ordering precedence
-            // Null < Bool < Int < Float < Text < Blob
+            // Null < Bool < Int < Float < Text < Bytes
             (Null, _) => Ordering::Less,
             (_, Null) => Ordering::Greater,
 
@@ -482,8 +482,8 @@ impl InvertedIndexSearcher {
             (Text(_), _) => Ordering::Less,
             (_, Text(_)) => Ordering::Greater,
 
-            (Blob(_, _), _) => Ordering::Less,
-            (_, Blob(_, _)) => Ordering::Greater,
+            (Bytes(_, _), _) => Ordering::Less,
+            (_, Bytes(_, _)) => Ordering::Greater,
 
             _ => Ordering::Equal, // Fallback
         }

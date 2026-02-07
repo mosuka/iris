@@ -37,9 +37,10 @@ fn test_wal_recovery_uncommitted() -> iris::Result<()> {
         let search_results = engine.search(search_request)?;
         assert_eq!(search_results.len(), 0);
 
-        let doc1 = Document::new()
+        let doc1 = Document::builder()
             .add_field("title", DataValue::Text("Rust Programming".into()))
-            .add_field("embedding", DataValue::Vector(vec![0.1; 128]));
+            .add_field("embedding", DataValue::Vector(vec![0.1; 128]))
+            .build();
 
         engine.put_document("doc1", doc1)?;
 

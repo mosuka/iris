@@ -45,15 +45,18 @@ fn main() -> Result<()> {
 
     // 4. Add Documents
     let documents = vec![
-        Document::new()
+        Document::builder()
             .add_field("title", DataValue::Text("The quick brown fox".into()))
-            .add_field("body", DataValue::Text("Jumped over the lazy dog".into())),
-        Document::new()
+            .add_field("body", DataValue::Text("Jumped over the lazy dog".into()))
+            .build(),
+        Document::builder()
             .add_field("title", DataValue::Text(" The quick red fox".into()))
-            .add_field("body", DataValue::Text("Jumped over the lazy cat".into())),
-        Document::new()
+            .add_field("body", DataValue::Text("Jumped over the lazy cat".into()))
+            .build(),
+        Document::builder()
             .add_field("title", DataValue::Text("The lazy brown dog".into()))
-            .add_field("body", DataValue::Text("Jumped over the quick fox".into())),
+            .add_field("body", DataValue::Text("Jumped over the quick fox".into()))
+            .build(),
     ];
 
     println!("Indexing {} documents...", documents.len());

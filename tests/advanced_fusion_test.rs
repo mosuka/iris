@@ -35,9 +35,10 @@ fn test_advanced_fusion_normalization() -> iris::Result<()> {
     vec1[0] = 1.0;
     engine.put_document(
         "doc1",
-        Document::new()
+        Document::builder()
             .add_field("title", "apple")
-            .add_field("embedding", vec1),
+            .add_field("embedding", vec1)
+            .build(),
     )?;
 
     // Doc 2: Bad lexical, Good vector
@@ -45,9 +46,10 @@ fn test_advanced_fusion_normalization() -> iris::Result<()> {
     vec2[1] = 1.0;
     engine.put_document(
         "doc2",
-        Document::new()
+        Document::builder()
             .add_field("title", "banana")
-            .add_field("embedding", vec2),
+            .add_field("embedding", vec2)
+            .build(),
     )?;
 
     engine.commit()?;
@@ -100,15 +102,17 @@ fn test_field_boosts() -> iris::Result<()> {
     // 3. Index Documents
     engine.put_document(
         "doc1",
-        Document::new()
+        Document::builder()
             .add_field("title", "rust")
-            .add_field("body", "programming"),
+            .add_field("body", "programming")
+            .build(),
     )?;
     engine.put_document(
         "doc2",
-        Document::new()
+        Document::builder()
             .add_field("title", "java")
-            .add_field("body", "rust"),
+            .add_field("body", "rust")
+            .build(),
     )?;
     engine.commit()?;
 

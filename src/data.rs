@@ -202,7 +202,7 @@ impl From<Vec<f32>> for DataValue {
 /// A document is a pure data container — a collection of named fields,
 /// each containing a [`DataValue`]. Document identity (external ID) is
 /// managed by the [`Engine`](crate::Engine), not by the document itself.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Document {
     /// Field data.
     pub fields: HashMap<String, DataValue>,
@@ -216,6 +216,53 @@ impl Document {
         }
     }
 
+    /// Get a reference to a field's value.
+    pub fn get(&self, name: &str) -> Option<&DataValue> {
+        self.fields.get(name)
+    }
+
+    /// Alias for get (compatibility with Lexical).
+    pub fn get_field(&self, name: &str) -> Option<&DataValue> {
+        self.get(name)
+    }
+
+    /// Check if the document has a field.
+    pub fn has_field(&self, name: &str) -> bool {
+        self.fields.contains_key(name)
+    }
+
+    /// Get all field names.
+    pub fn field_names(&self) -> Vec<&str> {
+        self.fields.keys().map(|s| s.as_str()).collect()
+    }
+
+    /// Get the number of fields.
+    pub fn len(&self) -> usize {
+        self.fields.len()
+    }
+
+    /// Check if the document is empty.
+    pub fn is_empty(&self) -> bool {
+        self.fields.is_empty()
+    }
+
+    pub fn builder() -> DocumentBuilder {
+        DocumentBuilder::default()
+    }
+}
+
+impl Default for Document {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[derive(Default)]
+pub struct DocumentBuilder {
+    fields: HashMap<String, DataValue>,
+}
+
+impl DocumentBuilder {
     /// Add a field to the document.
     pub fn add_field(mut self, name: impl Into<String>, value: impl Into<DataValue>) -> Self {
         self.fields.insert(name.into(), value.into());
@@ -262,33 +309,9 @@ impl Document {
         self.add_field(name.into(), DataValue::Bytes(data, None))
     }
 
-    /// Get a reference to a field's value.
-    pub fn get(&self, name: &str) -> Option<&DataValue> {
-        self.fields.get(name)
-    }
-
-    /// Alias for get (compatibility with Lexical).
-    pub fn get_field(&self, name: &str) -> Option<&DataValue> {
-        self.get(name)
-    }
-
-    /// Check if the document has a field.
-    pub fn has_field(&self, name: &str) -> bool {
-        self.fields.contains_key(name)
-    }
-
-    /// Get all field names.
-    pub fn field_names(&self) -> Vec<&str> {
-        self.fields.keys().map(|s| s.as_str()).collect()
-    }
-
-    /// Get the number of fields.
-    pub fn len(&self) -> usize {
-        self.fields.len()
-    }
-
-    /// Check if the document is empty.
-    pub fn is_empty(&self) -> bool {
-        self.fields.is_empty()
+    pub fn build(self) -> Document {
+        Document {
+            fields: self.fields,
+        }
     }
 }

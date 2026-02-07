@@ -35,28 +35,31 @@ fn test_unified_filtering() -> iris::Result<()> {
     // Doc 1: Apple (Fruit), Vector [1.0, 0.0]
     engine.put_document(
         "doc1",
-        Document::new()
+        Document::builder()
             .add_field("name", "Apple")
             .add_field("category", "fruit")
-            .add_field("embedding", vec![1.0, 0.0]),
+            .add_field("embedding", vec![1.0, 0.0])
+            .build(),
     )?;
 
     // Doc 2: Banana (Fruit), Vector [0.9, 0.1]
     engine.put_document(
         "doc2",
-        Document::new()
+        Document::builder()
             .add_field("name", "Banana")
             .add_field("category", "fruit")
-            .add_field("embedding", vec![0.9, 0.1]),
+            .add_field("embedding", vec![0.9, 0.1])
+            .build(),
     )?;
 
     // Doc 3: Carrot (Vegetable), Vector [1.0, 0.0] -> Identical vector to Apple!
     engine.put_document(
         "doc3",
-        Document::new()
+        Document::builder()
             .add_field("name", "Carrot")
             .add_field("category", "vegetable")
-            .add_field("embedding", vec![1.0, 0.0]),
+            .add_field("embedding", vec![1.0, 0.0])
+            .build(),
     )?;
 
     engine.commit()?;
@@ -132,24 +135,27 @@ fn test_unified_filtering_hnsw() -> iris::Result<()> {
     // 3. Index Documents
     engine.put_document(
         "doc1",
-        Document::new()
+        Document::builder()
             .add_field("name", "Apple")
             .add_field("category", "fruit")
-            .add_field("embedding", vec![1.0, 0.0]),
+            .add_field("embedding", vec![1.0, 0.0])
+            .build(),
     )?;
     engine.put_document(
         "doc2",
-        Document::new()
+        Document::builder()
             .add_field("name", "Banana")
             .add_field("category", "fruit")
-            .add_field("embedding", vec![0.9, 0.1]),
+            .add_field("embedding", vec![0.9, 0.1])
+            .build(),
     )?;
     engine.put_document(
         "doc3",
-        Document::new()
+        Document::builder()
             .add_field("name", "Carrot")
             .add_field("category", "vegetable")
-            .add_field("embedding", vec![1.0, 0.0]),
+            .add_field("embedding", vec![1.0, 0.0])
+            .build(),
     )?;
     engine.commit()?;
 
@@ -198,24 +204,27 @@ fn test_unified_filtering_ivf() -> iris::Result<()> {
     // 3. Index Documents
     engine.put_document(
         "doc1",
-        Document::new()
+        Document::builder()
             .add_field("name", "Apple")
             .add_field("category", "fruit")
-            .add_field("embedding", vec![1.0, 0.0]),
+            .add_field("embedding", vec![1.0, 0.0])
+            .build(),
     )?;
     engine.put_document(
         "doc2",
-        Document::new()
+        Document::builder()
             .add_field("name", "Banana")
             .add_field("category", "fruit")
-            .add_field("embedding", vec![0.9, 0.1]),
+            .add_field("embedding", vec![0.9, 0.1])
+            .build(),
     )?;
     engine.put_document(
         "doc3",
-        Document::new()
+        Document::builder()
             .add_field("name", "Carrot")
             .add_field("category", "vegetable")
-            .add_field("embedding", vec![1.0, 0.0]),
+            .add_field("embedding", vec![1.0, 0.0])
+            .build(),
     )?;
     engine.commit()?;
 

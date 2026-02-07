@@ -8,6 +8,26 @@ use serde::{Deserialize, Serialize};
 use crate::vector::core::distance::DistanceMetric;
 use crate::vector::core::quantization;
 
+fn default_dimension() -> usize {
+    128
+}
+
+fn default_getting_m() -> usize {
+    16
+}
+
+fn default_getting_ef_construction() -> usize {
+    200
+}
+
+fn default_getting_n_clusters() -> usize {
+    100
+}
+
+fn default_getting_n_probe() -> usize {
+    1
+}
+
 /// Options for vector fields.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", content = "options", rename_all = "snake_case")]
@@ -67,6 +87,7 @@ impl FieldOption {
 /// Options for Flat vector index.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FlatOption {
+    #[serde(default = "default_dimension")]
     pub dimension: usize,
     #[serde(default = "default_distance_metric")]
     pub distance: DistanceMetric,
@@ -90,6 +111,7 @@ impl Default for FlatOption {
 /// Options for HNSW vector index.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HnswOption {
+    #[serde(default = "default_dimension")]
     pub dimension: usize,
     #[serde(default = "default_distance_metric")]
     pub distance: DistanceMetric,
@@ -101,14 +123,6 @@ pub struct HnswOption {
     pub base_weight: f32,
     #[serde(default)]
     pub quantizer: Option<quantization::QuantizationMethod>,
-}
-
-fn default_getting_m() -> usize {
-    16
-}
-
-fn default_getting_ef_construction() -> usize {
-    200
 }
 
 impl Default for HnswOption {
@@ -138,14 +152,6 @@ pub struct IvfOption {
     pub base_weight: f32,
     #[serde(default)]
     pub quantizer: Option<quantization::QuantizationMethod>,
-}
-
-fn default_getting_n_clusters() -> usize {
-    100
-}
-
-fn default_getting_n_probe() -> usize {
-    1
 }
 
 impl Default for IvfOption {

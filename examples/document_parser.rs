@@ -72,18 +72,21 @@ fn main() -> Result<()> {
 
     // Create documents
     let docs = vec![
-        Document::new()
+        Document::builder()
             .add_text("id", "BOOK-001")
             .add_text("title", "Rust Programming Language")
-            .add_text("category", "programming"),
-        Document::new()
+            .add_text("category", "programming")
+            .build(),
+        Document::builder()
             .add_text("id", "BOOK-002")
             .add_text("title", "Learning Rust")
-            .add_text("category", "programming"),
-        Document::new()
+            .add_text("category", "programming")
+            .build(),
+        Document::builder()
             .add_text("id", "ARTICLE-001")
             .add_text("title", "Introduction to Python")
-            .add_text("category", "tutorial"),
+            .add_text("category", "tutorial")
+            .build(),
     ];
 
     // Analyze documents explicitly and add to index

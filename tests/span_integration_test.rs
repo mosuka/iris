@@ -25,13 +25,13 @@ fn create_test_index() -> Result<
     let mut writer = InvertedIndexWriter::new(storage.clone(), config)?;
 
     // Doc 0: "hello world"
-    writer.add_document(Document::new().add_text("content", "hello world"))?;
+    writer.add_document(Document::builder().add_text("content", "hello world").build())?;
     // Doc 1: "world hello"
-    writer.add_document(Document::new().add_text("content", "world hello"))?;
+    writer.add_document(Document::builder().add_text("content", "world hello").build())?;
     // Doc 2: "hello iris world"
-    writer.add_document(Document::new().add_text("content", "hello iris world"))?;
+    writer.add_document(Document::builder().add_text("content", "hello iris world").build())?;
     // Doc 3: "foo bar baz"
-    writer.add_document(Document::new().add_text("content", "foo bar baz"))?;
+    writer.add_document(Document::builder().add_text("content", "foo bar baz").build())?;
 
     writer.commit()?;
     let reader = writer.build_reader()?;

@@ -50,7 +50,7 @@ fn main() -> Result<()> {
 
     // Add documents with various patterns for wildcard matching
     let documents = vec![
-        Document::new()
+        Document::builder()
             .add_field(
                 "title",
                 DataValue::Text("JavaScript Tutorial for Beginners".into()),
@@ -65,8 +65,9 @@ fn main() -> Result<()> {
             )
             .add_field("category", DataValue::Text("programming".into()))
             .add_field("extension", DataValue::Text("pdf".into()))
-            .add_field("id", DataValue::Text("file001".into())),
-        Document::new()
+            .add_field("id", DataValue::Text("file001".into()))
+            .build(),
+        Document::builder()
             .add_field(
                 "title",
                 DataValue::Text("Python Programming Reference".into()),
@@ -78,8 +79,9 @@ fn main() -> Result<()> {
             )
             .add_field("category", DataValue::Text("programming".into()))
             .add_field("extension", DataValue::Text("html".into()))
-            .add_field("id", DataValue::Text("file002".into())),
-        Document::new()
+            .add_field("id", DataValue::Text("file002".into()))
+            .build(),
+        Document::builder()
             .add_field(
                 "title",
                 DataValue::Text("Machine Learning Algorithms".into()),
@@ -91,8 +93,9 @@ fn main() -> Result<()> {
             )
             .add_field("category", DataValue::Text("data-science".into()))
             .add_field("extension", DataValue::Text("docx".into()))
-            .add_field("id", DataValue::Text("file003".into())),
-        Document::new()
+            .add_field("id", DataValue::Text("file003".into()))
+            .build(),
+        Document::builder()
             .add_field(
                 "title",
                 DataValue::Text("Database Design Principles".into()),
@@ -104,8 +107,9 @@ fn main() -> Result<()> {
             )
             .add_field("category", DataValue::Text("database".into()))
             .add_field("extension", DataValue::Text("pptx".into()))
-            .add_field("id", DataValue::Text("file004".into())),
-        Document::new()
+            .add_field("id", DataValue::Text("file004".into()))
+            .build(),
+        Document::builder()
             .add_field(
                 "title",
                 DataValue::Text("Web Development Best Practices".into()),
@@ -117,8 +121,9 @@ fn main() -> Result<()> {
             )
             .add_field("category", DataValue::Text("web-development".into()))
             .add_field("extension", DataValue::Text("txt".into()))
-            .add_field("id", DataValue::Text("file005".into())),
-        Document::new()
+            .add_field("id", DataValue::Text("file005".into()))
+            .build(),
+        Document::builder()
             .add_field("title", DataValue::Text("React Component Patterns".into()))
             .add_field("filename", DataValue::Text("react_patterns.jsx".into()))
             .add_field(
@@ -127,8 +132,9 @@ fn main() -> Result<()> {
             )
             .add_field("category", DataValue::Text("frontend".into()))
             .add_field("extension", DataValue::Text("jsx".into()))
-            .add_field("id", DataValue::Text("file006".into())),
-        Document::new()
+            .add_field("id", DataValue::Text("file006".into()))
+            .build(),
+        Document::builder()
             .add_field(
                 "title",
                 DataValue::Text("API Documentation Template".into()),
@@ -140,8 +146,9 @@ fn main() -> Result<()> {
             )
             .add_field("category", DataValue::Text("documentation".into()))
             .add_field("extension", DataValue::Text("md".into()))
-            .add_field("id", DataValue::Text("file007".into())),
-        Document::new()
+            .add_field("id", DataValue::Text("file007".into()))
+            .build(),
+        Document::builder()
             .add_field("title", DataValue::Text("Configuration Settings".into()))
             .add_field("filename", DataValue::Text("app_config.json".into()))
             .add_field(
@@ -150,7 +157,8 @@ fn main() -> Result<()> {
             )
             .add_field("category", DataValue::Text("configuration".into()))
             .add_field("extension", DataValue::Text("json".into()))
-            .add_field("id", DataValue::Text("file008".into())),
+            .add_field("id", DataValue::Text("file008".into()))
+            .build(),
     ];
 
     println!("Adding {} documents to the index...", documents.len());

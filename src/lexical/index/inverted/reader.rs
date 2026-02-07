@@ -468,7 +468,7 @@ impl SegmentReader {
                             FieldValue::Bool(b)
                         }
                         4 => {
-                            // Blob (MIME type + Data)
+                            // Bytes (MIME type + Data)
                             let mime = reader.read_string()?;
                             let data = reader.read_bytes()?;
                             FieldValue::Bytes(data, if mime.is_empty() { None } else { Some(mime) })
@@ -500,7 +500,7 @@ impl SegmentReader {
                         }
                     };
 
-                    doc = doc.add_field(field_name, field_value);
+                    doc.fields.insert(field_name, field_value);
                 }
 
                 documents.insert(doc_id, doc);

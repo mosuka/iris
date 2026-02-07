@@ -51,7 +51,7 @@ fn main() -> Result<()> {
     // Add documents with geographic coordinates
     // Using famous locations around the world
     let documents = vec![
-        Document::new()
+        Document::builder()
             .add_field("name", DataValue::Text("Central Park".into()))
             .add_field(
                 "description",
@@ -60,8 +60,9 @@ fn main() -> Result<()> {
             .add_field("category", DataValue::Text("park".into()))
             .add_field("location", DataValue::Geo(40.7829, -73.9654))
             .add_field("city", DataValue::Text("New York".into()))
-            .add_field("id", DataValue::Text("loc001".into())),
-        Document::new()
+            .add_field("id", DataValue::Text("loc001".into()))
+            .build(),
+        Document::builder()
             .add_field("name", DataValue::Text("Statue of Liberty".into()))
             .add_field(
                 "description",
@@ -70,8 +71,9 @@ fn main() -> Result<()> {
             .add_field("category", DataValue::Text("monument".into()))
             .add_field("location", DataValue::Geo(40.6892, -74.0445))
             .add_field("city", DataValue::Text("New York".into()))
-            .add_field("id", DataValue::Text("loc002".into())),
-        Document::new()
+            .add_field("id", DataValue::Text("loc002".into()))
+            .build(),
+        Document::builder()
             .add_field("name", DataValue::Text("Golden Gate Bridge".into()))
             .add_field(
                 "description",
@@ -80,8 +82,9 @@ fn main() -> Result<()> {
             .add_field("category", DataValue::Text("bridge".into()))
             .add_field("location", DataValue::Geo(37.8199, -122.4783))
             .add_field("city", DataValue::Text("San Francisco".into()))
-            .add_field("id", DataValue::Text("loc003".into())),
-        Document::new()
+            .add_field("id", DataValue::Text("loc003".into()))
+            .build(),
+        Document::builder()
             .add_field("name", DataValue::Text("Alcatraz Island".into()))
             .add_field(
                 "description",
@@ -90,8 +93,9 @@ fn main() -> Result<()> {
             .add_field("category", DataValue::Text("historical".into()))
             .add_field("location", DataValue::Geo(37.8267, -122.4233))
             .add_field("city", DataValue::Text("San Francisco".into()))
-            .add_field("id", DataValue::Text("loc004".into())),
-        Document::new()
+            .add_field("id", DataValue::Text("loc004".into()))
+            .build(),
+        Document::builder()
             .add_field("name", DataValue::Text("Hollywood Sign".into()))
             .add_field(
                 "description",
@@ -100,8 +104,9 @@ fn main() -> Result<()> {
             .add_field("category", DataValue::Text("landmark".into()))
             .add_field("location", DataValue::Geo(34.1341, -118.3215))
             .add_field("city", DataValue::Text("Los Angeles".into()))
-            .add_field("id", DataValue::Text("loc005".into())),
-        Document::new()
+            .add_field("id", DataValue::Text("loc005".into()))
+            .build(),
+        Document::builder()
             .add_field("name", DataValue::Text("Santa Monica Pier".into()))
             .add_field(
                 "description",
@@ -110,8 +115,9 @@ fn main() -> Result<()> {
             .add_field("category", DataValue::Text("entertainment".into()))
             .add_field("location", DataValue::Geo(34.0084, -118.4966))
             .add_field("city", DataValue::Text("Los Angeles".into()))
-            .add_field("id", DataValue::Text("loc006".into())),
-        Document::new()
+            .add_field("id", DataValue::Text("loc006".into()))
+            .build(),
+        Document::builder()
             .add_field("name", DataValue::Text("Space Needle".into()))
             .add_field(
                 "description",
@@ -120,8 +126,9 @@ fn main() -> Result<()> {
             .add_field("category", DataValue::Text("tower".into()))
             .add_field("location", DataValue::Geo(47.6205, -122.3493))
             .add_field("city", DataValue::Text("Seattle".into()))
-            .add_field("id", DataValue::Text("loc007".into())),
-        Document::new()
+            .add_field("id", DataValue::Text("loc007".into()))
+            .build(),
+        Document::builder()
             .add_field("name", DataValue::Text("Pike Place Market".into()))
             .add_field(
                 "description",
@@ -130,7 +137,8 @@ fn main() -> Result<()> {
             .add_field("category", DataValue::Text("market".into()))
             .add_field("location", DataValue::Geo(47.6101, -122.3421))
             .add_field("city", DataValue::Text("Seattle".into()))
-            .add_field("id", DataValue::Text("loc008".into())),
+            .add_field("id", DataValue::Text("loc008".into()))
+            .build(),
     ];
 
     println!("Adding {} documents to the index...", documents.len());
