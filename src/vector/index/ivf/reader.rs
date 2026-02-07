@@ -8,7 +8,6 @@ use crate::maintenance::deletion::DeletionBitmap;
 use crate::storage::Storage;
 use crate::vector::core::distance::DistanceMetric;
 use crate::vector::core::vector::Vector;
-use crate::vector::index::io::read_metadata;
 use crate::vector::index::storage::VectorStorage;
 use crate::vector::reader::{ValidationReport, VectorIndexMetadata, VectorStats};
 use crate::vector::reader::{VectorIndexReader, VectorIterator};
@@ -106,7 +105,6 @@ impl IvfIndexReader {
                             ))
                         })?;
 
-                        let metadata = read_metadata(&mut input)?;
                         let mut values = vec![0.0f32; dimension];
                         for value in &mut values {
                             let mut value_buf = [0u8; 4];
@@ -117,7 +115,7 @@ impl IvfIndexReader {
                         vector_ids.push((doc_id, field_name.clone()));
                         vectors.insert(
                             (doc_id, field_name),
-                            Vector::with_metadata(values, metadata),
+                            Vector::new(values),
                         );
                     }
                 }
@@ -154,9 +152,6 @@ impl IvfIndexReader {
 
                         offsets.insert((doc_id, field_name.clone()), start_offset);
                         vector_ids.push((doc_id, field_name));
-
-                        // Skip metadata
-                        let _ = read_metadata(&mut input)?;
 
                         // Skip vector
                         input

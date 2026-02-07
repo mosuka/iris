@@ -113,19 +113,8 @@ impl VectorRanker {
     ///
     /// `Ok(())` if weighting succeeds
     fn apply_weighted_ranking(&self, results: &mut VectorIndexSearchResults) -> Result<()> {
-        for result in &mut results.results {
-            let mut weighted_score = result.similarity;
-
-            // Apply boost factors based on metadata
-            for (key, boost) in &self.config.boost_factors {
-                if result.metadata.contains_key(key) {
-                    weighted_score *= boost;
-                }
-            }
-
-            result.similarity = weighted_score;
-        }
-
+        // boost_factors are no longer applicable without per-vector metadata.
+        // Simply sort by similarity.
         results.sort_by_similarity();
         Ok(())
     }

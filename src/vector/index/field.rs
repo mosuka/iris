@@ -1,7 +1,7 @@
 //! Shared vector field traits and compatibility adapters.
 
 use std::any::Any;
-use std::collections::HashMap;
+
 use std::fmt::Debug;
 use std::sync::Arc;
 
@@ -109,8 +109,6 @@ pub struct FieldHit {
     pub field: String,
     pub score: f32,
     pub distance: f32,
-    #[serde(default)]
-    pub metadata: HashMap<String, String>,
 }
 
 /// Basic statistics collected per field.

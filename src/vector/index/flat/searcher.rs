@@ -75,7 +75,6 @@ impl VectorIndexSearcher for FlatVectorSearcher {
                 break;
             }
 
-            let metadata = vector.metadata.clone();
             let vector_output = if request.params.include_vectors {
                 Some(vector)
             } else {
@@ -90,7 +89,6 @@ impl VectorIndexSearcher for FlatVectorSearcher {
                     similarity,
                     distance,
                     vector: vector_output,
-                    metadata,
                 });
         }
 

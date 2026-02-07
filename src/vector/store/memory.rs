@@ -383,16 +383,12 @@ impl VectorFieldReader for InMemoryFieldReader {
                                 field: self.field_name.clone(),
                                 score: weighted_score,
                                 distance,
-                                metadata: vector.metadata.clone(),
                             });
                         }
                         Entry::Occupied(mut slot) => {
                             let hit = slot.get_mut();
                             hit.score += weighted_score;
                             hit.distance = hit.distance.min(distance);
-                            if hit.metadata.is_empty() {
-                                hit.metadata = vector.metadata.clone();
-                            }
                         }
                     }
                 }

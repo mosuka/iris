@@ -1,37 +1,21 @@
 //! Core vector data structure.
 
-use std::collections::HashMap;
-
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::error::{IrisError, Result};
-
-/// Metadata key used to store the original (pre-embedded) text.
-pub const ORIGINAL_TEXT_METADATA_KEY: &str = "original_text";
-pub const METADATA_WEIGHT: &str = "__weight";
 
 /// A dense vector representation for similarity search.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Vector {
     /// The vector dimensions as floating point values.
     pub data: Vec<f32>,
-    /// Optional metadata associated with this vector.
-    pub metadata: HashMap<String, String>,
 }
 
 impl Vector {
     /// Create a new vector with the given dimensions.
     pub fn new(data: Vec<f32>) -> Self {
-        Self {
-            data,
-            metadata: HashMap::new(),
-        }
-    }
-
-    /// Create a new vector with metadata.
-    pub fn with_metadata(data: Vec<f32>, metadata: HashMap<String, String>) -> Self {
-        Self { data, metadata }
+        Self { data }
     }
 
     /// Get the dimensionality of this vector.
@@ -59,29 +43,6 @@ impl Vector {
         let mut normalized = self.clone();
         normalized.normalize();
         normalized
-    }
-
-    /// Add metadata to this vector.
-    pub fn add_metadata(&mut self, key: String, value: String) {
-        self.metadata.insert(key, value);
-    }
-
-    /// Store the original text representation for this vector.
-    pub fn set_original_text<T: Into<String>>(&mut self, text: T) {
-        self.metadata
-            .insert(ORIGINAL_TEXT_METADATA_KEY.to_string(), text.into());
-    }
-
-    /// Get metadata by key.
-    pub fn get_metadata(&self, key: &str) -> Option<&String> {
-        self.metadata.get(key)
-    }
-
-    /// Convenience accessor for the stored original text.
-    pub fn original_text(&self) -> Option<&str> {
-        self.metadata
-            .get(ORIGINAL_TEXT_METADATA_KEY)
-            .map(|s| s.as_str())
     }
 
     /// Validate that this vector has the expected dimension.
@@ -138,13 +99,11 @@ impl Vector {
     }
 }
 
-/// Dense vector with embedded metadata, used for internal storage.
+/// Dense vector with weight, used for internal storage.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StoredVector {
     pub data: Vec<f32>,
     pub weight: f32,
-    #[serde(default)]
-    pub attributes: HashMap<String, crate::lexical::core::field::Field>,
 }
 
 impl StoredVector {
@@ -152,7 +111,6 @@ impl StoredVector {
         Self {
             data,
             weight: 1.0,
-            attributes: HashMap::new(),
         }
     }
 
@@ -166,36 +124,17 @@ impl StoredVector {
     }
 
     pub fn to_vector(&self) -> Vector {
-        let mut metadata = HashMap::new();
-        for (k, v) in &self.attributes {
-            if let Some(text) = v.value.as_text() {
-                metadata.insert(k.clone(), text.to_string());
-            }
-        }
         Vector {
             data: self.data.clone(),
-            metadata,
         }
     }
 }
 
 impl From<Vector> for StoredVector {
     fn from(vector: Vector) -> Self {
-        let mut attributes = HashMap::new();
-        for (k, v) in vector.metadata {
-            use crate::lexical::core::field::{Field, FieldOption, FieldValue, TextOption};
-            attributes.insert(
-                k,
-                Field::new(
-                    FieldValue::Text(v),
-                    FieldOption::Text(TextOption::default()),
-                ),
-            );
-        }
         Self {
             data: vector.data,
             weight: 1.0,
-            attributes,
         }
     }
 }

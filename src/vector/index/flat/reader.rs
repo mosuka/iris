@@ -7,7 +7,6 @@ use crate::error::{IrisError, Result};
 use crate::storage::Storage;
 use crate::vector::core::distance::DistanceMetric;
 use crate::vector::core::vector::Vector;
-use crate::vector::index::io::read_metadata;
 use crate::vector::reader::{ValidationReport, VectorIndexMetadata, VectorStats};
 use crate::vector::reader::{VectorIndexReader, VectorIterator};
 use std::sync::Mutex;
@@ -76,7 +75,6 @@ impl FlatVectorIndexReader {
                     let field_name = String::from_utf8(field_name_buf).map_err(|e| {
                         IrisError::InvalidOperation(format!("Invalid UTF-8 in field name: {}", e))
                     })?;
-                    let metadata = read_metadata(&mut input)?;
                     // Read vector data
                     let mut values = vec![0.0f32; dimension];
                     for value in &mut values {
@@ -88,7 +86,7 @@ impl FlatVectorIndexReader {
                     vector_ids.push((doc_id, field_name.clone()));
                     vectors.insert(
                         (doc_id, field_name),
-                        Vector::with_metadata(values, metadata),
+                        Vector::new(values),
                     );
                 }
                 (VectorStorage::Owned(Arc::new(vectors)), vector_ids)
@@ -125,17 +123,9 @@ impl FlatVectorIndexReader {
                     offsets.insert((doc_id, field_name.clone()), start_offset);
                     vector_ids.push((doc_id, field_name));
 
-                    // Skip metadata and vector data
-                    let _ = read_metadata(&mut input)?;
-                    // Seek past metadata content (keys/values are var len, read_metadata_len skips them?)
-                    // read_metadata_len implementation needs to be checked.
-                    // Previous implementation used read_metadata to skip?
-
-                    // Actually, let's look at previous Mmap implementation I wrote.
-                    // I replaced IndexLoadingMode::Mmap with crate::storage::LoadingMode::Lazy
-
-                    // Logic inside block:
-                    // ...
+                    // Skip vector data
+                    let skip_bytes = dimension * 4; // f32 = 4 bytes
+                    input.seek(std::io::SeekFrom::Current(skip_bytes as i64)).map_err(IrisError::Io)?;
                 }
 
                 // Re-open input for storage to avoid seeking issues with shared reference?

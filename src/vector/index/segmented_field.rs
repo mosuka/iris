@@ -7,8 +7,7 @@ use crate::error::{IrisError, Result};
 use crate::maintenance::deletion::DeletionBitmap;
 use crate::storage::Storage;
 use crate::vector::core::field::FieldOption;
-use crate::vector::core::vector::Vector;
-use crate::vector::core::vector::{METADATA_WEIGHT, StoredVector};
+use crate::vector::core::vector::{StoredVector, Vector};
 use crate::vector::index::VectorIndexWriter;
 use crate::vector::index::config::HnswIndexConfig;
 use crate::vector::index::field::{
@@ -313,7 +312,7 @@ impl SegmentedVectorField {
         for (doc_id, _field, vector) in vectors {
             let similarity = distance_metric.similarity(query, &vector.data)?;
             let distance = distance_metric.distance(query, &vector.data)?;
-            candidates.push((*doc_id, similarity, distance, vector.metadata.clone()));
+            candidates.push((*doc_id, similarity, distance));
         }
 
         // Sort by similarity descending
@@ -322,26 +321,12 @@ impl SegmentedVectorField {
         let hits = candidates
             .into_iter()
             .take(limit)
-            .map(
-                |(doc_id, similarity, distance, metadata): (
-                    u64,
-                    f32,
-                    f32,
-                    HashMap<String, String>,
-                )| {
-                    let vector_weight = metadata
-                        .get(METADATA_WEIGHT)
-                        .and_then(|raw: &String| raw.parse::<f32>().ok())
-                        .unwrap_or(1.0);
-                    FieldHit {
-                        doc_id,
-                        field: self.name.clone(),
-                        score: similarity * weight * vector_weight,
-                        distance,
-                        metadata,
-                    }
-                },
-            )
+            .map(|(doc_id, similarity, distance)| FieldHit {
+                doc_id,
+                field: self.name.clone(),
+                score: similarity * weight,
+                distance,
+            })
             .collect();
 
         Ok(hits)
@@ -398,7 +383,6 @@ impl SegmentedVectorField {
                     field: self.name.clone(),
                     score: res.similarity * weight,
                     distance: res.distance,
-                    metadata: res.metadata,
                 });
             }
         }
