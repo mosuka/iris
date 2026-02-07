@@ -8,7 +8,6 @@ use crate::vector::core::vector::Vector;
 use crate::vector::index::HnswIndexConfig;
 use crate::vector::index::field::LegacyVectorFieldWriter;
 use crate::vector::index::hnsw::graph::HnswGraph;
-use crate::vector::index::io::{read_metadata, write_metadata};
 use crate::vector::writer::{VectorIndexWriter, VectorIndexWriterConfig};
 use parking_lot::RwLock;
 use rand::Rng;
@@ -286,8 +285,7 @@ impl HnswIndexWriter {
                 IrisError::InvalidOperation(format!("Invalid UTF-8 in field name: {}", e))
             })?;
 
-            // Read metadata and vector data
-            let metadata = read_metadata(&mut input)?;
+            // Read vector data
             let mut values = vec![0.0f32; dimension];
             for value in &mut values {
                 let mut value_buf = [0u8; 4];
@@ -295,7 +293,7 @@ impl HnswIndexWriter {
                 *value = f32::from_le_bytes(value_buf);
             }
 
-            vectors.push((doc_id, field_name, Vector::with_metadata(values, metadata)));
+            vectors.push((doc_id, field_name, Vector::new(values)));
         }
 
         // Rebuild doc_id_map
@@ -1312,8 +1310,6 @@ impl VectorIndexWriter for HnswIndexWriter {
             output.write_all(&(field_name_bytes.len() as u32).to_le_bytes())?;
             output.write_all(field_name_bytes)?;
 
-            write_metadata(&mut output, &vector.metadata)?;
-
             // Write vector data
             for value in &vector.data {
                 output.write_all(&value.to_le_bytes())?;
@@ -1380,26 +1376,16 @@ impl VectorIndexWriter for HnswIndexWriter {
         Ok(())
     }
 
-    fn delete_documents(&mut self, field: &str, value: &str) -> Result<usize> {
+    fn delete_documents(&mut self, _field: &str, _value: &str) -> Result<usize> {
         if self.is_finalized {
             return Err(IrisError::InvalidOperation(
                 "Cannot delete documents from finalized index".to_string(),
             ));
         }
 
-        let initial_len = self.vectors.len();
-        self.vectors.retain(|(_, _, vector)| {
-            vector
-                .get_metadata(field)
-                .map(|v| v != value)
-                .unwrap_or(true)
-        });
-
-        let removed = initial_len - self.vectors.len();
-        if removed > 0 {
-            self.rebuild_doc_id_map();
-        }
-        Ok(removed)
+        // Vectors no longer carry metadata; field-based deletion is not supported.
+        // Use delete_document(doc_id) for document-level deletion.
+        Ok(0)
     }
 
     fn rollback(&mut self) -> Result<()> {

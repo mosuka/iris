@@ -8,7 +8,6 @@ use crate::storage::Storage;
 use crate::vector::core::distance::DistanceMetric;
 use crate::vector::core::vector::Vector;
 use crate::vector::index::hnsw::graph::HnswGraph;
-use crate::vector::index::io::read_metadata;
 use crate::vector::reader::{ValidationReport, VectorIndexMetadata, VectorStats};
 use crate::vector::reader::{VectorIndexReader, VectorIterator};
 use std::sync::Mutex;
@@ -157,7 +156,6 @@ impl HnswIndexReader {
                         IrisError::InvalidOperation(format!("Invalid UTF-8 in field name: {}", e))
                     })?;
 
-                    let metadata = read_metadata(&mut input)?;
                     // Read vector data
                     let mut values = vec![0.0f32; dimension];
                     for value in &mut values {
@@ -169,7 +167,7 @@ impl HnswIndexReader {
                     vector_ids.push((doc_id, field_name.clone()));
                     vectors.insert(
                         (doc_id, field_name),
-                        Vector::with_metadata(values, metadata),
+                        Vector::new(values),
                     );
                 }
                 let graph = read_graph(&mut input)?;
@@ -208,9 +206,6 @@ impl HnswIndexReader {
                     // We record offset where the entry starts (doc_id)
                     offsets.insert((doc_id, field_name.clone()), start_offset);
                     vector_ids.push((doc_id, field_name.clone()));
-
-                    // Skip metadata
-                    let _ = read_metadata(&mut input)?;
 
                     // Skip vector data (dimension * 4 bytes)
                     input

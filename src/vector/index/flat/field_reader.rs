@@ -8,7 +8,6 @@ use std::collections::{HashMap, hash_map::Entry};
 use std::sync::Arc;
 
 use crate::error::{IrisError, Result};
-use crate::vector::core::vector::METADATA_WEIGHT;
 use crate::vector::core::vector::Vector;
 use crate::vector::index::field::{
     FieldHit, FieldSearchInput, FieldSearchResults, VectorFieldReader, VectorFieldStats,
@@ -57,8 +56,7 @@ impl FlatFieldReader {
             .collect();
 
         // Calculate similarities for all vectors
-        let mut candidates: Vec<(u64, f32, f32, HashMap<String, String>)> =
-            Vec::with_capacity(filtered_ids.len());
+        let mut candidates: Vec<(u64, f32, f32)> = Vec::with_capacity(filtered_ids.len());
 
         for (doc_id, field_name) in filtered_ids {
             if let Ok(Some(vector)) = self.index_reader.get_vector(doc_id, &field_name) {
@@ -70,7 +68,7 @@ impl FlatFieldReader {
                     .index_reader
                     .distance_metric()
                     .distance(&query.data, &vector.data)?;
-                candidates.push((doc_id, similarity, distance, vector.metadata.clone()));
+                candidates.push((doc_id, similarity, distance));
             }
         }
 
@@ -82,28 +80,15 @@ impl FlatFieldReader {
         let hits: Vec<FieldHit> = candidates
             .into_iter()
             .take(top_k)
-            .map(|(doc_id, similarity, distance, metadata)| {
-                let vector_weight = Self::metadata_weight(&metadata);
-                FieldHit {
-                    doc_id,
-                    field: self.field_name.clone(),
-                    score: similarity * weight * vector_weight,
-                    distance,
-                    metadata,
-                }
+            .map(|(doc_id, similarity, distance)| FieldHit {
+                doc_id,
+                field: self.field_name.clone(),
+                score: similarity * weight,
+                distance,
             })
             .collect();
 
         Ok(hits)
-    }
-
-    /// Extract weight from vector metadata.
-    fn metadata_weight(metadata: &HashMap<String, String>) -> f32 {
-        metadata
-            .get(METADATA_WEIGHT)
-            .and_then(|raw| raw.parse::<f32>().ok())
-            .filter(|value| value.is_finite() && *value > 0.0)
-            .unwrap_or(1.0)
     }
 }
 
@@ -143,9 +128,6 @@ impl VectorFieldReader for FlatFieldReader {
                         let entry = slot.get_mut();
                         entry.score += hit.score;
                         entry.distance = entry.distance.min(hit.distance);
-                        if entry.metadata.is_empty() {
-                            entry.metadata = hit.metadata.clone();
-                        }
                     }
                 }
             }

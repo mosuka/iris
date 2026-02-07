@@ -97,7 +97,6 @@ impl VectorIndexSearcher for HnswSearcher {
                 break;
             }
 
-            let metadata = vector.metadata.clone();
             let vector_output = if request.params.include_vectors {
                 Some(vector)
             } else {
@@ -112,7 +111,6 @@ impl VectorIndexSearcher for HnswSearcher {
                     similarity,
                     distance,
                     vector: vector_output,
-                    metadata,
                 });
         }
 
@@ -300,7 +298,6 @@ impl HnswSearcher {
                     field_name: field_name.to_string(),
                     similarity,
                     distance: c.distance,
-                    metadata: vector.metadata.clone(),
                     vector: if request.params.include_vectors {
                         Some(vector)
                     } else {

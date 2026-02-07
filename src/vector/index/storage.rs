@@ -5,7 +5,6 @@ use std::sync::{Arc, Mutex};
 use crate::error::{IrisError, Result};
 use crate::storage::StorageInput;
 use crate::vector::core::vector::Vector;
-use crate::vector::index::io::read_metadata;
 
 /// Storage for vectors (in-memory or on-demand).
 #[derive(Debug, Clone)]
@@ -54,14 +53,24 @@ impl VectorStorage {
 
                     input.seek(SeekFrom::Start(offset)).map_err(IrisError::Io)?;
 
-                    let metadata = read_metadata(&mut *input)?;
+                    // Skip doc_id (8 bytes) + field_name (4 bytes length + variable)
+                    let mut doc_id_buf = [0u8; 8];
+                    input.read_exact(&mut doc_id_buf)?;
+
+                    let mut field_name_len_buf = [0u8; 4];
+                    input.read_exact(&mut field_name_len_buf)?;
+                    let field_name_len = u32::from_le_bytes(field_name_len_buf) as usize;
+                    let mut field_name_buf = vec![0u8; field_name_len];
+                    input.read_exact(&mut field_name_buf)?;
+
+                    // Read vector data
                     let mut values = vec![0.0f32; dimension];
                     for value in &mut values {
                         let mut value_buf = [0u8; 4];
                         input.read_exact(&mut value_buf)?;
                         *value = f32::from_le_bytes(value_buf);
                     }
-                    Ok(Some(Vector::with_metadata(values, metadata)))
+                    Ok(Some(Vector::new(values)))
                 } else {
                     Ok(None)
                 }
