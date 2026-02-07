@@ -493,11 +493,6 @@ impl SegmentReader {
                             // Null
                             FieldValue::Null
                         }
-                        8 => {
-                            // Vector (Legacy, convert to Blob)
-                            let text = reader.read_string()?;
-                            FieldValue::Bytes(text.into_bytes(), Some("text/plain".to_string()))
-                        }
                         _ => {
                             return Err(IrisError::index(format!(
                                 "Unknown field type tag: {type_tag}"

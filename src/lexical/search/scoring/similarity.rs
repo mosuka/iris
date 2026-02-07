@@ -436,7 +436,7 @@ impl SimilaritySearchEngine {
                 // Extract the field value
                 if let Some(field_value) = document.get_field(field_name) {
                     match field_value {
-                        FieldValue::Text(text) | FieldValue::String(text) => Ok(text.clone()),
+                        FieldValue::Text(text) => Ok(text.clone()),
                         FieldValue::Int64(value) => Ok(value.to_string()),
                         FieldValue::Float64(value) => Ok(value.to_string()),
                         FieldValue::Bool(value) => Ok(value.to_string()),
@@ -451,7 +451,6 @@ impl SimilaritySearchEngine {
                         FieldValue::Geo(lat, lon) => Ok(format!("{},{}", lat, lon)),
                         FieldValue::Null => Ok(String::new()),
                         FieldValue::Vector(v) => Ok(format!("[vector: dim={}]", v.len())),
-                        FieldValue::List(l) => Ok(l.join(", ")),
                     }
                 } else {
                     Ok(String::new())

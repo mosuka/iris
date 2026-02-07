@@ -1,29 +1,27 @@
+use std::collections::HashMap;
+
+use chrono::{DateTime, Utc};
 use rkyv::{Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 /// Helper for archiving DateTime as micros timestamp (i64)
 pub struct MicroSeconds;
 
-impl rkyv::with::ArchiveWith<chrono::DateTime<chrono::Utc>> for MicroSeconds {
+impl rkyv::with::ArchiveWith<DateTime<Utc>> for MicroSeconds {
     type Archived = rkyv::Archived<i64>;
     type Resolver = ();
 
-    fn resolve_with(
-        field: &chrono::DateTime<chrono::Utc>,
-        _: (),
-        out: rkyv::Place<Self::Archived>,
-    ) {
+    fn resolve_with(field: &DateTime<Utc>, _: (), out: rkyv::Place<Self::Archived>) {
         let ts = field.timestamp_micros();
         ts.resolve((), out);
     }
 }
 
-impl<S: rkyv::rancor::Fallible + ?Sized> rkyv::with::SerializeWith<chrono::DateTime<chrono::Utc>, S>
+impl<S: rkyv::rancor::Fallible + ?Sized> rkyv::with::SerializeWith<DateTime<Utc>, S>
     for MicroSeconds
 {
     fn serialize_with(
-        field: &chrono::DateTime<chrono::Utc>,
+        field: &DateTime<Utc>,
         serializer: &mut S,
     ) -> Result<Self::Resolver, S::Error> {
         RkyvSerialize::serialize(&field.timestamp_micros(), serializer)
@@ -31,13 +29,12 @@ impl<S: rkyv::rancor::Fallible + ?Sized> rkyv::with::SerializeWith<chrono::DateT
 }
 
 impl<D: rkyv::rancor::Fallible + ?Sized>
-    rkyv::with::DeserializeWith<rkyv::Archived<i64>, chrono::DateTime<chrono::Utc>, D>
-    for MicroSeconds
+    rkyv::with::DeserializeWith<rkyv::Archived<i64>, DateTime<Utc>, D> for MicroSeconds
 {
     fn deserialize_with(
         archived: &rkyv::Archived<i64>,
         _deserializer: &mut D,
-    ) -> Result<chrono::DateTime<chrono::Utc>, D::Error> {
+    ) -> Result<DateTime<Utc>, D::Error> {
         use chrono::TimeZone;
         let ts: i64 = (*archived).into();
         Ok(chrono::Utc.timestamp_micros(ts).single().unwrap())
@@ -52,17 +49,16 @@ impl<D: rkyv::rancor::Fallible + ?Sized>
     Debug, Clone, PartialEq, Serialize, Deserialize, Archive, RkyvSerialize, RkyvDeserialize,
 )]
 pub enum DataValue {
-    // --- Primitive Types (Metadata / Lexical / Storage) ---
+    // --- Primitive Types ---
     Null,
     Bool(bool),
     Int64(i64),
     Float64(f64),
 
-    /// String content typically used for keywords, IDs, or non-tokenized metadata.
-    String(String),
-
     // --- Complex / Searchable Types ---
-    /// Text content to be full-text indexed and/or embedded into a vector.
+    /// Text content. Whether this is tokenized or treated as a keyword
+    /// is determined by the schema's [`FieldOption`](crate::lexical::core::field::FieldOption)
+    /// and the configured [`Analyzer`](crate::analysis::analyzer::analyzer::Analyzer).
     Text(String),
 
     /// Binary content (image, audio, etc.) to be embedded.
@@ -71,9 +67,6 @@ pub enum DataValue {
 
     /// Pre-computed vector.
     Vector(Vec<f32>),
-
-    /// List of values (e.g. tags).
-    List(Vec<String>),
 
     /// Date and time in UTC.
     DateTime(#[rkyv(with = MicroSeconds)] chrono::DateTime<chrono::Utc>),
@@ -86,7 +79,7 @@ impl DataValue {
     /// Returns the text value if this is a Text variant.
     pub fn as_text(&self) -> Option<&str> {
         match self {
-            DataValue::Text(s) | DataValue::String(s) => Some(s),
+            DataValue::Text(s) => Some(s),
             _ => None,
         }
     }
@@ -230,57 +223,43 @@ impl Document {
     }
 
     /// Add a text field.
-    pub fn add_text(mut self, name: impl Into<String>, text: impl Into<String>) -> Self {
-        self.fields
-            .insert(name.into(), DataValue::Text(text.into()));
-        self
+    pub fn add_text(self, name: impl Into<String>, text: impl Into<String>) -> Self {
+        self.add_field(name.into(), DataValue::Text(text.into()))
     }
 
     /// Add an integer field.
-    pub fn add_integer(mut self, name: impl Into<String>, value: i64) -> Self {
-        self.fields.insert(name.into(), DataValue::Int64(value));
-        self
+    pub fn add_integer(self, name: impl Into<String>, value: i64) -> Self {
+        self.add_field(name.into(), DataValue::Int64(value))
     }
 
     /// Add a float field.
-    pub fn add_float(mut self, name: impl Into<String>, value: f64) -> Self {
-        self.fields.insert(name.into(), DataValue::Float64(value));
-        self
+    pub fn add_float(self, name: impl Into<String>, value: f64) -> Self {
+        self.add_field(name.into(), DataValue::Float64(value))
     }
 
     /// Add a boolean field.
-    pub fn add_boolean(mut self, name: impl Into<String>, value: bool) -> Self {
-        self.fields.insert(name.into(), DataValue::Bool(value));
-        self
+    pub fn add_boolean(self, name: impl Into<String>, value: bool) -> Self {
+        self.add_field(name.into(), DataValue::Bool(value))
     }
 
     /// Add a datetime field.
-    pub fn add_datetime(
-        mut self,
-        name: impl Into<String>,
-        value: chrono::DateTime<chrono::Utc>,
-    ) -> Self {
-        self.fields.insert(name.into(), DataValue::DateTime(value));
-        self
+    pub fn add_datetime(self, name: impl Into<String>, value: DateTime<Utc>) -> Self {
+        self.add_field(name.into(), DataValue::DateTime(value))
     }
 
     /// Add a vector field.
-    pub fn add_vector(mut self, name: impl Into<String>, vector: Vec<f32>) -> Self {
-        self.fields.insert(name.into(), DataValue::Vector(vector));
-        self
+    pub fn add_vector(self, name: impl Into<String>, vector: Vec<f32>) -> Self {
+        self.add_field(name.into(), DataValue::Vector(vector))
     }
 
     /// Add a geo field (latitude, longitude).
-    pub fn add_geo(mut self, name: impl Into<String>, lat: f64, lon: f64) -> Self {
-        self.fields.insert(name.into(), DataValue::Geo(lat, lon));
-        self
+    pub fn add_geo(self, name: impl Into<String>, lat: f64, lon: f64) -> Self {
+        self.add_field(name.into(), DataValue::Geo(lat, lon))
     }
 
     /// Add a binary data field.
-    pub fn add_bytes(mut self, name: impl Into<String>, data: Vec<u8>) -> Self {
-        self.fields
-            .insert(name.into(), DataValue::Bytes(data, None));
-        self
+    pub fn add_bytes(self, name: impl Into<String>, data: Vec<u8>) -> Self {
+        self.add_field(name.into(), DataValue::Bytes(data, None))
     }
 
     /// Get a reference to a field's value.

@@ -408,7 +408,7 @@ impl ResultProcessor {
     /// Convert field value to string.
     fn field_value_to_string(&self, field_value: &FieldValue) -> String {
         match field_value {
-            FieldValue::Text(s) | FieldValue::String(s) => s.clone(),
+            FieldValue::Text(s) => s.clone(),
             FieldValue::Int64(i) => i.to_string(),
             FieldValue::Float64(f) => f.to_string(),
             FieldValue::Bool(b) => b.to_string(),
@@ -420,7 +420,6 @@ impl ResultProcessor {
             FieldValue::Geo(lat, lon) => format!("{},{}", lat, lon),
             FieldValue::Null => "null".to_string(),
             FieldValue::Vector(v) => format!("[vector: dim={}]", v.len()),
-            FieldValue::List(l) => format!("[list: {} items]", l.len()),
         }
     }
 
