@@ -51,7 +51,7 @@ fn main() -> Result<()> {
     let lexical_store = LexicalStore::new(storage, lexical_index_config, doc_store)?;
 
     let documents = vec![
-        Document::new()
+        Document::builder()
             .add_text("title", "Advanced Python Programming")
             .add_text("body", "Learn advanced Python techniques including decorators, metaclasses, and async programming")
             .add_text("author", "Alice Johnson")
@@ -59,8 +59,9 @@ fn main() -> Result<()> {
             .add_float("price", 59.99)
             .add_float("rating", 4.7)
             .add_text("tags", "python advanced programming")
-            .add_text("_id", "book001"),
-        Document::new()
+            .add_text("_id", "book001")
+            .build(),
+        Document::builder()
             .add_text("title", "JavaScript for Web Development")
             .add_text("body", "Modern JavaScript techniques for frontend and backend web development")
             .add_text("author", "Bob Smith")
@@ -68,8 +69,9 @@ fn main() -> Result<()> {
             .add_float("price", 45.50)
             .add_float("rating", 4.3)
             .add_text("tags", "javascript web frontend backend")
-            .add_text("_id", "book002"),
-        Document::new()
+            .add_text("_id", "book002")
+            .build(),
+        Document::builder()
             .add_text("title", "Machine Learning with Python")
             .add_text("body", "Practical machine learning algorithms implemented in Python")
             .add_text("author", "Carol Davis")
@@ -77,8 +79,9 @@ fn main() -> Result<()> {
             .add_float("price", 72.99)
             .add_float("rating", 4.8)
             .add_text("tags", "python machine-learning data-science")
-            .add_text("_id", "book003"),
-        Document::new()
+            .add_text("_id", "book003")
+            .build(),
+        Document::builder()
             .add_text("title", "Web Design Fundamentals")
             .add_text("body", "Learn the basics of web design including HTML, CSS, and responsive design")
             .add_text("author", "David Brown")
@@ -86,8 +89,9 @@ fn main() -> Result<()> {
             .add_float("price", 39.99)
             .add_float("rating", 4.1)
             .add_text("tags", "web design html css")
-            .add_text("_id", "book004"),
-        Document::new()
+            .add_text("_id", "book004")
+            .build(),
+        Document::builder()
             .add_text("title", "Data Science with R")
             .add_text("body", "Statistical computing and data analysis using the R programming language")
             .add_text("author", "Eva Wilson")
@@ -95,8 +99,9 @@ fn main() -> Result<()> {
             .add_float("price", 65.00)
             .add_float("rating", 4.5)
             .add_text("tags", "r data-science statistics")
-            .add_text("_id", "book005"),
-        Document::new()
+            .add_text("_id", "book005")
+            .build(),
+        Document::builder()
             .add_text("title", "Advanced JavaScript Patterns")
             .add_text("body", "Design patterns and advanced programming techniques in JavaScript")
             .add_text("author", "Frank Miller")
@@ -104,7 +109,8 @@ fn main() -> Result<()> {
             .add_float("price", 54.99)
             .add_float("rating", 4.6)
             .add_text("tags", "javascript advanced patterns")
-            .add_text("_id", "book006"),
+            .add_text("_id", "book006")
+            .build(),
     ];
 
     println!("Adding {} documents to the index...", documents.len());

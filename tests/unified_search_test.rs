@@ -32,13 +32,15 @@ fn test_unified_search_hybrid() -> iris::Result<()> {
     let engine = Engine::new(storage.clone(), config)?;
 
     // 3. Index Documents
-    let doc1 = Document::new()
+    let doc1 = Document::builder()
         .add_field("title", DataValue::Text("Rust Programming".into()))
-        .add_field("embedding", DataValue::Vector(vec![1.0, 0.0, 0.0]));
+        .add_field("embedding", DataValue::Vector(vec![1.0, 0.0, 0.0]))
+        .build();
 
-    let doc2 = Document::new()
+    let doc2 = Document::builder()
         .add_field("title", DataValue::Text("Vector Search".into()))
-        .add_field("embedding", DataValue::Vector(vec![0.0, 1.0, 0.0]));
+        .add_field("embedding", DataValue::Vector(vec![0.0, 1.0, 0.0]))
+        .build();
 
     engine.put_document("doc1", doc1)?;
     engine.put_document("doc2", doc2)?;
@@ -92,15 +94,17 @@ fn test_unified_search_hybrid_fusion() -> iris::Result<()> {
     // Doc 2: "C++" in title, Vector [0, 1, 0]
     engine.put_document(
         "1",
-        Document::new()
+        Document::builder()
             .add_field("title", "Rust")
-            .add_field("embedding", vec![1.0, 0.0, 0.0]),
+            .add_field("embedding", vec![1.0, 0.0, 0.0])
+            .build(),
     )?;
     engine.put_document(
         "2",
-        Document::new()
+        Document::builder()
             .add_field("title", "C++")
-            .add_field("embedding", vec![0.0, 1.0, 0.0]),
+            .add_field("embedding", vec![0.0, 1.0, 0.0])
+            .build(),
     )?;
     engine.commit()?;
 

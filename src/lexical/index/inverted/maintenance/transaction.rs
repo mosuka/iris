@@ -483,7 +483,7 @@ mod tests {
     fn test_transaction_operations() {
         let mut txn = Transaction::new(IsolationLevel::ReadCommitted);
 
-        let doc = crate::lexical::core::document::Document::new().add_text("title", "Test");
+        let doc = crate::lexical::core::document::Document::builder().add_text("title", "Test").build();
 
         let op = TransactionOperation::AddDocument {
             document: doc,
@@ -495,7 +495,7 @@ mod tests {
 
         // Cannot add operation to inactive transaction
         txn.state = TransactionState::Committed;
-        let doc2 = crate::lexical::core::document::Document::new().add_text("title", "Test2");
+        let doc2 = crate::lexical::core::document::Document::builder().add_text("title", "Test2").build();
         let op2 = TransactionOperation::AddDocument {
             document: doc2,
             segment_id: None,

@@ -309,8 +309,9 @@ impl InvertedIndexWriter {
     /// let mut writer = InvertedIndexWriter::new(storage, config).unwrap();
     ///
     /// use iris::lexical::core::field::TextOption;
-    /// let doc = Document::new()
-    ///     .add_text("title", "Rust Programming");
+    /// let doc = Document::builder()
+    ///     .add_text("title", "Rust Programming")
+    ///     .build();
     ///
     /// let doc_parser = DocumentParser::new(Arc::new(per_field));
     /// let analyzed = doc_parser.parse(doc).unwrap();
@@ -410,7 +411,7 @@ impl InvertedIndexWriter {
                 Some(FieldOption::Boolean(opt)) => (opt.indexed, opt.stored),
                 Some(FieldOption::DateTime(opt)) => (opt.indexed, opt.stored),
                 Some(FieldOption::Geo(opt)) => (opt.indexed, opt.stored),
-                Some(FieldOption::Blob(opt)) => (false, opt.stored), // Blobs are not lexically indexed
+                Some(FieldOption::Bytes(opt)) => (false, opt.stored), // Bytes are not lexically indexed
                 None => (true, true), // Internal or schema-less default
             };
 
@@ -716,7 +717,7 @@ impl InvertedIndexWriter {
                         stored_writer.write_f64(*lon)?;
                     }
                     crate::data::DataValue::Bytes(bytes, mime) => {
-                        stored_writer.write_u8(4)?; // Type tag for Blob
+                        stored_writer.write_u8(4)?; // Type tag for Bytes
                         stored_writer.write_string(mime.as_deref().unwrap_or(""))?;
                         stored_writer.write_varint(bytes.len() as u64)?;
                         stored_writer.write_bytes(bytes)?;
@@ -841,7 +842,7 @@ impl InvertedIndexWriter {
         for (_doc_id, analyzed_doc) in &self.buffered_docs {
             let mut doc = Document::new();
             for (field_name, field_value) in &analyzed_doc.stored_fields {
-                doc = doc.add_field(field_name, field_value.clone());
+                doc.fields.insert(field_name.clone(), field_value.clone());
             }
             documents.push(doc);
         }

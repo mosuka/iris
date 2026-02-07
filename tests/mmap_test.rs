@@ -54,7 +54,7 @@ fn test_mmap_mode_basic_search() {
     ];
 
     for vec_data in vectors {
-        let doc = Document::new().add_field("mmap_field", DataValue::Vector(vec_data));
+        let doc = Document::builder().add_field("mmap_field", DataValue::Vector(vec_data)).build();
         engine.add_document(doc).unwrap();
     }
     engine.commit().unwrap();
@@ -105,7 +105,7 @@ fn test_mmap_mode_persistence_reload() {
         let vectors = vec![vec![1.0, 0.0, 0.0], vec![0.0, 1.0, 0.0]];
 
         for vec_data in vectors {
-            let doc = Document::new().add_field("mmap_field", DataValue::Vector(vec_data));
+            let doc = Document::builder().add_field("mmap_field", DataValue::Vector(vec_data)).build();
             engine.add_document(doc).unwrap();
         }
         engine.commit().unwrap();

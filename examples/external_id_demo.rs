@@ -73,16 +73,18 @@ fn main() -> Result<()> {
     // 2. Index Documents
     // "product-A": "Green Apple"
     println!("-> Indexing 'product-A'...");
-    let doc_a = Document::new()
+    let doc_a = Document::builder()
         .add_field("description", "Green Apple")
-        .add_field("description_vec", "Green Apple");
+        .add_field("description_vec", "Green Apple")
+        .build();
     engine.put_document("product-A", doc_a)?;
 
     // "product-B": "Yellow Banana"
     println!("-> Indexing 'product-B'...");
-    let doc_b = Document::new()
+    let doc_b = Document::builder()
         .add_field("description", "Yellow Banana")
-        .add_field("description_vec", "Yellow Banana");
+        .add_field("description_vec", "Yellow Banana")
+        .build();
     engine.put_document("product-B", doc_b)?;
 
     engine.commit()?;
@@ -91,9 +93,10 @@ fn main() -> Result<()> {
     // Change product-A to "Red Apple" (same ID)
     // The Engine will automatically detect the same ID and replace the old document.
     println!("\n-> Updating 'product-A' to 'Red Apple'...");
-    let doc_a_new = Document::new()
+    let doc_a_new = Document::builder()
         .add_field("description", "Red Apple")
-        .add_field("description_vec", "Red Apple");
+        .add_field("description_vec", "Red Apple")
+        .build();
     engine.put_document("product-A", doc_a_new)?;
     engine.commit()?;
 

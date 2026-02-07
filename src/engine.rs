@@ -252,7 +252,7 @@ impl Engine {
                                 LexicalFieldOption::Boolean(o) => !o.stored,
                                 LexicalFieldOption::DateTime(o) => !o.stored,
                                 LexicalFieldOption::Geo(o) => !o.stored,
-                                LexicalFieldOption::Blob(o) => !o.stored,
+                                LexicalFieldOption::Bytes(o) => !o.stored,
                             }
                         } else {
                             // Vector field - keep it

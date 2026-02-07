@@ -95,7 +95,7 @@ fn test_vector_segment_integration() {
     ];
 
     for vec_data in vectors {
-        let doc = Document::new().add_field("vector_field", DataValue::Vector(vec_data));
+        let doc = Document::builder().add_field("vector_field", DataValue::Vector(vec_data)).build();
         engine.add_document(doc).unwrap();
     }
 

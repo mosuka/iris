@@ -61,8 +61,9 @@ use parking_lot::{Mutex, RwLock};
 ///
 /// // Add documents
 /// use iris::lexical::core::field::TextOption;
-/// let doc = Document::new()
-///     .add_text("title", "Rust Programming");
+/// let doc = Document::builder()
+///     .add_text("title", "Rust Programming")
+///     .build();
 /// engine.add_document(doc).unwrap();
 /// engine.commit().unwrap();
 ///
@@ -187,9 +188,10 @@ impl LexicalStore {
     /// # let doc_store = Arc::new(RwLock::new(UnifiedDocumentStore::open(doc_storage).unwrap()));
     /// # let engine = LexicalStore::new(storage, LexicalIndexConfig::default(), doc_store).unwrap();
     ///
-    /// let doc = Document::new()
+    /// let doc = Document::builder()
     ///     .add_text("title", "Hello World")
-    ///     .add_text("body", "This is a test");
+    ///     .add_text("body", "This is a test")
+    ///     .build();
     /// let doc_id = engine.add_document(doc).unwrap();
     /// engine.commit().unwrap();  // Don't forget to commit!
     /// ```
@@ -503,9 +505,10 @@ impl LexicalStore {
     ///
     /// // Add multiple documents
     /// for i in 0..10 {
-    ///     let doc = Document::new()
+    ///     let doc = Document::builder()
     ///         .add_text("id", &i.to_string())
-    ///         .add_text("title", &format!("Document {}", i));
+    ///         .add_text("title", &format!("Document {}", i))
+    ///         .build();
     ///     engine.add_document(doc).unwrap();
     /// }
     ///
@@ -557,8 +560,9 @@ impl LexicalStore {
     ///
     /// // Add and commit many documents
     /// for i in 0..1000 {
-    ///     let doc = Document::new()
-    ///         .add_text("id", &i.to_string());
+    ///     let doc = Document::builder()
+    ///         .add_text("id", &i.to_string())
+    ///         .build();
     ///     engine.add_document(doc).unwrap();
     /// }
     /// engine.commit().unwrap();
@@ -629,7 +633,7 @@ impl LexicalStore {
     /// # let doc_store = Arc::new(RwLock::new(UnifiedDocumentStore::open(doc_storage).unwrap()));
     /// # let engine = LexicalStore::new(storage, LexicalIndexConfig::default(), doc_store).unwrap();
     /// # use iris::lexical::core::field::TextOption;
-    /// # let doc = Document::new().add_text("title", "hello world");
+    /// # let doc = Document::builder().add_text("title", "hello world").build();
     /// # engine.add_document(doc).unwrap();
     /// # engine.commit().unwrap();
     ///
@@ -838,9 +842,10 @@ mod tests {
 
     #[allow(dead_code)]
     fn create_test_document(title: &str, body: &str) -> Document {
-        Document::new()
+        Document::builder()
             .add_text("title", title)
             .add_text("body", body)
+            .build()
     }
 
     #[test]
@@ -1237,9 +1242,10 @@ mod tests {
         let engine = LexicalStore::new(storage.clone(), config, doc_store.clone()).unwrap();
 
         // 1. Index document with external ID
-        let doc = Document::new()
+        let doc = Document::builder()
             .add_text("title", "Test Doc")
-            .add_text("_id", "ext_1");
+            .add_text("_id", "ext_1")
+            .build();
         let internal_id = engine.put_document(doc).unwrap();
         engine.commit().unwrap();
         doc_store.write().commit().unwrap();
@@ -1253,9 +1259,10 @@ mod tests {
         );
 
         // 3. Index with external ID
-        let doc = Document::new()
+        let doc = Document::builder()
             .add_text("title", "Test Doc")
-            .add_text("_id", "ext_1");
+            .add_text("_id", "ext_1")
+            .build();
         let internal_id = engine.put_document(doc).unwrap();
 
         // Verify ID search
@@ -1264,9 +1271,10 @@ mod tests {
         engine.commit().unwrap();
 
         // 4. Update existing by put_document
-        let doc_v2 = Document::new()
+        let doc_v2 = Document::builder()
             .add_text("title", "Test Doc Updated")
-            .add_text("_id", "ext_1");
+            .add_text("_id", "ext_1")
+            .build();
         let internal_id_v2 = engine.put_document(doc_v2).unwrap();
         // Since UnifiedDocumentStore is append-only, update results in a new internal ID.
         assert_ne!(internal_id, internal_id_v2);

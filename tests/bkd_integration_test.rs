@@ -20,36 +20,39 @@ fn test_bkd_file_creation_and_query() {
     let mut writer = InvertedIndexWriter::new(storage.clone(), config).unwrap();
 
     // Doc 1: age=30, score=95.5
-    let doc1 = Document::new()
+    let doc1 = Document::builder()
         .add_field("age", DataValue::Int64(30))
         .add_field("score", DataValue::Float64(95.5))
         .add_field(
             "created_at",
             DataValue::DateTime(Utc.timestamp_opt(1600000000, 0).unwrap()),
         )
-        .add_field("description", DataValue::Text("User profile 1".into()));
+        .add_field("description", DataValue::Text("User profile 1".into()))
+        .build();
     writer.add_document(doc1).unwrap();
 
     // Doc 2: age=20, score=80.0
-    let doc2 = Document::new()
+    let doc2 = Document::builder()
         .add_field("age", DataValue::Int64(20))
         .add_field("score", DataValue::Float64(80.0))
         .add_field(
             "created_at",
             DataValue::DateTime(Utc.timestamp_opt(1500000000, 0).unwrap()),
         )
-        .add_field("description", DataValue::Text("User profile 2".into()));
+        .add_field("description", DataValue::Text("User profile 2".into()))
+        .build();
     writer.add_document(doc2).unwrap();
 
     // Doc 3: age=40, score=100.0
-    let doc3 = Document::new()
+    let doc3 = Document::builder()
         .add_field("age", DataValue::Int64(40))
         .add_field("score", DataValue::Float64(100.0))
         .add_field(
             "created_at",
             DataValue::DateTime(Utc.timestamp_opt(1700000000, 0).unwrap()),
         )
-        .add_field("description", DataValue::Text("User profile 3".into()));
+        .add_field("description", DataValue::Text("User profile 3".into()))
+        .build();
     writer.add_document(doc3).unwrap();
 
     // Commit to flush segment
@@ -118,25 +121,28 @@ fn test_geo_bkd_query() {
 
     writer
         .add_document(
-            Document::new()
+            Document::builder()
                 .add_field("location", DataValue::Geo(tokyo.lat, tokyo.lon))
-                .add_field("city", DataValue::Text("Tokyo".into())),
+                .add_field("city", DataValue::Text("Tokyo".into()))
+                .build(),
         )
         .unwrap();
 
     writer
         .add_document(
-            Document::new()
+            Document::builder()
                 .add_field("location", DataValue::Geo(yokohama.lat, yokohama.lon))
-                .add_field("city", DataValue::Text("Yokohama".into())),
+                .add_field("city", DataValue::Text("Yokohama".into()))
+                .build(),
         )
         .unwrap();
 
     writer
         .add_document(
-            Document::new()
+            Document::builder()
                 .add_field("location", DataValue::Geo(osaka.lat, osaka.lon))
-                .add_field("city", DataValue::Text("Osaka".into())),
+                .add_field("city", DataValue::Text("Osaka".into()))
+                .build(),
         )
         .unwrap();
 

@@ -122,16 +122,18 @@ async fn test_hybrid_search_unification_impl(
     engine: &Engine,
 ) -> std::result::Result<(), Box<dyn std::error::Error>> {
     // Index Doc 1: "apple" - both lexical and vector fields
-    let payload1 = Document::new()
+    let payload1 = Document::builder()
         .add_field("title", DataValue::Text("apple".into()))
-        .add_field("title_vec", DataValue::Text("apple".into()));
+        .add_field("title_vec", DataValue::Text("apple".into()))
+        .build();
 
     engine.add_document("1", payload1)?;
 
     // Index Doc 2: "banana" - both lexical and vector fields
-    let payload2 = Document::new()
+    let payload2 = Document::builder()
         .add_field("title", DataValue::Text("banana".into()))
-        .add_field("title_vec", DataValue::Text("banana".into()));
+        .add_field("title_vec", DataValue::Text("banana".into()))
+        .build();
 
     engine.add_document("2", payload2)?;
 

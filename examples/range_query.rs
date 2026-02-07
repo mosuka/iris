@@ -49,7 +49,7 @@ fn main() -> Result<()> {
     let lexical_engine = LexicalStore::new(storage, lexical_index_config, doc_store)?;
 
     let documents = vec![
-        Document::new()
+        Document::builder()
             .add_field(
                 "title",
                 DataValue::Text("Introduction to Algorithms".into()),
@@ -62,8 +62,9 @@ fn main() -> Result<()> {
             .add_field("rating", DataValue::Float64(4.8))
             .add_field("year", DataValue::Int64(2009))
             .add_field("pages", DataValue::Int64(1312))
-            .add_field("id", DataValue::Text("book001".into())),
-        Document::new()
+            .add_field("id", DataValue::Text("book001".into()))
+            .build(),
+        Document::builder()
             .add_field("title", DataValue::Text("Clean Code".into()))
             .add_field(
                 "description",
@@ -73,8 +74,9 @@ fn main() -> Result<()> {
             .add_field("rating", DataValue::Float64(4.6))
             .add_field("year", DataValue::Int64(2008))
             .add_field("pages", DataValue::Int64(464))
-            .add_field("id", DataValue::Text("book002".into())),
-        Document::new()
+            .add_field("id", DataValue::Text("book002".into()))
+            .build(),
+        Document::builder()
             .add_field("title", DataValue::Text("Design Patterns".into()))
             .add_field(
                 "description",
@@ -84,8 +86,9 @@ fn main() -> Result<()> {
             .add_field("rating", DataValue::Float64(4.5))
             .add_field("year", DataValue::Int64(1994))
             .add_field("pages", DataValue::Int64(395))
-            .add_field("id", DataValue::Text("book003".into())),
-        Document::new()
+            .add_field("id", DataValue::Text("book003".into()))
+            .build(),
+        Document::builder()
             .add_field("title", DataValue::Text("The Pragmatic Programmer".into()))
             .add_field(
                 "description",
@@ -95,8 +98,9 @@ fn main() -> Result<()> {
             .add_field("rating", DataValue::Float64(4.7))
             .add_field("year", DataValue::Int64(2019))
             .add_field("pages", DataValue::Int64(352))
-            .add_field("id", DataValue::Text("book004".into())),
-        Document::new()
+            .add_field("id", DataValue::Text("book004".into()))
+            .build(),
+        Document::builder()
             .add_field("title", DataValue::Text("Refactoring".into()))
             .add_field(
                 "description",
@@ -106,8 +110,9 @@ fn main() -> Result<()> {
             .add_field("rating", DataValue::Float64(4.4))
             .add_field("year", DataValue::Int64(2018))
             .add_field("pages", DataValue::Int64(448))
-            .add_field("id", DataValue::Text("book005".into())),
-        Document::new()
+            .add_field("id", DataValue::Text("book005".into()))
+            .build(),
+        Document::builder()
             .add_field("title", DataValue::Text("Code Complete".into()))
             .add_field(
                 "description",
@@ -118,7 +123,8 @@ fn main() -> Result<()> {
             .add_field("year", DataValue::Int64(2004))
             .add_field("pages", DataValue::Int64(914))
             .add_field("category", DataValue::Text("software".into()))
-            .add_field("id", DataValue::Text("book006".into())),
+            .add_field("id", DataValue::Text("book006".into()))
+            .build(),
     ];
 
     println!("Adding {} documents to the index...", documents.len());

@@ -16,9 +16,11 @@ use async_trait::async_trait;
 use iris::Document;
 use iris::Engine;
 use iris::Result;
+use iris::analysis::analyzer::keyword::KeywordAnalyzer;
+use iris::analysis::analyzer::per_field::PerFieldAnalyzer;
 use iris::analysis::analyzer::standard::StandardAnalyzer;
 use iris::lexical::{FieldOption as LexicalFieldOption, TextOption};
-use iris::{EmbedInput, EmbedInputType, Embedder};
+use iris::{EmbedInput, EmbedInputType, Embedder, PerFieldEmbedder};
 use iris::{FieldOption, Schema};
 use iris::{FusionAlgorithm, SearchRequestBuilder};
 
@@ -27,31 +29,27 @@ use iris::storage::memory::MemoryStorageConfig;
 use iris::storage::{StorageConfig, StorageFactory};
 use iris::vector::Vector;
 use iris::vector::VectorSearchRequestBuilder;
-use iris::vector::{FlatOption, FieldOption as VectorOption};
+use iris::vector::{FieldOption as VectorOption, FlatOption};
 
 // --- Mock Embedder Setup ---
-// A simple embedder that deterministically converts specific keywords into vectors
-// so we can test semantic matching without downloading a real ML model.
+// Two embedders that deterministically convert keywords into vectors.
+// FruitEmbedder focuses on fruit-related terms; ConceptEmbedder on abstract concepts.
+
 #[derive(Debug, Clone)]
-struct MockEmbedder;
+struct FruitEmbedder;
 
 #[async_trait]
-impl Embedder for MockEmbedder {
+impl Embedder for FruitEmbedder {
     async fn embed(&self, input: &EmbedInput<'_>) -> Result<Vector> {
         match input {
             EmbedInput::Text(t) => {
                 let t = t.to_lowercase();
-                // "Fruits" dimension
                 if t.contains("apple") {
                     Ok(Vector::new(vec![1.0, 0.0, 0.0, 0.0]))
                 } else if t.contains("banana") {
                     Ok(Vector::new(vec![0.0, 1.0, 0.0, 0.0]))
                 } else if t.contains("orange") {
                     Ok(Vector::new(vec![0.0, 0.0, 1.0, 0.0]))
-                }
-                // "Concepts" dimension
-                else if t.contains("tech") {
-                    Ok(Vector::new(vec![0.0, 0.0, 0.0, 1.0]))
                 } else {
                     Ok(Vector::new(vec![0.0, 0.0, 0.0, 0.0]))
                 }
@@ -69,7 +67,44 @@ impl Embedder for MockEmbedder {
         false
     }
     fn name(&self) -> &str {
-        "MockEmbedder"
+        "FruitEmbedder"
+    }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
+#[derive(Debug, Clone)]
+struct ConceptEmbedder;
+
+#[async_trait]
+impl Embedder for ConceptEmbedder {
+    async fn embed(&self, input: &EmbedInput<'_>) -> Result<Vector> {
+        match input {
+            EmbedInput::Text(t) => {
+                let t = t.to_lowercase();
+                if t.contains("tech") {
+                    Ok(Vector::new(vec![0.0, 0.0, 0.0, 1.0]))
+                } else if t.contains("nature") {
+                    Ok(Vector::new(vec![0.0, 0.0, 1.0, 0.0]))
+                } else {
+                    Ok(Vector::new(vec![0.0, 0.0, 0.0, 0.0]))
+                }
+            }
+            _ => Ok(Vector::new(vec![0.0; 4])),
+        }
+    }
+    fn supported_input_types(&self) -> Vec<EmbedInputType> {
+        vec![EmbedInputType::Text]
+    }
+    fn supports_text(&self) -> bool {
+        true
+    }
+    fn supports_image(&self) -> bool {
+        false
+    }
+    fn name(&self) -> &str {
+        "ConceptEmbedder"
     }
     fn as_any(&self) -> &dyn Any {
         self
@@ -83,76 +118,70 @@ fn main() -> Result<()> {
     let storage_config = StorageConfig::Memory(MemoryStorageConfig::default());
     let storage = StorageFactory::create(storage_config)?;
 
-    // 2. Configure the Engine
-    // We define a flexible schema:
-    // - "title":       Lexical Only (Keyword search is best for precise title matching)
-    // - "content":     Lexical (For keyword search on content)
-    // - "content_vec": Vector (For semantic search on content)
-    // - "embedding":   Vector Only (Hidden semantic features)
+    // 2. Configure the Engine Schema
+    // - "title": Lexical field (KeywordAnalyzer for exact matches)
+    // - "content": Lexical + Vector field (StandardAnalyzer + FruitEmbedder)
+    // - "content_vec": Vector field (embedded from "content" text)
+    // - "embedding": Separate Vector field (using ConceptEmbedder)
+    // Default fields: "title", "content"
     let schema = Schema::builder()
-        // Field 1: Lexical content field
-        .add_field(
-            "content",
-            FieldOption::Lexical(LexicalFieldOption::Text(TextOption::default())),
-        )
-        // Field 2: Vector content field (for semantic search)
-        .add_field(
-            "content_vec",
-            FieldOption::Vector(VectorOption::Flat(FlatOption {
-                dimension: 4,
-                ..Default::default()
-            })),
-        )
-        // Field 3: Lexical Only
-        .add_lexical_field("title", LexicalFieldOption::Text(TextOption::default()))
-        // Field 4: Vector Only
-        .add_vector_field(
-            "embedding",
-            VectorOption::Flat(FlatOption {
-                dimension: 4,
-                ..Default::default()
-            }),
-        )
+        .add_text_field("title", TextOption::default())
+        .add_text_field("content", TextOption::default())
+        .add_flat_field("content_vec", FlatOption::default().dimension(4))
+        .add_flat_field("embedding", FlatOption::default().dimension(4))
+        .add_default_field("title")
+        .add_default_field("content")
         .build();
 
+    // Setup PerFieldAnalyzer:
+    // - "title" uses KeywordAnalyzer (no tokenization, exact match)
+    // - All other fields use StandardAnalyzer (tokenization + lowercasing)
+    let std_analyzer = Arc::new(StandardAnalyzer::default());
+    let kw_analyzer = Arc::new(KeywordAnalyzer::new());
+
+    // Configure PerFieldAnalyzer
+    let mut per_field_analyzer = PerFieldAnalyzer::new(std_analyzer.clone());
+    per_field_analyzer.add_analyzer("title", kw_analyzer);
+    per_field_analyzer.add_analyzer("content", std_analyzer.clone());
+
+    let fruit_embedder = Arc::new(FruitEmbedder);
+    let concept_embedder = Arc::new(ConceptEmbedder);
+
+    // Setup PerFieldEmbedder:
+    // - "content_vec" uses FruitEmbedder (fruit-focused semantic space)
+    // - "embedding"   uses ConceptEmbedder (concept-focused semantic space)
+    // - Default fallback is FruitEmbedder
+    let mut per_field_embedder = PerFieldEmbedder::new(fruit_embedder.clone());
+    per_field_embedder.add_embedder("content_vec", fruit_embedder.clone());
+    per_field_embedder.add_embedder("embedding", concept_embedder.clone());
+
     let engine = Engine::builder(storage, schema)
-        .analyzer(Arc::new(StandardAnalyzer::default()))
-        .embedder(Arc::new(MockEmbedder))
+        .analyzer(Arc::new(per_field_analyzer))
+        .embedder(Arc::new(per_field_embedder))
         .build()?;
 
-    // 3. Index Data
-    let docs = vec![
-        // ID, Title, Content
-        (
-            "doc1",
-            "Fruit Guide",
-            "An apple a day keeps the doctor away.",
-        ),
-        (
-            "doc2",
-            "Tech Daily",
-            "The latest tech news about silicon chips.",
-        ),
-        (
-            "doc3",
-            "Orange Juice",
-            "Freshly squeezed orange juice is great.",
-        ),
-        (
-            "doc4",
-            "Banana Split",
-            "Dessert made with banana and ice cream.",
-        ),
-        ("doc5", "Hybrid Theory", "Technology and nature combined."),
-    ];
+    // 3. Index Data (JSON format)
+    let docs_json = r#"[
+      {"id": "doc1", "title": "Fruit Guide", "content": "An apple a day keeps the doctor away."},
+      {"id": "doc2", "title": "Tech Daily", "content": "The latest tech news about silicon chips."},
+      {"id": "doc3", "title": "Orange Juice", "content": "Freshly squeezed orange juice is great."},
+      {"id": "doc4", "title": "Banana Split", "content": "Dessert made with banana and ice cream."},
+      {"id": "doc5", "title": "Hybrid Theory", "content": "Technology and nature combined."}
+    ]"#;
 
+    let docs: Vec<serde_json::Value> = serde_json::from_str(docs_json).unwrap();
     println!("Indexing {} documents...", docs.len());
-    for (id, title, content) in docs {
-        let doc = Document::new()
+    for doc_value in &docs {
+        let id = doc_value["id"].as_str().unwrap();
+        let title = doc_value["title"].as_str().unwrap();
+        let content = doc_value["content"].as_str().unwrap();
+
+        let doc = Document::builder()
             .add_text("title", title)
             .add_text("content", content) // Lexical field
             .add_text("content_vec", content) // Vector field (auto-embedded)
-            .add_text("embedding", content); // Separate vector field
+            .add_text("embedding", content) // Separate vector field
+            .build();
         // Note: 'content_vec' and 'embedding' text will be automatically embedded
         // because they have vector configs and we registered a global embedder.
 

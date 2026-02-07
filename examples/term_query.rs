@@ -50,7 +50,7 @@ fn main() -> Result<()> {
 
     // Add documents with various terms
     let documents = vec![
-        Document::new()
+        Document::builder()
             .add_text("title", "Rust Programming Language")
             .add_text(
                 "body",
@@ -58,8 +58,9 @@ fn main() -> Result<()> {
             )
             .add_text("author", "Steve Klabnik")
             .add_text("category", "programming")
-            .add_text("id", "doc1"),
-        Document::new()
+            .add_text("id", "doc1")
+            .build(),
+        Document::builder()
             .add_text("title", "Python for Beginners")
             .add_text(
                 "body",
@@ -67,8 +68,9 @@ fn main() -> Result<()> {
             )
             .add_text("author", "John Smith")
             .add_text("category", "programming")
-            .add_text("id", "doc2"),
-        Document::new()
+            .add_text("id", "doc2")
+            .build(),
+        Document::builder()
             .add_text("title", "JavaScript Essentials")
             .add_text(
                 "body",
@@ -76,8 +78,9 @@ fn main() -> Result<()> {
             )
             .add_text("author", "Jane Doe")
             .add_text("category", "web-development")
-            .add_text("id", "doc3"),
-        Document::new()
+            .add_text("id", "doc3")
+            .build(),
+        Document::builder()
             .add_text("title", "Machine Learning Fundamentals")
             .add_text(
                 "body",
@@ -85,8 +88,9 @@ fn main() -> Result<()> {
             )
             .add_text("author", "Alice Johnson")
             .add_text("category", "data-science")
-            .add_text("id", "doc4"),
-        Document::new()
+            .add_text("id", "doc4")
+            .build(),
+        Document::builder()
             .add_text("title", "Data Structures in C++")
             .add_text(
                 "body",
@@ -94,7 +98,8 @@ fn main() -> Result<()> {
             )
             .add_text("author", "Bob Wilson")
             .add_text("category", "programming")
-            .add_text("id", "doc5"),
+            .add_text("id", "doc5")
+            .build(),
     ];
 
     println!("Adding {} documents to the index...", documents.len());

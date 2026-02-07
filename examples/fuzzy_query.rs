@@ -49,48 +49,55 @@ fn main() -> Result<()> {
 
     // Add documents with various spellings and terms for fuzzy matching
     let documents = vec![
-        Document::new()
+        Document::builder()
             .add_field("title", DataValue::Text("JavaScript Programming Guide".into()))
             .add_field("body", DataValue::Text("Comprehensive guide to JavaScript development and programming techniques".into()))
             .add_field("author", DataValue::Text("John Smith".into()))
             .add_field("tags", DataValue::Text("javascript programming tutorial".into()))
-            .add_field("id", DataValue::Text("doc001".into())),
-        Document::new()
+            .add_field("id", DataValue::Text("doc001".into()))
+            .build(),
+        Document::builder()
             .add_field("title", DataValue::Text("Python Programming Fundamentals".into()))
             .add_field("body", DataValue::Text("Learn Python programming language from scratch with practical examples".into()))
             .add_field("author", DataValue::Text("Alice Johnson".into()))
             .add_field("tags", DataValue::Text("python programming beginner".into()))
-            .add_field("id", DataValue::Text("doc002".into())),
-        Document::new()
+            .add_field("id", DataValue::Text("doc002".into()))
+            .build(),
+        Document::builder()
             .add_field("title", DataValue::Text("Machine Learning Algorithms".into()))
             .add_field("body", DataValue::Text("Understanding algorithms used in machine learning and artificial intelligence".into()))
             .add_field("author", DataValue::Text("Bob Wilson".into()))
             .add_field("tags", DataValue::Text("machine-learning algorithms ai".into()))
-            .add_field("id", DataValue::Text("doc003".into())),
-        Document::new()
+            .add_field("id", DataValue::Text("doc003".into()))
+            .build(),
+        Document::builder()
             .add_field("title", DataValue::Text("Database Management Systems".into()))
             .add_field("body", DataValue::Text("Introduction to database systems, SQL, and data management principles".into()))
             .add_field("author", DataValue::Text("Carol Davis".into()))
             .add_field("tags", DataValue::Text("database sql management".into()))
-            .add_field("id", DataValue::Text("doc004".into())),
-        Document::new()
+            .add_field("id", DataValue::Text("doc004".into()))
+            .build(),
+        Document::builder()
             .add_field("title", DataValue::Text("Web Development with React".into()))
             .add_field("body", DataValue::Text("Building modern web applications using React framework and components".into()))
             .add_field("author", DataValue::Text("David Brown".into()))
             .add_field("tags", DataValue::Text("react web-development frontend".into()))
-            .add_field("id", DataValue::Text("doc005".into())),
-        Document::new()
+            .add_field("id", DataValue::Text("doc005".into()))
+            .build(),
+        Document::builder()
             .add_field("title", DataValue::Text("Artificial Intelligence Overview".into()))
             .add_field("body", DataValue::Text("Introduction to artificial intelligence concepts, applications, and algorithms".into()))
             .add_field("author", DataValue::Text("Eva Martinez".into()))
             .add_field("tags", DataValue::Text("artificial-intelligence overview concepts".into()))
-            .add_field("id", DataValue::Text("doc006".into())),
-        Document::new()
+            .add_field("id", DataValue::Text("doc006".into()))
+            .build(),
+        Document::builder()
             .add_field("title", DataValue::Text("Software Engineering Principles".into()))
             .add_field("body", DataValue::Text("Best practices in software engineering, design patterns, and development".into()))
             .add_field("author", DataValue::Text("Frank Miller".into()))
             .add_field("tags", DataValue::Text("software engineering principles".into()))
-            .add_field("id", DataValue::Text("doc007".into())),
+            .add_field("id", DataValue::Text("doc007".into()))
+            .build(),
     ];
 
     println!("Adding {} documents to the index...", documents.len());

@@ -50,36 +50,41 @@ fn main() -> Result<()> {
 
     // Add documents with various phrases
     let documents = vec![
-        Document::new()
+        Document::builder()
             .add_field("title", DataValue::Text("Machine Learning Basics".into()))
             .add_field("body", DataValue::Text("Machine learning is a powerful tool for data analysis and artificial intelligence applications".into()))
             .add_field("author", DataValue::Text("Dr. Smith".into()))
             .add_field("description", DataValue::Text("An introduction to machine learning concepts and algorithms".into()))
-            .add_field("id", DataValue::Text("001".into())),
-        Document::new()
+            .add_field("id", DataValue::Text("001".into()))
+            .build(),
+        Document::builder()
             .add_field("title", DataValue::Text("Deep Learning Networks".into()))
             .add_field("body", DataValue::Text("Deep learning networks use artificial neural networks with multiple layers for complex pattern recognition".into()))
             .add_field("author", DataValue::Text("Prof. Johnson".into()))
             .add_field("description", DataValue::Text("Advanced techniques in deep learning and neural network architectures".into()))
-            .add_field("id", DataValue::Text("002".into())),
-        Document::new()
+            .add_field("id", DataValue::Text("002".into()))
+            .build(),
+        Document::builder()
             .add_field("title", DataValue::Text("Natural Language Processing".into()))
             .add_field("body", DataValue::Text("Natural language processing combines computational linguistics with machine learning and artificial intelligence".into()))
             .add_field("author", DataValue::Text("Dr. Wilson".into()))
             .add_field("description", DataValue::Text("Processing and understanding human language using computational methods".into()))
-            .add_field("id", DataValue::Text("003".into())),
-        Document::new()
+            .add_field("id", DataValue::Text("003".into()))
+            .build(),
+        Document::builder()
             .add_field("title", DataValue::Text("Computer Vision Applications".into()))
             .add_field("body", DataValue::Text("Computer vision applications include image recognition, object detection, and visual pattern analysis".into()))
             .add_field("author", DataValue::Text("Prof. Davis".into()))
             .add_field("description", DataValue::Text("Practical applications of computer vision in various industries".into()))
-            .add_field("id", DataValue::Text("004".into())),
-        Document::new()
+            .add_field("id", DataValue::Text("004".into()))
+            .build(),
+        Document::builder()
             .add_field("title", DataValue::Text("Data Science Fundamentals".into()))
             .add_field("body", DataValue::Text("Data science combines statistics, programming, and domain expertise to extract insights from data".into()))
             .add_field("author", DataValue::Text("Dr. Brown".into()))
             .add_field("description", DataValue::Text("Essential concepts and tools for data science practitioners".into()))
-            .add_field("id", DataValue::Text("005".into())),
+            .add_field("id", DataValue::Text("005".into()))
+            .build(),
     ];
 
     println!("Adding {} documents to the index...", documents.len());
