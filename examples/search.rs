@@ -16,9 +16,11 @@ use async_trait::async_trait;
 use iris::Document;
 use iris::Engine;
 use iris::Result;
+use iris::analysis::analyzer::keyword::KeywordAnalyzer;
+use iris::analysis::analyzer::per_field::PerFieldAnalyzer;
 use iris::analysis::analyzer::standard::StandardAnalyzer;
 use iris::lexical::{FieldOption as LexicalFieldOption, TextOption};
-use iris::{EmbedInput, EmbedInputType, Embedder};
+use iris::{EmbedInput, EmbedInputType, Embedder, PerFieldEmbedder};
 use iris::{FieldOption, Schema};
 use iris::{FusionAlgorithm, SearchRequestBuilder};
 
@@ -27,31 +29,27 @@ use iris::storage::memory::MemoryStorageConfig;
 use iris::storage::{StorageConfig, StorageFactory};
 use iris::vector::Vector;
 use iris::vector::VectorSearchRequestBuilder;
-use iris::vector::{FlatOption, FieldOption as VectorOption};
+use iris::vector::{FieldOption as VectorOption, FlatOption};
 
 // --- Mock Embedder Setup ---
-// A simple embedder that deterministically converts specific keywords into vectors
-// so we can test semantic matching without downloading a real ML model.
+// Two embedders that deterministically convert keywords into vectors.
+// FruitEmbedder focuses on fruit-related terms; ConceptEmbedder on abstract concepts.
+
 #[derive(Debug, Clone)]
-struct MockEmbedder;
+struct FruitEmbedder;
 
 #[async_trait]
-impl Embedder for MockEmbedder {
+impl Embedder for FruitEmbedder {
     async fn embed(&self, input: &EmbedInput<'_>) -> Result<Vector> {
         match input {
             EmbedInput::Text(t) => {
                 let t = t.to_lowercase();
-                // "Fruits" dimension
                 if t.contains("apple") {
                     Ok(Vector::new(vec![1.0, 0.0, 0.0, 0.0]))
                 } else if t.contains("banana") {
                     Ok(Vector::new(vec![0.0, 1.0, 0.0, 0.0]))
                 } else if t.contains("orange") {
                     Ok(Vector::new(vec![0.0, 0.0, 1.0, 0.0]))
-                }
-                // "Concepts" dimension
-                else if t.contains("tech") {
-                    Ok(Vector::new(vec![0.0, 0.0, 0.0, 1.0]))
                 } else {
                     Ok(Vector::new(vec![0.0, 0.0, 0.0, 0.0]))
                 }
@@ -69,7 +67,44 @@ impl Embedder for MockEmbedder {
         false
     }
     fn name(&self) -> &str {
-        "MockEmbedder"
+        "FruitEmbedder"
+    }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
+#[derive(Debug, Clone)]
+struct ConceptEmbedder;
+
+#[async_trait]
+impl Embedder for ConceptEmbedder {
+    async fn embed(&self, input: &EmbedInput<'_>) -> Result<Vector> {
+        match input {
+            EmbedInput::Text(t) => {
+                let t = t.to_lowercase();
+                if t.contains("tech") {
+                    Ok(Vector::new(vec![0.0, 0.0, 0.0, 1.0]))
+                } else if t.contains("nature") {
+                    Ok(Vector::new(vec![0.0, 0.0, 1.0, 0.0]))
+                } else {
+                    Ok(Vector::new(vec![0.0, 0.0, 0.0, 0.0]))
+                }
+            }
+            _ => Ok(Vector::new(vec![0.0; 4])),
+        }
+    }
+    fn supported_input_types(&self) -> Vec<EmbedInputType> {
+        vec![EmbedInputType::Text]
+    }
+    fn supports_text(&self) -> bool {
+        true
+    }
+    fn supports_image(&self) -> bool {
+        false
+    }
+    fn name(&self) -> &str {
+        "ConceptEmbedder"
     }
     fn as_any(&self) -> &dyn Any {
         self
@@ -115,9 +150,26 @@ fn main() -> Result<()> {
         )
         .build();
 
+    // Setup PerFieldAnalyzer:
+    // - "title" uses KeywordAnalyzer (no tokenization, exact match)
+    // - All other fields use StandardAnalyzer (tokenization + lowercasing)
+    let std_analyzer = Arc::new(StandardAnalyzer::default());
+    let kw_analyzer = Arc::new(KeywordAnalyzer::new());
+
+    let mut per_field_analyzer = PerFieldAnalyzer::new(std_analyzer);
+    per_field_analyzer.add_analyzer("title", kw_analyzer);
+
+    // Setup PerFieldEmbedder:
+    // - "content_vec" uses FruitEmbedder (fruit-focused semantic space)
+    // - "embedding"   uses ConceptEmbedder (concept-focused semantic space)
+    // - Default fallback is FruitEmbedder
+    let mut per_field_embedder = PerFieldEmbedder::new(Arc::new(FruitEmbedder));
+    per_field_embedder.add_embedder("content_vec", Arc::new(FruitEmbedder));
+    per_field_embedder.add_embedder("embedding", Arc::new(ConceptEmbedder));
+
     let engine = Engine::builder(storage, schema)
-        .analyzer(Arc::new(StandardAnalyzer::default()))
-        .embedder(Arc::new(MockEmbedder))
+        .analyzer(Arc::new(per_field_analyzer))
+        .embedder(Arc::new(per_field_embedder))
         .build()?;
 
     // 3. Index Data

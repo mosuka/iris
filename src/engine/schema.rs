@@ -1,7 +1,11 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use crate::lexical::core::field::FieldOption as LexicalOption;
+use crate::lexical::TextOption;
+use crate::lexical::core::field::{
+    BooleanOption, DateTimeOption, FieldOption as LexicalOption, FloatOption, IntegerOption,
+};
+use crate::vector::HnswOption;
 use crate::vector::core::field::FieldOption as VectorOption;
 
 /// Schema for the unified engine.
@@ -91,25 +95,88 @@ impl SchemaBuilder {
         self
     }
 
-    pub fn add_vector_field(
-        mut self,
-        name: impl Into<String>,
-        option: impl Into<VectorOption>,
-    ) -> Self {
-        let name = name.into();
-        self.fields.insert(name, FieldOption::Vector(option.into()));
-        self
-    }
-
     pub fn add_lexical_field(
-        mut self,
+        self,
         name: impl Into<String>,
         option: impl Into<LexicalOption>,
     ) -> Self {
-        let name = name.into();
-        self.fields
-            .insert(name, FieldOption::Lexical(option.into()));
-        self
+        self.add_field(name, FieldOption::Lexical(option.into()))
+    }
+
+    pub fn add_text_field(self, name: impl Into<String>, option: impl Into<TextOption>) -> Self {
+        self.add_lexical_field(name, LexicalOption::Text(option.into()))
+    }
+
+    pub fn add_integer_field(
+        self,
+        name: impl Into<String>,
+        option: impl Into<IntegerOption>,
+    ) -> Self {
+        self.add_lexical_field(name, LexicalOption::Integer(option.into()))
+    }
+
+    pub fn add_float_field(self, name: impl Into<String>, option: impl Into<FloatOption>) -> Self {
+        self.add_lexical_field(name, LexicalOption::Float(option.into()))
+    }
+
+    pub fn add_boolean_field(
+        self,
+        name: impl Into<String>,
+        option: impl Into<BooleanOption>,
+    ) -> Self {
+        self.add_lexical_field(name, LexicalOption::Boolean(option.into()))
+    }
+
+    pub fn add_datetime_field(
+        self,
+        name: impl Into<String>,
+        option: impl Into<DateTimeOption>,
+    ) -> Self {
+        self.add_lexical_field(name, LexicalOption::DateTime(option.into()))
+    }
+
+    pub fn add_geo_field(
+        self,
+        name: impl Into<String>,
+        option: impl Into<crate::lexical::core::field::GeoOption>,
+    ) -> Self {
+        self.add_lexical_field(name, LexicalOption::Geo(option.into()))
+    }
+
+    pub fn add_blob_field(
+        self,
+        name: impl Into<String>,
+        option: impl Into<crate::lexical::core::field::BlobOption>,
+    ) -> Self {
+        self.add_lexical_field(name, LexicalOption::Blob(option.into()))
+    }
+
+    pub fn add_vector_field(
+        self,
+        name: impl Into<String>,
+        option: impl Into<VectorOption>,
+    ) -> Self {
+        self.add_field(name, FieldOption::Vector(option.into()))
+    }
+
+    pub fn add_hnsw_field(self, name: impl Into<String>, option: impl Into<HnswOption>) -> Self {
+        self.add_vector_field(name, VectorOption::Hnsw(option.into()))
+    }
+
+    pub fn add_flat_field(
+        self,
+        name: impl Into<String>,
+        option: impl Into<crate::vector::FlatOption>,
+    ) -> Self {
+        self.add_vector_field(name, VectorOption::Flat(option.into()))
+    }
+
+    pub fn add_ivf_field(
+        self,
+        name: impl Into<String>,
+        option: impl Into<crate::vector::IvfOption>,
+    ) -> Self {
+        self.add_vector_field(name, VectorOption::Ivf(option.into()))
     }
 
     pub fn build(self) -> Schema {
