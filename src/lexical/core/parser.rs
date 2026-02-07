@@ -259,25 +259,9 @@ impl DocumentParser {
                     stored_fields.insert(field_name.clone(), FieldValue::Geo(lat, lon));
                     point_values.insert(field_name.clone(), vec![lat, lon]);
                 }
-                FieldValue::String(s) => {
-                    // Treat as a single keyword token
-                    let analyzed_term = AnalyzedTerm {
-                        term: s.clone(),
-                        position: 0,
-                        frequency: 1,
-                        offset: (0, s.len()),
-                    };
-                    field_terms.insert(field_name.clone(), vec![analyzed_term]);
-                    stored_fields.insert(field_name.clone(), FieldValue::String(s.clone()));
-                }
                 FieldValue::Vector(v) => {
                     // Vectors are stored but not indexed in lexical
                     stored_fields.insert(field_name.clone(), FieldValue::Vector(v.clone()));
-                }
-                FieldValue::List(l) => {
-                    // Lists are stored, maybe indexed as concatenated strings if needed?
-                    // For now, just store.
-                    stored_fields.insert(field_name.clone(), FieldValue::List(l.clone()));
                 }
                 FieldValue::Null => {
                     // Null fields are not indexed, only stored

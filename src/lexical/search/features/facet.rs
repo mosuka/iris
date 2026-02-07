@@ -758,7 +758,7 @@ impl GroupedSearchEngine {
             Ok(Some(document)) => {
                 if let Some(field_value) = document.get_field(&self.group_config.group_field) {
                     match field_value {
-                        FieldValue::Text(value) | FieldValue::String(value) => Ok(value.clone()),
+                        FieldValue::Text(value) => Ok(value.clone()),
                         FieldValue::Int64(value) => Ok(value.to_string()),
                         FieldValue::Float64(value) => Ok(value.to_string()),
                         FieldValue::Bool(value) => Ok(value.to_string()),

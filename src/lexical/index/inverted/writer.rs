@@ -724,22 +724,11 @@ impl InvertedIndexWriter {
                     crate::data::DataValue::Null => {
                         stored_writer.write_u8(7)?; // Type tag for Null
                     }
-                    crate::data::DataValue::String(s) => {
-                        stored_writer.write_u8(8)?; // Type tag for String/Keyword
-                        stored_writer.write_string(s)?;
-                    }
                     crate::data::DataValue::Vector(v) => {
                         stored_writer.write_u8(9)?; // Type tag for Vector
                         stored_writer.write_varint(v.len() as u64)?;
                         for &f in v {
                             stored_writer.write_f32(f)?;
-                        }
-                    }
-                    crate::data::DataValue::List(l) => {
-                        stored_writer.write_u8(10)?; // Type tag for List
-                        stored_writer.write_varint(l.len() as u64)?;
-                        for s in l {
-                            stored_writer.write_string(s)?;
                         }
                     }
                 }

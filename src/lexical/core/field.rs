@@ -392,21 +392,15 @@ impl FieldOption {
     /// type of field value.
     pub fn from_field_value(value: &FieldValue) -> Self {
         match value {
-            FieldValue::Text(_) | FieldValue::String(_) => FieldOption::Text(TextOption::default()),
+            FieldValue::Text(_) => FieldOption::Text(TextOption::default()),
             FieldValue::Int64(_) => FieldOption::Integer(IntegerOption::default()),
             FieldValue::Float64(_) => FieldOption::Float(FloatOption::default()),
             FieldValue::Bool(_) => FieldOption::Boolean(BooleanOption::default()),
-            // Since DateTime and Geo are missing from DataValue, we guess based on context?
-            // Or access DataValue extensions if we adding them back?
-            // For now, assume Int64 might be DateTime if context implies, but here we only see value.
-            // So Int64 -> IntegerOption.
-            // If DataValue::Vector -> FieldOption::Blob?
             FieldValue::Vector(_) | FieldValue::Bytes(_, _) => {
                 FieldOption::Blob(BlobOption::default())
             }
             FieldValue::DateTime(_) => FieldOption::DateTime(DateTimeOption::default()),
             FieldValue::Geo(_, _) => FieldOption::Geo(GeoOption::default()),
-            FieldValue::List(_) => FieldOption::Text(TextOption::default()), // Default list to text?
             FieldValue::Null => FieldOption::Text(TextOption::default()),
         }
     }

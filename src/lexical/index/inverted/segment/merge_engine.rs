@@ -496,9 +496,7 @@ impl MergeEngine {
                             format!("{},{}", lat, lon)
                         }
                         FieldValue::Vector(v) => format!("[vector: {} dims]", v.len()),
-                        FieldValue::List(l) => l.join(","),
                         FieldValue::Null => "null".to_string(),
-                        FieldValue::String(s) => s.clone(),
                     };
                     writer.write_string(&field_str)?;
                 }
