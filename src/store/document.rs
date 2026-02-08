@@ -254,6 +254,25 @@ impl UnifiedDocumentStore {
         Ok(doc_id)
     }
 
+    /// Get the current next_doc_id counter.
+    ///
+    /// Used by [`DocumentLog`](super::log::DocumentLog) to sync its own
+    /// counter with committed document store segments on startup.
+    pub fn next_doc_id(&self) -> u64 {
+        self.next_doc_id
+    }
+
+    /// Insert a document with a specific doc_id (used during WAL recovery).
+    ///
+    /// Updates `next_doc_id` if the given `doc_id` is >= current counter
+    /// to avoid ID conflicts on subsequent `add_document()` calls.
+    pub fn put_document_with_id(&mut self, doc_id: u64, doc: Document) {
+        self.pending_docs.insert(doc_id, doc);
+        if doc_id >= self.next_doc_id {
+            self.next_doc_id = doc_id + 1;
+        }
+    }
+
     pub fn add_segment(&mut self, docs: &HashMap<u64, Document>) -> Result<DocumentSegment> {
         let writer = DocumentSegmentWriter::new(self.storage.clone());
         let segment = writer.write_segment(self.next_segment_id, docs)?;

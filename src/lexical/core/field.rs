@@ -41,7 +41,6 @@
 //! let text = FieldValue::Text("true".to_string());
 //! assert_eq!(text.as_boolean(), None);
 
-use candle_transformers::models::whisper::audio::Float;
 use rkyv::{Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize};
 use serde::{Deserialize, Serialize};
 

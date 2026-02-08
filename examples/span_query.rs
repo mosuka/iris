@@ -13,11 +13,8 @@ use iris::lexical::LexicalSearchRequest;
 use iris::lexical::LexicalStore;
 use iris::lexical::span::{SpanQueryBuilder, SpanQueryWrapper};
 use iris::lexical::{LexicalSearchResults, Query};
-use iris::parking_lot::RwLock;
 use iris::storage::file::FileStorageConfig;
-use iris::storage::prefixed::PrefixedStorage;
 use iris::storage::{StorageConfig, StorageFactory};
-use iris::store::document::UnifiedDocumentStore;
 use iris::{DataValue, Document};
 use tempfile::TempDir;
 
@@ -37,11 +34,7 @@ fn main() -> Result<()> {
     });
 
     // 3. Create Engine
-    let doc_storage = Arc::new(PrefixedStorage::new("documents", storage.clone()));
-    let doc_store = Arc::new(RwLock::new(
-        UnifiedDocumentStore::open(doc_storage).unwrap(),
-    ));
-    let engine = LexicalStore::new(storage, index_config, doc_store)?;
+    let engine = LexicalStore::new(storage, index_config)?;
 
     // 4. Add Documents
     let documents = vec![
@@ -60,8 +53,8 @@ fn main() -> Result<()> {
     ];
 
     println!("Indexing {} documents...", documents.len());
-    for doc in documents {
-        engine.add_document(doc)?;
+    for (i, doc) in documents.into_iter().enumerate() {
+        engine.upsert_document((i + 1) as u64, doc)?;
     }
     engine.commit()?;
 

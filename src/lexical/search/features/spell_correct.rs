@@ -400,9 +400,6 @@ mod tests {
     use super::*;
     use crate::lexical::store::config::LexicalIndexConfig;
     use crate::storage::file::{FileStorage, FileStorageConfig};
-    use crate::storage::prefixed::PrefixedStorage;
-    use crate::store::document::UnifiedDocumentStore;
-    use parking_lot::RwLock;
     use std::sync::Arc;
     use tempfile::TempDir;
 
@@ -414,11 +411,7 @@ mod tests {
         let storage = Arc::new(
             FileStorage::new(temp_dir.path(), FileStorageConfig::new(temp_dir.path())).unwrap(),
         );
-        let doc_storage = Arc::new(PrefixedStorage::new("documents", storage.clone()));
-        let doc_store = Arc::new(RwLock::new(
-            UnifiedDocumentStore::open(doc_storage).unwrap(),
-        ));
-        let engine = LexicalStore::new(storage, config, doc_store).unwrap();
+        let engine = LexicalStore::new(storage, config).unwrap();
         let spell_engine = SpellCorrectedSearchEngine::new(engine);
 
         assert!(spell_engine.config.enabled);
@@ -432,11 +425,7 @@ mod tests {
         let storage = Arc::new(
             FileStorage::new(temp_dir.path(), FileStorageConfig::new(temp_dir.path())).unwrap(),
         );
-        let doc_storage = Arc::new(PrefixedStorage::new("documents", storage.clone()));
-        let doc_store = Arc::new(RwLock::new(
-            UnifiedDocumentStore::open(doc_storage).unwrap(),
-        ));
-        let engine = LexicalStore::new(storage, engine_config, doc_store).unwrap();
+        let engine = LexicalStore::new(storage, engine_config).unwrap();
 
         let spell_config = SpellCorrectedSearchConfig {
             enabled: false,
@@ -461,11 +450,7 @@ mod tests {
         let storage = Arc::new(
             FileStorage::new(temp_dir.path(), FileStorageConfig::new(temp_dir.path())).unwrap(),
         );
-        let doc_storage = Arc::new(PrefixedStorage::new("documents", storage.clone()));
-        let doc_store = Arc::new(RwLock::new(
-            UnifiedDocumentStore::open(doc_storage).unwrap(),
-        ));
-        let engine = LexicalStore::new(storage, config, doc_store).unwrap();
+        let engine = LexicalStore::new(storage, config).unwrap();
         let mut spell_engine = SpellCorrectedSearchEngine::new(engine);
 
         // Test with a query that might have typos
@@ -485,11 +470,7 @@ mod tests {
         let storage = Arc::new(
             FileStorage::new(temp_dir.path(), FileStorageConfig::new(temp_dir.path())).unwrap(),
         );
-        let doc_storage = Arc::new(PrefixedStorage::new("documents", storage.clone()));
-        let doc_store = Arc::new(RwLock::new(
-            UnifiedDocumentStore::open(doc_storage).unwrap(),
-        ));
-        let engine = LexicalStore::new(storage, config, doc_store).unwrap();
+        let engine = LexicalStore::new(storage, config).unwrap();
         let spell_engine = SpellCorrectedSearchEngine::new(engine);
 
         // Test with common words
@@ -549,11 +530,7 @@ mod tests {
         let storage = Arc::new(
             FileStorage::new(temp_dir.path(), FileStorageConfig::new(temp_dir.path())).unwrap(),
         );
-        let doc_storage = Arc::new(PrefixedStorage::new("documents", storage.clone()));
-        let doc_store = Arc::new(RwLock::new(
-            UnifiedDocumentStore::open(doc_storage).unwrap(),
-        ));
-        let engine = LexicalStore::new(storage, config, doc_store).unwrap();
+        let engine = LexicalStore::new(storage, config).unwrap();
         let spell_engine = SpellCorrectedSearchEngine::new(engine);
 
         let stats = spell_engine.corrector_stats();
