@@ -1,9 +1,6 @@
 use async_trait::async_trait;
 use iris::lexical::LexicalIndexConfig;
-use iris::parking_lot::RwLock;
 use iris::storage::memory::{MemoryStorage, MemoryStorageConfig};
-use iris::storage::prefixed::PrefixedStorage;
-use iris::store::document::UnifiedDocumentStore;
 use iris::vector::DistanceMetric;
 use iris::vector::Vector;
 use iris::vector::{HnswOption, FieldOption};
@@ -76,14 +73,9 @@ fn test_vector_segment_integration() {
     };
 
     // We construct engine manually to inject storage
-    let doc_storage = Arc::new(PrefixedStorage::new("documents", storage.clone()));
-    let doc_store = Arc::new(RwLock::new(
-        UnifiedDocumentStore::open(doc_storage).unwrap(),
-    ));
     let engine = iris::vector::VectorStore::new(
         storage.clone(),
         collection_config.clone(),
-        doc_store.clone(),
     )
     .unwrap();
 
@@ -94,25 +86,20 @@ fn test_vector_segment_integration() {
         vec![0.0, 0.0, 1.0, 0.0],
     ];
 
-    for vec_data in vectors {
+    for (i, vec_data) in vectors.into_iter().enumerate() {
         let doc = Document::builder().add_field("vector_field", DataValue::Vector(vec_data)).build();
-        engine.add_document(doc).unwrap();
+        engine.upsert_document_by_internal_id((i + 1) as u64, doc).unwrap();
     }
 
     // 3. Flush/Persist explicitly
     engine.commit().unwrap();
-    doc_store.write().commit().unwrap();
 
     // 4. Persistence check
     // We drop engine and recreates it.
     drop(engine);
 
-    let doc_storage_2 = Arc::new(PrefixedStorage::new("documents", storage.clone()));
-    let doc_store_2 = Arc::new(RwLock::new(
-        UnifiedDocumentStore::open(doc_storage_2).unwrap(),
-    ));
     let engine_2 =
-        iris::vector::VectorStore::new(storage.clone(), collection_config.clone(), doc_store_2)
+        iris::vector::VectorStore::new(storage.clone(), collection_config.clone())
             .unwrap();
 
     // We verify stats.

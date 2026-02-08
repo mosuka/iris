@@ -24,11 +24,8 @@ use iris::lexical::LexicalIndexConfig;
 use iris::lexical::LexicalSearchRequest;
 use iris::lexical::LexicalStore;
 use iris::lexical::{InvertedIndexWriter, InvertedIndexWriterConfig};
-use iris::parking_lot::RwLock;
 use iris::storage::file::FileStorage;
 use iris::storage::file::FileStorageConfig;
-use iris::storage::prefixed::PrefixedStorage;
-use iris::store::document::UnifiedDocumentStore;
 use iris::{DataValue, Document};
 
 fn main() -> Result<()> {
@@ -51,11 +48,7 @@ fn main() -> Result<()> {
         temp_dir.path(),
         FileStorageConfig::new(temp_dir.path()),
     )?);
-    let doc_storage = Arc::new(PrefixedStorage::new("documents", storage.clone()));
-    let doc_store = Arc::new(RwLock::new(
-        UnifiedDocumentStore::open(doc_storage).unwrap(),
-    ));
-    let engine = LexicalStore::new(storage.clone(), config, doc_store)?;
+    let engine = LexicalStore::new(storage.clone(), config)?;
 
     // Get storage for creating custom writer (already have it)
     let storage = storage.clone();

@@ -24,13 +24,10 @@ use iris::CandleClipEmbedder;
 use iris::Embedder;
 #[cfg(feature = "embeddings-multimodal")]
 use iris::Result;
-use iris::parking_lot::RwLock;
 #[cfg(feature = "embeddings-multimodal")]
 use iris::storage::file::FileStorageConfig;
-use iris::storage::prefixed::PrefixedStorage;
 #[cfg(feature = "embeddings-multimodal")]
 use iris::storage::{StorageConfig, StorageFactory};
-use iris::store::document::UnifiedDocumentStore;
 #[cfg(feature = "embeddings-multimodal")]
 use iris::vector::DistanceMetric;
 #[cfg(feature = "embeddings-multimodal")]
@@ -39,6 +36,7 @@ use iris::vector::VectorSearchRequestBuilder;
 use iris::vector::VectorStore;
 #[cfg(feature = "embeddings-multimodal")]
 use iris::vector::{FlatOption, FieldOption};
+#[cfg(feature = "embeddings-multimodal")]
 use iris::vector::{VectorFieldConfig, VectorIndexConfig};
 #[cfg(feature = "embeddings-multimodal")]
 use iris::{DataValue, Document};
@@ -78,9 +76,7 @@ fn main() -> Result<()> {
         .build()?;
 
     // 3. Create Engine
-    let doc_storage = Arc::new(PrefixedStorage::new("documents", storage.clone()));
-    let doc_store = Arc::new(RwLock::new(UnifiedDocumentStore::open(doc_storage)?));
-    let engine = VectorStore::new(storage, index_config, doc_store.clone())?;
+    let engine = VectorStore::new(storage, index_config)?;
 
     // 4. Index Images
     println!("\n--- Indexing Images ---");
@@ -95,7 +91,7 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
-    let mut indexed_count = 0;
+    let mut indexed_count: u64 = 0;
     // Iterate over jpg files
     let entries = std::fs::read_dir(&images_dir)?;
     for entry in entries {
@@ -116,8 +112,8 @@ fn main() -> Result<()> {
                         .add_field("type", DataValue::Text("image".into()))
                         .build();
 
-                    engine.add_document(doc)?;
                     indexed_count += 1;
+                    engine.upsert_document_by_internal_id(indexed_count, doc)?;
                 }
             }
         }
@@ -141,12 +137,12 @@ fn main() -> Result<()> {
             .add_field("text", DataValue::Text((*text).into()))
             .add_field("type", DataValue::Text("text".into()))
             .build();
-        engine.add_document(doc)?;
+        indexed_count += 1;
+        engine.upsert_document_by_internal_id(indexed_count, doc)?;
     }
 
     // Commit to make documents searchable
     engine.commit()?;
-    doc_store.write().commit()?;
 
     // 6. Search Demonstrations
 

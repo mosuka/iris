@@ -17,7 +17,6 @@ use crate::lexical::search::searcher::{LexicalSearchRequest, LexicalSearcher};
 use crate::lexical::store::config::LexicalIndexConfig;
 use crate::lexical::writer::LexicalIndexWriter;
 use crate::storage::Storage;
-use crate::store::document::UnifiedDocumentStore;
 use parking_lot::{Mutex, RwLock};
 
 /// A high-level lexical search engine that provides both indexing and searching capabilities.
@@ -47,24 +46,18 @@ use parking_lot::{Mutex, RwLock};
 /// use iris::lexical::store::config::LexicalIndexConfig;
 /// use iris::lexical::search::searcher::LexicalSearchRequest;
 /// use iris::storage::memory::{MemoryStorage, MemoryStorageConfig};
-/// use iris::store::document::UnifiedDocumentStore;
-/// use iris::storage::prefixed::PrefixedStorage;
-/// use parking_lot::RwLock;
 /// use std::sync::Arc;
 ///
 /// // Create storage and engine
 /// let storage = Arc::new(MemoryStorage::new(MemoryStorageConfig::default()));
-/// let doc_storage = Arc::new(PrefixedStorage::new("documents", storage.clone()));
-/// let doc_store = Arc::new(RwLock::new(UnifiedDocumentStore::open(doc_storage).unwrap()));
 /// let config = LexicalIndexConfig::default();
-/// let engine = LexicalStore::new(storage, config, doc_store).unwrap();
+/// let engine = LexicalStore::new(storage, config).unwrap();
 ///
 /// // Add documents
-/// use iris::lexical::core::field::TextOption;
 /// let doc = Document::builder()
 ///     .add_text("title", "Rust Programming")
 ///     .build();
-/// engine.add_document(doc).unwrap();
+/// engine.upsert_document(1, doc).unwrap();
 /// engine.commit().unwrap();
 ///
 /// // Search using DSL string
@@ -75,7 +68,6 @@ pub struct LexicalStore {
     index: Box<dyn LexicalIndex>,
     writer_cache: Mutex<Option<Box<dyn LexicalIndexWriter>>>,
     searcher_cache: RwLock<Option<Box<dyn LexicalSearcher>>>,
-    doc_store: Arc<RwLock<UnifiedDocumentStore>>,
 }
 
 impl std::fmt::Debug for LexicalStore {
@@ -109,16 +101,11 @@ impl LexicalStore {
     /// use iris::lexical::store::config::LexicalIndexConfig;
     /// use iris::storage::{Storage, StorageConfig, StorageFactory};
     /// use iris::storage::memory::MemoryStorageConfig;
-    /// use iris::store::document::UnifiedDocumentStore;
-    /// use iris::storage::prefixed::PrefixedStorage;
-    /// use parking_lot::RwLock;
     /// use std::sync::Arc;
     ///
     /// let storage_config = StorageConfig::Memory(MemoryStorageConfig::default());
     /// let storage = StorageFactory::create(storage_config).unwrap();
-    /// let doc_storage = Arc::new(PrefixedStorage::new("documents", storage.clone()));
-    /// let doc_store = Arc::new(RwLock::new(UnifiedDocumentStore::open(doc_storage).unwrap()));
-    /// let engine = LexicalStore::new(storage, LexicalIndexConfig::default(), doc_store).unwrap();
+    /// let engine = LexicalStore::new(storage, LexicalIndexConfig::default()).unwrap();
     /// ```
     ///
     /// # Example with File Storage
@@ -128,230 +115,30 @@ impl LexicalStore {
     /// use iris::lexical::store::config::LexicalIndexConfig;
     /// use iris::storage::{Storage, StorageConfig, StorageFactory};
     /// use iris::storage::file::FileStorageConfig;
-    /// use iris::store::document::UnifiedDocumentStore;
-    /// use iris::storage::prefixed::PrefixedStorage;
-    /// use parking_lot::RwLock;
     /// use std::sync::Arc;
     ///
     /// let storage_config = StorageConfig::File(FileStorageConfig::new("/tmp/index"));
     /// let storage = StorageFactory::create(storage_config).unwrap();
-    /// let doc_storage = Arc::new(PrefixedStorage::new("documents", storage.clone()));
-    /// let doc_store = Arc::new(RwLock::new(UnifiedDocumentStore::open(doc_storage).unwrap()));
-    /// let engine = LexicalStore::new(storage, LexicalIndexConfig::default(), doc_store).unwrap();
+    /// let engine = LexicalStore::new(storage, LexicalIndexConfig::default()).unwrap();
     /// ```
-    pub fn new(
-        storage: Arc<dyn Storage>,
-        config: LexicalIndexConfig,
-        doc_store: Arc<RwLock<UnifiedDocumentStore>>,
-    ) -> Result<Self> {
+    pub fn new(storage: Arc<dyn Storage>, config: LexicalIndexConfig) -> Result<Self> {
         let index = LexicalIndexFactory::open_or_create(storage, config)?;
         Ok(Self {
             index,
             writer_cache: Mutex::new(None),
             searcher_cache: RwLock::new(None),
-            doc_store,
         })
-    }
-
-    /// Add a document to the index.
-    ///
-    /// This method adds a single document to the index. The writer is created
-    /// and cached on the first call. Changes are not persisted until you call `commit()`.
-    ///
-    /// # Arguments
-    ///
-    /// * `doc` - The document to add
-    ///
-    /// # Returns
-    ///
-    /// Returns `Ok(())` on success, or an error if the operation fails.
-    ///
-    /// # Important
-    ///
-    /// You must call `commit()` to persist the changes to storage.
-    ///
-    /// # Example
-    ///
-    /// ```rust,no_run
-    /// use iris::lexical::core::document::Document;
-    /// # use iris::lexical::store::LexicalStore;
-    /// # use iris::lexical::store::config::LexicalIndexConfig;
-    /// # use iris::storage::{StorageConfig, StorageFactory};
-    /// use iris::storage::memory::MemoryStorageConfig;
-    /// # use iris::store::document::UnifiedDocumentStore;
-    /// # use iris::storage::prefixed::PrefixedStorage;
-    /// # use parking_lot::RwLock;
-    /// # use std::sync::Arc;
-    /// # let storage_config = StorageConfig::Memory(MemoryStorageConfig::default());
-    /// # let storage = StorageFactory::create(storage_config).unwrap();
-    /// # let doc_storage = Arc::new(PrefixedStorage::new("documents", storage.clone()));
-    /// # let doc_store = Arc::new(RwLock::new(UnifiedDocumentStore::open(doc_storage).unwrap()));
-    /// # let engine = LexicalStore::new(storage, LexicalIndexConfig::default(), doc_store).unwrap();
-    ///
-    /// let doc = Document::builder()
-    ///     .add_text("title", "Hello World")
-    ///     .add_text("body", "This is a test")
-    ///     .build();
-    /// let doc_id = engine.add_document(doc).unwrap();
-    /// engine.commit().unwrap();  // Don't forget to commit!
-    /// ```
-    /// Add a document to the index.
-    ///
-    /// This method intelligently handles both insertion and updates (upsert) based on the presence
-    /// of `Document.id`.
-    ///
-    /// - If `doc.id` is present: checks for an existing document with the same ID.
-    ///   - If found: updates the existing document (Upsert).
-    ///   - If not found: adds a new document with the specified ID.
-    /// - If `doc.id` is missing: adds a new document with an auto-generated internal ID.
-    ///
-    /// Changes are not persisted until you call `commit()`.
-    ///
-    /// # Arguments
-    ///
-    /// * `doc` - The document to add
-    ///
-    /// # Returns
-    ///
-    /// Returns the internal document ID on success.
-    pub fn add_document(&self, doc: Document) -> Result<u64> {
-        // Add to UnifiedDocumentStore first
-        let internal_id = self.doc_store.write().add_document(doc.clone())?;
-
-        let mut guard = self.writer_cache.lock();
-        if guard.is_none() {
-            *guard = Some(self.index.writer()?);
-        }
-
-        // Use upsert to force the specific ID assignment
-        guard.as_mut().unwrap().upsert_document(internal_id, doc)?;
-
-        Ok(internal_id)
-    }
-
-    /// Put (upsert) a document into the index.
-    ///
-    /// This method ensures that the document is uniquely identified by its `id`.
-    /// - If a document with the same `id` exists, it is updated (Upsert).
-    /// - If no such document exists, it is added (Insert).
-    ///
-    /// # Arguments
-    ///
-    /// * `doc` - The document to put. Must have `id` set.
-    ///
-    /// # Returns
-    ///
-    /// Returns the internal document ID on success.
-    /// Returns an error if `doc.id` is missing.
-    pub fn put_document(&self, doc: Document) -> Result<u64> {
-        let external_id = doc
-            .fields
-            .get("_id")
-            .and_then(|v| v.as_text())
-            .map(|s| s.to_string())
-            .ok_or_else(|| {
-                crate::error::IrisError::invalid_argument(
-                    "_id field is required for put_document",
-                )
-            })?;
-
-        if let Some(internal_id) = self.find_doc_id_by_term("_id", &external_id)? {
-            // Document Store is append-only, so we must delete the old mapping and add new one.
-            self.delete_document_by_internal_id(internal_id)?;
-            self.add_document(doc)
-        } else {
-            self.add_document(doc)
-        }
-    }
-
-    /// Get documents by external ID.
-    ///
-    /// Returns all documents that match the given external ID.
-    pub fn get_documents(&self, external_id: &str) -> Result<Vec<Document>> {
-        let doc_ids = self.find_doc_ids_by_term("_id", external_id)?;
-        let mut docs = Vec::with_capacity(doc_ids.len());
-        for doc_id in doc_ids {
-            if let Some(doc) = self.get_document_by_internal_id(doc_id)? {
-                docs.push(doc);
-            }
-        }
-        Ok(docs)
-    }
-
-    /// Delete documents by external ID.
-    ///
-    /// Returns `true` if any documents were found and deleted, `false` otherwise.
-    pub fn delete_documents(&self, external_id: &str) -> Result<bool> {
-        let ids = self.find_doc_ids_by_term("_id", external_id)?;
-        if ids.is_empty() {
-            return Ok(false);
-        }
-
-        let mut guard = self.writer_cache.lock();
-        if guard.is_none() {
-            *guard = Some(self.index.writer()?);
-        }
-        let writer = guard.as_mut().unwrap();
-
-        for doc_id in ids {
-            writer.delete_document(doc_id)?;
-        }
-
-        Ok(true)
     }
 
     /// Upsert a document with a specific internal ID.
     ///
-    /// Note: You must call `commit()` to persist the changes.
-    pub(crate) fn upsert_document(&self, internal_id: u64, doc: Document) -> Result<()> {
+    /// The caller is responsible for doc_id generation (via [`DocumentLog`](crate::store::log::DocumentLog)).
+    /// Changes are not persisted until you call `commit()`.
+    pub fn upsert_document(&self, internal_id: u64, doc: Document) -> Result<()> {
         let mut guard = self.writer_cache.lock();
         if guard.is_none() {
             *guard = Some(self.index.writer()?);
         }
-        // Update document store
-        // Note: UnifiedDocumentStore doesn't have upsert_by_id yet? Or maybe it does via insert on map?
-        // UnifiedDocumentStore API check needed. Assuming typical update pattern:
-        // If we want to keep ID, we should ensure the doc store reflects this.
-        // Actually DocumentStore only supports append (add_document). Update is not supported in append-only logs usually.
-        // But for "upsert", if it's an update, we might be appending a new version with same External ID but new Internal ID?
-        // Wait, LexicalStore::put_document logic:
-        // 1. find_doc_id_by_term("_id", external_id) -> returns internal_id
-        // 2. upsert_document(internal_id, doc)
-
-        // If we reuse internal_id, we must update the content at that ID in DocumentStore.
-        // But UnifiedDocumentStore is likely append-only for segments.
-        // Does it support update?
-        // If not, we cannot reuse internal_id easily without holes.
-        // Iris usually does "delete + insert" for updates, getting a new Internal ID.
-        // But put_document tries to reuse internal_id?
-
-        // Let's look at put_document (lines 210-227).
-        // It calls self.find_doc_id_by_term. If found, calls self.upsert_document(internal_id, doc).
-        // If we reuse internal_id, we imply in-place update.
-        // UnifiedDocumentStore needs to support replacing a document at an ID.
-        // If it doesn't, we should maybe DELETE old ID and Insert new ID, and update index mapping?
-        // But upsert_document takes internal_id.
-
-        // For now, let's assume we can't easily update in-place in DocumentStore.
-        // We should warn or implement update in DocumentStore later.
-        // Or, we update the logic of put_document to: Delete old -> Add new.
-        // But put_document signature returns u64 (internal_id).
-
-        // If we keep existing implementation of upsert_document, we just update the index.
-        // But the DocumentStore will still have the old document?
-        // We need to update DocumentStore too.
-        // doc_store.write().update_document(internal_id, doc)? -> Need to implement this if missing.
-
-        // TEMPORARY: Just update index. DocumentStore might be stale for this ID.
-        // This is a known issue if UnifiedDocumentStore doesn't support update.
-        // Ideally we should implement update_document in UnifiedDocumentStore.
-        // Let's try to call it, assuming it might exist or we will add it.
-        // Actually, UnifiedDocumentStore logic was "SegmentedDocumentStore".
-        // It likely supports append only.
-
-        // Let's update `put_document` instead to do "delete and add".
-        // But we are inside upsert_document here.
-
         guard.as_mut().unwrap().upsert_document(internal_id, doc)
     }
 
@@ -372,14 +159,6 @@ impl LexicalStore {
             *guard = Some(self.index.writer()?);
         }
         guard.as_mut().unwrap().delete_document(internal_id)
-    }
-
-    /// Get a document by its internal ID.
-    ///
-    /// This uses the system-reserved `_id` field to find the internal ID first.
-    pub(crate) fn get_document_by_internal_id(&self, internal_id: u64) -> Result<Option<Document>> {
-        let guard = self.doc_store.read();
-        guard.get_document(internal_id)
     }
 
     /// Find all internal document IDs for a given term (field:value).
@@ -429,46 +208,6 @@ impl LexicalStore {
         Ok(ids)
     }
 
-    /// Find the internal document ID for a given term (field:value).
-    ///
-    /// This searches both the uncommitted in-memory buffer (via Writer) and
-    /// the committed index (via Searcher).
-    fn find_doc_id_by_term(&self, field: &str, term: &str) -> Result<Option<u64>> {
-        let guard = self.writer_cache.lock();
-
-        // 1. Check writer (NRT - Uncommitted)
-        if let Some(writer) = guard.as_ref()
-            && let Some(doc_id) = writer.find_doc_id_by_term(field, term)?
-        {
-            return Ok(Some(doc_id));
-        }
-
-        // 2. Check reader (Committed)
-        use crate::lexical::index::inverted::query::Query;
-        use crate::lexical::index::inverted::query::term::TermQuery;
-
-        let query = Box::new(TermQuery::new(field, term)) as Box<dyn Query>;
-        let request = LexicalSearchRequest::new(query)
-            .max_docs(1)
-            .load_documents(false);
-
-        let results = self.search(request)?;
-        if let Some(hit) = results.hits.first() {
-            // Check if marked as deleted in pending set
-            let is_deleted = if let Some(writer) = guard.as_ref() {
-                writer.is_updated_deleted(hit.doc_id)
-            } else {
-                false
-            };
-
-            if !is_deleted {
-                return Ok(Some(hit.doc_id));
-            }
-        }
-
-        Ok(None)
-    }
-
     /// Commit any pending changes to the index.
     ///
     /// This method flushes all pending write operations to storage and makes them
@@ -494,14 +233,9 @@ impl LexicalStore {
     /// # use iris::storage::{StorageConfig, StorageFactory};
     /// use iris::storage::memory::MemoryStorageConfig;
     /// # use std::sync::Arc;
-    /// # use iris::store::document::UnifiedDocumentStore;
-    /// # use iris::storage::prefixed::PrefixedStorage;
-    /// # use parking_lot::RwLock;
     /// # let storage_config = StorageConfig::Memory(MemoryStorageConfig::default());
     /// # let storage = StorageFactory::create(storage_config).unwrap();
-    /// # let doc_storage = Arc::new(PrefixedStorage::new("documents", storage.clone()));
-    /// # let doc_store = Arc::new(RwLock::new(UnifiedDocumentStore::open(doc_storage).unwrap()));
-    /// # let engine = LexicalStore::new(storage, LexicalIndexConfig::default(), doc_store).unwrap();
+    /// # let engine = LexicalStore::new(storage, LexicalIndexConfig::default()).unwrap();
     ///
     /// // Add multiple documents
     /// for i in 0..10 {
@@ -509,7 +243,7 @@ impl LexicalStore {
     ///         .add_text("id", &i.to_string())
     ///         .add_text("title", &format!("Document {}", i))
     ///         .build();
-    ///     engine.add_document(doc).unwrap();
+    ///     engine.upsert_document(i + 1, doc).unwrap();
     /// }
     ///
     /// // Commit all changes at once
@@ -548,22 +282,17 @@ impl LexicalStore {
     /// # use iris::lexical::store::config::LexicalIndexConfig;
     /// # use iris::storage::{StorageConfig, StorageFactory};
     /// use iris::storage::memory::MemoryStorageConfig;
-    /// use iris::store::document::UnifiedDocumentStore;
-    /// use iris::storage::prefixed::PrefixedStorage;
-    /// use parking_lot::RwLock;
     /// # use std::sync::Arc;
     /// # let storage_config = StorageConfig::Memory(MemoryStorageConfig::default());
     /// # let storage = StorageFactory::create(storage_config).unwrap();
-    /// # let doc_storage = Arc::new(PrefixedStorage::new("documents", storage.clone()));
-    /// # let doc_store = Arc::new(RwLock::new(UnifiedDocumentStore::open(doc_storage).unwrap()));
-    /// # let mut engine = LexicalStore::new(storage, LexicalIndexConfig::default(), doc_store).unwrap();
+    /// # let mut engine = LexicalStore::new(storage, LexicalIndexConfig::default()).unwrap();
     ///
     /// // Add and commit many documents
     /// for i in 0..1000 {
     ///     let doc = Document::builder()
     ///         .add_text("id", &i.to_string())
     ///         .build();
-    ///     engine.add_document(doc).unwrap();
+    ///     engine.upsert_document(i + 1, doc).unwrap();
     /// }
     /// engine.commit().unwrap();
     ///
@@ -624,17 +353,11 @@ impl LexicalStore {
     /// # use iris::storage::{StorageConfig, StorageFactory};
     /// use iris::storage::memory::MemoryStorageConfig;
     /// # use std::sync::Arc;
-    /// # use iris::store::document::UnifiedDocumentStore;
-    /// # use iris::storage::prefixed::PrefixedStorage;
-    /// # use parking_lot::RwLock;
     /// # let storage_config = StorageConfig::Memory(MemoryStorageConfig::default());
     /// # let storage = StorageFactory::create(storage_config).unwrap();
-    /// # let doc_storage = Arc::new(PrefixedStorage::new("documents", storage.clone()));
-    /// # let doc_store = Arc::new(RwLock::new(UnifiedDocumentStore::open(doc_storage).unwrap()));
-    /// # let engine = LexicalStore::new(storage, LexicalIndexConfig::default(), doc_store).unwrap();
-    /// # use iris::lexical::core::field::TextOption;
+    /// # let engine = LexicalStore::new(storage, LexicalIndexConfig::default()).unwrap();
     /// # let doc = Document::builder().add_text("title", "hello world").build();
-    /// # engine.add_document(doc).unwrap();
+    /// # engine.upsert_document(1, doc).unwrap();
     /// # engine.commit().unwrap();
     ///
     /// // Using DSL string
@@ -661,14 +384,9 @@ impl LexicalStore {
     /// use iris::storage::memory::MemoryStorageConfig;
     /// use iris::analysis::analyzer::standard::StandardAnalyzer;
     /// # use std::sync::Arc;
-    /// # use iris::store::document::UnifiedDocumentStore;
-    /// # use iris::storage::prefixed::PrefixedStorage;
-    /// # use parking_lot::RwLock;
     /// # let storage_config = StorageConfig::Memory(MemoryStorageConfig::default());
     /// # let storage = StorageFactory::create(storage_config).unwrap();
-    /// # let doc_storage = Arc::new(PrefixedStorage::new("documents", storage.clone()));
-    /// # let doc_store = Arc::new(RwLock::new(UnifiedDocumentStore::open(doc_storage).unwrap()));
-    /// # let engine = LexicalStore::new(storage, LexicalIndexConfig::default(), doc_store).unwrap();
+    /// # let engine = LexicalStore::new(storage, LexicalIndexConfig::default()).unwrap();
     ///
     /// let analyzer = Arc::new(StandardAnalyzer::default());
     /// let parser = QueryParser::new(analyzer).with_default_field("title");
@@ -712,15 +430,10 @@ impl LexicalStore {
     /// # use iris::lexical::search::searcher::LexicalSearchRequest;
     /// # use iris::storage::memory::MemoryStorage;
     /// # use iris::storage::memory::MemoryStorageConfig;
-    /// use iris::store::document::UnifiedDocumentStore;
-    /// use iris::storage::prefixed::PrefixedStorage;
-    /// use parking_lot::RwLock;
     /// # use std::sync::Arc;
     /// # let config = LexicalIndexConfig::default();
     /// # let storage = Arc::new(MemoryStorage::new(MemoryStorageConfig::default()));
-    /// # let doc_storage = Arc::new(PrefixedStorage::new("documents", storage.clone()));
-    /// # let doc_store = Arc::new(RwLock::new(UnifiedDocumentStore::open(doc_storage).unwrap()));
-    /// # let engine = LexicalStore::new(storage, config, doc_store).unwrap();
+    /// # let engine = LexicalStore::new(storage, config).unwrap();
     /// // Count all matching documents
     /// let count = engine.count(LexicalSearchRequest::new("title:hello")).unwrap();
     /// println!("Found {} documents", count);
@@ -834,13 +547,9 @@ mod tests {
     use crate::lexical::store::config::LexicalIndexConfig;
     use crate::storage::file::{FileStorage, FileStorageConfig};
     use crate::storage::memory::{MemoryStorage, MemoryStorageConfig};
-    use crate::storage::prefixed::PrefixedStorage;
-    use crate::store::document::UnifiedDocumentStore;
-    use parking_lot::RwLock;
     use std::sync::Arc;
     use tempfile::TempDir;
 
-    #[allow(dead_code)]
     fn create_test_document(title: &str, body: &str) -> Document {
         Document::builder()
             .add_text("title", title)
@@ -855,13 +564,8 @@ mod tests {
         let storage = Arc::new(
             FileStorage::new(temp_dir.path(), FileStorageConfig::new(temp_dir.path())).unwrap(),
         );
-        let doc_storage = Arc::new(PrefixedStorage::new("documents", storage.clone()));
-        let doc_store = Arc::new(RwLock::new(
-            UnifiedDocumentStore::open(doc_storage).unwrap(),
-        ));
-        let engine = LexicalStore::new(storage, config, doc_store).unwrap();
+        let engine = LexicalStore::new(storage, config).unwrap();
 
-        // Schema-less mode: no schema() method available
         assert!(!engine.is_closed());
     }
 
@@ -869,31 +573,23 @@ mod tests {
     fn test_search_engine_in_memory() {
         let config = LexicalIndexConfig::default();
         let storage = Arc::new(MemoryStorage::new(MemoryStorageConfig::default()));
-        let doc_storage = Arc::new(PrefixedStorage::new("documents", storage.clone()));
-        let doc_store = Arc::new(RwLock::new(
-            UnifiedDocumentStore::open(doc_storage).unwrap(),
-        ));
-        let engine = LexicalStore::new(storage, config, doc_store.clone()).unwrap();
+        let engine = LexicalStore::new(storage, config).unwrap();
 
         // Add some documents
         let docs = vec![
             create_test_document("Test Document 1", "Content of test document 1"),
             create_test_document("Test Document 2", "Content of test document 2"),
         ];
-        for doc in docs {
-            engine.add_document(doc).unwrap();
+        for (i, doc) in docs.into_iter().enumerate() {
+            engine.upsert_document((i + 1) as u64, doc).unwrap();
         }
         engine.commit().unwrap();
-        doc_store.write().commit().unwrap();
 
         // Search for documents
         let query = Box::new(TermQuery::new("title", "Test")) as Box<dyn Query>;
         let request = LexicalSearchRequest::new(query);
         let _results = engine.search(request).unwrap();
 
-        // Should find documents in memory
-        // Note: total_hits may be 0 if the analyzer lowercases "Test" to "test"
-        // but we indexed "Test" (capital T). Just verify the search works.
         assert!(!engine.is_closed());
     }
 
@@ -906,66 +602,44 @@ mod tests {
         let storage = Arc::new(
             FileStorage::new(temp_dir.path(), FileStorageConfig::new(temp_dir.path())).unwrap(),
         );
-        let doc_storage = Arc::new(PrefixedStorage::new("documents", storage.clone()));
-        let doc_store = Arc::new(RwLock::new(
-            UnifiedDocumentStore::open(doc_storage).unwrap(),
-        ));
-        let engine = LexicalStore::new(storage, config.clone(), doc_store).unwrap();
+        let engine = LexicalStore::new(storage, config.clone()).unwrap();
         engine.close().unwrap();
 
         // Open engine
         let storage = Arc::new(
             FileStorage::new(temp_dir.path(), FileStorageConfig::new(temp_dir.path())).unwrap(),
         );
-        let doc_storage = Arc::new(PrefixedStorage::new("documents", storage.clone()));
-        let doc_store = Arc::new(RwLock::new(
-            UnifiedDocumentStore::open(doc_storage).unwrap(),
-        ));
-        let engine = LexicalStore::new(storage, config, doc_store).unwrap();
+        let engine = LexicalStore::new(storage, config).unwrap();
 
-        // Schema-less mode: no schema() method available
         assert!(!engine.is_closed());
     }
 
     #[test]
-    fn test_add_document() {
+    fn test_upsert_document() {
         let temp_dir = TempDir::new().unwrap();
         let config = LexicalIndexConfig::default();
 
         let storage = Arc::new(
             FileStorage::new(temp_dir.path(), FileStorageConfig::new(temp_dir.path())).unwrap(),
         );
-        let doc_storage = Arc::new(PrefixedStorage::new("documents", storage.clone()));
-        let doc_store = Arc::new(RwLock::new(
-            UnifiedDocumentStore::open(doc_storage).unwrap(),
-        ));
-        let engine = LexicalStore::new(storage, config, doc_store.clone()).unwrap();
+        let engine = LexicalStore::new(storage, config).unwrap();
 
         let doc = create_test_document("Hello World", "This is a test document");
-        engine.add_document(doc).unwrap();
+        engine.upsert_document(1, doc).unwrap();
         engine.commit().unwrap();
-        doc_store.write().commit().unwrap();
 
-        // Check that document was added (through stats)
         let _stats = engine.stats().unwrap();
-        // Note: stats might not reflect the added document immediately
-        // depending on the index implementation
-        // doc_count is usize, so >= 0 check is redundant
     }
 
     #[test]
-    fn test_add_multiple_documents() {
+    fn test_upsert_multiple_documents() {
         let temp_dir = TempDir::new().unwrap();
         let config = LexicalIndexConfig::default();
 
         let storage = Arc::new(
             FileStorage::new(temp_dir.path(), FileStorageConfig::new(temp_dir.path())).unwrap(),
         );
-        let doc_storage = Arc::new(PrefixedStorage::new("documents", storage.clone()));
-        let doc_store = Arc::new(RwLock::new(
-            UnifiedDocumentStore::open(doc_storage).unwrap(),
-        ));
-        let engine = LexicalStore::new(storage, config, doc_store.clone()).unwrap();
+        let engine = LexicalStore::new(storage, config).unwrap();
 
         let docs = vec![
             create_test_document("First Document", "Content of first document"),
@@ -973,14 +647,12 @@ mod tests {
             create_test_document("Third Document", "Content of third document"),
         ];
 
-        for doc in docs {
-            engine.add_document(doc).unwrap();
+        for (i, doc) in docs.into_iter().enumerate() {
+            engine.upsert_document((i + 1) as u64, doc).unwrap();
         }
         engine.commit().unwrap();
-        doc_store.write().commit().unwrap();
 
         let _stats = engine.stats().unwrap();
-        // doc_count is usize, so >= 0 check is redundant
     }
 
     #[test]
@@ -991,11 +663,7 @@ mod tests {
         let storage = Arc::new(
             FileStorage::new(temp_dir.path(), FileStorageConfig::new(temp_dir.path())).unwrap(),
         );
-        let doc_storage = Arc::new(PrefixedStorage::new("documents", storage.clone()));
-        let doc_store = Arc::new(RwLock::new(
-            UnifiedDocumentStore::open(doc_storage).unwrap(),
-        ));
-        let engine = LexicalStore::new(storage, config, doc_store).unwrap();
+        let engine = LexicalStore::new(storage, config).unwrap();
 
         let query = Box::new(TermQuery::new("title", "hello")) as Box<dyn Query>;
         let request = LexicalSearchRequest::new(query);
@@ -1014,32 +682,22 @@ mod tests {
         let storage = Arc::new(
             FileStorage::new(temp_dir.path(), FileStorageConfig::new(temp_dir.path())).unwrap(),
         );
-        let doc_storage = Arc::new(PrefixedStorage::new("documents", storage.clone()));
-        let doc_store = Arc::new(RwLock::new(
-            UnifiedDocumentStore::open(doc_storage).unwrap(),
-        ));
-        let engine = LexicalStore::new(storage, config, doc_store.clone()).unwrap();
+        let engine = LexicalStore::new(storage, config).unwrap();
 
         // Add some documents
         let docs = vec![
             create_test_document("Hello World", "This is a test document"),
             create_test_document("Goodbye World", "This is another test document"),
         ];
-        for doc in docs {
-            engine.add_document(doc).unwrap();
+        for (i, doc) in docs.into_iter().enumerate() {
+            engine.upsert_document((i + 1) as u64, doc).unwrap();
         }
         engine.commit().unwrap();
-        doc_store.write().commit().unwrap();
 
         // Search for documents
         let query = Box::new(TermQuery::new("title", "Hello")) as Box<dyn Query>;
         let request = LexicalSearchRequest::new(query);
         let _results = engine.search(request).unwrap();
-
-        // Results depend on the actual indexing implementation
-        // For now, we just check that search doesn't fail
-        // hits.len() is usize, so >= 0 check is redundant
-        // total_hits is u64, so >= 0 check is redundant
     }
 
     #[test]
@@ -1050,11 +708,7 @@ mod tests {
         let storage = Arc::new(
             FileStorage::new(temp_dir.path(), FileStorageConfig::new(temp_dir.path())).unwrap(),
         );
-        let doc_storage = Arc::new(PrefixedStorage::new("documents", storage.clone()));
-        let doc_store = Arc::new(RwLock::new(
-            UnifiedDocumentStore::open(doc_storage).unwrap(),
-        ));
-        let engine = LexicalStore::new(storage, config, doc_store).unwrap();
+        let engine = LexicalStore::new(storage, config).unwrap();
 
         let query = Box::new(TermQuery::new("title", "hello")) as Box<dyn Query>;
         let count = engine.count(LexicalSearchRequest::new(query)).unwrap();
@@ -1071,17 +725,12 @@ mod tests {
         let storage = Arc::new(
             FileStorage::new(temp_dir.path(), FileStorageConfig::new(temp_dir.path())).unwrap(),
         );
-        let doc_storage = Arc::new(PrefixedStorage::new("documents", storage.clone()));
-        let doc_store = Arc::new(RwLock::new(
-            UnifiedDocumentStore::open(doc_storage).unwrap(),
-        ));
-        let engine = LexicalStore::new(storage, config, doc_store.clone()).unwrap();
+        let engine = LexicalStore::new(storage, config).unwrap();
 
         // Add a document
         let doc = create_test_document("Test Document", "Test content");
-        engine.add_document(doc).unwrap();
+        engine.upsert_document(1, doc).unwrap();
         engine.commit().unwrap();
-        doc_store.write().commit().unwrap();
 
         // Refresh should not fail
         engine.refresh().unwrap();
@@ -1090,7 +739,6 @@ mod tests {
         let query = Box::new(TermQuery::new("title", "Test")) as Box<dyn Query>;
         let request = LexicalSearchRequest::new(query);
         let _results = engine.search(request).unwrap();
-        // hits.len() is usize, so >= 0 check is redundant
     }
 
     #[test]
@@ -1101,15 +749,9 @@ mod tests {
         let storage = Arc::new(
             FileStorage::new(temp_dir.path(), FileStorageConfig::new(temp_dir.path())).unwrap(),
         );
-        let doc_storage = Arc::new(PrefixedStorage::new("documents", storage.clone()));
-        let doc_store = Arc::new(RwLock::new(
-            UnifiedDocumentStore::open(doc_storage).unwrap(),
-        ));
-        let engine = LexicalStore::new(storage, config, doc_store).unwrap();
+        let engine = LexicalStore::new(storage, config).unwrap();
 
         let stats = engine.stats().unwrap();
-        // doc_count is usize, so >= 0 check is redundant
-        // term_count is usize, so >= 0 check is redundant
         assert!(stats.last_modified > 0);
     }
 
@@ -1121,11 +763,7 @@ mod tests {
         let storage = Arc::new(
             FileStorage::new(temp_dir.path(), FileStorageConfig::new(temp_dir.path())).unwrap(),
         );
-        let doc_storage = Arc::new(PrefixedStorage::new("documents", storage.clone()));
-        let doc_store = Arc::new(RwLock::new(
-            UnifiedDocumentStore::open(doc_storage).unwrap(),
-        ));
-        let engine = LexicalStore::new(storage, config, doc_store).unwrap();
+        let engine = LexicalStore::new(storage, config).unwrap();
 
         assert!(!engine.is_closed());
 
@@ -1142,11 +780,7 @@ mod tests {
         let storage = Arc::new(
             FileStorage::new(temp_dir.path(), FileStorageConfig::new(temp_dir.path())).unwrap(),
         );
-        let doc_storage = Arc::new(PrefixedStorage::new("documents", storage.clone()));
-        let doc_store = Arc::new(RwLock::new(
-            UnifiedDocumentStore::open(doc_storage).unwrap(),
-        ));
-        let engine = LexicalStore::new(storage, config, doc_store).unwrap();
+        let engine = LexicalStore::new(storage, config).unwrap();
 
         let query = Box::new(TermQuery::new("title", "hello")) as Box<dyn Query>;
         let request = LexicalSearchRequest::new(query)
@@ -1156,8 +790,7 @@ mod tests {
 
         let results = engine.search(request).unwrap();
 
-        // Should respect the configuration
-        assert_eq!(results.hits.len(), 0); // No matching documents
+        assert_eq!(results.hits.len(), 0);
         assert_eq!(results.total_hits, 0);
     }
 
@@ -1169,22 +802,17 @@ mod tests {
         let storage = Arc::new(
             FileStorage::new(temp_dir.path(), FileStorageConfig::new(temp_dir.path())).unwrap(),
         );
-        let doc_storage = Arc::new(PrefixedStorage::new("documents", storage.clone()));
-        let doc_store = Arc::new(RwLock::new(
-            UnifiedDocumentStore::open(doc_storage).unwrap(),
-        ));
-        let engine = LexicalStore::new(storage, config, doc_store.clone()).unwrap();
+        let engine = LexicalStore::new(storage, config).unwrap();
 
         // Add some documents with lowercase titles for testing
         let docs = vec![
             create_test_document("hello world", "This is a test document"),
             create_test_document("goodbye world", "This is another test document"),
         ];
-        for doc in docs {
-            engine.add_document(doc).unwrap();
+        for (i, doc) in docs.into_iter().enumerate() {
+            engine.upsert_document((i + 1) as u64, doc).unwrap();
         }
         engine.commit().unwrap();
-        doc_store.write().commit().unwrap();
 
         // Search with QueryParser (Lucene style)
         use crate::lexical::index::inverted::query::parser::QueryParser;
@@ -1197,7 +825,6 @@ mod tests {
         let results = engine.search(LexicalSearchRequest::new(query)).unwrap();
 
         // Should find the document
-        // QueryParser analyzes "Hello" -> "hello", which matches the indexed "hello"
         assert_eq!(results.hits.len(), 1);
         assert_eq!(results.total_hits, 1);
     }
@@ -1210,11 +837,7 @@ mod tests {
         let storage = Arc::new(
             FileStorage::new(temp_dir.path(), FileStorageConfig::new(temp_dir.path())).unwrap(),
         );
-        let doc_storage = Arc::new(PrefixedStorage::new("documents", storage.clone()));
-        let doc_store = Arc::new(RwLock::new(
-            UnifiedDocumentStore::open(doc_storage).unwrap(),
-        ));
-        let engine = LexicalStore::new(storage, config, doc_store).unwrap();
+        let engine = LexicalStore::new(storage, config).unwrap();
 
         // Search specific field
         use crate::analysis::analyzer::standard::StandardAnalyzer;
@@ -1229,75 +852,28 @@ mod tests {
     }
 
     #[test]
-    fn test_id_based_operations() {
+    fn test_find_doc_ids_by_term() {
         let temp_dir = TempDir::new().unwrap();
         let config = LexicalIndexConfig::default();
         let storage = Arc::new(
             FileStorage::new(temp_dir.path(), FileStorageConfig::new(temp_dir.path())).unwrap(),
         );
-        let doc_storage = Arc::new(PrefixedStorage::new("documents", storage.clone()));
-        let doc_store = Arc::new(RwLock::new(
-            UnifiedDocumentStore::open(doc_storage).unwrap(),
-        ));
-        let engine = LexicalStore::new(storage.clone(), config, doc_store.clone()).unwrap();
+        let engine = LexicalStore::new(storage, config).unwrap();
 
-        // 1. Index document with external ID
+        // Index document with external ID
         let doc = Document::builder()
             .add_text("title", "Test Doc")
             .add_text("_id", "ext_1")
             .build();
-        let internal_id = engine.put_document(doc).unwrap();
-        engine.commit().unwrap();
-        doc_store.write().commit().unwrap();
-
-        // 2. Get by internal ID
-        let found = engine.get_document_by_internal_id(internal_id).unwrap();
-        assert!(found.is_some());
-        assert_eq!(
-            found.unwrap().get_field("title").unwrap().as_text(),
-            Some("Test Doc")
-        );
-
-        // 3. Index with external ID
-        let doc = Document::builder()
-            .add_text("title", "Test Doc")
-            .add_text("_id", "ext_1")
-            .build();
-        let internal_id = engine.put_document(doc).unwrap();
-
-        // Verify ID search
-        let found_id = engine.find_doc_id_by_term("_id", "ext_1").unwrap();
-        assert_eq!(found_id, Some(internal_id));
+        engine.upsert_document(1, doc).unwrap();
         engine.commit().unwrap();
 
-        // 4. Update existing by put_document
-        let doc_v2 = Document::builder()
-            .add_text("title", "Test Doc Updated")
-            .add_text("_id", "ext_1")
-            .build();
-        let internal_id_v2 = engine.put_document(doc_v2).unwrap();
-        // Since UnifiedDocumentStore is append-only, update results in a new internal ID.
-        assert_ne!(internal_id, internal_id_v2);
-        engine.commit().unwrap();
+        // Verify find_doc_ids_by_term
+        let found_ids = engine.find_doc_ids_by_term("_id", "ext_1").unwrap();
+        assert_eq!(found_ids, vec![1]);
 
-        let found_v2 = engine.get_documents("ext_1").unwrap();
-        assert_eq!(found_v2.len(), 1);
-        assert_eq!(
-            found_v2[0].get_field("title").unwrap().as_text(),
-            Some("Test Doc Updated")
-        );
-
-        // 5. Delete by external ID
-        let deleted = engine.delete_documents("ext_1").unwrap();
-        assert!(deleted);
-        engine.commit().unwrap();
-
-        // 6. Verify deletion
-        let found_after = engine.get_documents("ext_1").unwrap();
-        assert!(found_after.is_empty());
-
-        // 7. Delete non-existent
-        let deleted_non = engine.delete_documents("non_existent").unwrap();
-        assert!(!deleted_non);
+        // Non-existent
+        let not_found = engine.find_doc_ids_by_term("_id", "ext_999").unwrap();
+        assert!(not_found.is_empty());
     }
 }

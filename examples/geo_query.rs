@@ -15,12 +15,9 @@ use iris::lexical::LexicalIndexConfig;
 use iris::lexical::LexicalSearchRequest;
 use iris::lexical::LexicalStore;
 use iris::lexical::Query;
-use iris::parking_lot::RwLock;
 use iris::storage::StorageConfig;
 use iris::storage::StorageFactory;
 use iris::storage::file::FileStorageConfig;
-use iris::storage::prefixed::PrefixedStorage;
-use iris::store::document::UnifiedDocumentStore;
 use iris::{DataValue, Document};
 
 fn main() -> Result<()> {
@@ -42,11 +39,7 @@ fn main() -> Result<()> {
         analyzer: Arc::new(per_field_analyzer.clone()),
         ..InvertedIndexConfig::default()
     });
-    let doc_storage = Arc::new(PrefixedStorage::new("documents", storage.clone()));
-    let doc_store = Arc::new(RwLock::new(
-        UnifiedDocumentStore::open(doc_storage).unwrap(),
-    ));
-    let lexical_engine = LexicalStore::new(storage, lexical_index_config, doc_store)?;
+    let lexical_engine = LexicalStore::new(storage, lexical_index_config)?;
 
     // Add documents with geographic coordinates
     // Using famous locations around the world
@@ -142,8 +135,8 @@ fn main() -> Result<()> {
     ];
 
     println!("Adding {} documents to the index...", documents.len());
-    for doc in documents {
-        lexical_engine.add_document(doc)?;
+    for (i, doc) in documents.into_iter().enumerate() {
+        lexical_engine.upsert_document((i + 1) as u64, doc)?;
     }
 
     // Commit changes to engine

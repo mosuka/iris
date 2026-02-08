@@ -1,10 +1,9 @@
 //! VectorStore: Simplified vector storage following LexicalStore pattern.
 //!
-//! This module provides a vector storage component with a simple 4-member structure:
+//! This module provides a vector storage component with a simple 3-member structure:
 //! - `index`: The underlying vector index
 //! - `writer_cache`: Cached writer for write operations
 //! - `searcher_cache`: Cached searcher for search operations
-//! - `doc_store`: Document storage
 //!
 //! # Module Structure
 //!
@@ -26,13 +25,12 @@ pub mod response;
 
 use std::sync::Arc;
 
-use parking_lot::{Mutex, RwLock};
+use parking_lot::Mutex;
 
 use crate::data::Document;
 use crate::embedding::embedder::Embedder;
 use crate::error::Result;
 use crate::storage::Storage;
-use crate::store::document::UnifiedDocumentStore;
 use crate::vector::core::vector::Vector;
 use crate::vector::index::config::VectorIndexTypeConfig;
 use crate::vector::index::factory::VectorIndexFactory;
@@ -46,20 +44,17 @@ use self::response::{VectorHit, VectorSearchResults, VectorStats};
 
 /// A simplified vector storage component following the LexicalStore pattern.
 ///
-/// This structure mirrors `LexicalStore` with only 4 members:
+/// This structure mirrors `LexicalStore` with only 3 members:
 /// - `index`: The underlying vector index
 /// - `writer_cache`: Cached writer for write operations
 /// - `searcher_cache`: Cached searcher for search operations
-/// - `doc_store`: Document storage
 pub struct VectorStore {
     /// The underlying vector index.
     index: Box<dyn VectorIndex>,
     /// Cached writer (created on-demand).
     writer_cache: Mutex<Option<Box<dyn VectorIndexWriter>>>,
     /// Cached searcher (invalidated after commit/optimize).
-    searcher_cache: RwLock<Option<Box<dyn VectorIndexSearcher>>>,
-    /// Document storage.
-    doc_store: Arc<RwLock<UnifiedDocumentStore>>,
+    searcher_cache: parking_lot::RwLock<Option<Box<dyn VectorIndexSearcher>>>,
 }
 
 impl std::fmt::Debug for VectorStore {
@@ -80,19 +75,14 @@ impl VectorStore {
     ///
     /// * `storage` - The storage backend for persisting index data
     /// * `config` - High-level configuration (compatible with Engine)
-    /// * `doc_store` - Document storage
     ///
     /// # Returns
     ///
     /// Returns a new `VectorStore` instance.
-    pub fn new(
-        storage: Arc<dyn Storage>,
-        config: VectorIndexConfig,
-        doc_store: Arc<RwLock<UnifiedDocumentStore>>,
-    ) -> Result<Self> {
+    pub fn new(storage: Arc<dyn Storage>, config: VectorIndexConfig) -> Result<Self> {
         // Extract index type config from the first field, or use default
         let index_type_config = Self::extract_index_type_config(&config);
-        Self::with_index_type_config(storage, index_type_config, doc_store)
+        Self::with_index_type_config(storage, index_type_config)
     }
 
     /// Create a new vector store with explicit index type configuration.
@@ -104,7 +94,6 @@ impl VectorStore {
     ///
     /// * `storage` - The storage backend for persisting index data
     /// * `config` - Configuration for the vector index (Flat, HNSW, or IVF)
-    /// * `doc_store` - Document storage
     ///
     /// # Returns
     ///
@@ -112,14 +101,12 @@ impl VectorStore {
     pub fn with_index_type_config(
         storage: Arc<dyn Storage>,
         config: VectorIndexTypeConfig,
-        doc_store: Arc<RwLock<UnifiedDocumentStore>>,
     ) -> Result<Self> {
         let index = VectorIndexFactory::open_or_create(storage, "vector_index", config)?;
         Ok(Self {
             index,
             writer_cache: Mutex::new(None),
-            searcher_cache: RwLock::new(None),
-            doc_store,
+            searcher_cache: parking_lot::RwLock::new(None),
         })
     }
 
@@ -167,83 +154,6 @@ impl VectorStore {
         })
     }
 
-    /// Add a document to the index.
-    ///
-    /// Changes are not persisted until you call `commit()`.
-    pub fn add_document(&self, doc: Document) -> Result<u64> {
-        // Add to document store first
-        let internal_id = self.doc_store.write().add_document(doc.clone())?;
-
-        // Get or create writer
-        let mut guard = self.writer_cache.lock();
-        if guard.is_none() {
-            *guard = Some(self.index.writer()?);
-        }
-
-        // Add values to index (writer handles embedding automatically)
-        let writer = guard.as_mut().unwrap();
-        for (field_name, value) in &doc.fields {
-            writer.add_value(internal_id, field_name.clone(), value.clone())?;
-        }
-
-        Ok(internal_id)
-    }
-
-    /// Put (upsert) a document into the index.
-    ///
-    /// If a document with the same ID exists, it is updated.
-    pub fn put_document(&self, doc: Document) -> Result<u64> {
-        let external_id = doc
-            .fields
-            .get("_id")
-            .and_then(|v| v.as_text())
-            .map(|s| s.to_string())
-            .ok_or_else(|| {
-                crate::error::IrisError::invalid_argument(
-                    "_id field is required for put_document",
-                )
-            })?;
-
-        // Delete existing documents with same ID
-        let _ = self.delete_documents(&external_id)?;
-
-        // Add the new document
-        self.add_document(doc)
-    }
-
-    /// Get documents by external ID.
-    pub fn get_documents(&self, external_id: &str) -> Result<Vec<Document>> {
-        let ids = self.doc_store.read().find_all_by_external_id(external_id)?;
-        let mut results = Vec::with_capacity(ids.len());
-        for id in ids {
-            if let Some(doc) = self.doc_store.read().get_document(id)? {
-                results.push(doc);
-            }
-        }
-        Ok(results)
-    }
-
-    /// Delete documents by external ID.
-    pub fn delete_documents(&self, external_id: &str) -> Result<bool> {
-        let ids = self.doc_store.read().find_all_by_external_id(external_id)?;
-        if ids.is_empty() {
-            return Ok(false);
-        }
-
-        let mut guard = self.writer_cache.lock();
-        if guard.is_none() {
-            *guard = Some(self.index.writer()?);
-        }
-        let writer = guard.as_mut().unwrap();
-
-        for id in &ids {
-            writer.delete_document(*id)?;
-            self.doc_store.write().delete_document(*id)?;
-        }
-
-        Ok(true)
-    }
-
     /// Upsert a document by its internal ID (used for WAL recovery).
     ///
     /// This method is primarily used during WAL recovery where the internal ID
@@ -276,7 +186,6 @@ impl VectorStore {
         let writer = guard.as_mut().unwrap();
 
         writer.delete_document(doc_id)?;
-        self.doc_store.write().delete_document(doc_id)?;
 
         Ok(())
     }
@@ -443,18 +352,13 @@ impl VectorStore {
 mod tests {
     use super::*;
     use crate::storage::memory::{MemoryStorage, MemoryStorageConfig};
-    use crate::storage::prefixed::PrefixedStorage;
 
     #[test]
     fn test_vectorstore_creation() {
         let storage = Arc::new(MemoryStorage::new(MemoryStorageConfig::default()));
-        let doc_storage = Arc::new(PrefixedStorage::new("documents", storage.clone()));
-        let doc_store = Arc::new(RwLock::new(
-            UnifiedDocumentStore::open(doc_storage).unwrap(),
-        ));
 
         let config = VectorIndexTypeConfig::default();
-        let store = VectorStore::with_index_type_config(storage, config, doc_store).unwrap();
+        let store = VectorStore::with_index_type_config(storage, config).unwrap();
 
         assert!(!store.is_closed());
     }
@@ -462,13 +366,9 @@ mod tests {
     #[test]
     fn test_vectorstore_close() {
         let storage = Arc::new(MemoryStorage::new(MemoryStorageConfig::default()));
-        let doc_storage = Arc::new(PrefixedStorage::new("documents", storage.clone()));
-        let doc_store = Arc::new(RwLock::new(
-            UnifiedDocumentStore::open(doc_storage).unwrap(),
-        ));
 
         let config = VectorIndexTypeConfig::default();
-        let store = VectorStore::with_index_type_config(storage, config, doc_store).unwrap();
+        let store = VectorStore::with_index_type_config(storage, config).unwrap();
 
         assert!(!store.is_closed());
         store.close().unwrap();
