@@ -4,7 +4,6 @@
 
 use crate::data::DataValue;
 
-use crate::vector::store::filter::VectorFilter;
 use crate::vector::store::request::{
     FieldSelector, QueryPayload, QueryVector, VectorScoreMode, VectorSearchRequest,
 };
@@ -14,7 +13,7 @@ use crate::vector::store::request::{
 /// # Example
 ///
 /// ```
-/// use iris::vector::store::query::VectorSearchRequestBuilder;
+/// use iris::vector::query::VectorSearchRequestBuilder;
 ///
 /// let request = VectorSearchRequestBuilder::new()
 ///     .add_vector("content", vec![0.1, 0.2, 0.3])
@@ -70,17 +69,6 @@ impl VectorSearchRequestBuilder {
     /// * `payload` - The payload to add
     ///
     /// This is the low-level method used by `add_text`, `add_image`, etc.
-    /// Add a payload to be embedded.
-    ///
-    /// This is the unified method for all modalities (text, image, video, etc.).
-    /// The bytes will be processed by the configured embedder.
-    ///
-    /// # Arguments
-    ///
-    /// * `field` - The target field name
-    /// * `payload` - The payload to add
-    ///
-    /// This is the low-level method used by `add_text`, `add_image`, etc.
     pub fn add_payload(mut self, field: impl Into<String>, payload: DataValue) -> Self {
         self.request
             .query_payloads
@@ -118,11 +106,9 @@ impl VectorSearchRequestBuilder {
     pub fn field(mut self, field: impl Into<String>) -> Self {
         let field = field.into();
         if let Some(fields) = &mut self.request.fields {
-            fields.push(crate::vector::store::request::FieldSelector::Exact(field));
+            fields.push(FieldSelector::Exact(field));
         } else {
-            self.request.fields = Some(vec![crate::vector::store::request::FieldSelector::Exact(
-                field,
-            )]);
+            self.request.fields = Some(vec![FieldSelector::Exact(field)]);
         }
         self
     }
@@ -142,12 +128,6 @@ impl VectorSearchRequestBuilder {
     /// Set the overfetch factor.
     pub fn overfetch(mut self, overfetch: f32) -> Self {
         self.request.overfetch = overfetch;
-        self
-    }
-
-    /// Set a filter for the query.
-    pub fn filter(mut self, filter: VectorFilter) -> Self {
-        self.request.filter = Some(filter);
         self
     }
 

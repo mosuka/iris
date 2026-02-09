@@ -14,13 +14,13 @@ use crate::data::DataValue::{
 use crate::error::{IrisError, Result};
 // Note: Geo and DateTime were removed from FieldValue definition implicitly by switching to DataValue.
 // Only standard types remain. Logic using Geo/DateTime needs update.
-use crate::lexical::index::inverted::query::Query;
-use crate::lexical::index::inverted::query::boolean::BooleanQuery;
-use crate::lexical::index::inverted::query::collector::{
+use crate::lexical::query::Query;
+use crate::lexical::query::boolean::BooleanQuery;
+use crate::lexical::query::collector::{
     Collector, CountCollector, TopDocsCollector, TopFieldCollector,
 };
-use crate::lexical::index::inverted::query::parser::QueryParser;
-use crate::lexical::index::inverted::query::{LexicalSearchResults, SearchHit};
+use crate::lexical::query::parser::QueryParser;
+use crate::lexical::query::{LexicalSearchResults, SearchHit};
 use crate::lexical::index::inverted::reader::InvertedIndexReader;
 use crate::lexical::reader::LexicalIndexReader;
 use crate::lexical::search::searcher::{
@@ -537,8 +537,8 @@ impl InvertedIndexSearcher {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::lexical::index::inverted::query::boolean::{BooleanQuery, BooleanQueryBuilder};
-    use crate::lexical::index::inverted::query::term::TermQuery;
+    use crate::lexical::query::boolean::{BooleanQuery, BooleanQueryBuilder};
+    use crate::lexical::query::term::TermQuery;
     use crate::lexical::index::inverted::reader::{InvertedIndexReader, InvertedIndexReaderConfig};
 
     use crate::storage::memory::MemoryStorage;

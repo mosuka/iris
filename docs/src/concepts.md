@@ -58,7 +58,7 @@ One of IRiS's core strengths is its ability to perform **Hybrid Search**—combi
 2. **Parallel Execution**:
    * The **Vector Searcher** scans the HNSW index to find nearest neighbors.
    * The **Lexical Searcher** scans the Inverted Index to find matching terms.
-3. **Fusion**: The results are merged using a configurable strategy (`FusionConfig`):
+3. **Fusion**: The results are merged using a configurable strategy (`FusionAlgorithm`):
    * **RRF (Reciprocal Rank Fusion)**: Ranks documents based on their positional rank in each result set. Robust and parameter-free.
    * **Weighted Sum**: Linearly combines normalized scores (`alpha * vector_score + beta * lexical_score`).
 

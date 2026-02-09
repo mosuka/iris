@@ -1,4 +1,4 @@
-use crate::lexical::index::inverted::query::Query;
+use crate::lexical::query::Query;
 use crate::vector::store::request::VectorSearchRequest;
 
 /// Unified search request.

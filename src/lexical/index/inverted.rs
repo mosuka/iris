@@ -31,7 +31,6 @@ use crate::storage::file::{FileStorage, FileStorageConfig};
 
 pub mod core;
 pub mod maintenance;
-pub mod query;
 pub mod reader;
 pub mod searcher;
 pub mod segment;

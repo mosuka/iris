@@ -14,9 +14,9 @@
 //! - `writer`: Index writer trait
 
 // Internal modules
-// Internal modules
 pub mod core;
 pub mod index;
+pub mod query;
 pub mod search;
 
 pub mod reader;
@@ -27,8 +27,8 @@ pub mod writer;
 pub use core::field::{FieldOption, NumericType, TextOption};
 pub use core::parser::DocumentParser;
 pub use index::config::InvertedIndexConfig;
-pub use index::inverted::query::*;
 pub use index::inverted::writer::{InvertedIndexWriter, InvertedIndexWriterConfig};
+pub use query::*;
 pub use reader::LexicalIndexReader;
 pub use search::searcher::{LexicalSearchParams, LexicalSearchQuery, LexicalSearchRequest};
 pub use store::LexicalStore;

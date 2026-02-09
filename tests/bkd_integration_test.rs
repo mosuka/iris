@@ -165,7 +165,7 @@ fn test_geo_bkd_query() {
 }
 
 fn collect_matcher_results(
-    mut m: Box<dyn iris::lexical::index::inverted::query::matcher::Matcher>,
+    mut m: Box<dyn iris::lexical::query::matcher::Matcher>,
 ) -> Vec<u64> {
     let mut docs = Vec::new();
     while !m.is_exhausted() {

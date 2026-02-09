@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::Result;
 use crate::lexical::index::inverted::core::terms::TermsEnum;
-use crate::lexical::index::inverted::query::Query;
+use crate::lexical::query::Query;
 use crate::lexical::reader::LexicalIndexReader;
 
 /// A query that matches multiple terms based on some pattern or criteria.
@@ -31,8 +31,8 @@ use crate::lexical::reader::LexicalIndexReader;
 /// # Example (conceptual - not fully implemented yet)
 ///
 /// ```ignore
-/// use iris::lexical::index::inverted::query::multi_term::MultiTermQuery;
-/// use iris::lexical::index::inverted::query::fuzzy::FuzzyQuery;
+/// use iris::lexical::query::multi_term::MultiTermQuery;
+/// use iris::lexical::query::fuzzy::FuzzyQuery;
 ///
 /// let fuzzy_query = FuzzyQuery::new("content", "hello").max_edits(2);
 ///
@@ -139,12 +139,12 @@ pub trait MultiTermQuery: Query {
 
         if matching_terms.is_empty() {
             // We return a BooleanQuery which will produce EmptyMatcher if empty.
-            use crate::lexical::index::inverted::query::boolean::BooleanQuery;
+            use crate::lexical::query::boolean::BooleanQuery;
             return Ok(Box::new(BooleanQuery::new()));
         }
 
-        use crate::lexical::index::inverted::query::boolean::{BooleanClause, BooleanQuery, Occur};
-        use crate::lexical::index::inverted::query::term::TermQuery;
+        use crate::lexical::query::boolean::{BooleanClause, BooleanQuery, Occur};
+        use crate::lexical::query::term::TermQuery;
 
         let mut boolean_query = BooleanQuery::new();
         boolean_query.set_boost(self.boost());

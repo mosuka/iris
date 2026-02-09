@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::error::Result;
-use crate::lexical::index::inverted::query::LexicalSearchResults;
+use crate::lexical::query::LexicalSearchResults;
 use crate::lexical::search::searcher::LexicalSearchRequest;
 use crate::lexical::store::LexicalStore;
 use crate::spelling::corrector::{
@@ -150,7 +150,7 @@ impl SpellCorrectedSearchEngine {
         query_str: &str,
         default_field: &str,
     ) -> Result<SpellCorrectedSearchResults> {
-        use crate::lexical::index::inverted::query::parser::QueryParser;
+        use crate::lexical::query::parser::QueryParser;
 
         // Get analyzer from engine
         let analyzer = self.engine.analyzer()?;
@@ -205,7 +205,7 @@ impl SpellCorrectedSearchEngine {
         field: &str,
         query_str: &str,
     ) -> Result<SpellCorrectedSearchResults> {
-        use crate::lexical::index::inverted::query::parser::QueryParser;
+        use crate::lexical::query::parser::QueryParser;
 
         // Get analyzer from engine
         let analyzer = self.engine.analyzer()?;
@@ -504,7 +504,7 @@ mod tests {
 
     #[test]
     fn test_spell_corrected_results() {
-        use crate::lexical::index::inverted::query::LexicalSearchResults;
+        use crate::lexical::query::LexicalSearchResults;
 
         let results = LexicalSearchResults {
             hits: vec![],

@@ -7,8 +7,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::Result;
 use crate::lexical::core::field::FieldValue;
-use crate::lexical::index::inverted::query::Hit;
-use crate::lexical::index::inverted::query::Query;
+use crate::lexical::query::Hit;
+use crate::lexical::query::Query;
 use crate::lexical::reader::LexicalIndexReader;
 
 /// Represents a facet field and its hierarchical structure.

@@ -7,10 +7,10 @@ use regex::Regex;
 
 use crate::error::Result;
 use crate::lexical::index::inverted::core::terms::{TermDictionaryAccess, TermsEnum};
-use crate::lexical::index::inverted::query::Query;
-use crate::lexical::index::inverted::query::matcher::Matcher;
-use crate::lexical::index::inverted::query::multi_term::{MultiTermQuery, RewriteMethod};
-use crate::lexical::index::inverted::query::scorer::Scorer;
+use crate::lexical::query::Query;
+use crate::lexical::query::matcher::Matcher;
+use crate::lexical::query::multi_term::{MultiTermQuery, RewriteMethod};
+use crate::lexical::query::scorer::Scorer;
 use crate::lexical::index::inverted::reader::InvertedIndexReader;
 use crate::lexical::reader::LexicalIndexReader;
 

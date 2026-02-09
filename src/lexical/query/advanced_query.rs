@@ -5,11 +5,11 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 use crate::error::Result;
-use crate::lexical::index::inverted::query::Query;
-use crate::lexical::index::inverted::query::QueryResult;
-use crate::lexical::index::inverted::query::boolean::{BooleanQuery, Occur};
-use crate::lexical::index::inverted::query::matcher::Matcher;
-use crate::lexical::index::inverted::query::scorer::Scorer;
+use crate::lexical::query::Query;
+use crate::lexical::query::QueryResult;
+use crate::lexical::query::boolean::{BooleanQuery, Occur};
+use crate::lexical::query::matcher::Matcher;
+use crate::lexical::query::scorer::Scorer;
 use crate::lexical::reader::LexicalIndexReader;
 
 /// Configuration for advanced query execution.
@@ -467,7 +467,7 @@ impl Query for MultiFieldQuery {
             MultiFieldQueryType::BestFields | MultiFieldQueryType::Boolean => {
                 // Add each field as a should clause
                 for field in self.fields.keys() {
-                    let term_query = crate::lexical::index::inverted::query::term::TermQuery::new(
+                    let term_query = crate::lexical::query::term::TermQuery::new(
                         field.clone(),
                         self.query_text.clone(),
                     );
@@ -478,7 +478,7 @@ impl Query for MultiFieldQuery {
             MultiFieldQueryType::MostFields => {
                 // All fields should match
                 for field in self.fields.keys() {
-                    let term_query = crate::lexical::index::inverted::query::term::TermQuery::new(
+                    let term_query = crate::lexical::query::term::TermQuery::new(
                         field.clone(),
                         self.query_text.clone(),
                     );
@@ -489,7 +489,7 @@ impl Query for MultiFieldQuery {
                 // Create phrase query across fields (simplified)
                 let mut combined_query = BooleanQuery::new();
                 for field in self.fields.keys() {
-                    let term_query = crate::lexical::index::inverted::query::term::TermQuery::new(
+                    let term_query = crate::lexical::query::term::TermQuery::new(
                         field.clone(),
                         self.query_text.clone(),
                     );
@@ -509,7 +509,7 @@ impl Query for MultiFieldQuery {
         match self.query_type {
             MultiFieldQueryType::BestFields | MultiFieldQueryType::Boolean => {
                 for field in self.fields.keys() {
-                    let term_query = crate::lexical::index::inverted::query::term::TermQuery::new(
+                    let term_query = crate::lexical::query::term::TermQuery::new(
                         field.clone(),
                         self.query_text.clone(),
                     );
@@ -519,7 +519,7 @@ impl Query for MultiFieldQuery {
             }
             MultiFieldQueryType::MostFields => {
                 for field in self.fields.keys() {
-                    let term_query = crate::lexical::index::inverted::query::term::TermQuery::new(
+                    let term_query = crate::lexical::query::term::TermQuery::new(
                         field.clone(),
                         self.query_text.clone(),
                     );
@@ -529,7 +529,7 @@ impl Query for MultiFieldQuery {
             MultiFieldQueryType::CrossFields => {
                 let mut combined_query = BooleanQuery::new();
                 for field in self.fields.keys() {
-                    let term_query = crate::lexical::index::inverted::query::term::TermQuery::new(
+                    let term_query = crate::lexical::query::term::TermQuery::new(
                         field.clone(),
                         self.query_text.clone(),
                     );
@@ -587,7 +587,7 @@ impl Query for MultiFieldQuery {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::lexical::index::inverted::query::term::TermQuery;
+    use crate::lexical::query::term::TermQuery;
 
     #[allow(dead_code)]
     #[test]

@@ -1,3 +1,4 @@
+pub mod query;
 pub mod schema;
 pub mod search;
 
@@ -378,9 +379,9 @@ impl Engine {
                 return Ok(Vec::new());
             }
 
-            let new_lexical_query: Option<Box<dyn crate::lexical::index::inverted::query::Query>> =
+            let new_lexical_query: Option<Box<dyn crate::lexical::query::Query>> =
                 if let Some(user_query) = &request.lexical {
-                    use crate::lexical::index::inverted::query::boolean::BooleanQueryBuilder;
+                    use crate::lexical::query::boolean::BooleanQueryBuilder;
                     let bool_query = BooleanQueryBuilder::new()
                         .must(user_query.clone_box())
                         .must(filter_query.clone_box())
@@ -469,7 +470,7 @@ impl Engine {
     /// Combine results from lexical and vector engines.
     fn fuse_results(
         &self,
-        lexical_hits: Vec<crate::lexical::index::inverted::query::SearchHit>,
+        lexical_hits: Vec<crate::lexical::query::SearchHit>,
         vector_hits: Vec<crate::vector::store::response::VectorHit>,
         fusion: FusionAlgorithm,
         limit: usize,

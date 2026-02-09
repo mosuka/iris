@@ -7,9 +7,9 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 use crate::error::Result;
-use crate::lexical::index::inverted::query::Query;
-use crate::lexical::index::inverted::query::matcher::Matcher;
-use crate::lexical::index::inverted::query::scorer::Scorer;
+use crate::lexical::query::Query;
+use crate::lexical::query::matcher::Matcher;
+use crate::lexical::query::scorer::Scorer;
 use crate::lexical::reader::LexicalIndexReader;
 
 /// A span represents a term occurrence with position information.

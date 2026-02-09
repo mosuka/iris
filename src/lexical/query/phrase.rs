@@ -4,9 +4,9 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 
 use crate::error::Result;
-use crate::lexical::index::inverted::query::Query;
-use crate::lexical::index::inverted::query::matcher::{EmptyMatcher, Matcher};
-use crate::lexical::index::inverted::query::scorer::{BM25Scorer, Scorer};
+use crate::lexical::query::Query;
+use crate::lexical::query::matcher::{EmptyMatcher, Matcher};
+use crate::lexical::query::scorer::{BM25Scorer, Scorer};
 use crate::lexical::reader::LexicalIndexReader;
 
 /// A matcher that finds documents containing phrase matches.

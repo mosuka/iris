@@ -9,9 +9,9 @@ use crate::analysis::analyzer::analyzer::Analyzer;
 use crate::analysis::analyzer::standard::StandardAnalyzer;
 use crate::error::Result;
 use crate::lexical::core::field::FieldValue;
-use crate::lexical::index::inverted::query::Query;
-use crate::lexical::index::inverted::query::matcher::Matcher;
-use crate::lexical::index::inverted::query::scorer::Scorer;
+use crate::lexical::query::Query;
+use crate::lexical::query::matcher::Matcher;
+use crate::lexical::query::scorer::Scorer;
 use crate::lexical::reader::LexicalIndexReader;
 
 /// Configuration for similarity search.
