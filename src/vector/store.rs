@@ -17,9 +17,7 @@
 pub mod config;
 pub mod embedder;
 pub mod embedding_writer;
-pub mod filter;
 pub mod memory;
-pub mod query;
 pub mod request;
 pub mod response;
 

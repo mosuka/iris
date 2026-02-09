@@ -3,8 +3,8 @@
 use std::fmt::Debug;
 
 use crate::error::Result;
-use crate::lexical::index::inverted::query::Query;
-use crate::lexical::index::inverted::query::matcher::Matcher;
+use crate::lexical::query::Query;
+use crate::lexical::query::matcher::Matcher;
 use crate::util::simd;
 
 /// Type alias for boolean scorer clauses.

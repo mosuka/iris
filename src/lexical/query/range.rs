@@ -6,9 +6,9 @@ use chrono::{DateTime, Utc};
 
 use crate::error::Result;
 use crate::lexical::core::field::NumericType;
-use crate::lexical::index::inverted::query::Query;
-use crate::lexical::index::inverted::query::matcher::{EmptyMatcher, Matcher, PreComputedMatcher};
-use crate::lexical::index::inverted::query::scorer::{BM25Scorer, Scorer};
+use crate::lexical::query::Query;
+use crate::lexical::query::matcher::{EmptyMatcher, Matcher, PreComputedMatcher};
+use crate::lexical::query::scorer::{BM25Scorer, Scorer};
 use crate::lexical::reader::LexicalIndexReader;
 
 /// Bound type for range queries.
@@ -829,7 +829,7 @@ pub struct NumericRangeFilterMatcher {
     /// The numeric range query for reference.
     query: NumericRangeQuery,
     /// The underlying AllMatcher.
-    all_matcher: crate::lexical::index::inverted::query::matcher::AllMatcher,
+    all_matcher: crate::lexical::query::matcher::AllMatcher,
     /// Reader reference for document access.
     reader: Option<std::sync::Arc<dyn LexicalIndexReader>>,
 }
@@ -840,7 +840,7 @@ impl NumericRangeFilterMatcher {
         let max_doc = reader.max_doc();
         NumericRangeFilterMatcher {
             query,
-            all_matcher: crate::lexical::index::inverted::query::matcher::AllMatcher::new(max_doc),
+            all_matcher: crate::lexical::query::matcher::AllMatcher::new(max_doc),
             reader: Some(reader),
         }
     }

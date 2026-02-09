@@ -12,7 +12,7 @@ use crate::lexical::core::document::Document;
 use crate::lexical::index::LexicalIndex;
 use crate::lexical::index::factory::LexicalIndexFactory;
 use crate::lexical::index::inverted::InvertedIndexStats;
-use crate::lexical::index::inverted::query::LexicalSearchResults;
+use crate::lexical::query::LexicalSearchResults;
 use crate::lexical::search::searcher::{LexicalSearchRequest, LexicalSearcher};
 use crate::lexical::store::config::LexicalIndexConfig;
 use crate::lexical::writer::LexicalIndexWriter;
@@ -177,8 +177,8 @@ impl LexicalStore {
         }
 
         // 2. Check reader (Committed)
-        use crate::lexical::index::inverted::query::Query;
-        use crate::lexical::index::inverted::query::term::TermQuery;
+        use crate::lexical::query::Query;
+        use crate::lexical::query::term::TermQuery;
 
         let query = Box::new(TermQuery::new(field, term)) as Box<dyn Query>;
         let request = LexicalSearchRequest::new(query)
@@ -347,7 +347,7 @@ impl LexicalStore {
     /// ```rust,no_run
     /// use iris::lexical::core::document::Document;
     /// use iris::lexical::search::searcher::LexicalSearchRequest;
-    /// use iris::lexical::index::inverted::query::term::TermQuery;
+    /// use iris::lexical::query::term::TermQuery;
     /// # use iris::lexical::store::LexicalStore;
     /// # use iris::lexical::store::config::LexicalIndexConfig;
     /// # use iris::storage::{StorageConfig, StorageFactory};
@@ -375,7 +375,7 @@ impl LexicalStore {
     /// # Example with QueryParser
     ///
     /// ```rust,no_run
-    /// use iris::lexical::index::inverted::query::parser::QueryParser;
+    /// use iris::lexical::query::parser::QueryParser;
     /// use iris::lexical::search::searcher::LexicalSearchRequest;
     /// # use iris::lexical::core::document::Document;
     /// # use iris::lexical::store::LexicalStore;
@@ -507,9 +507,9 @@ impl LexicalStore {
     /// Returns `Result<QueryParser>` containing the configured parser.
     pub fn query_parser(
         &self,
-    ) -> Result<crate::lexical::index::inverted::query::parser::QueryParser> {
+    ) -> Result<crate::lexical::query::parser::QueryParser> {
         let analyzer = self.analyzer()?;
-        let mut parser = crate::lexical::index::inverted::query::parser::QueryParser::new(analyzer);
+        let mut parser = crate::lexical::query::parser::QueryParser::new(analyzer);
 
         if let Ok(fields) = self.index.default_fields()
             && !fields.is_empty()
@@ -542,8 +542,8 @@ impl LexicalStore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::lexical::index::inverted::query::Query;
-    use crate::lexical::index::inverted::query::term::TermQuery;
+    use crate::lexical::query::Query;
+    use crate::lexical::query::term::TermQuery;
     use crate::lexical::store::config::LexicalIndexConfig;
     use crate::storage::file::{FileStorage, FileStorageConfig};
     use crate::storage::memory::{MemoryStorage, MemoryStorageConfig};
@@ -815,7 +815,7 @@ mod tests {
         engine.commit().unwrap();
 
         // Search with QueryParser (Lucene style)
-        use crate::lexical::index::inverted::query::parser::QueryParser;
+        use crate::lexical::query::parser::QueryParser;
         let parser = QueryParser::with_standard_analyzer()
             .unwrap()
             .with_default_field("title");
@@ -841,7 +841,7 @@ mod tests {
 
         // Search specific field
         use crate::analysis::analyzer::standard::StandardAnalyzer;
-        use crate::lexical::index::inverted::query::parser::QueryParser;
+        use crate::lexical::query::parser::QueryParser;
         let analyzer = Arc::new(StandardAnalyzer::new().unwrap());
         let parser = QueryParser::new(analyzer);
         let query = parser.parse_field("title", "hello world").unwrap();

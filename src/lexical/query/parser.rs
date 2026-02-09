@@ -22,16 +22,16 @@ use crate::analysis::analyzer::per_field::PerFieldAnalyzer;
 use crate::analysis::analyzer::standard::StandardAnalyzer;
 use crate::error::{IrisError, Result};
 use crate::lexical::core::field::NumericType;
-use crate::lexical::index::inverted::query::Query;
-use crate::lexical::index::inverted::query::boolean::{BooleanClause, BooleanQuery, Occur};
-use crate::lexical::index::inverted::query::fuzzy::FuzzyQuery;
-use crate::lexical::index::inverted::query::phrase::PhraseQuery;
-use crate::lexical::index::inverted::query::range::NumericRangeQuery;
-use crate::lexical::index::inverted::query::term::TermQuery;
-use crate::lexical::index::inverted::query::wildcard::WildcardQuery;
+use crate::lexical::query::Query;
+use crate::lexical::query::boolean::{BooleanClause, BooleanQuery, Occur};
+use crate::lexical::query::fuzzy::FuzzyQuery;
+use crate::lexical::query::phrase::PhraseQuery;
+use crate::lexical::query::range::NumericRangeQuery;
+use crate::lexical::query::term::TermQuery;
+use crate::lexical::query::wildcard::WildcardQuery;
 
 #[derive(Parser)]
-#[grammar = "lexical/index/inverted/query/parser.pest"]
+#[grammar = "lexical/query/parser.pest"]
 struct QueryStringParser;
 
 /// Query parser.
@@ -68,7 +68,7 @@ impl QueryParser {
     /// # Example
     /// ```
     /// use iris::analysis::analyzer::standard::StandardAnalyzer;
-    /// use iris::lexical::index::inverted::query::parser::QueryParser;
+    /// use iris::lexical::query::parser::QueryParser;
     /// use std::sync::Arc;
     ///
     /// let analyzer = Arc::new(StandardAnalyzer::new().unwrap());

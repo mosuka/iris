@@ -1,12 +1,12 @@
 //! Boolean query implementation for combining multiple queries.
 
 use crate::error::Result;
-use crate::lexical::index::inverted::query::Query;
-use crate::lexical::index::inverted::query::matcher::{
+use crate::lexical::query::Query;
+use crate::lexical::query::matcher::{
     AllMatcher, ConjunctionMatcher, ConjunctionNotMatcher, DisjunctionMatcher, EmptyMatcher,
     Matcher, NotMatcher,
 };
-use crate::lexical::index::inverted::query::scorer::{BM25Scorer, Scorer};
+use crate::lexical::query::scorer::{BM25Scorer, Scorer};
 use crate::lexical::reader::LexicalIndexReader;
 
 /// Occurrence requirements for boolean clauses.
@@ -311,7 +311,7 @@ impl Query for BooleanQuery {
     }
 
     fn scorer(&self, reader: &dyn LexicalIndexReader) -> Result<Box<dyn Scorer>> {
-        use crate::lexical::index::inverted::query::scorer::BooleanScorer;
+        use crate::lexical::query::scorer::BooleanScorer;
 
         let mut sub_queries = Vec::new();
 
@@ -480,7 +480,7 @@ impl Default for BooleanQueryBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::lexical::index::inverted::query::term::TermQuery;
+    use crate::lexical::query::term::TermQuery;
     use crate::lexical::index::inverted::reader::{InvertedIndexReader, InvertedIndexReaderConfig};
 
     use crate::storage::memory::MemoryStorage;

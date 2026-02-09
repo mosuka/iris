@@ -7,8 +7,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::Result;
 use crate::lexical::core::field::FieldValue;
-use crate::lexical::index::inverted::query::Query;
-use crate::lexical::index::inverted::query::QueryResult;
+use crate::lexical::query::Query;
+use crate::lexical::query::QueryResult;
 use crate::lexical::reader::LexicalIndexReader;
 use crate::lexical::search::features::facet::{FacetCollector, FacetResults};
 use crate::lexical::search::features::highlight::{HighlightConfig, Highlighter};

@@ -40,6 +40,7 @@ pub use embedding::precomputed::PrecomputedEmbedder;
 pub use engine::Engine;
 pub use engine::EngineBuilder;
 pub use engine::schema::{FieldOption, Schema};
+pub use engine::query::UnifiedQueryParser;
 pub use engine::search::{FusionAlgorithm, SearchRequest, SearchRequestBuilder, SearchResult};
 pub use error::{IrisError, Result};
 pub use maintenance::deletion::DeletionConfig;

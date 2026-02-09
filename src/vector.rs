@@ -15,6 +15,7 @@
 // Internal modules
 pub mod core;
 pub mod index;
+pub mod query;
 pub mod search;
 
 pub mod reader;
@@ -36,7 +37,8 @@ pub use search::searcher::{
 };
 pub use store::VectorStore;
 pub use store::config::{VectorFieldConfig, VectorIndexConfig};
-pub use store::query::VectorSearchRequestBuilder;
+pub use query::VectorSearchRequestBuilder;
+pub use query::VectorQueryParser;
 pub use store::request::{QueryVector, VectorScoreMode, VectorSearchRequest};
 pub use store::response::VectorSearchResults;
 pub use writer::{VectorIndexWriter, VectorIndexWriterConfig};

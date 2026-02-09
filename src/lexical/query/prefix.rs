@@ -1,52 +1,40 @@
-//! Regular expression query implementation.
+//! Prefix query implementation.
+//!
+//! This module provides support for finding terms that start with a specific prefix.
 
-use std::fmt::Debug;
-use std::sync::Arc;
-
-use regex::Regex;
 use serde::{Deserialize, Serialize};
 
-use crate::error::{IrisError, Result};
-use crate::lexical::index::inverted::core::automaton::{AutomatonTermsEnum, RegexAutomaton};
+use crate::error::Result;
 use crate::lexical::index::inverted::core::terms::{TermDictionaryAccess, TermsEnum};
-use crate::lexical::index::inverted::query::Query;
-use crate::lexical::index::inverted::query::matcher::Matcher;
-use crate::lexical::index::inverted::query::multi_term::{MultiTermQuery, RewriteMethod};
-use crate::lexical::index::inverted::query::scorer::Scorer;
+use crate::lexical::query::Query;
+use crate::lexical::query::matcher::Matcher;
+use crate::lexical::query::multi_term::{MultiTermQuery, RewriteMethod};
+use crate::lexical::query::scorer::Scorer;
 use crate::lexical::index::inverted::reader::InvertedIndexReader;
 use crate::lexical::reader::LexicalIndexReader;
 
-/// A query that matches documents containing terms that match a regular expression.
+/// A query that matches terms starting with a specific prefix.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RegexpQuery {
-    /// The field to search in.
+pub struct PrefixQuery {
+    /// Field to search in
     field: String,
-    /// The regular expression pattern.
-    pattern: String,
-    /// The compiled regex for matching.
-    #[serde(skip)]
-    regex: Option<Arc<Regex>>,
-    /// The boost factor for this query.
+    /// Prefix to search for
+    prefix: String,
+    /// Boost factor for the query
     boost: f32,
     /// Rewrite method for multi-term expansion
     rewrite_method: RewriteMethod,
 }
 
-impl RegexpQuery {
-    /// Create a new regexp query.
-    pub fn new<S: Into<String>>(field: S, pattern: S) -> Result<Self> {
-        let field = field.into();
-        let pattern = pattern.into();
-        let regex = Regex::new(&pattern)
-            .map_err(|e| IrisError::analysis(format!("Invalid regexp pattern: {e}")))?;
-
-        Ok(RegexpQuery {
-            field,
-            pattern,
-            regex: Some(Arc::new(regex)),
+impl PrefixQuery {
+    /// Create a new prefix query.
+    pub fn new<F: Into<String>, P: Into<String>>(field: F, prefix: P) -> Self {
+        PrefixQuery {
+            field: field.into(),
+            prefix: prefix.into(),
             boost: 1.0,
             rewrite_method: RewriteMethod::default(),
-        })
+        }
     }
 
     /// Set the boost factor for this query.
@@ -61,18 +49,23 @@ impl RegexpQuery {
         self
     }
 
+    /// Get the prefix.
+    pub fn prefix(&self) -> &str {
+        &self.prefix
+    }
+
     /// Get the field name.
     pub fn field(&self) -> &str {
         &self.field
     }
 
-    /// Get the pattern.
-    pub fn pattern(&self) -> &str {
-        &self.pattern
+    /// Get the rewrite method.
+    pub fn rewrite_method(&self) -> RewriteMethod {
+        self.rewrite_method
     }
 }
 
-impl MultiTermQuery for RegexpQuery {
+impl MultiTermQuery for PrefixQuery {
     fn field(&self) -> &str {
         &self.field
     }
@@ -88,13 +81,20 @@ impl MultiTermQuery for RegexpQuery {
         if let Some(inverted_reader) = reader.as_any().downcast_ref::<InvertedIndexReader>()
             && let Some(terms) = inverted_reader.terms(&self.field)?
         {
-            let regex_automaton = if let Some(regex) = &self.regex {
-                RegexAutomaton::from_regex(regex.as_ref().clone(), self.pattern.clone())
-            } else {
-                RegexAutomaton::new(&self.pattern)?
-            };
+            // Use Generic AutomatonTermsEnum with RegexAutomaton for prefix
+            // Pattern: ^escaped_prefix.*
+            let escaped_prefix = regex::escape(&self.prefix);
+            let pattern = format!("^{}.*", escaped_prefix);
 
-            let terms_enum = AutomatonTermsEnum::new(terms.iterator()?, regex_automaton);
+            let regex_automaton =
+                crate::lexical::index::inverted::core::automaton::RegexAutomaton::new(&pattern)?;
+
+            let terms_enum =
+                crate::lexical::index::inverted::core::automaton::AutomatonTermsEnum::new(
+                    terms.iterator()?,
+                    regex_automaton,
+                );
+
             return Ok(Some(Box::new(terms_enum)));
         }
         Ok(None)
@@ -118,7 +118,7 @@ impl MultiTermQuery for RegexpQuery {
     }
 }
 
-impl Query for RegexpQuery {
+impl Query for PrefixQuery {
     fn matcher(&self, reader: &dyn LexicalIndexReader) -> Result<Box<dyn Matcher>> {
         let rewritten = self.rewrite(reader)?;
         rewritten.matcher(reader)
@@ -139,8 +139,8 @@ impl Query for RegexpQuery {
 
     fn description(&self) -> String {
         format!(
-            "RegexpQuery(field: {}, pattern: {})",
-            self.field, self.pattern
+            "PrefixQuery(field: {}, prefix: {})",
+            self.field, self.prefix
         )
     }
 
@@ -149,45 +149,41 @@ impl Query for RegexpQuery {
     }
 
     fn is_empty(&self, _reader: &dyn LexicalIndexReader) -> Result<bool> {
-        Ok(self.pattern.is_empty())
+        Ok(self.prefix.is_empty())
     }
 
     fn cost(&self, reader: &dyn LexicalIndexReader) -> Result<u64> {
+        // Rough estimate
         Ok(reader.doc_count())
     }
 
     fn as_any(&self) -> &dyn std::any::Any {
         self
     }
+
+    fn field(&self) -> Option<&str> {
+        Some(&self.field)
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    // Removed unused imports:
+    // use crate::lexical::index::inverted::reader::{InvertedIndexReader, InvertedIndexReaderConfig};
+    // use crate::storage::memory::{MemoryStorage, MemoryStorageConfig};
+    // use std::sync::Arc;
 
     #[test]
-    fn test_regexp_query_creation() {
-        let query = RegexpQuery::new("field", "^abc.*").unwrap();
-        assert_eq!(query.field(), "field");
-        assert_eq!(query.pattern(), "^abc.*");
-        assert_eq!(query.boost(), 1.0);
+    fn test_prefix_query_creation() {
+        let query = PrefixQuery::new("field", "pre").with_boost(2.0);
+
+        // Changed to call MultiTermQuery::field() which returns &str
+        assert_eq!(MultiTermQuery::field(&query), "field");
+        assert_eq!(query.prefix(), "pre");
+        assert_eq!(query.boost(), 2.0);
     }
 
-    #[test]
-    fn test_prefix_extraction() {
-        use crate::lexical::index::inverted::core::automaton::{Automaton, RegexAutomaton};
-
-        // Test via RegexAutomaton
-        let automaton = RegexAutomaton::new("^abc.*").unwrap();
-        assert_eq!(automaton.initial_seek_term().as_deref(), Some("abc"));
-
-        let automaton = RegexAutomaton::new("abc.*").unwrap();
-        assert_eq!(automaton.initial_seek_term(), None); // No anchor
-
-        let automaton = RegexAutomaton::new("^abc\\.def").unwrap();
-        assert_eq!(automaton.initial_seek_term().as_deref(), Some("abc.def"));
-
-        let automaton = RegexAutomaton::new("^a(b|c)").unwrap();
-        assert_eq!(automaton.initial_seek_term().as_deref(), Some("a"));
-    }
+    // Note: Integration tests with actual index would be better,
+    // but we can test basic structural properties here.
 }
