@@ -36,7 +36,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-65e5f2e4.js";
+            window.path_to_searchindex_js = "searchindex-7511168e.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-9d358a08.js"></script>
@@ -468,7 +468,7 @@ iris = { version = "0.1.0", features = ["embeddings-openai"] }
 <li>The <strong>Lexical Searcher</strong> scans the Inverted Index to find matching terms.</li>
 </ul>
 </li>
-<li><strong>Fusion</strong>: The results are merged using a configurable strategy (<code>FusionConfig</code>):
+<li><strong>Fusion</strong>: The results are merged using a configurable strategy (<code>FusionAlgorithm</code>):
 <ul>
 <li><strong>RRF (Reciprocal Rank Fusion)</strong>: Ranks documents based on their positional rank in each result set. Robust and parameter-free.</li>
 <li><strong>Weighted Sum</strong>: Linearly combines normalized scores (<code>alpha * vector_score + beta * lexical_score</code>).</li>
