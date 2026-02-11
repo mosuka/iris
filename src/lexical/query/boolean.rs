@@ -18,6 +18,9 @@ pub enum Occur {
     Should,
     /// The clause must not match (equivalent to NOT).
     MustNot,
+    /// The clause must match but does not contribute to scoring.
+    /// Used for filtering results without affecting relevance scores.
+    Filter,
 }
 
 /// A clause in a boolean query.
@@ -57,6 +60,11 @@ impl BooleanClause {
     /// Create a MUST_NOT clause.
     pub fn must_not(query: Box<dyn Query>) -> Self {
         BooleanClause::new(query, Occur::MustNot)
+    }
+
+    /// Create a FILTER clause (matches like Must but does not affect scoring).
+    pub fn filter(query: Box<dyn Query>) -> Self {
+        BooleanClause::new(query, Occur::Filter)
     }
 }
 
@@ -99,6 +107,11 @@ impl BooleanQuery {
     /// Add a MUST_NOT clause.
     pub fn add_must_not(&mut self, query: Box<dyn Query>) {
         self.add_clause(BooleanClause::must_not(query));
+    }
+
+    /// Add a FILTER clause (matches like Must but does not affect scoring).
+    pub fn add_filter(&mut self, query: Box<dyn Query>) {
+        self.add_clause(BooleanClause::filter(query));
     }
 
     /// Set the boost factor.
@@ -164,20 +177,28 @@ impl Query for BooleanQuery {
         }
 
         let must_clauses = self.clauses_by_occur(Occur::Must);
+        let filter_clauses = self.clauses_by_occur(Occur::Filter);
         let should_clauses = self.clauses_by_occur(Occur::Should);
         let must_not_clauses = self.clauses_by_occur(Occur::MustNot);
 
-        // Handle MUST and MUST_NOT clauses
-        if !must_clauses.is_empty() || (!must_not_clauses.is_empty() && should_clauses.is_empty()) {
-            // Create positive matcher from MUST clauses
-            let mut positive_matcher = if !must_clauses.is_empty() {
-                if must_clauses.len() == 1 {
-                    // Single MUST clause
-                    must_clauses[0].query.matcher(reader)?
+        // Combine Must and Filter clauses for matching (Filter behaves like Must)
+        let mut required_clauses: Vec<&BooleanClause> = Vec::new();
+        required_clauses.extend(&must_clauses);
+        required_clauses.extend(&filter_clauses);
+
+        // Handle MUST/FILTER and MUST_NOT clauses
+        if !required_clauses.is_empty()
+            || (!must_not_clauses.is_empty() && should_clauses.is_empty())
+        {
+            // Create positive matcher from MUST and FILTER clauses
+            let mut positive_matcher = if !required_clauses.is_empty() {
+                if required_clauses.len() == 1 {
+                    // Single required clause
+                    required_clauses[0].query.matcher(reader)?
                 } else {
-                    // Multiple MUST clauses - use ConjunctionMatcher
+                    // Multiple required clauses - use ConjunctionMatcher
                     let mut matchers = Vec::new();
-                    for clause in &must_clauses {
+                    for clause in &required_clauses {
                         let matcher = clause.query.matcher(reader)?;
                         if matcher.is_exhausted() {
                             return Ok(Box::new(EmptyMatcher::new()));
@@ -187,7 +208,7 @@ impl Query for BooleanQuery {
                     Box::new(ConjunctionMatcher::new(matchers))
                 }
             } else {
-                // No MUST clauses, but we have MUST_NOT clauses and no SHOULD clauses
+                // No required clauses, but we have MUST_NOT clauses and no SHOULD clauses
                 // Match all documents and exclude the ones matching MUST_NOT
                 Box::new(AllMatcher::new(reader.max_doc()))
             };
@@ -214,7 +235,7 @@ impl Query for BooleanQuery {
                         positive_matcher,
                         should_matcher,
                     ]));
-                } else if !must_clauses.is_empty() {
+                } else if !required_clauses.is_empty() {
                     // SHOULD clauses are exhausted but minimum_should_match requires them
                     // This means no documents can match
                     return Ok(Box::new(EmptyMatcher::new()));
@@ -232,7 +253,7 @@ impl Query for BooleanQuery {
                 }
 
                 if !negative_matchers.is_empty() {
-                    if must_clauses.is_empty() {
+                    if required_clauses.is_empty() {
                         // Only MUST_NOT clauses - use NotMatcher
                         if negative_matchers.len() == 1 {
                             Ok(Box::new(NotMatcher::new(
@@ -360,6 +381,7 @@ impl Query for BooleanQuery {
                 Occur::Must => format!("+{}", clause.query.description()),
                 Occur::Should => clause.query.description(),
                 Occur::MustNot => format!("-{}", clause.query.description()),
+                Occur::Filter => format!("#{}", clause.query.description()),
             };
             parts.push(clause_desc);
         }
@@ -450,6 +472,12 @@ impl BooleanQueryBuilder {
     /// Add a MUST_NOT clause.
     pub fn must_not(mut self, query: Box<dyn Query>) -> Self {
         self.query.add_must_not(query);
+        self
+    }
+
+    /// Add a FILTER clause (matches like Must but does not affect scoring).
+    pub fn filter(mut self, query: Box<dyn Query>) -> Self {
+        self.query.add_filter(query);
         self
     }
 

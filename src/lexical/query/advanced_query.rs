@@ -145,9 +145,9 @@ impl AdvancedQuery {
             // Add core query as must clause
             boolean_builder = boolean_builder.add_clause(self.core_query.clone_box(), Occur::Must);
 
-            // Add filters as must clauses
+            // Add filters as filter clauses (match without affecting score)
             for filter in &self.filters {
-                boolean_builder = boolean_builder.add_clause(filter.clone_box(), Occur::Must);
+                boolean_builder = boolean_builder.add_clause(filter.clone_box(), Occur::Filter);
             }
 
             // Add negative filters as must_not clauses
@@ -379,6 +379,7 @@ impl BooleanQueryBuilder {
                 Occur::Must => boolean_query.add_must(query),
                 Occur::Should => boolean_query.add_should(query),
                 Occur::MustNot => boolean_query.add_must_not(query),
+                Occur::Filter => boolean_query.add_filter(query),
             }
         }
 
