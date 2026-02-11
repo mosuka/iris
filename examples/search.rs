@@ -25,6 +25,7 @@ use iris::lexical::core::field::{IntegerOption, NumericType};
 use iris::lexical::{NumericRangeQuery, TermQuery, TextOption};
 use iris::{EmbedInput, EmbedInputType, Embedder, PerFieldEmbedder};
 use iris::{FusionAlgorithm, Schema, SearchRequestBuilder};
+use serde_json::json;
 
 use iris::storage::memory::MemoryStorageConfig;
 use iris::storage::{StorageConfig, StorageFactory};
@@ -91,35 +92,35 @@ fn main() -> Result<()> {
     //
     // Lexical fields:
     //   - "title"      : Document title (keyword, exact match)
-    //   - "chunk_text"  : Chunk content (tokenized, full-text search)
+    //   - "text"  : Chunk content (tokenized, full-text search)
     //   - "category"    : Category label (keyword, for filtering)
     //   - "page"        : Page number (integer, for range filtering)
     //
     // Vector field:
-    //   - "embedding"   : Auto-embedded from chunk_text (4-dim, flat index)
+    //   - "text_vec"   : Auto-embedded from text (4-dim, flat index)
     let schema = Schema::builder()
         .add_text_field("title", TextOption::default())
-        .add_text_field("chunk_text", TextOption::default())
+        .add_text_field("text", TextOption::default())
         .add_text_field("category", TextOption::default())
         .add_integer_field("page", IntegerOption::default())
-        .add_flat_field("embedding", FlatOption::default().dimension(4))
-        .add_default_field("chunk_text")
+        .add_flat_field("text_vec", FlatOption::default().dimension(4))
+        .add_default_field("text")
         .build();
 
     // Analyzers: "title" and "category" use KeywordAnalyzer (exact match),
-    // "chunk_text" uses StandardAnalyzer (tokenization + lowercasing).
+    // "text" uses StandardAnalyzer (tokenization + lowercasing).
     let std_analyzer = Arc::new(StandardAnalyzer::default());
     let kw_analyzer = Arc::new(KeywordAnalyzer::new());
 
     let mut per_field_analyzer = PerFieldAnalyzer::new(std_analyzer.clone());
     per_field_analyzer.add_analyzer("title", kw_analyzer.clone());
     per_field_analyzer.add_analyzer("category", kw_analyzer.clone());
-    per_field_analyzer.add_analyzer("chunk_text", std_analyzer.clone());
+    per_field_analyzer.add_analyzer("text", std_analyzer.clone());
 
-    // Embedder for the "embedding" vector field
+    // Embedder for the "text_vec" vector field
     let embedder = Arc::new(MockEmbedder);
     let mut per_field_embedder = PerFieldEmbedder::new(embedder.clone());
-    per_field_embedder.add_embedder("embedding", embedder.clone());
+    per_field_embedder.add_embedder("text_vec", embedder.clone());
 
     let engine = Engine::builder(storage, schema)
         .analyzer(Arc::new(per_field_analyzer))
@@ -133,89 +134,56 @@ fn main() -> Result<()> {
 
     println!("--- Indexing chunked documents ---\n");
 
-    // Book A: "The Rust Programming Language"
-    let book_a_chunks = [
-        ("Chapter 1: Getting Started", 1, "basics"),
-        (
-            "Cargo is the Rust build system and package manager. Use cargo new to create a crate.",
-            2,
-            "basics",
-        ),
-        (
-            "Every value in Rust has an owner. Ownership rules prevent data races at compile time.",
-            3,
-            "memory",
-        ),
-        (
-            "References and borrowing let you use values without taking ownership of them.",
-            4,
-            "memory",
-        ),
-        (
-            "Generic types and trait bounds enable polymorphism without runtime overhead.",
-            5,
-            "type-system",
-        ),
-        (
-            "Async functions and tokio provide concurrent programming with lightweight tasks and threads.",
-            6,
-            "concurrency",
-        ),
-    ];
+    let books = json!([
+        {
+            "id": "book_a",
+            "title": "The Rust Programming Language",
+            "chunks": [
+                { "text": "Chapter 1: Getting Started", "page": 1, "category": "basics" },
+                { "text": "Cargo is the Rust build system and package manager. Use cargo new to create a crate.", "page": 2, "category": "basics" },
+                { "text": "Every value in Rust has an owner. Ownership rules prevent data races at compile time.", "page": 3, "category": "memory" },
+                { "text": "References and borrowing let you use values without taking ownership of them.", "page": 4, "category": "memory" },
+                { "text": "Generic types and trait bounds enable polymorphism without runtime overhead.", "page": 5, "category": "type-system" },
+                { "text": "Async functions and tokio provide concurrent programming with lightweight tasks and threads.", "page": 6, "category": "concurrency" }
+            ]
+        },
+        {
+            "id": "book_b",
+            "title": "Programming in Rust",
+            "chunks": [
+                { "text": "Rust's type system catches many bugs at compile time. Trait objects enable dynamic dispatch.", "page": 1, "category": "type-system" },
+                { "text": "The borrow checker ensures memory safety without garbage collection. Lifetime annotations help.", "page": 2, "category": "memory" },
+                { "text": "Rust async/await provides zero-cost concurrency for building scalable concurrent network services.", "page": 3, "category": "concurrency" }
+            ]
+        }
+    ]);
 
-    for (text, page, category) in &book_a_chunks {
-        let doc = Document::builder()
-            .add_text("title", "The Rust Programming Language")
-            .add_text("chunk_text", *text)
-            .add_text("category", *category)
-            .add_integer("page", *page as i64)
-            .add_text("embedding", *text) // Auto-embedded by MockEmbedder
-            .build();
-        engine.add_document("book_a", doc)?;
-    }
-
-    // Book B: "Programming in Rust" (3 chunks)
-    let book_b_chunks = [
-        (
-            "Rust's type system catches many bugs at compile time. Trait objects enable dynamic dispatch.",
-            1,
-            "type-system",
-        ),
-        (
-            "The borrow checker ensures memory safety without garbage collection. Lifetime annotations help.",
-            2,
-            "memory",
-        ),
-        (
-            "Rust async/await provides zero-cost concurrency for building scalable concurrent network services.",
-            3,
-            "concurrency",
-        ),
-    ];
-
-    for (text, page, category) in &book_b_chunks {
-        let doc = Document::builder()
-            .add_text("title", "Programming in Rust")
-            .add_text("chunk_text", *text)
-            .add_text("category", *category)
-            .add_integer("page", *page as i64)
-            .add_text("embedding", *text)
-            .build();
-        engine.add_document("book_b", doc)?;
+    let mut total_chunks = 0;
+    for book in books.as_array().unwrap() {
+        let id = book["id"].as_str().unwrap();
+        let title = book["title"].as_str().unwrap();
+        for chunk in book["chunks"].as_array().unwrap() {
+            let text = chunk["text"].as_str().unwrap();
+            let page = chunk["page"].as_i64().unwrap();
+            let category = chunk["category"].as_str().unwrap();
+            let doc = Document::builder()
+                .add_text("title", title)
+                .add_text("text", text)
+                .add_text("category", category)
+                .add_integer("page", page)
+                .add_text("text_vec", text) // Auto-embedded by MockEmbedder
+                .build();
+            engine.add_document(id, doc)?;
+            total_chunks += 1;
+        }
     }
 
     engine.commit()?;
     println!(
-        "Indexed 2 books as {} chunks total.\n",
-        book_a_chunks.len() + book_b_chunks.len()
+        "Indexed {} books as {} chunks total.\n",
+        books.as_array().unwrap().len(),
+        total_chunks
     );
-
-    // Note: VectorSearchRequestBuilder::add_vector() is used for pre-computed
-    // query vectors. The MockEmbedder maps concepts to these vectors:
-    //   Memory safety  → [0.3, 0.2, 0.8, 0.2]
-    //   Concurrency    → [0.3, 0.1, 0.2, 0.9]
-    //   Type system    → [0.4, 0.8, 0.2, 0.1]
-    //   Build system   → [0.8, 0.3, 0.1, 0.2]
 
     // 4. Case A: Vector Search (find chunks semantically similar to "memory safety")
     println!("[Case A] Vector Search: 'memory safety'");
@@ -225,7 +193,7 @@ fn main() -> Result<()> {
         SearchRequestBuilder::new()
             .with_vector(
                 VectorSearchRequestBuilder::new()
-                    .add_vector("embedding", vec![0.3, 0.2, 0.8, 0.2])
+                    .add_text("text_vec", "memory safety")
                     .build(),
             )
             .limit(3)
@@ -241,7 +209,7 @@ fn main() -> Result<()> {
         SearchRequestBuilder::new()
             .with_vector(
                 VectorSearchRequestBuilder::new()
-                    .add_vector("embedding", vec![0.3, 0.2, 0.8, 0.2])
+                    .add_text("text_vec", "memory safety")
                     .build(),
             )
             .filter(Box::new(TermQuery::new("category", "concurrency")))
@@ -258,7 +226,7 @@ fn main() -> Result<()> {
         SearchRequestBuilder::new()
             .with_vector(
                 VectorSearchRequestBuilder::new()
-                    .add_vector("embedding", vec![0.4, 0.8, 0.2, 0.1])
+                    .add_text("text_vec", "type system")
                     .build(),
             )
             .filter(Box::new(NumericRangeQuery::new(
@@ -280,7 +248,7 @@ fn main() -> Result<()> {
 
     let results = engine.search(
         SearchRequestBuilder::new()
-            .with_lexical(Box::new(TermQuery::new("chunk_text", "ownership")))
+            .with_lexical(Box::new(TermQuery::new("text", "ownership")))
             .limit(3)
             .build(),
     )?;
@@ -294,10 +262,10 @@ fn main() -> Result<()> {
         SearchRequestBuilder::new()
             .with_vector(
                 VectorSearchRequestBuilder::new()
-                    .add_vector("embedding", vec![0.3, 0.1, 0.2, 0.9])
+                    .add_text("text_vec", "concurrent")
                     .build(),
             )
-            .with_lexical(Box::new(TermQuery::new("chunk_text", "async")))
+            .with_lexical(Box::new(TermQuery::new("text", "async")))
             .fusion(FusionAlgorithm::RRF { k: 60.0 })
             .limit(3)
             .build(),
@@ -328,16 +296,16 @@ fn print_results(results: &[iris::SearchResult]) {
             .and_then(|d| d.get("category"))
             .and_then(|v| v.as_text())
             .unwrap_or("?");
-        let chunk_text = doc
-            .and_then(|d| d.get("chunk_text"))
+        let text_content = doc
+            .and_then(|d| d.get("text"))
             .and_then(|v| v.as_text())
             .unwrap_or("?");
 
         // Truncate long text for display
-        let display_text = if chunk_text.len() > 60 {
-            format!("{}...", &chunk_text[..60])
+        let display_text = if text_content.len() > 60 {
+            format!("{}...", &text_content[..60])
         } else {
-            chunk_text.to_string()
+            text_content.to_string()
         };
 
         println!(

@@ -384,7 +384,7 @@ impl Engine {
                     use crate::lexical::query::boolean::BooleanQueryBuilder;
                     let bool_query = BooleanQueryBuilder::new()
                         .must(user_query.clone_box())
-                        .must(filter_query.clone_box())
+                        .filter(filter_query.clone_box())
                         .build();
                     Some(Box::new(bool_query))
                 } else {
@@ -429,6 +429,45 @@ impl Engine {
             }
             if let Some(ids) = &allowed_ids {
                 vreq.allowed_ids = Some(ids.clone());
+            }
+            // Embed query_payloads into query_vectors before searching
+            if !vreq.query_payloads.is_empty() {
+                use crate::data::DataValue;
+                use crate::embedding::embedder::EmbedInput;
+                use crate::embedding::per_field::PerFieldEmbedder;
+                use crate::vector::store::embedder::EmbedderExecutor;
+                use crate::vector::store::request::QueryVector;
+
+                let embedder = self.vector.embedder();
+                let executor = EmbedderExecutor::new()?;
+                for payload in vreq.query_payloads.drain(..) {
+                    let (text_owned, bytes_owned, mime_owned) = match payload.payload {
+                        DataValue::Text(t) => (Some(t), None, None),
+                        DataValue::Bytes(b, m) => (None, Some(b), m),
+                        _ => continue,
+                    };
+                    let field_name = payload.field.clone();
+                    let emb = embedder.clone();
+                    let vector = executor.run(async move {
+                        let input = if let Some(ref text) = text_owned {
+                            EmbedInput::Text(text)
+                        } else if let Some(ref bytes) = bytes_owned {
+                            EmbedInput::Bytes(bytes, mime_owned.as_deref())
+                        } else {
+                            unreachable!()
+                        };
+                        if let Some(pf) = emb.as_any().downcast_ref::<PerFieldEmbedder>() {
+                            pf.embed_field(&field_name, &input).await
+                        } else {
+                            emb.embed(&input).await
+                        }
+                    })?;
+                    vreq.query_vectors.push(QueryVector {
+                        vector: vector.data,
+                        weight: payload.weight,
+                        fields: Some(vec![payload.field]),
+                    });
+                }
             }
             self.vector.search(vreq)?.hits
         } else {
