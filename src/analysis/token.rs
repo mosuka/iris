@@ -353,7 +353,7 @@ impl fmt::Display for Token {
 }
 
 /// A token stream represents a sequence of tokens from the analysis pipeline.
-pub type TokenStream = Box<dyn Iterator<Item = Token>>;
+pub type TokenStream = Box<dyn Iterator<Item = Token> + Send>;
 
 /// Trait for types that can produce a token stream.
 pub trait IntoTokenStream {

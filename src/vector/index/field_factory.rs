@@ -21,7 +21,6 @@ use crate::vector::index::ivf::field_reader::IvfFieldReader;
 use crate::vector::index::ivf::reader::IvfIndexReader as IvfVectorIndexReader;
 use crate::vector::index::ivf::writer::IvfIndexWriter;
 use crate::vector::store::config::VectorFieldConfig;
-use crate::vector::store::embedder::EmbedderExecutor;
 use crate::vector::writer::VectorIndexWriterConfig;
 
 /// Base name for field index files.
@@ -37,7 +36,6 @@ impl VectorFieldFactory {
         vector_option: &FieldOption,
         storage: Arc<dyn Storage>,
         embedder: Arc<dyn Embedder>,
-        executor: Arc<EmbedderExecutor>,
     ) -> Result<Arc<dyn VectorFieldWriter>> {
         if vector_option.dimension() == 0 {
             return Err(IrisError::invalid_config(format!(
@@ -97,7 +95,7 @@ impl VectorFieldFactory {
             }
         };
 
-        let embedding_writer = EmbeddingVectorIndexWriter::new(inner_writer, embedder, executor);
+        let embedding_writer = EmbeddingVectorIndexWriter::new(inner_writer, embedder);
         let writer: Arc<dyn VectorFieldWriter> =
             Arc::new(LegacyVectorFieldWriter::new(field_name, embedding_writer));
 
@@ -161,7 +159,6 @@ impl VectorFieldFactory {
         storage: Arc<dyn Storage>,
         deletion_bitmap: Option<Arc<crate::maintenance::deletion::DeletionBitmap>>,
         embedder: Arc<dyn Embedder>,
-        executor: Arc<EmbedderExecutor>,
     ) -> Result<Arc<dyn VectorField>> {
         use crate::vector::index::hnsw::segment::manager::{SegmentManager, SegmentManagerConfig};
         use crate::vector::index::segmented_field::SegmentedVectorField;
@@ -187,7 +184,7 @@ impl VectorFieldFactory {
                 let (delegate_writer, delegate_reader) = if let Some(opt) = vector_option {
                     if opt.dimension() > 0 {
                         let writer =
-                            Self::create_writer(&name, opt, storage.clone(), embedder, executor)?;
+                            Self::create_writer(&name, opt, storage.clone(), embedder)?;
                         // Only create reader if storage exists, otherwise None?
                         // Actually create_reader attempts to LOAD. If file doesn't exist, it might fail or return empty?
                         // FlatVectorIndexReader::load checks file existence usually?

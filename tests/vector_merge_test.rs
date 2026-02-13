@@ -8,8 +8,8 @@ use iris::vector::index::segmented_field::SegmentedVectorField;
 use iris::vector::{HnswOption, FieldOption};
 use std::sync::Arc;
 
-#[test]
-fn test_segmented_field_manual_merge() -> Result<(), Box<dyn std::error::Error>> {
+#[tokio::test]
+async fn test_segmented_field_manual_merge() -> Result<(), Box<dyn std::error::Error>> {
     // 1. Setup Storage and Manager with small constraints
     let storage = Arc::new(MemoryStorage::new(MemoryStorageConfig::default()));
 
@@ -43,16 +43,16 @@ fn test_segmented_field_manual_merge() -> Result<(), Box<dyn std::error::Error>>
 
     // 3. Add vectors and flush to create segments
     // Segment 1
-    field.add_stored_vector(1, &StoredVector::new(vec![1.0, 0.0, 0.0, 0.0].into()), 0)?;
-    field.flush()?;
+    field.add_stored_vector(1, &StoredVector::new(vec![1.0, 0.0, 0.0, 0.0].into()), 0).await?;
+    field.flush().await?;
 
     // Segment 2
-    field.add_stored_vector(2, &StoredVector::new(vec![0.0, 1.0, 0.0, 0.0].into()), 0)?;
-    field.flush()?;
+    field.add_stored_vector(2, &StoredVector::new(vec![0.0, 1.0, 0.0, 0.0].into()), 0).await?;
+    field.flush().await?;
 
     // Segment 3
-    field.add_stored_vector(3, &StoredVector::new(vec![0.0, 0.0, 1.0, 0.0].into()), 0)?;
-    field.flush()?;
+    field.add_stored_vector(3, &StoredVector::new(vec![0.0, 0.0, 1.0, 0.0].into()), 0).await?;
+    field.flush().await?;
 
     // Check we have 3 segments
     let segments = manager.list_segments();

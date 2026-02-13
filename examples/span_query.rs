@@ -18,7 +18,8 @@ use iris::storage::{StorageConfig, StorageFactory};
 use iris::{DataValue, Document};
 use tempfile::TempDir;
 
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
     println!("=== Span Query Example ===\n");
 
     // 1. Setup Storage

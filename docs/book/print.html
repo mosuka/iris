@@ -179,19 +179,200 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="introduction"><a class="header" href="#introduction">Introduction</a></h1>
-<p>Iris is a fast, featureful full-text search library for Rust, inspired by Whoosh.</p>
+                        <h1 id="iris"><a class="header" href="#iris">IRiS</a></h1>
+<p><a href="https://crates.io/crates/iris"><img src="https://img.shields.io/crates/v/iris.svg" alt="Crates.io" /></a>
+<a href="https://docs.rs/iris"><img src="https://docs.rs/iris/badge.svg" alt="Documentation" /></a>
+<a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT" /></a></p>
+<p>IRiS is a <strong>high-performance</strong> search core library written in Rust, designed for <strong>Information Retrieval with Semantics</strong>.</p>
+<p>IRiS provides the foundational mechanisms <strong>essential for</strong> advanced search capabilities:</p>
+<ul>
+<li><strong>Lexical search primitives</strong> for precise, exact-match retrieval</li>
+<li><strong>Vector-based similarity search</strong> for deep semantic understanding</li>
+<li><strong>Hybrid scoring and ranking</strong> to synthesize multiple signals into coherent results</li>
+</ul>
+<p>Rather than functioning as a monolithic search engine, IRiS is architected as a <strong>composable search core</strong> — a suite of modular building blocks designed to be embedded into applications, extended with custom logic, or orchestrated within distributed systems.</p>
+<h2 id="documentation"><a class="header" href="#documentation">Documentation</a></h2>
+<p>Comprehensive documentation is available in the <a href="https://github.com/mosuka/iris/tree/main/docs"><code>docs/</code></a> directory and online at <a href="https://mosuka.github.io/iris/">https://mosuka.github.io/iris/</a>:</p>
+<ul>
+<li><a href="https://mosuka.github.io/iris/getting_started/index.html"><strong>Getting Started</strong></a>: Installation and basic usage.</li>
+<li><a href="https://mosuka.github.io/iris/concepts/index.html"><strong>Core Concepts</strong></a>: Architecture, Lexical Search, and Vector Search.</li>
+<li><a href="https://mosuka.github.io/iris/advanced/index.html"><strong>Advanced Features</strong></a>: ID Management, Persistence, and Deletions.</li>
+<li><a href="https://docs.rs/iris"><strong>API Reference</strong></a></li>
+</ul>
 <h2 id="features"><a class="header" href="#features">Features</a></h2>
 <ul>
-<li><strong>Pure Rust</strong>: Single binary, easy deployment, high performance.</li>
-<li><strong>Hybrid Search</strong>: Seamlessly combine lexical (BM25) and semantic (Vector) search.</li>
-<li><strong>Flexible Analysis</strong>: Configurable tokenizers and analyzers (Standard, Keyword, Lindera for Japanese).</li>
-<li><strong>Advanced Querying</strong>: Boolean, Phrase, Range, Fuzzy, Wildcard, Geo, and Span queries.</li>
-<li><strong>Pluggable Storage</strong>: Abstract storage interface supporting memory mapping and file-based storage.</li>
+<li><strong>Pure Rust Implementation</strong>: Memory-safe and fast performance with zero-cost abstractions.</li>
+<li><strong>Hybrid Search</strong>: Seamlessly combine BM25 lexical search with HNSW vector search using configurable fusion strategies.</li>
+<li><strong>Multimodal capabilities</strong>: Native support for text-to-image and image-to-image search via CLIP embeddings.</li>
+<li><strong>Rich Query DSL</strong>: Term, phrase, boolean, fuzzy, wildcard, range, and geographic queries.</li>
+<li><strong>Flexible Analysis</strong>: Configurable pipelines for tokenization, normalization, and stemming (including CJK support).</li>
+<li><strong>Pluggable Storage</strong>: Interfaces for in-memory, file-system, and memory-mapped storage backends.</li>
 </ul>
-<h2 id="philosophy"><a class="header" href="#philosophy">Philosophy</a></h2>
-<p>Iris aims to provide a "batteries-included" search experience that is easy to get started with but powerful enough for production use cases requiring customizability. It decouples the complexity of inverted indexes and HNSW graphs behind a clean, high-level API.</p>
-<div style="break-before: page; page-break-before: always;"></div><div style="break-before: page; page-break-before: always;"></div><h1 id="installation"><a class="header" href="#installation">Installation</a></h1>
+<h2 id="quick-start"><a class="header" href="#quick-start">Quick Start</a></h2>
+<pre><pre class="playground"><code class="language-rust">use iris::{Document, Engine, FieldOption, FusionAlgorithm, Schema, SearchRequestBuilder};
+use iris::analysis::analyzer::standard::StandardAnalyzer;
+use iris::lexical::{FieldOption as LexicalFieldOption, TextOption, TermQuery};
+use iris::vector::{FlatOption, VectorOption, VectorSearchRequestBuilder};
+use iris::storage::{StorageConfig, StorageFactory};
+use iris::storage::memory::MemoryStorageConfig;
+use std::sync::Arc;
+
+fn main() -&gt; iris::Result&lt;()&gt; {
+    // 1. Create storage
+    let storage = StorageFactory::create(StorageConfig::Memory(MemoryStorageConfig::default()))?;
+
+    // 2. Define schema with separate lexical and vector fields
+    let schema = Schema::builder()
+        .add_field("content", FieldOption::Lexical(LexicalFieldOption::Text(TextOption::default())))
+        .add_field("content_vec", FieldOption::Vector(VectorOption::Flat(FlatOption { dimension: 384, ..Default::default() })))
+        .build();
+
+    // 3. Create engine with analyzer and embedder
+    let engine = Engine::builder(storage, schema)
+        .analyzer(Arc::new(StandardAnalyzer::default()))
+        .embedder(Arc::new(MyEmbedder))  // Your embedder implementation
+        .build()?;
+
+    engine.index(
+        Document::new_with_id("doc1")
+            .add_text("content", "Rust is a systems programming language")
+            .add_text("content_vec", "Rust is a systems programming language")
+    )?;
+    engine.index(
+        Document::new_with_id("doc2")
+            .add_text("content", "Python is great for machine learning")
+            .add_text("content_vec", "Python is great for machine learning")
+    )?;
+    engine.commit()?;
+
+    // 4. Hybrid search (combines lexical keyword match + semantic similarity)
+    let results = engine.search(
+        SearchRequestBuilder::new()
+            .with_lexical(Box::new(TermQuery::new("content", "programming")))
+            .with_vector(VectorSearchRequestBuilder::new().add_text("content_vec", "systems language").build())
+            .fusion(FusionAlgorithm::RRF { k: 60.0 })
+            .build()
+    )?;
+
+    // 5. Display results with document content
+    for hit in results {
+        if let Ok(Some(doc)) = engine.get_document(hit.doc_id) {
+            let id = doc.id().unwrap_or("unknown");
+            let content = doc.fields.get("content").and_then(|v| v.as_text()).unwrap_or("");
+            println!("[{}] {} (internal_id={}, score={:.4})", id, content, hit.doc_id, hit.score);
+        }
+    }
+
+    Ok(())
+}</code></pre></pre>
+<h2 id="examples"><a class="header" href="#examples">Examples</a></h2>
+<p>You can find usage examples in the <a href="https://github.com/mosuka/iris/tree/main/examples"><code>examples/</code></a> directory:</p>
+<h3 id="search"><a class="header" href="#search">Search</a></h3>
+<ul>
+<li><a href="https://github.com/mosuka/iris/blob/main/examples/search.rs">Unified Search</a> - Lexical, Vector, and Hybrid search in one cohesive example</li>
+<li><a href="https://github.com/mosuka/iris/blob/main/examples/multimodal_search.rs">Multimodal Search</a> - Text-to-image and image-to-image search</li>
+</ul>
+<h3 id="query-types"><a class="header" href="#query-types">Query Types</a></h3>
+<ul>
+<li><a href="https://github.com/mosuka/iris/blob/main/examples/term_query.rs">Term Query</a> - Basic keyword search</li>
+<li><a href="https://github.com/mosuka/iris/blob/main/examples/boolean_query.rs">Boolean Query</a> - Complex boolean expressions (AND, OR, NOT)</li>
+<li><a href="https://github.com/mosuka/iris/blob/main/examples/phrase_query.rs">Phrase Query</a> - Exact phrase matching</li>
+<li><a href="https://github.com/mosuka/iris/blob/main/examples/fuzzy_query.rs">Fuzzy Query</a> - Approximate string matching</li>
+<li><a href="https://github.com/mosuka/iris/blob/main/examples/wildcard_query.rs">Wildcard Query</a> - Pattern-based search</li>
+<li><a href="https://github.com/mosuka/iris/blob/main/examples/range_query.rs">Range Query</a> - Numeric and date range queries</li>
+<li><a href="https://github.com/mosuka/iris/blob/main/examples/geo_query.rs">Geo Query</a> - Geographic search</li>
+<li><a href="https://github.com/mosuka/iris/blob/main/examples/span_query.rs">Span Query</a> - Positional queries</li>
+</ul>
+<h3 id="embeddings"><a class="header" href="#embeddings">Embeddings</a></h3>
+<ul>
+<li><a href="https://github.com/mosuka/iris/blob/main/examples/embedding_with_candle.rs">Candle Embedder</a> - Local BERT embeddings</li>
+<li><a href="https://github.com/mosuka/iris/blob/main/examples/embedding_with_openai.rs">OpenAI Embedder</a> - Cloud-based embeddings</li>
+</ul>
+<h2 id="contributing"><a class="header" href="#contributing">Contributing</a></h2>
+<p>We welcome contributions! Please see our <a href="https://github.com/mosuka/iris/blob/main/CONTRIBUTING.md">Contributing Guidelines</a> for details.</p>
+<ol>
+<li>Fork the repository</li>
+<li>Create a feature branch (<code>git checkout -b feature/amazing-feature</code>)</li>
+<li>Commit your changes (<code>git commit -m 'Add some amazing feature'</code>)</li>
+<li>Push to the branch (<code>git push origin feature/amazing-feature</code>)</li>
+<li>Open a Pull Request</li>
+</ol>
+<h2 id="license"><a class="header" href="#license">License</a></h2>
+<p>This project is licensed under either of</p>
+<ul>
+<li>MIT License (<a href="https://github.com/mosuka/iris/blob/main/LICENSE-MIT">LICENSE-MIT</a> or <a href="http://opensource.org/licenses/MIT">http://opensource.org/licenses/MIT</a>)</li>
+</ul>
+<p>at your option.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="getting-started"><a class="header" href="#getting-started">Getting Started</a></h1>
+<p>Welcome to the Iris getting started guide. This section is designed to try out Iris quickly.</p>
+<h2 id="workflow-overview"><a class="header" href="#workflow-overview">Workflow Overview</a></h2>
+<p>Building a search application with Iris typically involves the following steps:</p>
+<ol>
+<li><strong>Installation</strong>: Adding <code>iris</code> to your project dependencies.</li>
+<li><strong>Configuration</strong>: Setting up the <code>Engine</code> with <code>Schema</code> and choosing a storage backend (Memory, File, or Mmap).</li>
+<li><strong>Indexing</strong>: Inserting documents that contain both text (for lexical search) and vectors (for semantic search).</li>
+<li><strong>Searching</strong>: Executing queries to retrieve relevant results.</li>
+</ol>
+<h2 id="in-this-section"><a class="header" href="#in-this-section">In this Section</a></h2>
+<ul>
+<li><strong><a href="./getting_started/installation.html">Installation</a></strong>
+Learn how to add Iris to your Rust project and configure necessary feature flags (e.g., for different tokenizer support).</li>
+</ul>
+<h2 id="quick-example"><a class="header" href="#quick-example">Quick Example</a></h2>
+<p>For a complete, runnable example of how to set up a Hybrid Search (combining vector and text search), please refer to the <strong><a href="https://github.com/mosuka/iris/blob/main/examples/search.rs">Unified Search Example</a></strong> in the repository.</p>
+<pre><pre class="playground"><code class="language-rust">use iris::{Document, Engine, FieldOption, FusionAlgorithm, Schema, SearchRequestBuilder};
+use iris::analysis::analyzer::standard::StandardAnalyzer;
+use iris::lexical::{FieldOption as LexicalFieldOption, TextOption, TermQuery};
+use iris::vector::{FlatOption, VectorOption, VectorSearchRequestBuilder};
+use iris::storage::{StorageConfig, StorageFactory};
+use iris::storage::memory::MemoryStorageConfig;
+use std::sync::Arc;
+
+fn main() -&gt; iris::Result&lt;()&gt; {
+    // 1. Create storage
+    let storage = StorageFactory::create(StorageConfig::Memory(MemoryStorageConfig::default()))?;
+
+    // 2. Define schema with separate lexical and vector fields
+    let schema = Schema::builder()
+        .add_field("content", FieldOption::Lexical(LexicalFieldOption::Text(TextOption::default())))
+        .add_field("content_vec", FieldOption::Vector(VectorOption::Flat(FlatOption { dimension: 384, ..Default::default() })))
+        .build();
+
+    // 3. Create engine with analyzer and embedder
+    let engine = Engine::builder(storage, schema)
+        .analyzer(Arc::new(StandardAnalyzer::default()))
+        .embedder(Arc::new(MyEmbedder))  // Your embedder implementation
+        .build()?;
+
+    engine.put_document("doc1",
+        Document::new()
+            .add_text("content", "Rust is a systems programming language")
+            .add_text("content_vec", "Rust is a systems programming language")
+    )?;
+    engine.put_document("doc2",
+        Document::new()
+            .add_text("content", "Python is great for machine learning")
+            .add_text("content_vec", "Python is great for machine learning")
+    )?;
+    engine.commit()?;
+
+    // 4. Hybrid search (combines lexical keyword match + semantic similarity)
+    let results = engine.search(
+        SearchRequestBuilder::new()
+            .with_lexical(Box::new(TermQuery::new("content", "programming")))
+            .with_vector(VectorSearchRequestBuilder::new().add_text("content_vec", "systems language").build())
+            .fusion(FusionAlgorithm::RRF { k: 60.0 })
+            .build()
+    )?;
+
+    // 5. Display results
+    for hit in results {
+        println!("[{}] score={:.4}", hit.id, hit.score);
+    }
+
+    Ok(())
+}</code></pre></pre>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="installation"><a class="header" href="#installation">Installation</a></h1>
 <p>Add iris to your <code>Cargo.toml</code>:</p>
 <pre><code class="language-toml">[dependencies]
 iris = "0.1.0"
@@ -285,7 +466,7 @@ iris = { version = "0.1.0", features = ["embeddings-openai"] }
 <li>The <strong>Lexical Searcher</strong> scans the Inverted Index to find matching terms.</li>
 </ul>
 </li>
-<li><strong>Fusion</strong>: The results are merged using a configurable strategy (<code>FusionConfig</code>):
+<li><strong>Fusion</strong>: The results are merged using a configurable strategy (<code>FusionAlgorithm</code>):
 <ul>
 <li><strong>RRF (Reciprocal Rank Fusion)</strong>: Ranks documents based on their positional rank in each result set. Robust and parameter-free.</li>
 <li><strong>Weighted Sum</strong>: Linearly combines normalized scores (<code>alpha * vector_score + beta * lexical_score</code>).</li>
@@ -299,11 +480,11 @@ iris = { version = "0.1.0", features = ["embeddings-openai"] }
 <li><strong>Snapshots</strong>: Periodically, the in-memory state of the registry and documents is serialized to disk (<code>document_snapshot.bin</code>). This speeds up recovery by avoiding full WAL replay.</li>
 <li><strong>Commit</strong>: Calling <code>commit()</code> forces a flush of all in-memory buffers to persistent storage and rotates the logs.</li>
 </ul>
-<pre class="mermaid">graph TD
+<pre><code class="language-mermaid">graph TD
     User[User Update] --&gt;|1. Write| WAL[Write-Ahead Log]
     User --&gt;|2. Update| Mem[In-Memory Index]
     
-    subgraph &quot;Persistence&quot;
+    subgraph "Persistence"
         WAL
         Snapshot[Snapshot File]
     end
@@ -311,151 +492,135 @@ iris = { version = "0.1.0", features = ["embeddings-openai"] }
     Mem --&gt;|Commit/Flush| Snapshot
     WAL --&gt;|Recovery| Mem
     Snapshot --&gt;|Recovery| Mem
-</pre>
+</code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="architecture"><a class="header" href="#architecture">Architecture</a></h1>
-<p>Iris is built on a unified modular architecture where the <strong>Vector Engine</strong> serves as the core orchestrator.</p>
-<h2 id="1-vector-engine-unified"><a class="header" href="#1-vector-engine-unified">1. Vector Engine (Unified)</a></h2>
+<p>Iris is built on a unified modular architecture where the <strong>Engine</strong> serves as the core orchestrator.</p>
+<h2 id="1-engine-unified"><a class="header" href="#1-engine-unified">1. Engine (Unified)</a></h2>
 <p>The primary engine associated with the library. It unifies vector similarity search with full-text search capabilities.</p>
 <ul>
-<li><strong>Orchestration</strong>: Manages both HNSW (vector) and Inverted Indices (lexical).</li>
+<li><strong>Orchestration</strong>: Manages both VectorStore (HNSW/IVF/Flat index) and LexicalStore (Inverted Index).</li>
 <li><strong>Hybrid Search</strong>: Performs unified queries combining vector similarity and keyword relevance.</li>
 <li><strong>ID Management</strong>: Manages external ID to internal integer ID mapping.</li>
 </ul>
-<h2 id="2-lexical-engine-component"><a class="header" href="#2-lexical-engine-component">2. Lexical Engine (Component)</a></h2>
-<p>Now operates as a component managed by the Vector Engine, rather than a standalone top-level engine in typical usage.</p>
+<h2 id="2-lexicalstore-component"><a class="header" href="#2-lexicalstore-component">2. LexicalStore (Component)</a></h2>
+<p>Operates as a component managed by the Engine, handling full-text search.</p>
 <ul>
 <li><strong>Inverted Index</strong>: Standard posting lists for term lookups.</li>
 <li><strong>Analyzers</strong>: Tokenization and normalization pipeline.</li>
 <li><strong>Query Parser</strong>: Supports boolean, phrase, and structured queries.</li>
 </ul>
-<pre class="mermaid">graph TD
-    subgraph &quot;Application Layer&quot;
+<h2 id="3-vectorstore-component"><a class="header" href="#3-vectorstore-component">3. VectorStore (Component)</a></h2>
+<p>Operates as a component managed by the Engine, handling vector similarity search.</p>
+<ul>
+<li><strong>Vector Index</strong>: Supports HNSW, IVF, and Flat index types.</li>
+<li><strong>Embedder</strong>: Automatic text/image to vector embedding.</li>
+<li><strong>Distance Metrics</strong>: Cosine, Euclidean, and DotProduct similarity.</li>
+</ul>
+<pre><code class="language-mermaid">graph TD
+    subgraph "Application Layer"
         User[User / App]
-        Req[VectorSearchRequest]
+        Req[SearchRequest]
     end
 
-    subgraph &quot;Iris Vector Engine&quot;
-        VE[VectorEngine]
-        
-        subgraph &quot;Components&quot;
-            HNSW[HNSW Index]
-            Lexical[LexicalEngine]
+    subgraph "Iris Engine"
+        E[Engine]
+
+        subgraph "Components"
+            VS[VectorStore]
+            LS[LexicalStore]
+            DS[DocumentStore]
             WAL[Write-Ahead Log]
         end
-        
+
         Fusion[Result Fusion]
     end
 
-    subgraph &quot;Storage Layer&quot;
+    subgraph "Storage Layer"
         FS[FileStorage / Mmap]
     end
 
     %% Flows
-    User --&gt;|insert/search| VE
-    VE --&gt; HNSW
-    VE --&gt; Lexical
-    VE --&gt; WAL
+    User --&gt;|index/search| E
+    E --&gt; VS
+    E --&gt; LS
+    E --&gt; DS
+    E --&gt; WAL
 
-    Lexical --&gt; FS
-    HNSW --&gt; FS
+    LS --&gt; FS
+    VS --&gt; FS
+    DS --&gt; FS
     WAL --&gt; FS
-    
+
     %% Search Flow
-    Req --&gt; VE
-    VE --&gt;|Vector Query| HNSW
-    VE --&gt;|Keyword Query| Lexical
-    
-    HNSW --&gt;|Hits| Fusion
-    Lexical --&gt;|Hits| Fusion
-    
+    Req --&gt; E
+    E --&gt;|Vector Query| VS
+    E --&gt;|Keyword Query| LS
+
+    VS --&gt;|Hits| Fusion
+    LS --&gt;|Hits| Fusion
+
     Fusion --&gt;|Unified Results| User
-</pre>
+</code></pre>
 <h2 id="storage-layer"><a class="header" href="#storage-layer">Storage Layer</a></h2>
-<p>All engines abstract their storage through a <code>Storage</code> trait, allowing seamless switching between:</p>
+<p>All components abstract their storage through a <code>Storage</code> trait, allowing seamless switching between:</p>
 <ul>
 <li><strong>Memory</strong>: For testing and ephemeral data.</li>
 <li><strong>File</strong>: For persistent on-disk storage.</li>
 <li><strong>Mmap</strong>: For high-performance memory-mapped file access.</li>
 </ul>
+<h2 id="component-structure"><a class="header" href="#component-structure">Component Structure</a></h2>
+<p>Each store follows a simplified 4-member structure pattern:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub struct LexicalStore {
+    index: Box&lt;dyn LexicalIndex&gt;,
+    writer_cache: Mutex&lt;Option&lt;Box&lt;dyn LexicalIndexWriter&gt;&gt;&gt;,
+    searcher_cache: RwLock&lt;Option&lt;Box&lt;dyn LexicalIndexSearcher&gt;&gt;&gt;,
+    doc_store: Arc&lt;RwLock&lt;UnifiedDocumentStore&gt;&gt;,
+}
+
+pub struct VectorStore {
+    index: Box&lt;dyn VectorIndex&gt;,
+    writer_cache: Mutex&lt;Option&lt;Box&lt;dyn VectorIndexWriter&gt;&gt;&gt;,
+    searcher_cache: RwLock&lt;Option&lt;Box&lt;dyn VectorIndexSearcher&gt;&gt;&gt;,
+    doc_store: Arc&lt;RwLock&lt;UnifiedDocumentStore&gt;&gt;,
+}
+<span class="boring">}</span></code></pre></pre>
+<p>This pattern provides:</p>
+<ul>
+<li><strong>Lazy Initialization</strong>: Writers and searchers are created on-demand.</li>
+<li><strong>Cache Invalidation</strong>: Searcher cache is invalidated after commit/optimize.</li>
+<li><strong>Shared Document Store</strong>: Both stores share the same document storage.</li>
+</ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="lexical-search"><a class="header" href="#lexical-search">Lexical Search</a></h1>
 <p>Lexical search matches documents based on exact or approximate keyword matches. It is the traditional "search engine" functionality found in Lucene or Elasticsearch.</p>
 <blockquote>
-<p><strong>Note</strong>: In the unified Iris architecture, Lexical Search is typically handled by the <code>VectorEngine</code>, which orchestrates both lexical and vector components concurrently. <code>LexicalEngine</code> can still be used as a standalone engine for pure keyword search scenarios.</p>
+<p><strong>Note</strong>: In the unified Iris architecture, Lexical Search is handled by the <code>Engine</code>, which orchestrates both lexical (LexicalStore) and vector (VectorStore) components concurrently.</p>
 </blockquote>
 <h2 id="document-structure"><a class="header" href="#document-structure">Document Structure</a></h2>
 <p>In Iris, a <strong>Document</strong> is the fundamental unit of indexing. It follows a <strong>schema-less</strong> design, allowing fields to be added dynamically without defining a schema upfront.</p>
 <p>Each <code>Document</code> consists of multiple <code>Fields</code> stored in a Map where the key is the field name. Each <code>Field</code> has a <strong>Value</strong> and <strong>Options</strong> defining how it should be indexed.</p>
-<pre class="mermaid">classDiagram
-    class Document {
-        fields: Map&lt;String, Field&gt;
-    }
+<pre><code class="language-mermaid">flowchart LR
+    IntID1("Internal ID&lt;br&gt;1") --&gt; Document_Container
 
-    class Field {
-        value: FieldValue
-        option: FieldOption
-    }
+    subgraph Document_Container [Document]
+        direction TB
+        
+        ExtID1["Field (External ID)&lt;br&gt;Name: '_id'&lt;br&gt;Value: 'product_123'&lt;br&gt;Type: Text"]
+        F11["Field&lt;br&gt;Name: 'title'&lt;br&gt;Value: 'Apple'&lt;br&gt;Type: Text"]
+        F12["Field&lt;br&gt;Name: 'price'&lt;br&gt;Value: 10.00&lt;br&gt;Type: Float"]
+    end
+    
+    IntID2("Internal ID&lt;br&gt;2") --&gt; Document_Container2
 
-    class FieldValue {
-        Text
-        Integer
-        Float
-        Boolean
-        DateTime
-        Geo
-        Blob
-        Null
-    }
-
-    class FieldOption {
-        &lt;&lt;enumeration&gt;&gt;
-        Text(TextOption)
-        Integer(IntegerOption)
-        Float(FloatOption)
-        Boolean(BooleanOption)
-        DateTime(DateTimeOption)
-        Geo(GeoOption)
-        Blob(BlobOption)
-    }
-
-    class TextOption {
-        indexed: bool
-        stored: bool
-        term_vectors: bool
-    }
-
-    class IntegerOption {
-        indexed: bool
-        stored: bool
-    }
-
-    class FloatOption {
-        indexed: bool
-        stored: bool
-    }
-
-    class BooleanOption {
-        indexed: bool
-        stored: bool
-    }
-
-    class DateTimeOption {
-        indexed: bool
-        stored: bool
-    }
-
-    class GeoOption {
-        indexed: bool
-        stored: bool
-    }
-
-    class BlobOption {
-        stored: bool
-    }
-
-    Document *-- Field
-    Field --&gt; FieldValue
-    Field --&gt; FieldOption
-</pre>
+    subgraph Document_Container2 [Document]
+        direction TB
+        
+        ExtID2["Field (External ID)&lt;br&gt;Name: '_id'&lt;br&gt;Value: 'product_456'&lt;br&gt;Type: Text"]
+        F21["Field&lt;br&gt;Name: 'title'&lt;br&gt;Value: 'Orange'&lt;br&gt;Type: Text"]
+        F22["Field&lt;br&gt;Name: 'price'&lt;br&gt;Value: 11.00&lt;br&gt;Type: Float"]
+    end
+</code></pre>
 <h3 id="document"><a class="header" href="#document">Document</a></h3>
 <p>The fundamental unit of indexing in Iris.</p>
 <ul>
@@ -520,41 +685,41 @@ iris = { version = "0.1.0", features = ["embeddings-openai"] }
 </ul>
 <h2 id="indexing-process"><a class="header" href="#indexing-process">Indexing Process</a></h2>
 <p>The lexical indexing process translates documents into inverted indexes and BKD trees.</p>
-<pre class="mermaid">graph TD
-    subgraph &quot;Indexing Flow&quot;
-        Input[&quot;Raw Data&quot;] --&gt; DocBuilder[&quot;Document Construction&quot;]
+<pre><code class="language-mermaid">graph TD
+    subgraph "Indexing Flow"
+        Input["Raw Data"] --&gt; DocBuilder["Document Construction"]
         
-        subgraph &quot;Processing (InvertedIndexWriter)&quot;
-            DocBuilder --&gt;|Text| CharFilter[&quot;Char Filter&quot;]
-            DocBuilder --&gt;|Numeric/Date/Geo| Normalizer[&quot;String Normalizer&quot;]
-            DocBuilder --&gt;|Numeric/Date/Geo| PtExt[&quot;Point Extractor&quot;]
-            DocBuilder --&gt;|Stored Field| StoreProc[&quot;Field Values Collector&quot;]
-            DocBuilder --&gt;|All Fields| LenTracker[&quot;Field Length Tracker&quot;]
-            DocBuilder --&gt;|Doc Values| DVTracker[&quot;Doc Values Collector&quot;]
+        subgraph "Processing (InvertedIndexWriter)"
+            DocBuilder --&gt;|Text| CharFilter["Char Filter"]
+            DocBuilder --&gt;|Numeric/Date/Geo| Normalizer["String Normalizer"]
+            DocBuilder --&gt;|Numeric/Date/Geo| PtExt["Point Extractor"]
+            DocBuilder --&gt;|Stored Field| StoreProc["Field Values Collector"]
+            DocBuilder --&gt;|All Fields| LenTracker["Field Length Tracker"]
+            DocBuilder --&gt;|Doc Values| DVTracker["Doc Values Collector"]
             
-            subgraph &quot;Analysis Chain&quot;
-                CharFilter --&gt; Tokenizer[&quot;Tokenizer&quot;]
-                Tokenizer --&gt; TokenFilter[&quot;Token Filter&quot;]
+            subgraph "Analysis Chain"
+                CharFilter --&gt; Tokenizer["Tokenizer"]
+                Tokenizer --&gt; TokenFilter["Token Filter"]
             end
         end
         
-        subgraph &quot;In-Memory Buffering&quot;
-            TokenFilter --&gt;|Terms| InvBuffer[&quot;Term Posting Index&quot;]
+        subgraph "In-Memory Buffering"
+            TokenFilter --&gt;|Terms| InvBuffer["Term Posting Index"]
             Normalizer --&gt;|Terms| InvBuffer
-            PtExt --&gt;|Points| BkdBuffer[&quot;Point Values Buffer&quot;]
-            StoreProc --&gt;|Data| DocsBuffer[&quot;Stored Docs Buffer&quot;]
+            PtExt --&gt;|Points| BkdBuffer["Point Values Buffer"]
+            StoreProc --&gt;|Data| DocsBuffer["Stored Docs Buffer"]
         end
         
-        subgraph &quot;Segment Flushing (Disk)&quot;
-            InvBuffer --&gt;|Write| Postings[&quot;.dict / .post&quot;]
-            BkdBuffer --&gt;|Sort &amp; Write| BKD[&quot;.bkd&quot;]
-            DocsBuffer --&gt;|Write| DOCS[&quot;.docs&quot;]
-            DVTracker --&gt;|Write| DV[&quot;.dv&quot;]
-            LenTracker --&gt;|Write| LENS[&quot;.lens&quot;]
-            InvBuffer -.-&gt;|Stats| Meta[&quot;.meta / .fstats&quot;]
+        subgraph "Segment Flushing (Disk)"
+            InvBuffer --&gt;|Write| Postings[".dict / .post"]
+            BkdBuffer --&gt;|Sort &amp; Write| BKD[".bkd"]
+            DocsBuffer --&gt;|Write| DOCS[".docs"]
+            DVTracker --&gt;|Write| DV[".dv"]
+            LenTracker --&gt;|Write| LENS[".lens"]
+            InvBuffer -.-&gt;|Stats| Meta[".meta / .fstats"]
         end
     end
-</pre>
+</code></pre>
 <ol>
 <li><strong>Document Processing</strong>:
 <ul>
@@ -607,9 +772,9 @@ Unlike an inverted index, a BKD tree is designed for <strong>range search</stron
 <h3 id="simd-optimization"><a class="header" href="#simd-optimization">SIMD Optimization</a></h3>
 <p>Iris uses SIMD-accelerated batch scoring for high-throughput ranking. The BM25 scoring algorithm is optimized to process multiple documents simultaneously, leveraging modern CPU instructions to provide a several-fold increase in performance compared to scalar processing.</p>
 <h2 id="engine-architecture"><a class="header" href="#engine-architecture">Engine Architecture</a></h2>
-<h3 id="lexical-engine-lexicalengine"><a class="header" href="#lexical-engine-lexicalengine">Lexical Engine (<code>LexicalEngine</code>)</a></h3>
-<p>The engine that manages indexing and searching for text data. It coordinates between <code>InvertedIndexWriter</code> and <code>InvertedIndexSearcher</code>.
-In the unified architecture, this engine operates as a <strong>sub-component</strong> managed by the <code>VectorEngine</code>, handling the inverted index portions of hybrid documents. It handles manifest persistence and consistent ID mapping when run in standalone mode.</p>
+<h3 id="lexicalstore"><a class="header" href="#lexicalstore">LexicalStore</a></h3>
+<p>The store component that manages indexing and searching for text data. It coordinates between <code>LexicalIndexWriter</code> and <code>LexicalIndexSearcher</code>.
+In the unified architecture, LexicalStore operates as a <strong>sub-component</strong> managed by the <code>Engine</code>, handling the inverted index portions of hybrid documents.</p>
 <h3 id="index-components"><a class="header" href="#index-components">Index Components</a></h3>
 <ul>
 <li><strong>InvertedIndexWriter</strong>: The primary interface for adding documents. It orchestrates analysis, point extraction, and buffering.</li>
@@ -630,31 +795,31 @@ In the unified architecture, this engine operates as a <strong>sub-component</st
 </div>
 <h2 id="search-process"><a class="header" href="#search-process">Search Process</a></h2>
 <p>The search process involves structure-aware traversal and weighted scoring.</p>
-<pre class="mermaid">graph TD
-    subgraph &quot;Search Flow&quot;
-        UserQuery[&quot;User Query&quot;] --&gt; Parser
+<pre><code class="language-mermaid">graph TD
+    subgraph "Search Flow"
+        UserQuery["User Query"] --&gt; Parser
         
-        subgraph &quot;Searcher&quot;
-            Parser[&quot;Query Parser&quot;] --&gt; QueryObj[&quot;Query&quot;]
-            QueryObj --&gt; WeightObj[&quot;Weight&quot;]
-            WeightObj --&gt; MatcherObj[&quot;Matcher&quot;]
-            WeightObj --&gt; ScorerObj[&quot;Scorer&quot;]
+        subgraph "Searcher"
+            Parser["Query Parser"] --&gt; QueryObj["Query"]
+            QueryObj --&gt; WeightObj["Weight"]
+            WeightObj --&gt; MatcherObj["Matcher"]
+            WeightObj --&gt; ScorerObj["Scorer"]
             
-            subgraph &quot;Index Access&quot;
-                MatcherObj -.-&gt;|Look up| II[&quot;Inverted Index&quot;]
-                MatcherObj -.-&gt;|Range Scan| BKD[&quot;BKD Tree&quot;]
+            subgraph "Index Access"
+                MatcherObj -.-&gt;|Look up| II["Inverted Index"]
+                MatcherObj -.-&gt;|Range Scan| BKD["BKD Tree"]
             end
             
-            MatcherObj --&gt;|Doc IDs| CollectorObj[&quot;Collector&quot;]
+            MatcherObj --&gt;|Doc IDs| CollectorObj["Collector"]
             ScorerObj --&gt;|Scores| CollectorObj
-            CollectorObj -.-&gt;|Sort by Field| DV[&quot;Doc Values&quot;]
-            CollectorObj --&gt;|Top Doc IDs| Fetcher[&quot;Fetcher&quot;]
+            CollectorObj -.-&gt;|Sort by Field| DV["Doc Values"]
+            CollectorObj --&gt;|Top Doc IDs| Fetcher["Fetcher"]
             Fetcher -.-&gt;|Retrieve Fields| Docs
         end
         
-        Fetcher --&gt; Result[&quot;Search Results&quot;]
+        Fetcher --&gt; Result["Search Results"]
     end
-</pre>
+</code></pre>
 <ol>
 <li><strong>Query Parsing</strong>: Translates a human-friendly string or DSL into a structured <code>Query</code> tree.</li>
 <li><strong>Weight Creation</strong>: Precomputes global statistics (like IDF) to prepare for execution across multiple segments.</li>
@@ -666,7 +831,7 @@ In the unified architecture, this engine operates as a <strong>sub-component</st
 </li>
 <li><strong>Collection &amp; Fetching</strong>: Aggregates top results into a sorted list and retrieves original field data for the final response.</li>
 </ol>
-<h2 id="query-types"><a class="header" href="#query-types">Query Types</a></h2>
+<h2 id="query-types-1"><a class="header" href="#query-types-1">Query Types</a></h2>
 <p>Iris supports a wide range of queries for different information needs.</p>
 <ul>
 <li><strong>Term Query</strong>: Match a single analyzed term exactly.</li>
@@ -679,57 +844,64 @@ In the unified architecture, this engine operates as a <strong>sub-component</st
 <h2 id="scoring-bm25"><a class="header" href="#scoring-bm25">Scoring (BM25)</a></h2>
 <p>Iris uses <strong>Okapi BM25</strong> as its default scoring function. It improves results by prioritizing rare terms and normalizing for document length, ensuring that matches in shorter, focused documents are ranked appropriately.</p>
 <h2 id="code-examples"><a class="header" href="#code-examples">Code Examples</a></h2>
-<h3 id="1-configuring-lexicalengine"><a class="header" href="#1-configuring-lexicalengine">1. Configuring LexicalEngine</a></h3>
-<p>Setting up a schema-less engine with a default analyzer.</p>
+<h3 id="1-configuring-engine-for-lexical-search"><a class="header" href="#1-configuring-engine-for-lexical-search">1. Configuring Engine for Lexical Search</a></h3>
+<p>Setting up an engine with a lexical field and default analyzer.</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>use std::sync::Arc;
-use iris::lexical::engine::LexicalEngine;
-use iris::lexical::engine::config::LexicalIndexConfig;
-use iris::storage::memory::{MemoryStorage, MemoryStorageConfig};
+use iris::{Engine, Schema};
+use iris::analysis::analyzer::standard::StandardAnalyzer;
+use iris::lexical::{FieldOption, TextOption};
+use iris::storage::{StorageConfig, StorageFactory};
+use iris::storage::memory::MemoryStorageConfig;
 
-fn setup_engine() -&gt; iris::error::Result&lt;LexicalEngine&gt; {
-    let storage = Arc::new(MemoryStorage::new(MemoryStorageConfig::default()));
-    
-    // Default configuration uses StandardAnalyzer
-    let config = LexicalIndexConfig::default();
-    let engine = LexicalEngine::new(storage, config)?;
-    Ok(engine)
+fn setup_engine() -&gt; iris::Result&lt;Engine&gt; {
+    let storage = StorageFactory::create(StorageConfig::Memory(MemoryStorageConfig::default()))?;
+
+    let schema = Schema::builder()
+        .add_lexical_field("title", FieldOption::Text(TextOption::default()))
+        .add_lexical_field("content", FieldOption::Text(TextOption::default()))
+        .build();
+
+    Engine::builder(storage, schema)
+        .analyzer(Arc::new(StandardAnalyzer::default()))
+        .build()
 }
 <span class="boring">}</span></code></pre></pre>
 <h3 id="2-adding-documents"><a class="header" href="#2-adding-documents">2. Adding Documents</a></h3>
 <p>Creating and indexing documents with various field types.</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use iris::lexical::core::document::Document;
-use iris::lexical::core::field::TextOption;
+</span>use iris::{Document, DataValue};
 
-fn add_documents(engine: &amp;LexicalEngine) -&gt; iris::error::Result&lt;()&gt; {
-    let doc = Document::builder()
-        .add_text("title", "Iris Search", TextOption::default())
-        .add_text("content", "Fast and semantic search engine in Rust", TextOption::default())
-        .add_integer("price", 100)
-        .build();
+fn add_documents(engine: &amp;Engine) -&gt; iris::Result&lt;()&gt; {
+    let doc = Document::new()
+        .add_text("title", "Iris Search")
+        .add_text("content", "Fast and semantic search engine in Rust")
+        .add_field("price", DataValue::Integer(100));
 
-    engine.add_document(doc)?;
+    engine.put_document("doc1", doc)?;
     engine.commit()?; // Flush and commit to make searchable
     Ok(())
 }
 <span class="boring">}</span></code></pre></pre>
-<h3 id="3-searching-via-dsl"><a class="header" href="#3-searching-via-dsl">3. Searching via DSL</a></h3>
-<p>Executing a simple search using the query string parser.</p>
+<h3 id="3-searching-with-term-query"><a class="header" href="#3-searching-with-term-query">3. Searching with Term Query</a></h3>
+<p>Executing a simple search using a term query.</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use iris::lexical::search::searcher::LexicalSearchRequest;
+</span>use iris::SearchRequestBuilder;
+use iris::lexical::TermQuery;
 
-fn search(engine: &amp;LexicalEngine) -&gt; iris::error::Result&lt;()&gt; {
-    // Search for matches in the default fields
-    let request = LexicalSearchRequest::new("content:rust")
-        .max_docs(10);
+fn search(engine: &amp;Engine) -&gt; iris::Result&lt;()&gt; {
+    let results = engine.search(
+        SearchRequestBuilder::new()
+            .with_lexical(Box::new(TermQuery::new("content", "rust")))
+            .limit(10)
+            .build()
+    )?;
 
-    let results = engine.search(request)?;
-    for hit in results.hits {
-        println!("Doc ID: {}, Score: {}", hit.doc_id, hit.score);
+    for hit in results {
+        println!("[{}] Score: {:.4}", hit.id, hit.score);
     }
     Ok(())
 }
@@ -739,18 +911,19 @@ fn search(engine: &amp;LexicalEngine) -&gt; iris::error::Result&lt;()&gt; {
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>use iris::analysis::analyzer::japanese::JapaneseAnalyzer;
-use iris::lexical::engine::config::LexicalIndexConfig;
 
-fn setup_japanese_engine() -&gt; iris::error::Result&lt;LexicalEngine&gt; {
-    let storage = Arc::new(MemoryStorage::new(MemoryStorageConfig::default()));
-    
+fn setup_japanese_engine() -&gt; iris::Result&lt;Engine&gt; {
+    let storage = StorageFactory::create(StorageConfig::Memory(MemoryStorageConfig::default()))?;
+
     // Configure default analyzer to Japanese
     let analyzer = Arc::new(JapaneseAnalyzer::default());
-    let config = LexicalIndexConfig::builder()
-        .analyzer(analyzer)
+    let schema = Schema::builder()
+        .add_lexical_field("content", FieldOption::Text(TextOption::default()))
         .build();
 
-    LexicalEngine::new(storage, config)
+    Engine::builder(storage, schema)
+        .analyzer(analyzer)
+        .build()
 }
 <span class="boring">}</span></code></pre></pre>
 <h2 id="future-outlook"><a class="header" href="#future-outlook">Future Outlook</a></h2>
@@ -760,45 +933,81 @@ fn setup_japanese_engine() -&gt; iris::error::Result&lt;LexicalEngine&gt; {
 <li><strong>Multilingual Support</strong>: Integration with more language-specific tokenizers and dictionaries.</li>
 <li><strong>Tiered Storage</strong>: Support for moving older segments to slower/cheaper storage automatically.</li>
 </ul>
-<div style="break-before: page; page-break-before: always;"></div><h1 id="unified-vector-search"><a class="header" href="#unified-vector-search">Unified Vector Search</a></h1>
-<p>Vector search (finding "nearest neighbors") enables semantic retrieval where matches are based on meaning rather than exact keywords. Iris provides a <strong>Unified Vector Engine</strong> that combines this semantic search with traditional lexical (keyword) search capabilities.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="vector-search"><a class="header" href="#vector-search">Vector Search</a></h1>
+<p>Vector search (finding "nearest neighbors") enables semantic retrieval where matches are based on meaning rather than exact keywords. Iris provides a <strong>Unified Engine</strong> that combines this semantic search with traditional lexical (keyword) search capabilities.</p>
 <h2 id="document-structure-1"><a class="header" href="#document-structure-1">Document Structure</a></h2>
 <p>With the unified engine, a document can contain both vector fields (for semantic search) and lexical fields (for keyword search/filtering).</p>
-<pre class="mermaid">classDiagram
-    class VectorEngine {
-        lexical_engine: LexicalEngine
-        vector_index: VectorIndex
-    }
+<pre><code class="language-mermaid">flowchart LR
+    IntID1("Internal ID&lt;br&gt;1") --&gt; DocContainer1_Vec
+    IntID1 --&gt; DocContainer1_Lex
 
-    class HybridDocument {
-        &lt;&lt;Concept&gt;&gt;
-        vectors: Map&lt;String, Vector&gt;
-        lexical_fields: Map&lt;String, Field&gt;
-        metadata: Map&lt;String, String&gt;
-    }
+    subgraph DocContainer1_Vec [Vector Document]
+        direction TB
+        subgraph VecField1 [Vector Field]
+            direction TB
+            F11["Vector Field&lt;br&gt;Name: 'image_vec'&lt;br&gt;Value: [0.12, 0.05, ...]&lt;br&gt;Type: HNSW"]
+        end
+        subgraph Meta1 [Metadata]
+            direction TB
+            F12["Metadata Field&lt;br&gt;Name: '_id'&lt;br&gt;Value: 'img_001'"]
+            F13["Metadata Field&lt;br&gt;Name: '_mime_type'&lt;br&gt;Value: 'image/jpeg'"]
+        end
+        VecField1 --&gt; Meta1
 
-    class Vector {
-        data: Vec&lt;f32&gt;
-        dimension: usize
-    }
+        subgraph VecField1_2 [Vector Field]
+            direction TB
+            F11_2["Vector Field&lt;br&gt;Name: 'text_vec'&lt;br&gt;Value: [0.33, 0.44, ...]&lt;br&gt;Type: HNSW"]
+        end
+        subgraph Meta1_2 [Metadata]
+            direction TB
+            F12_2["Metadata Field&lt;br&gt;Name: '_id'&lt;br&gt;Value: 'img_001'"]
+            F13_2["Metadata Field&lt;br&gt;Name: '_mime_type'&lt;br&gt;Value: 'text/plain'"]
+        end
+        VecField1_2 --&gt; Meta1_2
+    end
 
-    class VectorFieldConfig {
-        dimension: usize
-        distance_metric: DistanceMetric
-        index_type: VectorIndexType
-        quantization: QuantizationMethod
-    }
+    subgraph DocContainer1_Lex [Lexical Document]
+        direction TB
+        ExtID1_Lex["Lexical Field (External ID)&lt;br&gt;Name: '_id'&lt;br&gt;Value: 'img_001'&lt;br&gt;Type: Text"]
+        L11["Lexical Field&lt;br&gt;Name: 'description'&lt;br&gt;Value: 'A cute cat'&lt;br&gt;Type: Text"]
+        L12["Lexical Field&lt;br&gt;Name: 'like'&lt;br&gt;Value: 53&lt;br&gt;Type: Integer"]
+    end
 
-    class DistanceMetric {
-        &lt;&lt;enumeration&gt;&gt;
-        Cosine
-        L2 (Euclidean)
-        DotProduct
-    }
+    IntID2("Internal ID&lt;br&gt;2") --&gt; DocContainer2_Vec
+    IntID2 --&gt; DocContainer2_Lex
 
-    VectorDocument *-- Vector
-    VectorDocument --&gt; VectorFieldConfig
-</pre>
+    subgraph DocContainer2_Vec [Vector Document]
+        direction TB
+        subgraph VecField2 [Vector Field]
+            direction TB
+            F21["Vector Field&lt;br&gt;Name: 'image_vec'&lt;br&gt;Value: [0.88, 0.91, ...]&lt;br&gt;Type: HNSW"]
+        end
+        subgraph Meta2 [Metadata]
+            direction TB
+            F22["Metadata Field&lt;br&gt;Name: '_id'&lt;br&gt;Value: 'img_002'"]
+            F23["Metadata Field&lt;br&gt;Name: '_mime_type'&lt;br&gt;Value: 'image/jpeg'"]
+        end
+        VecField2 --&gt; Meta2
+
+        subgraph VecField2_2 [Vector Field]
+            direction TB
+            F21_2["Vector Field&lt;br&gt;Name: 'text_vec'&lt;br&gt;Value: [0.11, 0.99, ...]&lt;br&gt;Type: HNSW"]
+        end
+        subgraph Meta2_2 [Metadata]
+            direction TB
+            F22_2["Metadata Field&lt;br&gt;Name: '_id'&lt;br&gt;Value: 'img_002'"]
+            F23_2["Metadata Field&lt;br&gt;Name: '_mime_type'&lt;br&gt;Value: 'text/plain'"]
+        end
+        VecField2_2 --&gt; Meta2_2
+    end
+
+    subgraph DocContainer2_Lex [Lexical Document]
+        direction TB
+        ExtID2_Lex["Lexical Field (External ID)&lt;br&gt;Name: '_id'&lt;br&gt;Value: 'img_002'&lt;br&gt;Type: Text"]
+        L21["Lexical Field&lt;br&gt;Name: 'description'&lt;br&gt;Value: 'A loyal dog'&lt;br&gt;Type: Text"]
+        L22["Lexical Field&lt;br&gt;Name: 'like'&lt;br&gt;Value: 42&lt;br&gt;Type: Integer"]
+    end
+</code></pre>
 <h3 id="vector"><a class="header" href="#vector">Vector</a></h3>
 <p>A mathematical representation of an object (text, image, audio) in a multi-dimensional space.</p>
 <ul>
@@ -814,32 +1023,32 @@ fn setup_japanese_engine() -&gt; iris::error::Result&lt;LexicalEngine&gt; {
 </ul>
 <h2 id="indexing-process-1"><a class="header" href="#indexing-process-1">Indexing Process</a></h2>
 <p>The vector indexing process transforms raw data or pre-computed vectors into efficient, searchable structures.</p>
-<pre class="mermaid">graph TD
-    subgraph &quot;Vector Indexing Flow&quot;
-        Input[&quot;Raw Input (Text/Image)&quot;] --&gt; Embedder[&quot;Embedding Model&quot;]
-        Embedder --&gt;|Vector| Norm[&quot;Normalization&quot;]
-        PreComp[&quot;Pre-computed Vector&quot;] --&gt; Norm
+<pre><code class="language-mermaid">graph TD
+    subgraph "Vector Indexing Flow"
+        Input["Raw Input (Text/Image)"] --&gt; Embedder["Embedding Model"]
+        Embedder --&gt;|Vector| Norm["Normalization"]
+        PreComp["Pre-computed Vector"] --&gt; Norm
         
-        subgraph &quot;VectorEngine&quot;
-            Norm --&gt; Quant[&quot;Quantizer (PQ/SQ)&quot;]
-            Quant --&gt;|Quantized| Buffer[&quot;In-memory Buffer&quot;]
+        subgraph "VectorEngine"
+            Norm --&gt; Quant["Quantizer (PQ/SQ)"]
+            Quant --&gt;|Quantized| Buffer["In-memory Buffer"]
             Norm --&gt;|Raw| Buffer
             
-            subgraph &quot;Index Building&quot;
-                Buffer --&gt;|HNSW| GraphBuilder[&quot;Graph Builder&quot;]
-                Buffer --&gt;|IVF| Clustering[&quot;K-Means Clustering&quot;]
-                Buffer --&gt;|Flat| ArrayBuilder[&quot;Linear Array Builder&quot;]
+            subgraph "Index Building"
+                Buffer --&gt;|HNSW| GraphBuilder["Graph Builder"]
+                Buffer --&gt;|IVF| Clustering["K-Means Clustering"]
+                Buffer --&gt;|Flat| ArrayBuilder["Linear Array Builder"]
             end
         end
         
-        subgraph &quot;Segment Flushing&quot;
-            GraphBuilder --&gt;|Write| HNSWFiles[&quot;.hnsw / .vecs&quot;]
-            Clustering --&gt;|Write| IVFFiles[&quot;.ivf / .vecs&quot;]
-            ArrayBuilder --&gt;|Write| FlatFiles[&quot;.vecs&quot;]
-            Quant -.-&gt;|Codebook| QMeta[&quot;.quant&quot;]
+        subgraph "Segment Flushing"
+            GraphBuilder --&gt;|Write| HNSWFiles[".hnsw / .vecs"]
+            Clustering --&gt;|Write| IVFFiles[".ivf / .vecs"]
+            ArrayBuilder --&gt;|Write| FlatFiles[".vecs"]
+            Quant -.-&gt;|Codebook| QMeta[".quant"]
         end
     end
-</pre>
+</code></pre>
 <ol>
 <li><strong>Vector Acquisition</strong>: Vectors are either provided directly or generated from text/images using an <code>Embedder</code>.</li>
 <li><strong>Processing</strong>:
@@ -896,13 +1105,20 @@ fn setup_japanese_engine() -&gt; iris::error::Result&lt;LexicalEngine&gt; {
 <li><strong>Product Quantization (PQ)</strong>: Decomposes vectors into sub-vectors and performs clustering (16x-64x compression).</li>
 </ul>
 <h2 id="engine-architecture-1"><a class="header" href="#engine-architecture-1">Engine Architecture</a></h2>
-<h3 id="vector-engine-vectorengine"><a class="header" href="#vector-engine-vectorengine">Vector Engine (<code>VectorEngine</code>)</a></h3>
-<p>The high-level orchestrator that manages multiple vector fields, handles persistence via WAL (Write-Ahead Log), and coordinates aggregated searches across fields.</p>
+<h3 id="vectorstore"><a class="header" href="#vectorstore">VectorStore</a></h3>
+<p>The store component that manages vector indexing and searching. It follows a simplified 4-member structure:</p>
+<ul>
+<li><strong>index</strong>: The underlying vector index (HNSW, IVF, or Flat)</li>
+<li><strong>writer_cache</strong>: Cached writer for write operations</li>
+<li><strong>searcher_cache</strong>: Cached searcher for search operations</li>
+<li><strong>doc_store</strong>: Shared document storage</li>
+</ul>
 <h3 id="index-components-1"><a class="header" href="#index-components-1">Index Components</a></h3>
 <ul>
-<li><strong>VectorField</strong>: Abstracts individual field implementations (e.g., <code>InMemoryVectorField</code>, <code>SegmentedVectorField</code>).</li>
-<li><strong>Index Writers/Readers</strong>: Specific implementations for each algorithm (e.g., <code>HnswIndexWriter</code>, <code>FlatVectorIndexReader</code>, <code>IvfIndexReader</code>).</li>
-<li><strong>VectorEngineSearcher</strong>: Integrates results from multiple fields based on specified score modes (WeightedSum, MaxSim).</li>
+<li><strong>VectorIndex</strong>: Trait for vector index implementations (HnswIndex, IvfIndex, FlatIndex).</li>
+<li><strong>VectorIndexWriter</strong>: Handles vector insertion and embedding.</li>
+<li><strong>VectorIndexSearcher</strong>: Performs nearest neighbor search.</li>
+<li><strong>EmbeddingVectorIndexWriter</strong>: Wrapper that automatically embeds text/images before indexing.</li>
 </ul>
 <h2 id="index-segment-files-1"><a class="header" href="#index-segment-files-1">Index Segment Files</a></h2>
 <p>A vector segment consists of several specialized files:</p>
@@ -916,22 +1132,22 @@ fn setup_japanese_engine() -&gt; iris::error::Result&lt;LexicalEngine&gt; {
 </div>
 <h2 id="search-process-1"><a class="header" href="#search-process-1">Search Process</a></h2>
 <p>Finding the nearest neighbors involves navigating the index structure to minimize distance calculations.</p>
-<pre class="mermaid">graph TD
-    subgraph &quot;Vector Search Flow&quot;
-        Query[&quot;Query Vector&quot;] --&gt; Quant[&quot;Quantization (Encoding)&quot;]
+<pre><code class="language-mermaid">graph TD
+    subgraph "Vector Search Flow"
+        Query["Query Vector"] --&gt; Quant["Quantization (Encoding)"]
         
-        subgraph &quot;Segment Search&quot;
-            Quant --&gt;|HNSW| HNSWNav[&quot;Graph Navigation&quot;]
-            Quant --&gt;|IVF| CentroidScan[&quot;Nearest Centroid Probe&quot;]
+        subgraph "Segment Search"
+            Quant --&gt;|HNSW| HNSWNav["Graph Navigation"]
+            Quant --&gt;|IVF| CentroidScan["Nearest Centroid Probe"]
             
-            HNSWNav --&gt;|Top-K| ResBuffer[&quot;Candidate Buffer&quot;]
+            HNSWNav --&gt;|Top-K| ResBuffer["Candidate Buffer"]
             CentroidScan --&gt;|Top-K| ResBuffer
         end
         
-        ResBuffer --&gt;|Re-ranking| Refine[&quot;Precision Scoring (Raw Vectors)&quot;]
-        Refine --&gt; Final[&quot;Sorted Hits&quot;]
+        ResBuffer --&gt;|Re-ranking| Refine["Precision Scoring (Raw Vectors)"]
+        Refine --&gt; Final["Sorted Hits"]
     end
-</pre>
+</code></pre>
 <ol>
 <li><strong>Preparation</strong>: The query vector is normalized and/or quantized to match the index format.</li>
 <li><strong>Navigation</strong>:
@@ -942,7 +1158,7 @@ fn setup_japanese_engine() -&gt; iris::error::Result&lt;LexicalEngine&gt; {
 </li>
 <li><strong>Refinement</strong>: (Optional) If quantization was used, raw vectors may be accessed to re-rank the top candidates for higher precision.</li>
 </ol>
-<h2 id="query-types-1"><a class="header" href="#query-types-1">Query Types</a></h2>
+<h2 id="query-types-2"><a class="header" href="#query-types-2">Query Types</a></h2>
 <h3 id="k-nn-search-k-nearest-neighbors"><a class="header" href="#k-nn-search-k-nearest-neighbors">K-NN Search (K-Nearest Neighbors)</a></h3>
 <p>The basic vector search query.</p>
 <ul>
@@ -966,144 +1182,149 @@ fn setup_japanese_engine() -&gt; iris::error::Result&lt;LexicalEngine&gt; {
 </li>
 </ol>
 <h2 id="search-process-for-hybrid-queries"><a class="header" href="#search-process-for-hybrid-queries">Search Process for Hybrid Queries</a></h2>
-<pre class="mermaid">graph TD
-    Query[&quot;Search Request&quot;] --&gt; Engine[&quot;VectorEngine&quot;]
-    Engine --&gt;|Text Query| LexSearch[&quot;Lexical Component&quot;]
-    Engine --&gt;|Vector Query| VecSearch[&quot;Vector Component&quot;]
-    
-    LexSearch --&gt; LexHits[&quot;Lexical Hits&quot;]
-    VecSearch --&gt; VecHits[&quot;Vector Hits&quot;]
-    
-    LexHits --&gt; Fusion[&quot;Result Fusion&quot;]
+<pre><code class="language-mermaid">graph TD
+    Query["SearchRequest"] --&gt; Engine["Engine"]
+    Engine --&gt;|Lexical Query| LexSearch["LexicalStore"]
+    Engine --&gt;|Vector Query| VecSearch["VectorStore"]
+
+    LexSearch --&gt; LexHits["Lexical Hits"]
+    VecSearch --&gt; VecHits["Vector Hits"]
+
+    LexHits --&gt; Fusion["Result Fusion"]
     VecHits --&gt; Fusion
-    
-    Fusion --&gt; Combine[&quot;Score Combination&quot;]
-    Combine --&gt; TopDocs[&quot;Final Top Results&quot;]
-</pre>
+
+    Fusion --&gt; Combine["Score Combination"]
+    Combine --&gt; TopDocs["Final Top Results"]
+</code></pre>
 <h2 id="code-examples-1"><a class="header" href="#code-examples-1">Code Examples</a></h2>
-<h3 id="1-configuring-vectorengine"><a class="header" href="#1-configuring-vectorengine">1. Configuring VectorEngine</a></h3>
-<p>Example of creating an engine with an embedder and field configurations.</p>
+<h3 id="1-configuring-engine-for-vector-search"><a class="header" href="#1-configuring-engine-for-vector-search">1. Configuring Engine for Vector Search</a></h3>
+<p>Example of creating an engine with an embedder and vector field configurations.</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>use std::sync::Arc;
-use iris::vector::engine::VectorEngine;
-use iris::vector::engine::config::{VectorIndexConfig, VectorFieldConfig, VectorIndexKind};
-use iris::vector::core::distance::DistanceMetric;
-use iris::embedding::precomputed::PrecomputedEmbedder;
-use iris::storage::memory::{MemoryStorage, MemoryStorageConfig};
+use iris::{Engine, Schema};
+use iris::vector::{FlatOption, HnswOption, VectorOption, DistanceMetric};
+use iris::storage::{StorageConfig, StorageFactory};
+use iris::storage::memory::MemoryStorageConfig;
 
-fn setup_engine() -&gt; iris::error::Result&lt;VectorEngine&gt; {
-    let storage = Arc::new(MemoryStorage::new(MemoryStorageConfig::default()));
-    
-    // Create configuration
-    let config = VectorIndexConfig::builder()
-        .add_field("title_embedding", 384)? // 384-dimensional field
-        .add_field("body_embedding", 384)?
-        .default_distance(DistanceMetric::Cosine)
-        .build()?;
+fn setup_engine() -&gt; iris::Result&lt;Engine&gt; {
+    let storage = StorageFactory::create(StorageConfig::Memory(MemoryStorageConfig::default()))?;
 
-    let engine = VectorEngine::new(storage, config)?;
-    Ok(engine)
+    let schema = Schema::builder()
+        .add_vector_field(
+            "embedding",
+            VectorOption::Hnsw(HnswOption {
+                dimension: 384,
+                distance: DistanceMetric::Cosine,
+                m: 16,
+                ef_construction: 200,
+                ..Default::default()
+            }),
+        )
+        .build();
+
+    Engine::builder(storage, schema)
+        .embedder(Arc::new(MyEmbedder))  // Your embedder implementation
+        .build()
 }
 <span class="boring">}</span></code></pre></pre>
 <h3 id="2-adding-documents-1"><a class="header" href="#2-adding-documents-1">2. Adding Documents</a></h3>
-<p>Example of indexing a document with vector data.</p>
+<p>Example of indexing a document with text that gets automatically embedded.</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use iris::vector::core::document::{DocumentVector, StoredVector};
+</span>use iris::{Document, DataValue};
 
-fn add_document(engine: &amp;VectorEngine) -&gt; iris::error::Result&lt;()&gt; {
-    let mut doc = DocumentVector::new();
-    
-    // Create vector data
-    let vector_data = Arc::from(vec![0.1; 384]);
-    doc.set_field("title_embedding", StoredVector::new(vector_data));
-    
-    // Add metadata (available for filtering)
-    doc.metadata.insert("category".to_string(), "technology".to_string());
+fn add_document(engine: &amp;Engine) -&gt; iris::Result&lt;()&gt; {
+    // Text is automatically embedded by the configured embedder
+    let doc = Document::new()
+        .add_text("embedding", "Fast semantic search in Rust")
+        .add_field("category", DataValue::Text("technology".into()));
 
-    // Add document with specific ID
-    engine.upsert_vectors(1, doc)?;
-    engine.commit()?; // Persist data
-    
+    engine.put_document("doc_001", doc)?;
+    engine.commit()?;
+
     Ok(())
 }
 <span class="boring">}</span></code></pre></pre>
 <h3 id="3-executing-vector-search"><a class="header" href="#3-executing-vector-search">3. Executing Vector Search</a></h3>
-<p>Example of performing a search using <code>VectorSearchRequest</code>.</p>
+<p>Example of performing a search using <code>VectorSearchRequestBuilder</code>.</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use iris::vector::engine::request::{VectorSearchRequest, QueryVector};
-use iris::vector::core::document::StoredVector;
+</span>use iris::SearchRequestBuilder;
+use iris::vector::VectorSearchRequestBuilder;
 
-fn search(engine: &amp;VectorEngine) -&gt; iris::error::Result&lt;()&gt; {
-    // Prepare query vector
-    let query_data = Arc::from(vec![0.1; 384]);
-    let query_vector = QueryVector {
-        vector: StoredVector::new(query_data),
-        weight: 1.0,
-        fields: None,
-    };
+fn search(engine: &amp;Engine) -&gt; iris::Result&lt;()&gt; {
+    let results = engine.search(
+        SearchRequestBuilder::new()
+            .with_vector(
+                VectorSearchRequestBuilder::new()
+                    .add_text("embedding", "semantic search")
+                    .build()
+            )
+            .limit(10)
+            .build()
+    )?;
 
-    let request = VectorSearchRequest {
-        query_vectors: vec![query_vector],
-        limit: 10,
-        min_score: 0.7,
-        ..Default::default()
-    };
-
-    let results = engine.search(request)?;
-    for hit in results.hits {
-        println!("Doc ID: {}, Score: {}", hit.doc_id, hit.score);
+    for hit in results {
+        println!("[{}] Score: {:.4}", hit.id, hit.score);
     }
-    
+
     Ok(())
 }
 <span class="boring">}</span></code></pre></pre>
-<h3 id="4-filtered-search"><a class="header" href="#4-filtered-search">4. Filtered Search</a></h3>
-<p>Example of a search restricted to a specific category.</p>
+<h3 id="4-hybrid-search"><a class="header" href="#4-hybrid-search">4. Hybrid Search</a></h3>
+<p>Example of combining vector and keyword search. Note that vector and lexical searches use separate fields.</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use iris::vector::engine::filter::{VectorFilter, FilterCondition};
+</span>use iris::{FusionAlgorithm, SearchRequestBuilder};
+use iris::lexical::TermQuery;
+use iris::vector::VectorSearchRequestBuilder;
 
-fn filtered_search(engine: &amp;VectorEngine) -&gt; iris::error::Result&lt;()&gt; {
-    let mut filter = VectorFilter::default();
-    filter.document.equals.insert("category".to_string(), "technology".to_string());
+fn hybrid_search(engine: &amp;Engine) -&gt; iris::Result&lt;()&gt; {
+    let results = engine.search(
+        SearchRequestBuilder::new()
+            // Vector search (semantic) on vector field
+            .with_vector(
+                VectorSearchRequestBuilder::new()
+                    .add_text("content_vec", "fast semantic search")
+                    .build()
+            )
+            // Lexical search (keyword) on lexical field
+            .with_lexical(Box::new(TermQuery::new("content", "rust")))
+            // Fusion strategy
+            .fusion(FusionAlgorithm::RRF { k: 60.0 })
+            .limit(10)
+            .build()
+    )?;
 
-    let request = VectorSearchRequest {
-        query_vectors: vec![/* query vector */],
-        filter: Some(filter),
-        limit: 5,
-        ..Default::default()
-    };
+    for hit in results {
+        println!("[{}] score={:.4}", hit.id, hit.score);
+    }
 
-    let results = engine.search(request)?;
     Ok(())
 }
 <span class="boring">}</span></code></pre></pre>
-<h3 id="5-hybrid-search"><a class="header" href="#5-hybrid-search">5. Hybrid Search</a></h3>
-<p>Example of combining vector and keyword search.</p>
+<h3 id="5-weighted-sum-fusion"><a class="header" href="#5-weighted-sum-fusion">5. Weighted Sum Fusion</a></h3>
+<p>Example using weighted sum fusion for fine-grained control.</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use iris::vector::engine::query::{VectorSearchRequest, HybridSearchQuery};
+</span>fn weighted_hybrid_search(engine: &amp;Engine) -&gt; iris::Result&lt;()&gt; {
+    let results = engine.search(
+        SearchRequestBuilder::new()
+            .with_vector(
+                VectorSearchRequestBuilder::new()
+                    .add_text("content_vec", "machine learning")
+                    .build()
+            )
+            .with_lexical(Box::new(TermQuery::new("content", "python")))
+            .fusion(FusionAlgorithm::WeightedSum {
+                vector_weight: 0.7,  // 70% semantic
+                lexical_weight: 0.3, // 30% keyword
+            })
+            .limit(10)
+            .build()
+    )?;
 
-async fn hybrid_search(engine: &amp;VectorEngine, query_vector: Vec&lt;f32&gt;) -&gt; iris::error::Result&lt;()&gt; {
-    // Define Hybrid Query
-    let request = VectorSearchRequest::builder()
-        .vector(query_vector.into())
-        .hybrid_query(HybridSearchQuery {
-            keyword_query: "fast rust search".to_string(),
-            keyword_weight: 0.5,
-            vector_weight: 0.5,
-            top_k: 10,
-        })
-        .build();
-
-    let results = engine.search(request).await?;
-    
-    for res in results.hits {
-        println!("Doc ID: {}, Score: {}", res.id, res.score);
-    }
     Ok(())
 }
 <span class="boring">}</span></code></pre></pre>
@@ -1113,7 +1334,231 @@ async fn hybrid_search(engine: &amp;VectorEngine, query_vector: Vec&lt;f32&gt;) 
 <li><strong>GPU Acceleration</strong>: Offloading distance calculations to GPUs, in addition to model inference.</li>
 <li><strong>Disk-ANN Support</strong>: Mechanisms to efficiently search large indexes stored on SSDs when they exceed memory capacity.</li>
 </ul>
-<div style="break-before: page; page-break-before: always;"></div><div style="break-before: page; page-break-before: always;"></div><h1 id="id-management"><a class="header" href="#id-management">ID Management</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><div style="break-before: page; page-break-before: always;"></div><h1 id="query-dsl"><a class="header" href="#query-dsl">Query DSL</a></h1>
+<p>Iris provides a unified query DSL (Domain Specific Language) that allows lexical (keyword) and vector (semantic) search in a single query string. The <code>UnifiedQueryParser</code> splits the input into lexical and vector portions and delegates to the appropriate sub-parser.</p>
+<h2 id="overview"><a class="header" href="#overview">Overview</a></h2>
+<pre><code>title:hello AND content:~"cute kitten"^0.8
+|--- lexical --|    |--- vector --------|
+</code></pre>
+<p>The <code>~"</code> pattern distinguishes vector clauses from lexical clauses. Everything else is treated as a lexical query.</p>
+<h2 id="lexical-query-syntax"><a class="header" href="#lexical-query-syntax">Lexical Query Syntax</a></h2>
+<p>Lexical queries search the inverted index using exact or approximate keyword matching.</p>
+<h3 id="term-query"><a class="header" href="#term-query">Term Query</a></h3>
+<p>Match a single term against a field (or the default field):</p>
+<pre><code>hello
+title:hello
+</code></pre>
+<h3 id="boolean-operators"><a class="header" href="#boolean-operators">Boolean Operators</a></h3>
+<p>Combine clauses with <code>AND</code> and <code>OR</code> (case-insensitive):</p>
+<pre><code>title:hello AND body:world
+title:hello OR title:goodbye
+</code></pre>
+<p>Space-separated clauses without an explicit operator use implicit boolean (behaves like OR with scoring).</p>
+<h3 id="required--prohibited-clauses"><a class="header" href="#required--prohibited-clauses">Required / Prohibited Clauses</a></h3>
+<p>Use <code>+</code> (must match) and <code>-</code> (must not match):</p>
+<pre><code>+title:hello -title:goodbye
+</code></pre>
+<h3 id="phrase-query"><a class="header" href="#phrase-query">Phrase Query</a></h3>
+<p>Match an exact phrase using double quotes. Optional proximity (<code>~N</code>) allows N words between terms:</p>
+<pre><code>"hello world"
+"hello world"~2
+</code></pre>
+<h3 id="fuzzy-query"><a class="header" href="#fuzzy-query">Fuzzy Query</a></h3>
+<p>Approximate matching with edit distance. Append <code>~</code> and optionally the maximum edit distance:</p>
+<pre><code>roam~
+roam~2
+</code></pre>
+<h3 id="wildcard-query"><a class="header" href="#wildcard-query">Wildcard Query</a></h3>
+<p>Use <code>?</code> (single character) and <code>*</code> (zero or more characters):</p>
+<pre><code>te?t
+test*
+</code></pre>
+<h3 id="range-query"><a class="header" href="#range-query">Range Query</a></h3>
+<p>Inclusive <code>[]</code> or exclusive <code>{}</code> ranges, useful for numeric and date fields:</p>
+<pre><code>price:[100 TO 500]
+date:{2024-01-01 TO 2024-12-31}
+price:[* TO 100]
+</code></pre>
+<h3 id="boost"><a class="header" href="#boost">Boost</a></h3>
+<p>Increase the weight of a clause with <code>^</code>:</p>
+<pre><code>title:hello^2
+"important phrase"^1.5
+</code></pre>
+<h3 id="grouping"><a class="header" href="#grouping">Grouping</a></h3>
+<p>Use parentheses for sub-expressions:</p>
+<pre><code>(title:hello OR title:hi) AND body:world
+</code></pre>
+<h3 id="peg-grammar"><a class="header" href="#peg-grammar">PEG Grammar</a></h3>
+<p>The full lexical grammar (<a href="https://github.com/mosuka/iris/blob/main/src/lexical/query/parser.pest">parser.pest</a>):</p>
+<pre><code class="language-pest">query          = { SOI ~ boolean_query ~ EOI }
+boolean_query  = { clause ~ (boolean_op ~ clause | clause)* }
+clause         = { required_clause | prohibited_clause | sub_clause }
+required_clause   = { "+" ~ sub_clause }
+prohibited_clause = { "-" ~ sub_clause }
+sub_clause     = { grouped_query | field_query | term_query }
+grouped_query  = { "(" ~ boolean_query ~ ")" ~ boost? }
+boolean_op     = { ^"AND" | ^"OR" }
+field_query    = { field ~ ":" ~ field_value }
+field_value    = { range_query | phrase_query | fuzzy_term
+                 | wildcard_term | simple_term }
+phrase_query   = { "\"" ~ phrase_content ~ "\"" ~ proximity? ~ boost? }
+proximity      = { "~" ~ number }
+fuzzy_term     = { term ~ "~" ~ fuzziness? ~ boost? }
+wildcard_term  = { wildcard_pattern ~ boost? }
+simple_term    = { term ~ boost? }
+boost          = { "^" ~ boost_value }
+</code></pre>
+<h2 id="vector-query-syntax"><a class="header" href="#vector-query-syntax">Vector Query Syntax</a></h2>
+<p>Vector queries embed text into vectors at parse time and perform similarity search.</p>
+<h3 id="basic-syntax"><a class="header" href="#basic-syntax">Basic Syntax</a></h3>
+<pre><code>field:~"text"
+field:~"text"^weight
+</code></pre>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Element</th><th style="text-align: center">Required</th><th style="text-align: left">Description</th><th style="text-align: left">Example</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>field:</code></td><td style="text-align: center">No</td><td style="text-align: left">Target vector field name</td><td style="text-align: left"><code>content:</code></td></tr>
+<tr><td style="text-align: left"><code>~</code></td><td style="text-align: center"><strong>Yes</strong></td><td style="text-align: left">Vector query marker</td><td style="text-align: left"></td></tr>
+<tr><td style="text-align: left"><code>"text"</code></td><td style="text-align: center"><strong>Yes</strong></td><td style="text-align: left">Text to embed</td><td style="text-align: left"><code>"cute kitten"</code></td></tr>
+<tr><td style="text-align: left"><code>^weight</code></td><td style="text-align: center">No</td><td style="text-align: left">Score weight (default: 1.0)</td><td style="text-align: left"><code>^0.8</code></td></tr>
+</tbody></table>
+</div>
+<h3 id="examples-1"><a class="header" href="#examples-1">Examples</a></h3>
+<pre><code># Single field
+content:~"cute kitten"
+
+# With boost weight
+content:~"cute kitten"^0.8
+
+# Default field (when configured)
+~"cute kitten"
+
+# Multiple clauses
+content:~"cats" image:~"dogs"^0.5
+
+# Nested field name (dot notation)
+metadata.embedding:~"text"
+</code></pre>
+<h3 id="multiple-clauses"><a class="header" href="#multiple-clauses">Multiple Clauses</a></h3>
+<p>Multiple vector clauses are space-separated. All clauses are executed and their scores are combined using the <code>score_mode</code> (default: <code>WeightedSum</code>):</p>
+<pre><code>content:~"cats" image:~"dogs"^0.5
+</code></pre>
+<p>This produces:</p>
+<pre><code>score = similarity("cats", content) * 1.0
+      + similarity("dogs", image)   * 0.5
+</code></pre>
+<p>There are no <code>AND</code>/<code>OR</code> operators in the vector DSL. Vector search is inherently a ranking operation, and the weight (<code>^</code>) controls the contribution of each clause.</p>
+<h3 id="score-modes"><a class="header" href="#score-modes">Score Modes</a></h3>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Mode</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>WeightedSum</code> (default)</td><td style="text-align: left">Sum of (similarity * weight) across all clauses</td></tr>
+<tr><td style="text-align: left"><code>MaxSim</code></td><td style="text-align: left">Maximum similarity score across clauses</td></tr>
+<tr><td style="text-align: left"><code>LateInteraction</code></td><td style="text-align: left">Late interaction scoring</td></tr>
+</tbody></table>
+</div>
+<p>Score mode cannot be set from DSL syntax. Use the Rust API to override:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let mut request = parser.parse(r#"content:~"cats" image:~"dogs""#).await?;
+request.score_mode = VectorScoreMode::MaxSim;
+<span class="boring">}</span></code></pre></pre>
+<h3 id="peg-grammar-1"><a class="header" href="#peg-grammar-1">PEG Grammar</a></h3>
+<p>The full vector grammar (<a href="https://github.com/mosuka/iris/blob/main/src/vector/query/parser.pest">parser.pest</a>):</p>
+<pre><code class="language-pest">query          = { SOI ~ vector_clause+ ~ EOI }
+vector_clause  = { field_prefix? ~ "~" ~ quoted_text ~ boost? }
+field_prefix   = { field_name ~ ":" }
+field_name     = @{ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_" | ".")* }
+quoted_text    = ${ "\"" ~ inner_text ~ "\"" }
+inner_text     = @{ (!("\"") ~ ANY)* }
+boost          = { "^" ~ float_value }
+float_value    = @{ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)? }
+</code></pre>
+<h2 id="unified-hybrid-query-syntax"><a class="header" href="#unified-hybrid-query-syntax">Unified (Hybrid) Query Syntax</a></h2>
+<p>The <code>UnifiedQueryParser</code> allows mixing lexical and vector clauses freely in a single query string:</p>
+<pre><code>title:hello content:~"cute kitten"^0.8
+</code></pre>
+<h3 id="how-it-works"><a class="header" href="#how-it-works">How It Works</a></h3>
+<ol>
+<li><strong>Split</strong>: Vector clauses (matching <code>field:~"text"^boost</code> pattern) are extracted via regex.</li>
+<li><strong>Delegate</strong>: Vector portion goes to <code>VectorQueryParser</code>, remainder goes to lexical <code>QueryParser</code>.</li>
+<li><strong>Fuse</strong>: If both lexical and vector results exist, they are combined using a fusion algorithm.</li>
+</ol>
+<h3 id="disambiguation"><a class="header" href="#disambiguation">Disambiguation</a></h3>
+<p>The <code>~"</code> pattern unambiguously identifies vector clauses because in lexical syntax, <code>~</code> only appears <em>after</em> a term or phrase (e.g., <code>roam~2</code>, <code>"hello world"~10</code>), never before a quote.</p>
+<h3 id="fusion-algorithms"><a class="header" href="#fusion-algorithms">Fusion Algorithms</a></h3>
+<p>When a query contains both lexical and vector clauses, results are fused:</p>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Algorithm</th><th style="text-align: left">Formula</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: left"><strong>RRF</strong> (default)</td><td style="text-align: left"><code>score = sum(1 / (k + rank))</code></td><td style="text-align: left">Reciprocal Rank Fusion. Robust to different score distributions. Default k=60.</td></tr>
+<tr><td style="text-align: left"><strong>WeightedSum</strong></td><td style="text-align: left"><code>score = lexical * a + vector * b</code></td><td style="text-align: left">Linear combination with configurable weights.</td></tr>
+</tbody></table>
+</div>
+<h3 id="examples-2"><a class="header" href="#examples-2">Examples</a></h3>
+<pre><code># Lexical only — no fusion
+title:hello AND body:world
+
+# Vector only — no fusion
+content:~"cute kitten"
+
+# Hybrid — RRF fusion (default)
+title:hello content:~"cute kitten"
+
+# Hybrid with boolean operators
+title:hello AND category:animal content:~"cute kitten"^0.8
+
+# Multiple vector clauses + lexical
+category:animal content:~"cats" image:~"dogs"^0.5
+
+# Default fields (when configured)
+hello ~"cats"
+</code></pre>
+<h2 id="code-examples-2"><a class="header" href="#code-examples-2">Code Examples</a></h2>
+<h3 id="lexical-search-with-dsl"><a class="header" href="#lexical-search-with-dsl">Lexical Search with DSL</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use std::sync::Arc;
+use iris::analysis::analyzer::standard::StandardAnalyzer;
+use iris::lexical::query::QueryParser;
+
+let analyzer = Arc::new(StandardAnalyzer::new()?);
+let parser = QueryParser::new(analyzer)
+    .with_default_field("title");
+
+let query = parser.parse("title:hello AND body:world")?;
+<span class="boring">}</span></code></pre></pre>
+<h3 id="vector-search-with-dsl"><a class="header" href="#vector-search-with-dsl">Vector Search with DSL</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use std::sync::Arc;
+use iris::vector::query::VectorQueryParser;
+
+let parser = VectorQueryParser::new(embedder)
+    .with_default_field("content");
+
+let request = parser.parse(r#"content:~"cute kitten"^0.8"#).await?;
+<span class="boring">}</span></code></pre></pre>
+<h3 id="hybrid-search-with-unified-dsl"><a class="header" href="#hybrid-search-with-unified-dsl">Hybrid Search with Unified DSL</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use iris::engine::query::UnifiedQueryParser;
+
+let unified = UnifiedQueryParser::new(lexical_parser, vector_parser);
+
+let request = unified.parse(
+    r#"title:hello content:~"cute kitten"^0.8"#
+).await?;
+// request.lexical  -&gt; Some(...)  — lexical query
+// request.vector   -&gt; Some(...)  — vector query
+// request.fusion   -&gt; Some(RRF)  — fusion algorithm
+<span class="boring">}</span></code></pre></pre>
+<h3 id="custom-fusion"><a class="header" href="#custom-fusion">Custom Fusion</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use iris::engine::search::FusionAlgorithm;
+
+let unified = UnifiedQueryParser::new(lexical_parser, vector_parser)
+    .with_fusion(FusionAlgorithm::WeightedSum {
+        lexical_weight: 0.3,
+        vector_weight: 0.7,
+    });
+<span class="boring">}</span></code></pre></pre>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="id-management"><a class="header" href="#id-management">ID Management</a></h1>
 <p>Iris uses a dual-tiered ID management strategy to ensure efficient document retrieval, updates, and aggregation in distributed environments.</p>
 <h2 id="1-external-id-string"><a class="header" href="#1-external-id-string">1. External ID (String)</a></h2>
 <p>The External ID is a <strong>logical identifier</strong> used by users and applications to uniquely identify a document.</p>
@@ -1146,8 +1591,8 @@ async fn hybrid_search(engine: &amp;VectorEngine, query_vector: Vec&lt;f32&gt;) 
 </ol>
 <h2 id="id-lifecycle"><a class="header" href="#id-lifecycle">ID Lifecycle</a></h2>
 <ol>
-<li><strong>Registration (<code>index_document</code>)</strong>: User provides a document with an External ID.</li>
-<li><strong>ID Assignment</strong>: The <code>HybridEngine</code> combines the current <code>shard_id</code> with a new Local ID to issue a Shard-Prefixed Internal ID.</li>
+<li><strong>Registration (<code>engine.index()</code>)</strong>: User provides a document with an External ID.</li>
+<li><strong>ID Assignment</strong>: The <code>Engine</code> combines the current <code>shard_id</code> with a new Local ID to issue a Shard-Prefixed Internal ID.</li>
 <li><strong>Mapping</strong>: The engine maintains the relationship between the External ID and the new Internal ID.</li>
 <li><strong>Search</strong>: Search results return the <code>u64</code> Internal ID for efficiency.</li>
 <li><strong>Retrieval/Deletion</strong>: While the user-facing API accepts External IDs for convenience, the engine internally converts them to Internal IDs for near-instant processing.</li>
@@ -1167,10 +1612,10 @@ async fn hybrid_search(engine: &amp;VectorEngine, query_vector: Vec&lt;f32&gt;) 
 </ul>
 <h2 id="checkpointing"><a class="header" href="#checkpointing">Checkpointing</a></h2>
 <p>Currently, explicit commits flush the in-memory state to durable index files.</p>
-<ul>
-<li><code>lexical_engine.commit()</code></li>
-<li><code>hybrid_engine.commit()</code></li>
-</ul>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>engine.commit()?;  // Flush and persist all changes
+<span class="boring">}</span></code></pre></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="deletions--compaction"><a class="header" href="#deletions--compaction">Deletions &amp; Compaction</a></h1>
 <h2 id="logical-deletion"><a class="header" href="#logical-deletion">Logical Deletion</a></h2>
 <p>When a document is deleted:</p>
@@ -1190,7 +1635,7 @@ async fn hybrid_search(engine: &amp;VectorEngine, query_vector: Vec&lt;f32&gt;) 
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// Example of triggering manual compaction
-vector_engine.force_merge()?;
+engine.optimize()?;
 <span class="boring">}</span></code></pre></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="api-reference"><a class="header" href="#api-reference">API Reference</a></h1>
 <p>For detailed API documentation, please refer to the auto-generated Rustdocs.</p>
@@ -1232,6 +1677,8 @@ vector_engine.force_merge()?;
         <script src="book.js"></script>
 
         <!-- Custom JS scripts -->
+        <script src="mermaid.min.js"></script>
+        <script src="mermaid-init.js"></script>
 
         <script>
         window.addEventListener('load', function() {

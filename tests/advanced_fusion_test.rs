@@ -11,8 +11,8 @@ use iris::vector::VectorSearchRequestBuilder;
 use iris::{FieldOption, Schema};
 use iris::{FusionAlgorithm, SearchRequestBuilder};
 
-#[test]
-fn test_advanced_fusion_normalization() -> iris::Result<()> {
+#[tokio::test(flavor = "multi_thread")]
+async fn test_advanced_fusion_normalization() -> iris::Result<()> {
     // 1. Setup Storage
     let temp_dir = TempDir::new().unwrap();
     let storage_config = StorageConfig::File(FileStorageConfig::new(temp_dir.path()));
@@ -27,7 +27,7 @@ fn test_advanced_fusion_normalization() -> iris::Result<()> {
         .add_field("embedding", FieldOption::Vector(vector_opt))
         .build();
 
-    let engine = Engine::new(storage, config)?;
+    let engine = Engine::new(storage, config).await?;
 
     // 3. Index Documents
     // Doc 1: Good lexical, Bad vector
@@ -39,7 +39,7 @@ fn test_advanced_fusion_normalization() -> iris::Result<()> {
             .add_field("title", "apple")
             .add_field("embedding", vec1)
             .build(),
-    )?;
+    ).await?;
 
     // Doc 2: Bad lexical, Good vector
     let mut vec2 = vec![0.0; 128];
@@ -50,9 +50,9 @@ fn test_advanced_fusion_normalization() -> iris::Result<()> {
             .add_field("title", "banana")
             .add_field("embedding", vec2)
             .build(),
-    )?;
+    ).await?;
 
-    engine.commit()?;
+    engine.commit().await?;
 
     let mut query_vec = vec![0.0; 128];
     query_vec[1] = 1.0;
@@ -69,7 +69,7 @@ fn test_advanced_fusion_normalization() -> iris::Result<()> {
         })
         .build();
 
-    let results = engine.search(request)?;
+    let results = engine.search(request).await?;
     assert_eq!(results.len(), 2);
 
     // Without normalization, vector scores (cosine similarity with small values)
@@ -84,8 +84,8 @@ fn test_advanced_fusion_normalization() -> iris::Result<()> {
     Ok(())
 }
 
-#[test]
-fn test_field_boosts() -> iris::Result<()> {
+#[tokio::test(flavor = "multi_thread")]
+async fn test_field_boosts() -> iris::Result<()> {
     // 1. Setup Storage
     let temp_dir = TempDir::new().unwrap();
     let storage_config = StorageConfig::File(FileStorageConfig::new(temp_dir.path()));
@@ -97,7 +97,7 @@ fn test_field_boosts() -> iris::Result<()> {
         .add_field("body", FieldOption::Lexical(LexicalOption::default()))
         .build();
 
-    let engine = Engine::new(storage, config)?;
+    let engine = Engine::new(storage, config).await?;
 
     // 3. Index Documents
     engine.put_document(
@@ -106,15 +106,15 @@ fn test_field_boosts() -> iris::Result<()> {
             .add_field("title", "rust")
             .add_field("body", "programming")
             .build(),
-    )?;
+    ).await?;
     engine.put_document(
         "doc2",
         Document::builder()
             .add_field("title", "java")
             .add_field("body", "rust")
             .build(),
-    )?;
-    engine.commit()?;
+    ).await?;
+    engine.commit().await?;
 
     // 4. Search for "rust" in both fields with different boosts
     // Case A: Boost title
@@ -129,9 +129,9 @@ fn test_field_boosts() -> iris::Result<()> {
         .add_field_boost("body", 1.0)
         .build();
 
-    let res_a = engine.search(req_a)?;
+    let res_a = engine.search(req_a).await?;
     // res_a[0].id is the external ID (String)
-    let docs_a = engine.get_documents(&res_a[0].id)?;
+    let docs_a = engine.get_documents(&res_a[0].id).await?;
     let doc_a = &docs_a[0];
     assert_eq!(
         doc_a.fields.get("_id").and_then(|v| v.as_text()),
@@ -151,8 +151,8 @@ fn test_field_boosts() -> iris::Result<()> {
         .add_field_boost("body", 10.0)
         .build();
 
-    let res_b = engine.search(req_b)?;
-    let docs_b = engine.get_documents(&res_b[0].id)?;
+    let res_b = engine.search(req_b).await?;
+    let docs_b = engine.get_documents(&res_b[0].id).await?;
     let doc_b = &docs_b[0];
     assert_eq!(
         doc_b.fields.get("_id").and_then(|v| v.as_text()),

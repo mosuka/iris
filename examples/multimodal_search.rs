@@ -15,7 +15,6 @@
 //! ```
 
 #[cfg(feature = "embeddings-multimodal")]
-#[cfg(feature = "embeddings-multimodal")]
 use std::path::Path;
 
 #[cfg(feature = "embeddings-multimodal")]
@@ -44,7 +43,8 @@ use iris::{DataValue, Document};
 use tempfile::TempDir;
 
 #[cfg(feature = "embeddings-multimodal")]
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
     use std::sync::Arc;
 
     println!("=== Multimodal Search Example (CLIP) ===\n");
@@ -113,7 +113,7 @@ fn main() -> Result<()> {
                         .build();
 
                     indexed_count += 1;
-                    engine.upsert_document_by_internal_id(indexed_count, doc)?;
+                    engine.upsert_document_by_internal_id(indexed_count, doc).await?;
                 }
             }
         }
@@ -138,11 +138,11 @@ fn main() -> Result<()> {
             .add_field("type", DataValue::Text("text".into()))
             .build();
         indexed_count += 1;
-        engine.upsert_document_by_internal_id(indexed_count, doc)?;
+        engine.upsert_document_by_internal_id(indexed_count, doc).await?;
     }
 
     // Commit to make documents searchable
-    engine.commit()?;
+    engine.commit().await?;
 
     // 6. Search Demonstrations
 

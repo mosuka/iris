@@ -178,18 +178,130 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="introduction"><a class="header" href="#introduction">Introduction</a></h1>
-<p>Iris is a fast, featureful full-text search library for Rust, inspired by Whoosh.</p>
+                        <h1 id="iris"><a class="header" href="#iris">IRiS</a></h1>
+<p><a href="https://crates.io/crates/iris"><img src="https://img.shields.io/crates/v/iris.svg" alt="Crates.io" /></a>
+<a href="https://docs.rs/iris"><img src="https://docs.rs/iris/badge.svg" alt="Documentation" /></a>
+<a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT" /></a></p>
+<p>IRiS is a <strong>high-performance</strong> search core library written in Rust, designed for <strong>Information Retrieval with Semantics</strong>.</p>
+<p>IRiS provides the foundational mechanisms <strong>essential for</strong> advanced search capabilities:</p>
+<ul>
+<li><strong>Lexical search primitives</strong> for precise, exact-match retrieval</li>
+<li><strong>Vector-based similarity search</strong> for deep semantic understanding</li>
+<li><strong>Hybrid scoring and ranking</strong> to synthesize multiple signals into coherent results</li>
+</ul>
+<p>Rather than functioning as a monolithic search engine, IRiS is architected as a <strong>composable search core</strong> — a suite of modular building blocks designed to be embedded into applications, extended with custom logic, or orchestrated within distributed systems.</p>
+<h2 id="documentation"><a class="header" href="#documentation">Documentation</a></h2>
+<p>Comprehensive documentation is available in the <a href="https://github.com/mosuka/iris/tree/main/docs"><code>docs/</code></a> directory and online at <a href="https://mosuka.github.io/iris/">https://mosuka.github.io/iris/</a>:</p>
+<ul>
+<li><a href="https://mosuka.github.io/iris/getting_started/index.html"><strong>Getting Started</strong></a>: Installation and basic usage.</li>
+<li><a href="https://mosuka.github.io/iris/concepts/index.html"><strong>Core Concepts</strong></a>: Architecture, Lexical Search, and Vector Search.</li>
+<li><a href="https://mosuka.github.io/iris/advanced/index.html"><strong>Advanced Features</strong></a>: ID Management, Persistence, and Deletions.</li>
+<li><a href="https://docs.rs/iris"><strong>API Reference</strong></a></li>
+</ul>
 <h2 id="features"><a class="header" href="#features">Features</a></h2>
 <ul>
-<li><strong>Pure Rust</strong>: Single binary, easy deployment, high performance.</li>
-<li><strong>Hybrid Search</strong>: Seamlessly combine lexical (BM25) and semantic (Vector) search.</li>
-<li><strong>Flexible Analysis</strong>: Configurable tokenizers and analyzers (Standard, Keyword, Lindera for Japanese).</li>
-<li><strong>Advanced Querying</strong>: Boolean, Phrase, Range, Fuzzy, Wildcard, Geo, and Span queries.</li>
-<li><strong>Pluggable Storage</strong>: Abstract storage interface supporting memory mapping and file-based storage.</li>
+<li><strong>Pure Rust Implementation</strong>: Memory-safe and fast performance with zero-cost abstractions.</li>
+<li><strong>Hybrid Search</strong>: Seamlessly combine BM25 lexical search with HNSW vector search using configurable fusion strategies.</li>
+<li><strong>Multimodal capabilities</strong>: Native support for text-to-image and image-to-image search via CLIP embeddings.</li>
+<li><strong>Rich Query DSL</strong>: Term, phrase, boolean, fuzzy, wildcard, range, and geographic queries.</li>
+<li><strong>Flexible Analysis</strong>: Configurable pipelines for tokenization, normalization, and stemming (including CJK support).</li>
+<li><strong>Pluggable Storage</strong>: Interfaces for in-memory, file-system, and memory-mapped storage backends.</li>
 </ul>
-<h2 id="philosophy"><a class="header" href="#philosophy">Philosophy</a></h2>
-<p>Iris aims to provide a "batteries-included" search experience that is easy to get started with but powerful enough for production use cases requiring customizability. It decouples the complexity of inverted indexes and HNSW graphs behind a clean, high-level API.</p>
+<h2 id="quick-start"><a class="header" href="#quick-start">Quick Start</a></h2>
+<pre><pre class="playground"><code class="language-rust">use iris::{Document, Engine, FieldOption, FusionAlgorithm, Schema, SearchRequestBuilder};
+use iris::analysis::analyzer::standard::StandardAnalyzer;
+use iris::lexical::{FieldOption as LexicalFieldOption, TextOption, TermQuery};
+use iris::vector::{FlatOption, VectorOption, VectorSearchRequestBuilder};
+use iris::storage::{StorageConfig, StorageFactory};
+use iris::storage::memory::MemoryStorageConfig;
+use std::sync::Arc;
+
+fn main() -&gt; iris::Result&lt;()&gt; {
+    // 1. Create storage
+    let storage = StorageFactory::create(StorageConfig::Memory(MemoryStorageConfig::default()))?;
+
+    // 2. Define schema with separate lexical and vector fields
+    let schema = Schema::builder()
+        .add_field("content", FieldOption::Lexical(LexicalFieldOption::Text(TextOption::default())))
+        .add_field("content_vec", FieldOption::Vector(VectorOption::Flat(FlatOption { dimension: 384, ..Default::default() })))
+        .build();
+
+    // 3. Create engine with analyzer and embedder
+    let engine = Engine::builder(storage, schema)
+        .analyzer(Arc::new(StandardAnalyzer::default()))
+        .embedder(Arc::new(MyEmbedder))  // Your embedder implementation
+        .build()?;
+
+    engine.index(
+        Document::new_with_id("doc1")
+            .add_text("content", "Rust is a systems programming language")
+            .add_text("content_vec", "Rust is a systems programming language")
+    )?;
+    engine.index(
+        Document::new_with_id("doc2")
+            .add_text("content", "Python is great for machine learning")
+            .add_text("content_vec", "Python is great for machine learning")
+    )?;
+    engine.commit()?;
+
+    // 4. Hybrid search (combines lexical keyword match + semantic similarity)
+    let results = engine.search(
+        SearchRequestBuilder::new()
+            .with_lexical(Box::new(TermQuery::new("content", "programming")))
+            .with_vector(VectorSearchRequestBuilder::new().add_text("content_vec", "systems language").build())
+            .fusion(FusionAlgorithm::RRF { k: 60.0 })
+            .build()
+    )?;
+
+    // 5. Display results with document content
+    for hit in results {
+        if let Ok(Some(doc)) = engine.get_document(hit.doc_id) {
+            let id = doc.id().unwrap_or("unknown");
+            let content = doc.fields.get("content").and_then(|v| v.as_text()).unwrap_or("");
+            println!("[{}] {} (internal_id={}, score={:.4})", id, content, hit.doc_id, hit.score);
+        }
+    }
+
+    Ok(())
+}</code></pre></pre>
+<h2 id="examples"><a class="header" href="#examples">Examples</a></h2>
+<p>You can find usage examples in the <a href="https://github.com/mosuka/iris/tree/main/examples"><code>examples/</code></a> directory:</p>
+<h3 id="search"><a class="header" href="#search">Search</a></h3>
+<ul>
+<li><a href="https://github.com/mosuka/iris/blob/main/examples/search.rs">Unified Search</a> - Lexical, Vector, and Hybrid search in one cohesive example</li>
+<li><a href="https://github.com/mosuka/iris/blob/main/examples/multimodal_search.rs">Multimodal Search</a> - Text-to-image and image-to-image search</li>
+</ul>
+<h3 id="query-types"><a class="header" href="#query-types">Query Types</a></h3>
+<ul>
+<li><a href="https://github.com/mosuka/iris/blob/main/examples/term_query.rs">Term Query</a> - Basic keyword search</li>
+<li><a href="https://github.com/mosuka/iris/blob/main/examples/boolean_query.rs">Boolean Query</a> - Complex boolean expressions (AND, OR, NOT)</li>
+<li><a href="https://github.com/mosuka/iris/blob/main/examples/phrase_query.rs">Phrase Query</a> - Exact phrase matching</li>
+<li><a href="https://github.com/mosuka/iris/blob/main/examples/fuzzy_query.rs">Fuzzy Query</a> - Approximate string matching</li>
+<li><a href="https://github.com/mosuka/iris/blob/main/examples/wildcard_query.rs">Wildcard Query</a> - Pattern-based search</li>
+<li><a href="https://github.com/mosuka/iris/blob/main/examples/range_query.rs">Range Query</a> - Numeric and date range queries</li>
+<li><a href="https://github.com/mosuka/iris/blob/main/examples/geo_query.rs">Geo Query</a> - Geographic search</li>
+<li><a href="https://github.com/mosuka/iris/blob/main/examples/span_query.rs">Span Query</a> - Positional queries</li>
+</ul>
+<h3 id="embeddings"><a class="header" href="#embeddings">Embeddings</a></h3>
+<ul>
+<li><a href="https://github.com/mosuka/iris/blob/main/examples/embedding_with_candle.rs">Candle Embedder</a> - Local BERT embeddings</li>
+<li><a href="https://github.com/mosuka/iris/blob/main/examples/embedding_with_openai.rs">OpenAI Embedder</a> - Cloud-based embeddings</li>
+</ul>
+<h2 id="contributing"><a class="header" href="#contributing">Contributing</a></h2>
+<p>We welcome contributions! Please see our <a href="https://github.com/mosuka/iris/blob/main/CONTRIBUTING.md">Contributing Guidelines</a> for details.</p>
+<ol>
+<li>Fork the repository</li>
+<li>Create a feature branch (<code>git checkout -b feature/amazing-feature</code>)</li>
+<li>Commit your changes (<code>git commit -m 'Add some amazing feature'</code>)</li>
+<li>Push to the branch (<code>git push origin feature/amazing-feature</code>)</li>
+<li>Open a Pull Request</li>
+</ol>
+<h2 id="license"><a class="header" href="#license">License</a></h2>
+<p>This project is licensed under either of</p>
+<ul>
+<li>MIT License (<a href="https://github.com/mosuka/iris/blob/main/LICENSE-MIT">LICENSE-MIT</a> or <a href="http://opensource.org/licenses/MIT">http://opensource.org/licenses/MIT</a>)</li>
+</ul>
+<p>at your option.</p>
 
                     </main>
 
@@ -231,6 +343,8 @@
         <script src="book.js"></script>
 
         <!-- Custom JS scripts -->
+        <script src="mermaid.min.js"></script>
+        <script src="mermaid-init.js"></script>
 
 
 

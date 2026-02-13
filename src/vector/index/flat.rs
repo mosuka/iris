@@ -20,7 +20,6 @@ use crate::vector::index::flat::writer::FlatIndexWriter;
 use crate::vector::index::{VectorIndex, VectorIndexStats};
 use crate::vector::reader::VectorIndexReader;
 use crate::vector::search::searcher::VectorIndexSearcher;
-use crate::vector::store::embedder::EmbedderExecutor;
 use crate::vector::store::embedding_writer::EmbeddingVectorIndexWriter;
 use crate::vector::writer::{VectorIndexWriter, VectorIndexWriterConfig};
 
@@ -68,9 +67,6 @@ pub struct FlatIndex {
 
     /// Index metadata (thread-safe).
     metadata: RwLock<IndexMetadata>,
-
-    /// Executor for async embedding operations.
-    executor: Arc<EmbedderExecutor>,
 }
 
 impl std::fmt::Debug for FlatIndex {
@@ -93,14 +89,12 @@ impl FlatIndex {
             ..Default::default()
         };
 
-        let executor = Arc::new(EmbedderExecutor::new()?);
         let index = FlatIndex {
             name: name.to_string(),
             storage,
             config,
             closed: AtomicBool::new(false),
             metadata: RwLock::new(metadata),
-            executor,
         };
 
         index.write_metadata()?;
@@ -115,7 +109,6 @@ impl FlatIndex {
         }
 
         let metadata = Self::read_metadata(storage.as_ref(), name)?;
-        let executor = Arc::new(EmbedderExecutor::new()?);
 
         Ok(FlatIndex {
             name: name.to_string(),
@@ -123,7 +116,6 @@ impl FlatIndex {
             config,
             closed: AtomicBool::new(false),
             metadata: RwLock::new(metadata),
-            executor,
         })
     }
 
@@ -225,7 +217,7 @@ impl VectorIndex for FlatIndex {
         // Wrap with EmbeddingVectorIndexWriter for automatic text/image embedding
         let embedder = self.embedder();
         let writer =
-            EmbeddingVectorIndexWriter::new(Box::new(inner_writer), embedder, self.executor.clone());
+            EmbeddingVectorIndexWriter::new(Box::new(inner_writer), embedder);
         Ok(Box::new(writer))
     }
 

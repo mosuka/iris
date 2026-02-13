@@ -11,8 +11,8 @@ use iris::vector::FieldOption as VectorOption;
 use iris::vector::VectorSearchRequestBuilder;
 use iris::{FieldOption, Schema};
 
-#[test]
-fn test_engine_unified_deletion() -> iris::Result<()> {
+#[tokio::test(flavor = "multi_thread")]
+async fn test_engine_unified_deletion() -> iris::Result<()> {
     // 1. Setup Storage
     let temp_dir = TempDir::new().unwrap();
     let storage_config = StorageConfig::File(FileStorageConfig::new(temp_dir.path()));
@@ -27,7 +27,7 @@ fn test_engine_unified_deletion() -> iris::Result<()> {
         .add_field("embedding", FieldOption::Vector(vector_opt))
         .build();
 
-    let engine = Engine::new(storage.clone(), config)?;
+    let engine = Engine::new(storage.clone(), config).await?;
 
     // 3. Index Document with ID "doc1"
     let doc1 = Document::builder()
@@ -35,15 +35,15 @@ fn test_engine_unified_deletion() -> iris::Result<()> {
         .add_field("embedding", vec![0.1; 128])
         .build();
 
-    engine.put_document("doc1", doc1)?;
-    engine.commit()?;
+    engine.put_document("doc1", doc1).await?;
+    engine.commit().await?;
 
     // 4. Verify it exists in both
     // Lexical check
     let req_lexical = SearchRequestBuilder::new()
         .with_lexical(Box::new(TermQuery::new("title", "hello")))
         .build();
-    let res_lexical = engine.search(req_lexical)?;
+    let res_lexical = engine.search(req_lexical).await?;
     assert_eq!(res_lexical.len(), 1, "Should be found lexically");
 
     // Vector check
@@ -54,19 +54,19 @@ fn test_engine_unified_deletion() -> iris::Result<()> {
                 .build(),
         )
         .build();
-    let res_vector = engine.search(req_vector)?;
+    let res_vector = engine.search(req_vector).await?;
     assert_eq!(res_vector.len(), 1, "Should be found via vector");
 
     // 5. Delete by ID
-    engine.delete_documents("doc1")?;
-    engine.commit()?;
+    engine.delete_documents("doc1").await?;
+    engine.commit().await?;
 
     // 6. Verify it is GONE from both
     let res_lexical_after = engine.search(
         SearchRequestBuilder::new()
             .with_lexical(Box::new(TermQuery::new("title", "hello")))
             .build(),
-    )?;
+    ).await?;
     assert_eq!(res_lexical_after.len(), 0, "Should be deleted lexically");
 
     let res_vector_after = engine.search(
@@ -77,14 +77,14 @@ fn test_engine_unified_deletion() -> iris::Result<()> {
                     .build(),
             )
             .build(),
-    )?;
+    ).await?;
     assert_eq!(res_vector_after.len(), 0, "Should be deleted via vector");
 
     Ok(())
 }
 
-#[test]
-fn test_engine_upsert() -> iris::Result<()> {
+#[tokio::test(flavor = "multi_thread")]
+async fn test_engine_upsert() -> iris::Result<()> {
     // 1. Setup Storage
     let temp_dir = TempDir::new().unwrap();
     let storage_config = StorageConfig::File(FileStorageConfig::new(temp_dir.path()));
@@ -103,7 +103,7 @@ fn test_engine_upsert() -> iris::Result<()> {
         .add_field("embedding", FieldOption::Vector(vector_opt))
         .build();
 
-    let engine = Engine::new(storage.clone(), config)?;
+    let engine = Engine::new(storage.clone(), config).await?;
 
     // 3. Index Document with ID "doc1"
     let doc1 = Document::builder()
@@ -111,15 +111,15 @@ fn test_engine_upsert() -> iris::Result<()> {
         .add_field("embedding", vec![1.0, 0.0])
         .build();
 
-    engine.put_document("doc1", doc1)?;
-    engine.commit()?;
+    engine.put_document("doc1", doc1).await?;
+    engine.commit().await?;
 
     // 4. Verify initial version exists
     let res = engine.search(
         SearchRequestBuilder::new()
             .with_lexical(Box::new(TermQuery::new("title", "initial")))
             .build(),
-    )?;
+    ).await?;
     assert_eq!(res.len(), 1);
 
     // 5. Index updated document with SAME ID "doc1"
@@ -128,8 +128,8 @@ fn test_engine_upsert() -> iris::Result<()> {
         .add_field("embedding", vec![0.0, 1.0])
         .build();
 
-    engine.put_document("doc1", doc1_v2)?;
-    engine.commit()?;
+    engine.put_document("doc1", doc1_v2).await?;
+    engine.commit().await?;
 
     // 6. Verify update
     // Old version lookup should fail
@@ -137,7 +137,7 @@ fn test_engine_upsert() -> iris::Result<()> {
         SearchRequestBuilder::new()
             .with_lexical(Box::new(TermQuery::new("title", "initial")))
             .build(),
-    )?;
+    ).await?;
     assert_eq!(res_old.len(), 0, "Old version should be replaced");
 
     // New version lookup should succeed
@@ -145,7 +145,7 @@ fn test_engine_upsert() -> iris::Result<()> {
         SearchRequestBuilder::new()
             .with_lexical(Box::new(TermQuery::new("title", "updated")))
             .build(),
-    )?;
+    ).await?;
     assert_eq!(res_new.len(), 1, "New version should be found");
 
     // Vector check for new vector
@@ -157,7 +157,7 @@ fn test_engine_upsert() -> iris::Result<()> {
                     .build(),
             )
             .build(),
-    )?;
+    ).await?;
     assert_eq!(res_vec.len(), 1, "New vector should be found");
 
     Ok(())

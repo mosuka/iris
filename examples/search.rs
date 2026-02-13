@@ -22,15 +22,17 @@ use iris::analysis::analyzer::keyword::KeywordAnalyzer;
 use iris::analysis::analyzer::per_field::PerFieldAnalyzer;
 use iris::analysis::analyzer::standard::StandardAnalyzer;
 use iris::lexical::core::field::{IntegerOption, NumericType};
+use iris::lexical::query::QueryParser;
 use iris::lexical::{NumericRangeQuery, TermQuery, TextOption};
 use iris::{EmbedInput, EmbedInputType, Embedder, PerFieldEmbedder};
-use iris::{FusionAlgorithm, Schema, SearchRequestBuilder};
+use iris::{FusionAlgorithm, Schema, SearchRequestBuilder, UnifiedQueryParser};
 use serde_json::json;
 
 use iris::storage::memory::MemoryStorageConfig;
 use iris::storage::{StorageConfig, StorageFactory};
 use iris::vector::FlatOption;
 use iris::vector::Vector;
+use iris::vector::VectorQueryParser;
 use iris::vector::VectorSearchRequestBuilder;
 
 // --- Mock Embedder ---
@@ -81,7 +83,8 @@ impl Embedder for MockEmbedder {
     }
 }
 
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
     println!("=== Iris Chunk-based Document Search Example ===\n");
 
     // 1. Setup Storage (In-memory for this example)
@@ -118,14 +121,16 @@ fn main() -> Result<()> {
     per_field_analyzer.add_analyzer("text", std_analyzer.clone());
 
     // Embedder for the "text_vec" vector field
-    let embedder = Arc::new(MockEmbedder);
+    let embedder: Arc<dyn Embedder> = Arc::new(MockEmbedder);
     let mut per_field_embedder = PerFieldEmbedder::new(embedder.clone());
     per_field_embedder.add_embedder("text_vec", embedder.clone());
+    let per_field_embedder = Arc::new(per_field_embedder);
 
     let engine = Engine::builder(storage, schema)
         .analyzer(Arc::new(per_field_analyzer))
-        .embedder(Arc::new(per_field_embedder))
-        .build()?;
+        .embedder(per_field_embedder.clone())
+        .build()
+        .await?;
 
     // 3. Register Chunked Documents
     //
@@ -173,12 +178,12 @@ fn main() -> Result<()> {
                 .add_integer("page", page)
                 .add_text("text_vec", text) // Auto-embedded by MockEmbedder
                 .build();
-            engine.add_document(id, doc)?;
+            engine.add_document(id, doc).await?;
             total_chunks += 1;
         }
     }
 
-    engine.commit()?;
+    engine.commit().await?;
     println!(
         "Indexed {} books as {} chunks total.\n",
         books.as_array().unwrap().len(),
@@ -198,7 +203,20 @@ fn main() -> Result<()> {
             )
             .limit(3)
             .build(),
-    )?;
+    ).await?;
+    print_results(&results);
+
+    // 4b. Case A': Vector Search via Query Parser (same query using DSL syntax)
+    println!("\n[Case A'] Vector Search via Query Parser: text_vec:~\"memory safety\"");
+    println!("  → Same results as Case A, using query parser DSL\n");
+
+    let vector_parser = VectorQueryParser::new(per_field_embedder.clone());
+    let results = engine.search(
+        SearchRequestBuilder::new()
+            .with_vector(vector_parser.parse("text_vec:~\"memory safety\"").await?)
+            .limit(3)
+            .build(),
+    ).await?;
     print_results(&results);
 
     // 5. Case B: Filtered Vector Search (memory safety, but only "concurrency" category)
@@ -215,7 +233,7 @@ fn main() -> Result<()> {
             .filter(Box::new(TermQuery::new("category", "concurrency")))
             .limit(3)
             .build(),
-    )?;
+    ).await?;
     print_results(&results);
 
     // 6. Case C: Filtered Vector Search with numeric range (pages 1-3 only)
@@ -239,7 +257,7 @@ fn main() -> Result<()> {
             )))
             .limit(3)
             .build(),
-    )?;
+    ).await?;
     print_results(&results);
 
     // 7. Case D: Lexical Search (keyword: "ownership")
@@ -251,7 +269,7 @@ fn main() -> Result<()> {
             .with_lexical(Box::new(TermQuery::new("text", "ownership")))
             .limit(3)
             .build(),
-    )?;
+    ).await?;
     print_results(&results);
 
     // 8. Case E: Hybrid Search (RRF Fusion)
@@ -269,7 +287,24 @@ fn main() -> Result<()> {
             .fusion(FusionAlgorithm::RRF { k: 60.0 })
             .limit(3)
             .build(),
-    )?;
+    ).await?;
+    print_results(&results);
+
+    // 8b. Case E': Hybrid Search via Unified Query Parser (same query using DSL syntax)
+    println!(
+        "\n[Case E'] Hybrid Search via Unified Query Parser: \"text:async text_vec:~\\\"concurrent\\\"\""
+    );
+    println!("  → Same results as Case E, using unified query parser DSL\n");
+
+    let unified_parser = UnifiedQueryParser::new(
+        QueryParser::new(std_analyzer.clone()).with_default_field("text"),
+        VectorQueryParser::new(per_field_embedder.clone()),
+    );
+    let mut request = unified_parser
+        .parse("text:async text_vec:~\"concurrent\"")
+        .await?;
+    request.limit = 3;
+    let results = engine.search(request).await?;
     print_results(&results);
 
     Ok(())

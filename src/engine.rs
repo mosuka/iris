@@ -39,8 +39,8 @@ impl Engine {
     /// Create a new Unified Engine with default analyzer and no embedder.
     ///
     /// For custom analyzer or embedder configuration, use [`Engine::builder`].
-    pub fn new(storage: Arc<dyn Storage>, schema: Schema) -> Result<Self> {
-        EngineBuilder::new(storage, schema).build()
+    pub async fn new(storage: Arc<dyn Storage>, schema: Schema) -> Result<Self> {
+        EngineBuilder::new(storage, schema).build().await
     }
 
     /// Create an [`EngineBuilder`] for custom configuration.
@@ -58,7 +58,7 @@ impl Engine {
     }
 
     /// Recover index state from the document log.
-    fn recover(&self) -> Result<()> {
+    async fn recover(&self) -> Result<()> {
         // read_all() internally syncs next_doc_id with doc_store segments.
         let records = self.log.read_all()?;
 
@@ -86,7 +86,8 @@ impl Engine {
 
                     // Re-index into both stores using the recorded doc_id
                     if record.seq > lexical_last_seq {
-                        self.lexical.upsert_document(doc_id, document.clone())?;
+                        self.lexical
+                            .upsert_document(doc_id, document.clone())?;
                         self.lexical.set_last_wal_seq(record.seq)?;
                     }
 
@@ -104,7 +105,8 @@ impl Engine {
                             }
                         }
                         self.vector
-                            .upsert_document_by_internal_id(doc_id, vector_doc)?;
+                            .upsert_document_by_internal_id(doc_id, vector_doc)
+                            .await?;
                         self.vector.set_last_wal_seq(record.seq);
                     }
                 }
@@ -113,11 +115,14 @@ impl Engine {
                     external_id: _,
                 } => {
                     if record.seq > lexical_last_seq {
-                        self.lexical.delete_document_by_internal_id(doc_id)?;
+                        self.lexical
+                            .delete_document_by_internal_id(doc_id)?;
                         self.lexical.set_last_wal_seq(record.seq)?;
                     }
                     if record.seq > vector_last_seq {
-                        self.vector.delete_document_by_internal_id(doc_id)?;
+                        self.vector
+                            .delete_document_by_internal_id(doc_id)
+                            .await?;
                         self.vector.set_last_wal_seq(record.seq);
                     }
                 }
@@ -131,27 +136,27 @@ impl Engine {
     /// If a document with the same external ID exists, it is replaced.
     /// The document will be routed to the appropriate underlying engines
     /// based on the schema field configuration.
-    pub fn put_document(&self, id: &str, doc: Document) -> Result<()> {
-        let _ = self.index_internal(id, doc, false)?;
+    pub async fn put_document(&self, id: &str, doc: Document) -> Result<()> {
+        let _ = self.index_internal(id, doc, false).await?;
         Ok(())
     }
 
     /// Add a document as a new chunk (always appends).
     ///
     /// This allows multiple documents (chunks) to share the same external ID.
-    pub fn add_document(&self, id: &str, doc: Document) -> Result<()> {
-        let _ = self.index_internal(id, doc, true)?;
+    pub async fn add_document(&self, id: &str, doc: Document) -> Result<()> {
+        let _ = self.index_internal(id, doc, true).await?;
         Ok(())
     }
 
-    fn index_internal(&self, id: &str, mut doc: Document, as_chunk: bool) -> Result<u64> {
+    async fn index_internal(&self, id: &str, mut doc: Document, as_chunk: bool) -> Result<u64> {
         // 1. Inject _id field
         use crate::data::DataValue;
         doc.fields
             .insert("_id".to_string(), DataValue::Text(id.to_string()));
 
         if !as_chunk {
-            self.delete_documents(id)?;
+            self.delete_documents(id).await?;
         }
 
         // 2. Write-Ahead Log: assign doc_id + persist (before any index updates)
@@ -178,21 +183,17 @@ impl Engine {
             }
         }
 
-        // 6. Index into Lexical and Vector stores in parallel
-        std::thread::scope(|s| {
-            let lexical_handle = s.spawn(|| self.lexical.upsert_document(doc_id, doc));
-            let vector_result = self.vector.upsert_document_by_internal_id(doc_id, vector_doc);
-            let lexical_result = lexical_handle.join().expect("lexical indexing panicked");
-            lexical_result?;
-            vector_result?;
-            Ok::<_, crate::error::IrisError>(())
-        })?;
+        // 6. Index into Lexical and Vector stores
+        self.lexical.upsert_document(doc_id, doc)?;
+        self.vector
+            .upsert_document_by_internal_id(doc_id, vector_doc)
+            .await?;
 
         Ok(doc_id)
     }
 
     /// Delete all documents (including chunks) by external ID.
-    pub fn delete_documents(&self, id: &str) -> Result<()> {
+    pub async fn delete_documents(&self, id: &str) -> Result<()> {
         let doc_ids = self.lexical.find_doc_ids_by_term("_id", id)?;
         for doc_id in doc_ids {
             // 1. Write to log
@@ -203,15 +204,15 @@ impl Engine {
             // 3. Delete from Lexical
             self.lexical.delete_document_by_internal_id(doc_id)?;
             // 4. Delete from Vector
-            self.vector.delete_document_by_internal_id(doc_id)?;
+            self.vector.delete_document_by_internal_id(doc_id).await?;
         }
         Ok(())
     }
 
     /// Commit changes to both engines.
-    pub fn commit(&self) -> Result<()> {
+    pub async fn commit(&self) -> Result<()> {
         self.lexical.commit()?;
-        self.vector.commit()?;
+        self.vector.commit().await?;
         self.log.commit_documents()?;
         // After successful commit to all stores, truncate the log
         self.log.truncate()?;
@@ -224,7 +225,7 @@ impl Engine {
     }
 
     /// Get all documents (including chunks) by external ID.
-    pub fn get_documents(&self, id: &str) -> Result<Vec<Document>> {
+    pub async fn get_documents(&self, id: &str) -> Result<Vec<Document>> {
         let doc_ids = self.lexical.find_doc_ids_by_term("_id", id)?;
         let mut docs = Vec::with_capacity(doc_ids.len());
         for doc_id in doc_ids {
@@ -361,7 +362,7 @@ impl Engine {
     /// Search the index.
     ///
     /// Executes hybrid search combining lexical and vector results.
-    pub fn search(
+    pub async fn search(
         &self,
         request: self::search::SearchRequest,
     ) -> Result<Vec<self::search::SearchResult>> {
@@ -430,16 +431,17 @@ impl Engine {
             if let Some(ids) = &allowed_ids {
                 vreq.allowed_ids = Some(ids.clone());
             }
-            // Embed query_payloads into query_vectors before searching
+            // Embed query_payloads into query_vectors before searching.
+            // NOTE: When using VectorQueryParser, query_vectors are already populated
+            // at parse time, so this block is skipped. This fallback remains for
+            // VectorSearchRequestBuilder users who populate query_payloads directly.
             if !vreq.query_payloads.is_empty() {
                 use crate::data::DataValue;
                 use crate::embedding::embedder::EmbedInput;
                 use crate::embedding::per_field::PerFieldEmbedder;
-                use crate::vector::store::embedder::EmbedderExecutor;
                 use crate::vector::store::request::QueryVector;
 
                 let embedder = self.vector.embedder();
-                let executor = EmbedderExecutor::new()?;
                 for payload in vreq.query_payloads.drain(..) {
                     let (text_owned, bytes_owned, mime_owned) = match payload.payload {
                         DataValue::Text(t) => (Some(t), None, None),
@@ -447,21 +449,19 @@ impl Engine {
                         _ => continue,
                     };
                     let field_name = payload.field.clone();
-                    let emb = embedder.clone();
-                    let vector = executor.run(async move {
-                        let input = if let Some(ref text) = text_owned {
-                            EmbedInput::Text(text)
-                        } else if let Some(ref bytes) = bytes_owned {
-                            EmbedInput::Bytes(bytes, mime_owned.as_deref())
+                    let input = if let Some(ref text) = text_owned {
+                        EmbedInput::Text(text)
+                    } else if let Some(ref bytes) = bytes_owned {
+                        EmbedInput::Bytes(bytes, mime_owned.as_deref())
+                    } else {
+                        unreachable!()
+                    };
+                    let vector =
+                        if let Some(pf) = embedder.as_any().downcast_ref::<PerFieldEmbedder>() {
+                            pf.embed_field(&field_name, &input).await?
                         } else {
-                            unreachable!()
+                            embedder.embed(&input).await?
                         };
-                        if let Some(pf) = emb.as_any().downcast_ref::<PerFieldEmbedder>() {
-                            pf.embed_field(&field_name, &input).await
-                        } else {
-                            emb.embed(&input).await
-                        }
-                    })?;
                     vreq.query_vectors.push(QueryVector {
                         vector: vector.data,
                         weight: payload.weight,
@@ -678,7 +678,7 @@ impl EngineBuilder {
     /// # Errors
     ///
     /// Returns an error if the storage or index initialization fails.
-    pub fn build(self) -> Result<Engine> {
+    pub async fn build(self) -> Result<Engine> {
         let (lexical_config, vector_config) =
             Engine::split_schema(&self.schema, self.analyzer, self.embedder);
 
@@ -703,7 +703,7 @@ impl EngineBuilder {
             log,
         };
 
-        engine.recover()?;
+        engine.recover().await?;
 
         Ok(engine)
     }
@@ -716,8 +716,8 @@ mod tests {
     use crate::embedding::precomputed::PrecomputedEmbedder;
     use crate::storage::memory::MemoryStorage;
 
-    #[test]
-    fn test_accepts_per_field_analyzer() {
+    #[tokio::test]
+    async fn test_accepts_per_field_analyzer() {
         let storage: Arc<dyn Storage> = Arc::new(MemoryStorage::new(Default::default()));
         let schema = Schema::new();
 
@@ -725,13 +725,14 @@ mod tests {
 
         let result = Engine::builder(storage, schema)
             .analyzer(Arc::new(per_field))
-            .build();
+            .build()
+            .await;
 
         assert!(result.is_ok(), "Should accept PerFieldAnalyzer");
     }
 
-    #[test]
-    fn test_accepts_per_field_embedder() {
+    #[tokio::test]
+    async fn test_accepts_per_field_embedder() {
         let storage: Arc<dyn Storage> = Arc::new(MemoryStorage::new(Default::default()));
         let schema = Schema::new();
 
@@ -740,25 +741,27 @@ mod tests {
 
         let result = Engine::builder(storage, schema)
             .embedder(Arc::new(per_field))
-            .build();
+            .build()
+            .await;
 
         assert!(result.is_ok(), "Should accept PerFieldEmbedder");
     }
 
-    #[test]
-    fn test_accepts_simple_analyzer() {
+    #[tokio::test]
+    async fn test_accepts_simple_analyzer() {
         let storage: Arc<dyn Storage> = Arc::new(MemoryStorage::new(Default::default()));
         let schema = Schema::new();
 
         let result = Engine::builder(storage, schema)
             .analyzer(Arc::new(StandardAnalyzer::default()))
-            .build();
+            .build()
+            .await;
 
         assert!(result.is_ok(), "Should accept StandardAnalyzer");
     }
 
-    #[test]
-    fn test_accepts_simple_embedder() {
+    #[tokio::test]
+    async fn test_accepts_simple_embedder() {
         let storage: Arc<dyn Storage> = Arc::new(MemoryStorage::new(Default::default()));
         let schema = Schema::new();
 
@@ -766,7 +769,8 @@ mod tests {
 
         let result = Engine::builder(storage, schema)
             .embedder(dummy_embedder)
-            .build();
+            .build()
+            .await;
 
         assert!(result.is_ok(), "Should accept simple embedder");
     }

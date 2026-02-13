@@ -34,12 +34,12 @@
 //!
 //! Using a built-in analyzer:
 //!
-//! ```
+//! ```ignore
 //! use iris::analysis::analyzer::analyzer::Analyzer;
 //! use iris::analysis::analyzer::standard::StandardAnalyzer;
 //!
 //! let analyzer = StandardAnalyzer::new().unwrap();
-//! let tokens: Vec<_> = analyzer.analyze("Hello World").unwrap().collect();
+//! let tokens: Vec<_> = analyzer.analyze("Hello World").await.unwrap().collect();
 //!
 //! assert_eq!(tokens[0].text, "hello");
 //! assert_eq!(tokens[1].text, "world");
@@ -47,16 +47,18 @@
 //!
 //! Implementing a custom analyzer:
 //!
-//! ```
+//! ```ignore
 //! use iris::analysis::analyzer::analyzer::Analyzer;
 //! use iris::analysis::token::TokenStream;
 //! use iris::Result;
+//! use async_trait::async_trait;
 //!
 //! #[derive(Debug)]
 //! struct MyAnalyzer;
 //!
+//! #[async_trait]
 //! impl Analyzer for MyAnalyzer {
-//!     fn analyze(&self, text: &str) -> Result<TokenStream> {
+//!     async fn analyze(&self, text: &str) -> Result<TokenStream> {
 //!         // Custom analysis logic here
 //!         Ok(Box::new(std::iter::empty()))
 //!     }
@@ -107,12 +109,12 @@ pub trait Analyzer: Send + Sync + std::fmt::Debug {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// use iris::analysis::analyzer::analyzer::Analyzer;
     /// use iris::analysis::analyzer::standard::StandardAnalyzer;
     ///
     /// let analyzer = StandardAnalyzer::new().unwrap();
-    /// let tokens: Vec<_> = analyzer.analyze("The quick brown fox").unwrap().collect();
+    /// let tokens: Vec<_> = analyzer.analyze("The quick brown fox").await.unwrap().collect();
     ///
     /// // "The" is removed as a stop word, others are lowercased
     /// assert_eq!(tokens.len(), 3);

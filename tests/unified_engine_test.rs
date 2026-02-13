@@ -8,8 +8,8 @@ use iris::vector::FieldOption as VectorOption;
 use iris::{DataValue, Document};
 use iris::{FieldOption, Schema};
 
-#[test]
-fn test_unified_engine_indexing() -> iris::Result<()> {
+#[tokio::test(flavor = "multi_thread")]
+async fn test_unified_engine_indexing() -> iris::Result<()> {
     // 1. Setup Storage
     let temp_dir = TempDir::new().unwrap();
     let storage_config = StorageConfig::File(FileStorageConfig::new(temp_dir.path()));
@@ -32,7 +32,7 @@ fn test_unified_engine_indexing() -> iris::Result<()> {
         .build();
 
     // 3. Initialize Engine
-    let engine = Engine::new(storage.clone(), config)?;
+    let engine = Engine::new(storage.clone(), config).await?;
 
     // 4. Index Documents
     let doc1 = Document::builder()
@@ -50,11 +50,11 @@ fn test_unified_engine_indexing() -> iris::Result<()> {
         .add_field("embedding", DataValue::Vector(vec![0.2; 128]))
         .build();
 
-    engine.put_document("doc1", doc1)?;
-    engine.put_document("doc2", doc2)?;
+    engine.put_document("doc1", doc1).await?;
+    engine.put_document("doc2", doc2).await?;
 
     // 5. Commit
-    engine.commit()?;
+    engine.commit().await?;
 
     // 6. Verify Files Exist in Storage
     // Lexical engine should create files in "lexical/"

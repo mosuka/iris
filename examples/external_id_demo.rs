@@ -44,7 +44,8 @@ impl Embedder for SimpleEmbedder {
     }
 }
 
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
     println!("=== External ID Support Demo (Unified Engine) ===\n");
 
     // 1. Initialize Engine
@@ -68,7 +69,8 @@ fn main() -> Result<()> {
 
     let engine = Engine::builder(storage, schema)
         .embedder(Arc::new(SimpleEmbedder))
-        .build()?;
+        .build()
+        .await?;
 
     // 2. Index Documents
     // "product-A": "Green Apple"
@@ -77,7 +79,7 @@ fn main() -> Result<()> {
         .add_field("description", "Green Apple")
         .add_field("description_vec", "Green Apple")
         .build();
-    engine.put_document("product-A", doc_a)?;
+    engine.put_document("product-A", doc_a).await?;
 
     // "product-B": "Yellow Banana"
     println!("-> Indexing 'product-B'...");
@@ -85,9 +87,9 @@ fn main() -> Result<()> {
         .add_field("description", "Yellow Banana")
         .add_field("description_vec", "Yellow Banana")
         .build();
-    engine.put_document("product-B", doc_b)?;
+    engine.put_document("product-B", doc_b).await?;
 
-    engine.commit()?;
+    engine.commit().await?;
 
     // 3. Update Document
     // Change product-A to "Red Apple" (same ID)
@@ -97,13 +99,13 @@ fn main() -> Result<()> {
         .add_field("description", "Red Apple")
         .add_field("description_vec", "Red Apple")
         .build();
-    engine.put_document("product-A", doc_a_new)?;
-    engine.commit()?;
+    engine.put_document("product-A", doc_a_new).await?;
+    engine.commit().await?;
 
     // 4. Delete Document
     println!("-> Deleting 'product-B'...");
-    engine.delete_documents("product-B")?;
-    engine.commit()?;
+    engine.delete_documents("product-B").await?;
+    engine.commit().await?;
 
     println!("\nDemo completed. Document management is handled via the unified Engine API.");
     Ok(())
