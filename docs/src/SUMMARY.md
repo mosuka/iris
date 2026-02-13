@@ -8,6 +8,7 @@
   - [Lexical Search](concepts/lexical_search.md)
   - [Vector Search](concepts/vector_search.md)
 - [Advanced Features](advanced.md)
+  - [Query DSL](advanced/query_dsl.md)
   - [ID Management](advanced/id_management.md)
   - [Persistence & WAL](advanced/persistence.md)
   - [Deletions & Compaction](advanced/deletions.md)

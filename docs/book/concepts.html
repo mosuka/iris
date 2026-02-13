@@ -256,7 +256,7 @@
 <li>The <strong>Lexical Searcher</strong> scans the Inverted Index to find matching terms.</li>
 </ul>
 </li>
-<li><strong>Fusion</strong>: The results are merged using a configurable strategy (<code>FusionConfig</code>):
+<li><strong>Fusion</strong>: The results are merged using a configurable strategy (<code>FusionAlgorithm</code>):
 <ul>
 <li><strong>RRF (Reciprocal Rank Fusion)</strong>: Ranks documents based on their positional rank in each result set. Robust and parameter-free.</li>
 <li><strong>Weighted Sum</strong>: Linearly combines normalized scores (<code>alpha * vector_score + beta * lexical_score</code>).</li>
@@ -270,11 +270,11 @@
 <li><strong>Snapshots</strong>: Periodically, the in-memory state of the registry and documents is serialized to disk (<code>document_snapshot.bin</code>). This speeds up recovery by avoiding full WAL replay.</li>
 <li><strong>Commit</strong>: Calling <code>commit()</code> forces a flush of all in-memory buffers to persistent storage and rotates the logs.</li>
 </ul>
-<pre class="mermaid">graph TD
+<pre><code class="language-mermaid">graph TD
     User[User Update] --&gt;|1. Write| WAL[Write-Ahead Log]
     User --&gt;|2. Update| Mem[In-Memory Index]
     
-    subgraph &quot;Persistence&quot;
+    subgraph "Persistence"
         WAL
         Snapshot[Snapshot File]
     end
@@ -282,7 +282,7 @@
     Mem --&gt;|Commit/Flush| Snapshot
     WAL --&gt;|Recovery| Mem
     Snapshot --&gt;|Recovery| Mem
-</pre>
+</code></pre>
 
                     </main>
 
@@ -330,6 +330,8 @@
         <script src="book.js"></script>
 
         <!-- Custom JS scripts -->
+        <script src="mermaid.min.js"></script>
+        <script src="mermaid-init.js"></script>
 
 
 

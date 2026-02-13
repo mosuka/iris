@@ -178,45 +178,81 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="unified-vector-search"><a class="header" href="#unified-vector-search">Unified Vector Search</a></h1>
-<p>Vector search (finding "nearest neighbors") enables semantic retrieval where matches are based on meaning rather than exact keywords. Iris provides a <strong>Unified Vector Engine</strong> that combines this semantic search with traditional lexical (keyword) search capabilities.</p>
+                        <h1 id="vector-search"><a class="header" href="#vector-search">Vector Search</a></h1>
+<p>Vector search (finding "nearest neighbors") enables semantic retrieval where matches are based on meaning rather than exact keywords. Iris provides a <strong>Unified Engine</strong> that combines this semantic search with traditional lexical (keyword) search capabilities.</p>
 <h2 id="document-structure"><a class="header" href="#document-structure">Document Structure</a></h2>
 <p>With the unified engine, a document can contain both vector fields (for semantic search) and lexical fields (for keyword search/filtering).</p>
-<pre class="mermaid">classDiagram
-    class VectorEngine {
-        lexical_engine: LexicalEngine
-        vector_index: VectorIndex
-    }
+<pre><code class="language-mermaid">flowchart LR
+    IntID1("Internal ID&lt;br&gt;1") --&gt; DocContainer1_Vec
+    IntID1 --&gt; DocContainer1_Lex
 
-    class HybridDocument {
-        &lt;&lt;Concept&gt;&gt;
-        vectors: Map&lt;String, Vector&gt;
-        lexical_fields: Map&lt;String, Field&gt;
-        metadata: Map&lt;String, String&gt;
-    }
+    subgraph DocContainer1_Vec [Vector Document]
+        direction TB
+        subgraph VecField1 [Vector Field]
+            direction TB
+            F11["Vector Field&lt;br&gt;Name: 'image_vec'&lt;br&gt;Value: [0.12, 0.05, ...]&lt;br&gt;Type: HNSW"]
+        end
+        subgraph Meta1 [Metadata]
+            direction TB
+            F12["Metadata Field&lt;br&gt;Name: '_id'&lt;br&gt;Value: 'img_001'"]
+            F13["Metadata Field&lt;br&gt;Name: '_mime_type'&lt;br&gt;Value: 'image/jpeg'"]
+        end
+        VecField1 --&gt; Meta1
 
-    class Vector {
-        data: Vec&lt;f32&gt;
-        dimension: usize
-    }
+        subgraph VecField1_2 [Vector Field]
+            direction TB
+            F11_2["Vector Field&lt;br&gt;Name: 'text_vec'&lt;br&gt;Value: [0.33, 0.44, ...]&lt;br&gt;Type: HNSW"]
+        end
+        subgraph Meta1_2 [Metadata]
+            direction TB
+            F12_2["Metadata Field&lt;br&gt;Name: '_id'&lt;br&gt;Value: 'img_001'"]
+            F13_2["Metadata Field&lt;br&gt;Name: '_mime_type'&lt;br&gt;Value: 'text/plain'"]
+        end
+        VecField1_2 --&gt; Meta1_2
+    end
 
-    class VectorFieldConfig {
-        dimension: usize
-        distance_metric: DistanceMetric
-        index_type: VectorIndexType
-        quantization: QuantizationMethod
-    }
+    subgraph DocContainer1_Lex [Lexical Document]
+        direction TB
+        ExtID1_Lex["Lexical Field (External ID)&lt;br&gt;Name: '_id'&lt;br&gt;Value: 'img_001'&lt;br&gt;Type: Text"]
+        L11["Lexical Field&lt;br&gt;Name: 'description'&lt;br&gt;Value: 'A cute cat'&lt;br&gt;Type: Text"]
+        L12["Lexical Field&lt;br&gt;Name: 'like'&lt;br&gt;Value: 53&lt;br&gt;Type: Integer"]
+    end
 
-    class DistanceMetric {
-        &lt;&lt;enumeration&gt;&gt;
-        Cosine
-        L2 (Euclidean)
-        DotProduct
-    }
+    IntID2("Internal ID&lt;br&gt;2") --&gt; DocContainer2_Vec
+    IntID2 --&gt; DocContainer2_Lex
 
-    VectorDocument *-- Vector
-    VectorDocument --&gt; VectorFieldConfig
-</pre>
+    subgraph DocContainer2_Vec [Vector Document]
+        direction TB
+        subgraph VecField2 [Vector Field]
+            direction TB
+            F21["Vector Field&lt;br&gt;Name: 'image_vec'&lt;br&gt;Value: [0.88, 0.91, ...]&lt;br&gt;Type: HNSW"]
+        end
+        subgraph Meta2 [Metadata]
+            direction TB
+            F22["Metadata Field&lt;br&gt;Name: '_id'&lt;br&gt;Value: 'img_002'"]
+            F23["Metadata Field&lt;br&gt;Name: '_mime_type'&lt;br&gt;Value: 'image/jpeg'"]
+        end
+        VecField2 --&gt; Meta2
+
+        subgraph VecField2_2 [Vector Field]
+            direction TB
+            F21_2["Vector Field&lt;br&gt;Name: 'text_vec'&lt;br&gt;Value: [0.11, 0.99, ...]&lt;br&gt;Type: HNSW"]
+        end
+        subgraph Meta2_2 [Metadata]
+            direction TB
+            F22_2["Metadata Field&lt;br&gt;Name: '_id'&lt;br&gt;Value: 'img_002'"]
+            F23_2["Metadata Field&lt;br&gt;Name: '_mime_type'&lt;br&gt;Value: 'text/plain'"]
+        end
+        VecField2_2 --&gt; Meta2_2
+    end
+
+    subgraph DocContainer2_Lex [Lexical Document]
+        direction TB
+        ExtID2_Lex["Lexical Field (External ID)&lt;br&gt;Name: '_id'&lt;br&gt;Value: 'img_002'&lt;br&gt;Type: Text"]
+        L21["Lexical Field&lt;br&gt;Name: 'description'&lt;br&gt;Value: 'A loyal dog'&lt;br&gt;Type: Text"]
+        L22["Lexical Field&lt;br&gt;Name: 'like'&lt;br&gt;Value: 42&lt;br&gt;Type: Integer"]
+    end
+</code></pre>
 <h3 id="vector"><a class="header" href="#vector">Vector</a></h3>
 <p>A mathematical representation of an object (text, image, audio) in a multi-dimensional space.</p>
 <ul>
@@ -232,32 +268,32 @@
 </ul>
 <h2 id="indexing-process"><a class="header" href="#indexing-process">Indexing Process</a></h2>
 <p>The vector indexing process transforms raw data or pre-computed vectors into efficient, searchable structures.</p>
-<pre class="mermaid">graph TD
-    subgraph &quot;Vector Indexing Flow&quot;
-        Input[&quot;Raw Input (Text/Image)&quot;] --&gt; Embedder[&quot;Embedding Model&quot;]
-        Embedder --&gt;|Vector| Norm[&quot;Normalization&quot;]
-        PreComp[&quot;Pre-computed Vector&quot;] --&gt; Norm
+<pre><code class="language-mermaid">graph TD
+    subgraph "Vector Indexing Flow"
+        Input["Raw Input (Text/Image)"] --&gt; Embedder["Embedding Model"]
+        Embedder --&gt;|Vector| Norm["Normalization"]
+        PreComp["Pre-computed Vector"] --&gt; Norm
         
-        subgraph &quot;VectorEngine&quot;
-            Norm --&gt; Quant[&quot;Quantizer (PQ/SQ)&quot;]
-            Quant --&gt;|Quantized| Buffer[&quot;In-memory Buffer&quot;]
+        subgraph "VectorEngine"
+            Norm --&gt; Quant["Quantizer (PQ/SQ)"]
+            Quant --&gt;|Quantized| Buffer["In-memory Buffer"]
             Norm --&gt;|Raw| Buffer
             
-            subgraph &quot;Index Building&quot;
-                Buffer --&gt;|HNSW| GraphBuilder[&quot;Graph Builder&quot;]
-                Buffer --&gt;|IVF| Clustering[&quot;K-Means Clustering&quot;]
-                Buffer --&gt;|Flat| ArrayBuilder[&quot;Linear Array Builder&quot;]
+            subgraph "Index Building"
+                Buffer --&gt;|HNSW| GraphBuilder["Graph Builder"]
+                Buffer --&gt;|IVF| Clustering["K-Means Clustering"]
+                Buffer --&gt;|Flat| ArrayBuilder["Linear Array Builder"]
             end
         end
         
-        subgraph &quot;Segment Flushing&quot;
-            GraphBuilder --&gt;|Write| HNSWFiles[&quot;.hnsw / .vecs&quot;]
-            Clustering --&gt;|Write| IVFFiles[&quot;.ivf / .vecs&quot;]
-            ArrayBuilder --&gt;|Write| FlatFiles[&quot;.vecs&quot;]
-            Quant -.-&gt;|Codebook| QMeta[&quot;.quant&quot;]
+        subgraph "Segment Flushing"
+            GraphBuilder --&gt;|Write| HNSWFiles[".hnsw / .vecs"]
+            Clustering --&gt;|Write| IVFFiles[".ivf / .vecs"]
+            ArrayBuilder --&gt;|Write| FlatFiles[".vecs"]
+            Quant -.-&gt;|Codebook| QMeta[".quant"]
         end
     end
-</pre>
+</code></pre>
 <ol>
 <li><strong>Vector Acquisition</strong>: Vectors are either provided directly or generated from text/images using an <code>Embedder</code>.</li>
 <li><strong>Processing</strong>:
@@ -314,13 +350,20 @@
 <li><strong>Product Quantization (PQ)</strong>: Decomposes vectors into sub-vectors and performs clustering (16x-64x compression).</li>
 </ul>
 <h2 id="engine-architecture"><a class="header" href="#engine-architecture">Engine Architecture</a></h2>
-<h3 id="vector-engine-vectorengine"><a class="header" href="#vector-engine-vectorengine">Vector Engine (<code>VectorEngine</code>)</a></h3>
-<p>The high-level orchestrator that manages multiple vector fields, handles persistence via WAL (Write-Ahead Log), and coordinates aggregated searches across fields.</p>
+<h3 id="vectorstore"><a class="header" href="#vectorstore">VectorStore</a></h3>
+<p>The store component that manages vector indexing and searching. It follows a simplified 4-member structure:</p>
+<ul>
+<li><strong>index</strong>: The underlying vector index (HNSW, IVF, or Flat)</li>
+<li><strong>writer_cache</strong>: Cached writer for write operations</li>
+<li><strong>searcher_cache</strong>: Cached searcher for search operations</li>
+<li><strong>doc_store</strong>: Shared document storage</li>
+</ul>
 <h3 id="index-components"><a class="header" href="#index-components">Index Components</a></h3>
 <ul>
-<li><strong>VectorField</strong>: Abstracts individual field implementations (e.g., <code>InMemoryVectorField</code>, <code>SegmentedVectorField</code>).</li>
-<li><strong>Index Writers/Readers</strong>: Specific implementations for each algorithm (e.g., <code>HnswIndexWriter</code>, <code>FlatVectorIndexReader</code>, <code>IvfIndexReader</code>).</li>
-<li><strong>VectorEngineSearcher</strong>: Integrates results from multiple fields based on specified score modes (WeightedSum, MaxSim).</li>
+<li><strong>VectorIndex</strong>: Trait for vector index implementations (HnswIndex, IvfIndex, FlatIndex).</li>
+<li><strong>VectorIndexWriter</strong>: Handles vector insertion and embedding.</li>
+<li><strong>VectorIndexSearcher</strong>: Performs nearest neighbor search.</li>
+<li><strong>EmbeddingVectorIndexWriter</strong>: Wrapper that automatically embeds text/images before indexing.</li>
 </ul>
 <h2 id="index-segment-files"><a class="header" href="#index-segment-files">Index Segment Files</a></h2>
 <p>A vector segment consists of several specialized files:</p>
@@ -334,22 +377,22 @@
 </div>
 <h2 id="search-process"><a class="header" href="#search-process">Search Process</a></h2>
 <p>Finding the nearest neighbors involves navigating the index structure to minimize distance calculations.</p>
-<pre class="mermaid">graph TD
-    subgraph &quot;Vector Search Flow&quot;
-        Query[&quot;Query Vector&quot;] --&gt; Quant[&quot;Quantization (Encoding)&quot;]
+<pre><code class="language-mermaid">graph TD
+    subgraph "Vector Search Flow"
+        Query["Query Vector"] --&gt; Quant["Quantization (Encoding)"]
         
-        subgraph &quot;Segment Search&quot;
-            Quant --&gt;|HNSW| HNSWNav[&quot;Graph Navigation&quot;]
-            Quant --&gt;|IVF| CentroidScan[&quot;Nearest Centroid Probe&quot;]
+        subgraph "Segment Search"
+            Quant --&gt;|HNSW| HNSWNav["Graph Navigation"]
+            Quant --&gt;|IVF| CentroidScan["Nearest Centroid Probe"]
             
-            HNSWNav --&gt;|Top-K| ResBuffer[&quot;Candidate Buffer&quot;]
+            HNSWNav --&gt;|Top-K| ResBuffer["Candidate Buffer"]
             CentroidScan --&gt;|Top-K| ResBuffer
         end
         
-        ResBuffer --&gt;|Re-ranking| Refine[&quot;Precision Scoring (Raw Vectors)&quot;]
-        Refine --&gt; Final[&quot;Sorted Hits&quot;]
+        ResBuffer --&gt;|Re-ranking| Refine["Precision Scoring (Raw Vectors)"]
+        Refine --&gt; Final["Sorted Hits"]
     end
-</pre>
+</code></pre>
 <ol>
 <li><strong>Preparation</strong>: The query vector is normalized and/or quantized to match the index format.</li>
 <li><strong>Navigation</strong>:
@@ -384,144 +427,149 @@
 </li>
 </ol>
 <h2 id="search-process-for-hybrid-queries"><a class="header" href="#search-process-for-hybrid-queries">Search Process for Hybrid Queries</a></h2>
-<pre class="mermaid">graph TD
-    Query[&quot;Search Request&quot;] --&gt; Engine[&quot;VectorEngine&quot;]
-    Engine --&gt;|Text Query| LexSearch[&quot;Lexical Component&quot;]
-    Engine --&gt;|Vector Query| VecSearch[&quot;Vector Component&quot;]
-    
-    LexSearch --&gt; LexHits[&quot;Lexical Hits&quot;]
-    VecSearch --&gt; VecHits[&quot;Vector Hits&quot;]
-    
-    LexHits --&gt; Fusion[&quot;Result Fusion&quot;]
+<pre><code class="language-mermaid">graph TD
+    Query["SearchRequest"] --&gt; Engine["Engine"]
+    Engine --&gt;|Lexical Query| LexSearch["LexicalStore"]
+    Engine --&gt;|Vector Query| VecSearch["VectorStore"]
+
+    LexSearch --&gt; LexHits["Lexical Hits"]
+    VecSearch --&gt; VecHits["Vector Hits"]
+
+    LexHits --&gt; Fusion["Result Fusion"]
     VecHits --&gt; Fusion
-    
-    Fusion --&gt; Combine[&quot;Score Combination&quot;]
-    Combine --&gt; TopDocs[&quot;Final Top Results&quot;]
-</pre>
+
+    Fusion --&gt; Combine["Score Combination"]
+    Combine --&gt; TopDocs["Final Top Results"]
+</code></pre>
 <h2 id="code-examples"><a class="header" href="#code-examples">Code Examples</a></h2>
-<h3 id="1-configuring-vectorengine"><a class="header" href="#1-configuring-vectorengine">1. Configuring VectorEngine</a></h3>
-<p>Example of creating an engine with an embedder and field configurations.</p>
+<h3 id="1-configuring-engine-for-vector-search"><a class="header" href="#1-configuring-engine-for-vector-search">1. Configuring Engine for Vector Search</a></h3>
+<p>Example of creating an engine with an embedder and vector field configurations.</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>use std::sync::Arc;
-use iris::vector::engine::VectorEngine;
-use iris::vector::engine::config::{VectorIndexConfig, VectorFieldConfig, VectorIndexKind};
-use iris::vector::core::distance::DistanceMetric;
-use iris::embedding::precomputed::PrecomputedEmbedder;
-use iris::storage::memory::{MemoryStorage, MemoryStorageConfig};
+use iris::{Engine, Schema};
+use iris::vector::{FlatOption, HnswOption, VectorOption, DistanceMetric};
+use iris::storage::{StorageConfig, StorageFactory};
+use iris::storage::memory::MemoryStorageConfig;
 
-fn setup_engine() -&gt; iris::error::Result&lt;VectorEngine&gt; {
-    let storage = Arc::new(MemoryStorage::new(MemoryStorageConfig::default()));
-    
-    // Create configuration
-    let config = VectorIndexConfig::builder()
-        .add_field("title_embedding", 384)? // 384-dimensional field
-        .add_field("body_embedding", 384)?
-        .default_distance(DistanceMetric::Cosine)
-        .build()?;
+fn setup_engine() -&gt; iris::Result&lt;Engine&gt; {
+    let storage = StorageFactory::create(StorageConfig::Memory(MemoryStorageConfig::default()))?;
 
-    let engine = VectorEngine::new(storage, config)?;
-    Ok(engine)
+    let schema = Schema::builder()
+        .add_vector_field(
+            "embedding",
+            VectorOption::Hnsw(HnswOption {
+                dimension: 384,
+                distance: DistanceMetric::Cosine,
+                m: 16,
+                ef_construction: 200,
+                ..Default::default()
+            }),
+        )
+        .build();
+
+    Engine::builder(storage, schema)
+        .embedder(Arc::new(MyEmbedder))  // Your embedder implementation
+        .build()
 }
 <span class="boring">}</span></code></pre></pre>
 <h3 id="2-adding-documents"><a class="header" href="#2-adding-documents">2. Adding Documents</a></h3>
-<p>Example of indexing a document with vector data.</p>
+<p>Example of indexing a document with text that gets automatically embedded.</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use iris::vector::core::document::{DocumentVector, StoredVector};
+</span>use iris::{Document, DataValue};
 
-fn add_document(engine: &amp;VectorEngine) -&gt; iris::error::Result&lt;()&gt; {
-    let mut doc = DocumentVector::new();
-    
-    // Create vector data
-    let vector_data = Arc::from(vec![0.1; 384]);
-    doc.set_field("title_embedding", StoredVector::new(vector_data));
-    
-    // Add metadata (available for filtering)
-    doc.metadata.insert("category".to_string(), "technology".to_string());
+fn add_document(engine: &amp;Engine) -&gt; iris::Result&lt;()&gt; {
+    // Text is automatically embedded by the configured embedder
+    let doc = Document::new()
+        .add_text("embedding", "Fast semantic search in Rust")
+        .add_field("category", DataValue::Text("technology".into()));
 
-    // Add document with specific ID
-    engine.upsert_vectors(1, doc)?;
-    engine.commit()?; // Persist data
-    
+    engine.put_document("doc_001", doc)?;
+    engine.commit()?;
+
     Ok(())
 }
 <span class="boring">}</span></code></pre></pre>
 <h3 id="3-executing-vector-search"><a class="header" href="#3-executing-vector-search">3. Executing Vector Search</a></h3>
-<p>Example of performing a search using <code>VectorSearchRequest</code>.</p>
+<p>Example of performing a search using <code>VectorSearchRequestBuilder</code>.</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use iris::vector::engine::request::{VectorSearchRequest, QueryVector};
-use iris::vector::core::document::StoredVector;
+</span>use iris::SearchRequestBuilder;
+use iris::vector::VectorSearchRequestBuilder;
 
-fn search(engine: &amp;VectorEngine) -&gt; iris::error::Result&lt;()&gt; {
-    // Prepare query vector
-    let query_data = Arc::from(vec![0.1; 384]);
-    let query_vector = QueryVector {
-        vector: StoredVector::new(query_data),
-        weight: 1.0,
-        fields: None,
-    };
+fn search(engine: &amp;Engine) -&gt; iris::Result&lt;()&gt; {
+    let results = engine.search(
+        SearchRequestBuilder::new()
+            .with_vector(
+                VectorSearchRequestBuilder::new()
+                    .add_text("embedding", "semantic search")
+                    .build()
+            )
+            .limit(10)
+            .build()
+    )?;
 
-    let request = VectorSearchRequest {
-        query_vectors: vec![query_vector],
-        limit: 10,
-        min_score: 0.7,
-        ..Default::default()
-    };
-
-    let results = engine.search(request)?;
-    for hit in results.hits {
-        println!("Doc ID: {}, Score: {}", hit.doc_id, hit.score);
+    for hit in results {
+        println!("[{}] Score: {:.4}", hit.id, hit.score);
     }
-    
+
     Ok(())
 }
 <span class="boring">}</span></code></pre></pre>
-<h3 id="4-filtered-search"><a class="header" href="#4-filtered-search">4. Filtered Search</a></h3>
-<p>Example of a search restricted to a specific category.</p>
+<h3 id="4-hybrid-search"><a class="header" href="#4-hybrid-search">4. Hybrid Search</a></h3>
+<p>Example of combining vector and keyword search. Note that vector and lexical searches use separate fields.</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use iris::vector::engine::filter::{VectorFilter, FilterCondition};
+</span>use iris::{FusionAlgorithm, SearchRequestBuilder};
+use iris::lexical::TermQuery;
+use iris::vector::VectorSearchRequestBuilder;
 
-fn filtered_search(engine: &amp;VectorEngine) -&gt; iris::error::Result&lt;()&gt; {
-    let mut filter = VectorFilter::default();
-    filter.document.equals.insert("category".to_string(), "technology".to_string());
+fn hybrid_search(engine: &amp;Engine) -&gt; iris::Result&lt;()&gt; {
+    let results = engine.search(
+        SearchRequestBuilder::new()
+            // Vector search (semantic) on vector field
+            .with_vector(
+                VectorSearchRequestBuilder::new()
+                    .add_text("content_vec", "fast semantic search")
+                    .build()
+            )
+            // Lexical search (keyword) on lexical field
+            .with_lexical(Box::new(TermQuery::new("content", "rust")))
+            // Fusion strategy
+            .fusion(FusionAlgorithm::RRF { k: 60.0 })
+            .limit(10)
+            .build()
+    )?;
 
-    let request = VectorSearchRequest {
-        query_vectors: vec![/* query vector */],
-        filter: Some(filter),
-        limit: 5,
-        ..Default::default()
-    };
+    for hit in results {
+        println!("[{}] score={:.4}", hit.id, hit.score);
+    }
 
-    let results = engine.search(request)?;
     Ok(())
 }
 <span class="boring">}</span></code></pre></pre>
-<h3 id="5-hybrid-search"><a class="header" href="#5-hybrid-search">5. Hybrid Search</a></h3>
-<p>Example of combining vector and keyword search.</p>
+<h3 id="5-weighted-sum-fusion"><a class="header" href="#5-weighted-sum-fusion">5. Weighted Sum Fusion</a></h3>
+<p>Example using weighted sum fusion for fine-grained control.</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use iris::vector::engine::query::{VectorSearchRequest, HybridSearchQuery};
+</span>fn weighted_hybrid_search(engine: &amp;Engine) -&gt; iris::Result&lt;()&gt; {
+    let results = engine.search(
+        SearchRequestBuilder::new()
+            .with_vector(
+                VectorSearchRequestBuilder::new()
+                    .add_text("content_vec", "machine learning")
+                    .build()
+            )
+            .with_lexical(Box::new(TermQuery::new("content", "python")))
+            .fusion(FusionAlgorithm::WeightedSum {
+                vector_weight: 0.7,  // 70% semantic
+                lexical_weight: 0.3, // 30% keyword
+            })
+            .limit(10)
+            .build()
+    )?;
 
-async fn hybrid_search(engine: &amp;VectorEngine, query_vector: Vec&lt;f32&gt;) -&gt; iris::error::Result&lt;()&gt; {
-    // Define Hybrid Query
-    let request = VectorSearchRequest::builder()
-        .vector(query_vector.into())
-        .hybrid_query(HybridSearchQuery {
-            keyword_query: "fast rust search".to_string(),
-            keyword_weight: 0.5,
-            vector_weight: 0.5,
-            top_k: 10,
-        })
-        .build();
-
-    let results = engine.search(request).await?;
-    
-    for res in results.hits {
-        println!("Doc ID: {}, Score: {}", res.id, res.score);
-    }
     Ok(())
 }
 <span class="boring">}</span></code></pre></pre>
@@ -578,6 +626,8 @@ async fn hybrid_search(engine: &amp;VectorEngine, query_vector: Vec&lt;f32&gt;) 
         <script src="../book.js"></script>
 
         <!-- Custom JS scripts -->
+        <script src="../mermaid.min.js"></script>
+        <script src="../mermaid-init.js"></script>
 
 
 

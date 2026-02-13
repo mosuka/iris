@@ -181,82 +181,32 @@
                         <h1 id="lexical-search"><a class="header" href="#lexical-search">Lexical Search</a></h1>
 <p>Lexical search matches documents based on exact or approximate keyword matches. It is the traditional "search engine" functionality found in Lucene or Elasticsearch.</p>
 <blockquote>
-<p><strong>Note</strong>: In the unified Iris architecture, Lexical Search is typically handled by the <code>VectorEngine</code>, which orchestrates both lexical and vector components concurrently. <code>LexicalEngine</code> can still be used as a standalone engine for pure keyword search scenarios.</p>
+<p><strong>Note</strong>: In the unified Iris architecture, Lexical Search is handled by the <code>Engine</code>, which orchestrates both lexical (LexicalStore) and vector (VectorStore) components concurrently.</p>
 </blockquote>
 <h2 id="document-structure"><a class="header" href="#document-structure">Document Structure</a></h2>
 <p>In Iris, a <strong>Document</strong> is the fundamental unit of indexing. It follows a <strong>schema-less</strong> design, allowing fields to be added dynamically without defining a schema upfront.</p>
 <p>Each <code>Document</code> consists of multiple <code>Fields</code> stored in a Map where the key is the field name. Each <code>Field</code> has a <strong>Value</strong> and <strong>Options</strong> defining how it should be indexed.</p>
-<pre class="mermaid">classDiagram
-    class Document {
-        fields: Map&lt;String, Field&gt;
-    }
+<pre><code class="language-mermaid">flowchart LR
+    IntID1("Internal ID&lt;br&gt;1") --&gt; Document_Container
 
-    class Field {
-        value: FieldValue
-        option: FieldOption
-    }
+    subgraph Document_Container [Document]
+        direction TB
+        
+        ExtID1["Field (External ID)&lt;br&gt;Name: '_id'&lt;br&gt;Value: 'product_123'&lt;br&gt;Type: Text"]
+        F11["Field&lt;br&gt;Name: 'title'&lt;br&gt;Value: 'Apple'&lt;br&gt;Type: Text"]
+        F12["Field&lt;br&gt;Name: 'price'&lt;br&gt;Value: 10.00&lt;br&gt;Type: Float"]
+    end
+    
+    IntID2("Internal ID&lt;br&gt;2") --&gt; Document_Container2
 
-    class FieldValue {
-        Text
-        Integer
-        Float
-        Boolean
-        DateTime
-        Geo
-        Blob
-        Null
-    }
-
-    class FieldOption {
-        &lt;&lt;enumeration&gt;&gt;
-        Text(TextOption)
-        Integer(IntegerOption)
-        Float(FloatOption)
-        Boolean(BooleanOption)
-        DateTime(DateTimeOption)
-        Geo(GeoOption)
-        Blob(BlobOption)
-    }
-
-    class TextOption {
-        indexed: bool
-        stored: bool
-        term_vectors: bool
-    }
-
-    class IntegerOption {
-        indexed: bool
-        stored: bool
-    }
-
-    class FloatOption {
-        indexed: bool
-        stored: bool
-    }
-
-    class BooleanOption {
-        indexed: bool
-        stored: bool
-    }
-
-    class DateTimeOption {
-        indexed: bool
-        stored: bool
-    }
-
-    class GeoOption {
-        indexed: bool
-        stored: bool
-    }
-
-    class BlobOption {
-        stored: bool
-    }
-
-    Document *-- Field
-    Field --&gt; FieldValue
-    Field --&gt; FieldOption
-</pre>
+    subgraph Document_Container2 [Document]
+        direction TB
+        
+        ExtID2["Field (External ID)&lt;br&gt;Name: '_id'&lt;br&gt;Value: 'product_456'&lt;br&gt;Type: Text"]
+        F21["Field&lt;br&gt;Name: 'title'&lt;br&gt;Value: 'Orange'&lt;br&gt;Type: Text"]
+        F22["Field&lt;br&gt;Name: 'price'&lt;br&gt;Value: 11.00&lt;br&gt;Type: Float"]
+    end
+</code></pre>
 <h3 id="document"><a class="header" href="#document">Document</a></h3>
 <p>The fundamental unit of indexing in Iris.</p>
 <ul>
@@ -321,41 +271,41 @@
 </ul>
 <h2 id="indexing-process"><a class="header" href="#indexing-process">Indexing Process</a></h2>
 <p>The lexical indexing process translates documents into inverted indexes and BKD trees.</p>
-<pre class="mermaid">graph TD
-    subgraph &quot;Indexing Flow&quot;
-        Input[&quot;Raw Data&quot;] --&gt; DocBuilder[&quot;Document Construction&quot;]
+<pre><code class="language-mermaid">graph TD
+    subgraph "Indexing Flow"
+        Input["Raw Data"] --&gt; DocBuilder["Document Construction"]
         
-        subgraph &quot;Processing (InvertedIndexWriter)&quot;
-            DocBuilder --&gt;|Text| CharFilter[&quot;Char Filter&quot;]
-            DocBuilder --&gt;|Numeric/Date/Geo| Normalizer[&quot;String Normalizer&quot;]
-            DocBuilder --&gt;|Numeric/Date/Geo| PtExt[&quot;Point Extractor&quot;]
-            DocBuilder --&gt;|Stored Field| StoreProc[&quot;Field Values Collector&quot;]
-            DocBuilder --&gt;|All Fields| LenTracker[&quot;Field Length Tracker&quot;]
-            DocBuilder --&gt;|Doc Values| DVTracker[&quot;Doc Values Collector&quot;]
+        subgraph "Processing (InvertedIndexWriter)"
+            DocBuilder --&gt;|Text| CharFilter["Char Filter"]
+            DocBuilder --&gt;|Numeric/Date/Geo| Normalizer["String Normalizer"]
+            DocBuilder --&gt;|Numeric/Date/Geo| PtExt["Point Extractor"]
+            DocBuilder --&gt;|Stored Field| StoreProc["Field Values Collector"]
+            DocBuilder --&gt;|All Fields| LenTracker["Field Length Tracker"]
+            DocBuilder --&gt;|Doc Values| DVTracker["Doc Values Collector"]
             
-            subgraph &quot;Analysis Chain&quot;
-                CharFilter --&gt; Tokenizer[&quot;Tokenizer&quot;]
-                Tokenizer --&gt; TokenFilter[&quot;Token Filter&quot;]
+            subgraph "Analysis Chain"
+                CharFilter --&gt; Tokenizer["Tokenizer"]
+                Tokenizer --&gt; TokenFilter["Token Filter"]
             end
         end
         
-        subgraph &quot;In-Memory Buffering&quot;
-            TokenFilter --&gt;|Terms| InvBuffer[&quot;Term Posting Index&quot;]
+        subgraph "In-Memory Buffering"
+            TokenFilter --&gt;|Terms| InvBuffer["Term Posting Index"]
             Normalizer --&gt;|Terms| InvBuffer
-            PtExt --&gt;|Points| BkdBuffer[&quot;Point Values Buffer&quot;]
-            StoreProc --&gt;|Data| DocsBuffer[&quot;Stored Docs Buffer&quot;]
+            PtExt --&gt;|Points| BkdBuffer["Point Values Buffer"]
+            StoreProc --&gt;|Data| DocsBuffer["Stored Docs Buffer"]
         end
         
-        subgraph &quot;Segment Flushing (Disk)&quot;
-            InvBuffer --&gt;|Write| Postings[&quot;.dict / .post&quot;]
-            BkdBuffer --&gt;|Sort &amp; Write| BKD[&quot;.bkd&quot;]
-            DocsBuffer --&gt;|Write| DOCS[&quot;.docs&quot;]
-            DVTracker --&gt;|Write| DV[&quot;.dv&quot;]
-            LenTracker --&gt;|Write| LENS[&quot;.lens&quot;]
-            InvBuffer -.-&gt;|Stats| Meta[&quot;.meta / .fstats&quot;]
+        subgraph "Segment Flushing (Disk)"
+            InvBuffer --&gt;|Write| Postings[".dict / .post"]
+            BkdBuffer --&gt;|Sort &amp; Write| BKD[".bkd"]
+            DocsBuffer --&gt;|Write| DOCS[".docs"]
+            DVTracker --&gt;|Write| DV[".dv"]
+            LenTracker --&gt;|Write| LENS[".lens"]
+            InvBuffer -.-&gt;|Stats| Meta[".meta / .fstats"]
         end
     end
-</pre>
+</code></pre>
 <ol>
 <li><strong>Document Processing</strong>:
 <ul>
@@ -408,9 +358,9 @@ Unlike an inverted index, a BKD tree is designed for <strong>range search</stron
 <h3 id="simd-optimization"><a class="header" href="#simd-optimization">SIMD Optimization</a></h3>
 <p>Iris uses SIMD-accelerated batch scoring for high-throughput ranking. The BM25 scoring algorithm is optimized to process multiple documents simultaneously, leveraging modern CPU instructions to provide a several-fold increase in performance compared to scalar processing.</p>
 <h2 id="engine-architecture"><a class="header" href="#engine-architecture">Engine Architecture</a></h2>
-<h3 id="lexical-engine-lexicalengine"><a class="header" href="#lexical-engine-lexicalengine">Lexical Engine (<code>LexicalEngine</code>)</a></h3>
-<p>The engine that manages indexing and searching for text data. It coordinates between <code>InvertedIndexWriter</code> and <code>InvertedIndexSearcher</code>.
-In the unified architecture, this engine operates as a <strong>sub-component</strong> managed by the <code>VectorEngine</code>, handling the inverted index portions of hybrid documents. It handles manifest persistence and consistent ID mapping when run in standalone mode.</p>
+<h3 id="lexicalstore"><a class="header" href="#lexicalstore">LexicalStore</a></h3>
+<p>The store component that manages indexing and searching for text data. It coordinates between <code>LexicalIndexWriter</code> and <code>LexicalIndexSearcher</code>.
+In the unified architecture, LexicalStore operates as a <strong>sub-component</strong> managed by the <code>Engine</code>, handling the inverted index portions of hybrid documents.</p>
 <h3 id="index-components"><a class="header" href="#index-components">Index Components</a></h3>
 <ul>
 <li><strong>InvertedIndexWriter</strong>: The primary interface for adding documents. It orchestrates analysis, point extraction, and buffering.</li>
@@ -431,31 +381,31 @@ In the unified architecture, this engine operates as a <strong>sub-component</st
 </div>
 <h2 id="search-process"><a class="header" href="#search-process">Search Process</a></h2>
 <p>The search process involves structure-aware traversal and weighted scoring.</p>
-<pre class="mermaid">graph TD
-    subgraph &quot;Search Flow&quot;
-        UserQuery[&quot;User Query&quot;] --&gt; Parser
+<pre><code class="language-mermaid">graph TD
+    subgraph "Search Flow"
+        UserQuery["User Query"] --&gt; Parser
         
-        subgraph &quot;Searcher&quot;
-            Parser[&quot;Query Parser&quot;] --&gt; QueryObj[&quot;Query&quot;]
-            QueryObj --&gt; WeightObj[&quot;Weight&quot;]
-            WeightObj --&gt; MatcherObj[&quot;Matcher&quot;]
-            WeightObj --&gt; ScorerObj[&quot;Scorer&quot;]
+        subgraph "Searcher"
+            Parser["Query Parser"] --&gt; QueryObj["Query"]
+            QueryObj --&gt; WeightObj["Weight"]
+            WeightObj --&gt; MatcherObj["Matcher"]
+            WeightObj --&gt; ScorerObj["Scorer"]
             
-            subgraph &quot;Index Access&quot;
-                MatcherObj -.-&gt;|Look up| II[&quot;Inverted Index&quot;]
-                MatcherObj -.-&gt;|Range Scan| BKD[&quot;BKD Tree&quot;]
+            subgraph "Index Access"
+                MatcherObj -.-&gt;|Look up| II["Inverted Index"]
+                MatcherObj -.-&gt;|Range Scan| BKD["BKD Tree"]
             end
             
-            MatcherObj --&gt;|Doc IDs| CollectorObj[&quot;Collector&quot;]
+            MatcherObj --&gt;|Doc IDs| CollectorObj["Collector"]
             ScorerObj --&gt;|Scores| CollectorObj
-            CollectorObj -.-&gt;|Sort by Field| DV[&quot;Doc Values&quot;]
-            CollectorObj --&gt;|Top Doc IDs| Fetcher[&quot;Fetcher&quot;]
+            CollectorObj -.-&gt;|Sort by Field| DV["Doc Values"]
+            CollectorObj --&gt;|Top Doc IDs| Fetcher["Fetcher"]
             Fetcher -.-&gt;|Retrieve Fields| Docs
         end
         
-        Fetcher --&gt; Result[&quot;Search Results&quot;]
+        Fetcher --&gt; Result["Search Results"]
     end
-</pre>
+</code></pre>
 <ol>
 <li><strong>Query Parsing</strong>: Translates a human-friendly string or DSL into a structured <code>Query</code> tree.</li>
 <li><strong>Weight Creation</strong>: Precomputes global statistics (like IDF) to prepare for execution across multiple segments.</li>
@@ -480,57 +430,64 @@ In the unified architecture, this engine operates as a <strong>sub-component</st
 <h2 id="scoring-bm25"><a class="header" href="#scoring-bm25">Scoring (BM25)</a></h2>
 <p>Iris uses <strong>Okapi BM25</strong> as its default scoring function. It improves results by prioritizing rare terms and normalizing for document length, ensuring that matches in shorter, focused documents are ranked appropriately.</p>
 <h2 id="code-examples"><a class="header" href="#code-examples">Code Examples</a></h2>
-<h3 id="1-configuring-lexicalengine"><a class="header" href="#1-configuring-lexicalengine">1. Configuring LexicalEngine</a></h3>
-<p>Setting up a schema-less engine with a default analyzer.</p>
+<h3 id="1-configuring-engine-for-lexical-search"><a class="header" href="#1-configuring-engine-for-lexical-search">1. Configuring Engine for Lexical Search</a></h3>
+<p>Setting up an engine with a lexical field and default analyzer.</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>use std::sync::Arc;
-use iris::lexical::engine::LexicalEngine;
-use iris::lexical::engine::config::LexicalIndexConfig;
-use iris::storage::memory::{MemoryStorage, MemoryStorageConfig};
+use iris::{Engine, Schema};
+use iris::analysis::analyzer::standard::StandardAnalyzer;
+use iris::lexical::{FieldOption, TextOption};
+use iris::storage::{StorageConfig, StorageFactory};
+use iris::storage::memory::MemoryStorageConfig;
 
-fn setup_engine() -&gt; iris::error::Result&lt;LexicalEngine&gt; {
-    let storage = Arc::new(MemoryStorage::new(MemoryStorageConfig::default()));
-    
-    // Default configuration uses StandardAnalyzer
-    let config = LexicalIndexConfig::default();
-    let engine = LexicalEngine::new(storage, config)?;
-    Ok(engine)
+fn setup_engine() -&gt; iris::Result&lt;Engine&gt; {
+    let storage = StorageFactory::create(StorageConfig::Memory(MemoryStorageConfig::default()))?;
+
+    let schema = Schema::builder()
+        .add_lexical_field("title", FieldOption::Text(TextOption::default()))
+        .add_lexical_field("content", FieldOption::Text(TextOption::default()))
+        .build();
+
+    Engine::builder(storage, schema)
+        .analyzer(Arc::new(StandardAnalyzer::default()))
+        .build()
 }
 <span class="boring">}</span></code></pre></pre>
 <h3 id="2-adding-documents"><a class="header" href="#2-adding-documents">2. Adding Documents</a></h3>
 <p>Creating and indexing documents with various field types.</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use iris::lexical::core::document::Document;
-use iris::lexical::core::field::TextOption;
+</span>use iris::{Document, DataValue};
 
-fn add_documents(engine: &amp;LexicalEngine) -&gt; iris::error::Result&lt;()&gt; {
-    let doc = Document::builder()
-        .add_text("title", "Iris Search", TextOption::default())
-        .add_text("content", "Fast and semantic search engine in Rust", TextOption::default())
-        .add_integer("price", 100)
-        .build();
+fn add_documents(engine: &amp;Engine) -&gt; iris::Result&lt;()&gt; {
+    let doc = Document::new()
+        .add_text("title", "Iris Search")
+        .add_text("content", "Fast and semantic search engine in Rust")
+        .add_field("price", DataValue::Integer(100));
 
-    engine.add_document(doc)?;
+    engine.put_document("doc1", doc)?;
     engine.commit()?; // Flush and commit to make searchable
     Ok(())
 }
 <span class="boring">}</span></code></pre></pre>
-<h3 id="3-searching-via-dsl"><a class="header" href="#3-searching-via-dsl">3. Searching via DSL</a></h3>
-<p>Executing a simple search using the query string parser.</p>
+<h3 id="3-searching-with-term-query"><a class="header" href="#3-searching-with-term-query">3. Searching with Term Query</a></h3>
+<p>Executing a simple search using a term query.</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use iris::lexical::search::searcher::LexicalSearchRequest;
+</span>use iris::SearchRequestBuilder;
+use iris::lexical::TermQuery;
 
-fn search(engine: &amp;LexicalEngine) -&gt; iris::error::Result&lt;()&gt; {
-    // Search for matches in the default fields
-    let request = LexicalSearchRequest::new("content:rust")
-        .max_docs(10);
+fn search(engine: &amp;Engine) -&gt; iris::Result&lt;()&gt; {
+    let results = engine.search(
+        SearchRequestBuilder::new()
+            .with_lexical(Box::new(TermQuery::new("content", "rust")))
+            .limit(10)
+            .build()
+    )?;
 
-    let results = engine.search(request)?;
-    for hit in results.hits {
-        println!("Doc ID: {}, Score: {}", hit.doc_id, hit.score);
+    for hit in results {
+        println!("[{}] Score: {:.4}", hit.id, hit.score);
     }
     Ok(())
 }
@@ -540,18 +497,19 @@ fn search(engine: &amp;LexicalEngine) -&gt; iris::error::Result&lt;()&gt; {
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>use iris::analysis::analyzer::japanese::JapaneseAnalyzer;
-use iris::lexical::engine::config::LexicalIndexConfig;
 
-fn setup_japanese_engine() -&gt; iris::error::Result&lt;LexicalEngine&gt; {
-    let storage = Arc::new(MemoryStorage::new(MemoryStorageConfig::default()));
-    
+fn setup_japanese_engine() -&gt; iris::Result&lt;Engine&gt; {
+    let storage = StorageFactory::create(StorageConfig::Memory(MemoryStorageConfig::default()))?;
+
     // Configure default analyzer to Japanese
     let analyzer = Arc::new(JapaneseAnalyzer::default());
-    let config = LexicalIndexConfig::builder()
-        .analyzer(analyzer)
+    let schema = Schema::builder()
+        .add_lexical_field("content", FieldOption::Text(TextOption::default()))
         .build();
 
-    LexicalEngine::new(storage, config)
+    Engine::builder(storage, schema)
+        .analyzer(analyzer)
+        .build()
 }
 <span class="boring">}</span></code></pre></pre>
 <h2 id="future-outlook"><a class="header" href="#future-outlook">Future Outlook</a></h2>
@@ -608,6 +566,8 @@ fn setup_japanese_engine() -&gt; iris::error::Result&lt;LexicalEngine&gt; {
         <script src="../book.js"></script>
 
         <!-- Custom JS scripts -->
+        <script src="../mermaid.min.js"></script>
+        <script src="../mermaid-init.js"></script>
 
 
 
