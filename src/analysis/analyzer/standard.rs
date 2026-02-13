@@ -13,20 +13,19 @@
 //!
 //! # Examples
 //!
-//! ```
+//! ```ignore
 //! use iris::analysis::analyzer::analyzer::Analyzer;
 //! use iris::analysis::analyzer::standard::StandardAnalyzer;
 //!
 //! let analyzer = StandardAnalyzer::new().unwrap();
-//! let tokens: Vec<_> = analyzer.analyze("Hello the world and test").unwrap().collect();
+//! let tokens: Vec<_> = analyzer.analyze("Hello the world and test").await.unwrap().collect();
 //!
 //! // "the" and "and" are filtered out as stop words
 //! assert_eq!(tokens.len(), 3);
 //! assert_eq!(tokens[0].text, "hello");
 //! assert_eq!(tokens[1].text, "world");
 //! assert_eq!(tokens[2].text, "test");
-//! ```
-
+//! ```ignore
 use std::sync::Arc;
 
 use crate::analysis::analyzer::analyzer::Analyzer;

@@ -20,7 +20,8 @@ use iris::storage::StorageFactory;
 use iris::storage::file::FileStorageConfig;
 use iris::{DataValue, Document};
 
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
     println!("=== WildcardQuery Example - Pattern Matching with Wildcards ===\n");
 
     // Create a storage backend
@@ -386,9 +387,9 @@ fn main() -> Result<()> {
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_wildcard_query_example() {
-        let result = main();
+    #[tokio::test]
+    async fn test_wildcard_query_example() {
+        let result = main().await;
         assert!(result.is_ok());
     }
 }

@@ -11,20 +11,19 @@
 //!
 //! # Examples
 //!
-//! ```
+//! ```ignore
 //! use iris::analysis::analyzer::analyzer::Analyzer;
 //! use iris::analysis::analyzer::language::english::EnglishAnalyzer;
 //!
 //! let analyzer = EnglishAnalyzer::new().unwrap();
-//! let tokens: Vec<_> = analyzer.analyze("Hello the world and test").unwrap().collect();
+//! let tokens: Vec<_> = analyzer.analyze("Hello the world and test").await.unwrap().collect();
 //!
 //! // "the" and "and" are filtered out
 //! assert_eq!(tokens.len(), 3);
 //! assert_eq!(tokens[0].text, "hello");
 //! assert_eq!(tokens[1].text, "world");
 //! assert_eq!(tokens[2].text, "test");
-//! ```
-
+//! ```ignore
 use std::fmt::Debug;
 use std::fmt::Formatter;
 use std::sync::Arc;

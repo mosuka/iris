@@ -806,7 +806,8 @@ impl SegmentReader {
         }
 
         let docs = self.stored_documents.read().unwrap();
-        if let Some(documents) = docs.as_ref() {
+
+        if let Some(ref documents) = *docs {
             let mut postings = Vec::new();
             let default_analyzer = StandardAnalyzer::new()?;
 

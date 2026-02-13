@@ -7,6 +7,7 @@ use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use parking_lot::RwLock;
 
 use crate::error::{IrisError, Result};
@@ -105,6 +106,7 @@ impl InMemoryVectorField {
     }
 }
 
+#[async_trait]
 impl VectorField for InMemoryVectorField {
     fn name(&self) -> &str {
         &self.name
@@ -186,18 +188,24 @@ impl InMemoryFieldWriter {
     }
 }
 
+#[async_trait]
 impl VectorFieldWriter for InMemoryFieldWriter {
-    fn add_value(&self, doc_id: u64, value: &crate::data::DataValue, version: u64) -> Result<()> {
+    async fn add_value(
+        &self,
+        doc_id: u64,
+        value: &crate::data::DataValue,
+        version: u64,
+    ) -> Result<()> {
         // If we have a delegate, let it handle embedding (EmbeddingVectorIndexWriter)
         if let Some(delegate) = &self.delegate {
             // Get count before to find new vector
-            let before_count = delegate.vectors().len();
+            let before_count = delegate.vectors().await.len();
 
             // Delegate handles embedding
-            delegate.add_value(doc_id, value, version)?;
+            delegate.add_value(doc_id, value, version).await?;
 
             // Retrieve the newly added vector and store it locally
-            let vectors = delegate.vectors();
+            let vectors = delegate.vectors().await;
             if vectors.len() > before_count {
                 // Get the last added vector
                 let (_, _, ref vec) = vectors[vectors.len() - 1];
@@ -216,7 +224,7 @@ impl VectorFieldWriter for InMemoryFieldWriter {
         // No delegate - only accept pre-computed vectors
         if let crate::data::DataValue::Vector(v) = value {
             let stored = StoredVector::new(v.clone());
-            self.add_stored_vector(doc_id, &stored, version)
+            self.add_stored_vector(doc_id, &stored, version).await
         } else {
             Err(IrisError::invalid_argument(
                 "add_value not supported for this field writer (needs embedding helper)",
@@ -224,9 +232,14 @@ impl VectorFieldWriter for InMemoryFieldWriter {
         }
     }
 
-    fn add_stored_vector(&self, doc_id: u64, vector: &StoredVector, version: u64) -> Result<()> {
+    async fn add_stored_vector(
+        &self,
+        doc_id: u64,
+        vector: &StoredVector,
+        version: u64,
+    ) -> Result<()> {
         if let Some(delegate) = &self.delegate {
-            delegate.add_stored_vector(doc_id, vector, version)?;
+            delegate.add_stored_vector(doc_id, vector, version).await?;
         }
 
         let converted = self.convert_vector(vector)?;
@@ -239,20 +252,19 @@ impl VectorFieldWriter for InMemoryFieldWriter {
         Ok(())
     }
 
-    fn has_storage(&self) -> bool {
-        // InMemoryFieldWriter usually doesn't have disk storage in the same sense
+    async fn has_storage(&self) -> bool {
         if let Some(delegate) = &self.delegate {
-            delegate.has_storage()
+            delegate.has_storage().await
         } else {
             false
         }
     }
 
-    fn rebuild(&self, vectors: Vec<(u64, String, Vector)>) -> Result<()> {
+    async fn rebuild(&self, vectors: Vec<(u64, String, Vector)>) -> Result<()> {
         let vectors_clone = vectors.clone();
 
         if let Some(delegate) = &self.delegate {
-            delegate.rebuild(vectors)?;
+            delegate.rebuild(vectors).await?;
         }
 
         let mut guard = self.store.entries.write();
@@ -268,41 +280,35 @@ impl VectorFieldWriter for InMemoryFieldWriter {
         Ok(())
     }
 
-    fn vectors(&self) -> Vec<(u64, String, Vector)> {
-        // InMemoryFieldWriter stores vectors in self.store/field_store
-        // But the trait expects a slice reference, which we can't easily return if it's in a HashMap/BTreeMap
-        // For now, delegate or return empty.
-        // If we want accurate Vacuum, we need access.
-        // However, optimize() usually targets the persistent storage (delegate).
+    async fn vectors(&self) -> Vec<(u64, String, Vector)> {
         if let Some(delegate) = &self.delegate {
-            delegate.vectors()
+            delegate.vectors().await
         } else {
             Vec::new()
         }
     }
 
-    fn delete_document(&self, doc_id: u64, version: u64) -> Result<()> {
+    async fn delete_document(&self, doc_id: u64, version: u64) -> Result<()> {
         self.store.remove(doc_id);
         if let Some(delegate) = &self.delegate {
-            delegate.delete_document(doc_id, version)?;
+            delegate.delete_document(doc_id, version).await?;
         }
         Ok(())
     }
 
-    fn flush(&self) -> Result<()> {
+    async fn flush(&self) -> Result<()> {
         if let Some(delegate) = &self.delegate {
-            delegate.flush()?;
+            delegate.flush().await?;
         }
         Ok(())
     }
 
-    fn optimize(&self) -> Result<()> {
+    async fn optimize(&self) -> Result<()> {
         if let Some(delegate) = &self.delegate {
             // Rebuild delegate using vectors from RAM store
-            // This ensures delegate reflects the current in-memory state
             let vectors = self.store.vector_tuples(&self.field_name);
-            delegate.rebuild(vectors)?;
-            delegate.flush()?;
+            delegate.rebuild(vectors).await?;
+            delegate.flush().await?;
         }
         Ok(())
     }

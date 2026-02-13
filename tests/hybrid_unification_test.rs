@@ -77,7 +77,7 @@ impl Embedder for MockEmbedder {
     }
 }
 
-fn create_hybrid_engine() -> std::result::Result<Engine, Box<dyn std::error::Error>> {
+async fn create_hybrid_engine() -> std::result::Result<Engine, Box<dyn std::error::Error>> {
     // Embedder setup
     let embedder = Arc::new(MockEmbedder::new());
     embedder.add("apple", vec![0.9, 0.1, 0.0]);
@@ -103,31 +103,22 @@ fn create_hybrid_engine() -> std::result::Result<Engine, Box<dyn std::error::Err
     // Use simple embedder directly (PerFieldEmbedder is not supported)
     let engine = Engine::builder(storage, schema)
         .embedder(embedder)
-        .build()?;
+        .build()
+        .await?;
     Ok(engine)
 }
 
-#[test]
-fn test_hybrid_search_unification() -> std::result::Result<(), Box<dyn std::error::Error>> {
-    let rt = tokio::runtime::Runtime::new()?;
-    let engine = create_hybrid_engine()?;
+#[tokio::test(flavor = "multi_thread")]
+async fn test_hybrid_search_unification() -> std::result::Result<(), Box<dyn std::error::Error>> {
+    let engine = create_hybrid_engine().await?;
 
-    rt.block_on(async { test_hybrid_search_unification_impl(&engine).await })?;
-
-    drop(engine);
-    Ok(())
-}
-
-async fn test_hybrid_search_unification_impl(
-    engine: &Engine,
-) -> std::result::Result<(), Box<dyn std::error::Error>> {
     // Index Doc 1: "apple" - both lexical and vector fields
     let payload1 = Document::builder()
         .add_field("title", DataValue::Text("apple".into()))
         .add_field("title_vec", DataValue::Text("apple".into()))
         .build();
 
-    engine.add_document("1", payload1)?;
+    engine.add_document("1", payload1).await?;
 
     // Index Doc 2: "banana" - both lexical and vector fields
     let payload2 = Document::builder()
@@ -135,9 +126,9 @@ async fn test_hybrid_search_unification_impl(
         .add_field("title_vec", DataValue::Text("banana".into()))
         .build();
 
-    engine.add_document("2", payload2)?;
+    engine.add_document("2", payload2).await?;
 
-    engine.commit()?;
+    engine.commit().await?;
 
     // Test 1: Vector Search (query closest to apple [0.9, 0.1, 0.0])
     let req_vector = SearchRequestBuilder::new()
@@ -153,7 +144,7 @@ async fn test_hybrid_search_unification_impl(
         .limit(10)
         .build();
 
-    let res_vector = engine.search(req_vector)?;
+    let res_vector = engine.search(req_vector).await?;
     assert!(!res_vector.is_empty(), "Vector search should return hits");
     let top_id = res_vector[0].id.clone();
 
@@ -163,7 +154,7 @@ async fn test_hybrid_search_unification_impl(
         .limit(10)
         .build();
 
-    let res_lexical = engine.search(req_lexical)?;
+    let res_lexical = engine.search(req_lexical).await?;
     assert!(!res_lexical.is_empty(), "Lexical search should return hits");
     assert_ne!(
         res_lexical[0].id, top_id,
@@ -186,7 +177,7 @@ async fn test_hybrid_search_unification_impl(
         .limit(10)
         .build();
 
-    let res_hybrid = engine.search(req_hybrid)?;
+    let res_hybrid = engine.search(req_hybrid).await?;
     assert!(!res_hybrid.is_empty());
 
     assert_eq!(

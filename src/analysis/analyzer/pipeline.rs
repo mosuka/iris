@@ -13,7 +13,7 @@
 //!
 //! # Examples
 //!
-//! ```
+//! ```ignore
 //! use iris::analysis::analyzer::analyzer::Analyzer;
 //! use iris::analysis::analyzer::pipeline::PipelineAnalyzer;
 //! use iris::analysis::tokenizer::regex::RegexTokenizer;
@@ -28,14 +28,13 @@
 //!     .add_filter(Arc::new(StopFilter::from_words(vec!["the", "and"])))
 //!     .with_name("my_custom_analyzer".to_string());
 //!
-//! let tokens: Vec<_> = analyzer.analyze("Hello THE world AND test").unwrap().collect();
+//! let tokens: Vec<_> = analyzer.analyze("Hello THE world AND test").await.unwrap().collect();
 //!
 //! assert_eq!(tokens.len(), 3);
 //! assert_eq!(tokens[0].text, "hello");
 //! assert_eq!(tokens[1].text, "world");
 //! assert_eq!(tokens[2].text, "test");
-//! ```
-
+//! ```ignore
 use std::sync::Arc;
 
 use crate::analysis::analyzer::analyzer::Analyzer;

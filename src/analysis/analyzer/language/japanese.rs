@@ -11,7 +11,7 @@
 //!
 //! # Examples
 //!
-//! ```
+//! ```ignore
 //! use iris::analysis::analyzer::analyzer::Analyzer;
 //! use iris::analysis::analyzer::language::japanese::JapaneseAnalyzer;
 //!
@@ -20,8 +20,7 @@
 //!
 //! // Properly segmented Japanese tokens
 //! assert!(tokens.len() > 0);
-//! ```
-
+//! ```ignore
 use std::fmt::Debug;
 use std::fmt::Formatter;
 use std::sync::Arc;

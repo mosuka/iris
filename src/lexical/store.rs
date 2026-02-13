@@ -17,7 +17,8 @@ use crate::lexical::search::searcher::{LexicalSearchRequest, LexicalSearcher};
 use crate::lexical::store::config::LexicalIndexConfig;
 use crate::lexical::writer::LexicalIndexWriter;
 use crate::storage::Storage;
-use parking_lot::{Mutex, RwLock};
+use parking_lot::RwLock;
+use parking_lot::Mutex;
 
 /// A high-level lexical search engine that provides both indexing and searching capabilities.
 ///

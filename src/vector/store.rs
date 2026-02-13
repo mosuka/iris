@@ -8,14 +8,12 @@
 //! # Module Structure
 //!
 //! - [`config`] - Configuration types (VectorIndexConfig, VectorFieldConfig)
-//! - [`embedder`] - Embedding utilities (EmbedderExecutor)
 //! - [`embedding_writer`] - Embedding writer wrapper
 //! - [`query`] - Search query builder
 //! - [`request`] - Search request types
 //! - [`response`] - Search response types
 
 pub mod config;
-pub mod embedder;
 pub mod embedding_writer;
 pub mod memory;
 pub mod request;
@@ -23,7 +21,7 @@ pub mod response;
 
 use std::sync::Arc;
 
-use parking_lot::Mutex;
+use tokio::sync::Mutex;
 
 use crate::data::Document;
 use crate::embedding::embedder::Embedder;
@@ -156,9 +154,9 @@ impl VectorStore {
     ///
     /// This method is primarily used during WAL recovery where the internal ID
     /// is already known.
-    pub fn upsert_document_by_internal_id(&self, doc_id: u64, doc: Document) -> Result<()> {
+    pub async fn upsert_document_by_internal_id(&self, doc_id: u64, doc: Document) -> Result<()> {
         // Get or create writer
-        let mut guard = self.writer_cache.lock();
+        let mut guard = self.writer_cache.lock().await;
         if guard.is_none() {
             *guard = Some(self.index.writer()?);
         }
@@ -169,15 +167,15 @@ impl VectorStore {
 
         // Add values to index (writer handles embedding automatically)
         for (field_name, value) in &doc.fields {
-            writer.add_value(doc_id, field_name.clone(), value.clone())?;
+            writer.add_value(doc_id, field_name.clone(), value.clone()).await?;
         }
 
         Ok(())
     }
 
     /// Delete a document by its internal ID.
-    pub fn delete_document_by_internal_id(&self, doc_id: u64) -> Result<()> {
-        let mut guard = self.writer_cache.lock();
+    pub async fn delete_document_by_internal_id(&self, doc_id: u64) -> Result<()> {
+        let mut guard = self.writer_cache.lock().await;
         if guard.is_none() {
             *guard = Some(self.index.writer()?);
         }
@@ -189,8 +187,8 @@ impl VectorStore {
     }
 
     /// Commit any pending changes to the index.
-    pub fn commit(&self) -> Result<()> {
-        if let Some(mut writer) = self.writer_cache.lock().take() {
+    pub async fn commit(&self) -> Result<()> {
+        if let Some(mut writer) = self.writer_cache.lock().await.take() {
             // commit() calls finalize() then write() to persist to storage
             writer.commit()?;
         }
@@ -316,8 +314,8 @@ impl VectorStore {
     }
 
     /// Close the store.
-    pub fn close(&self) -> Result<()> {
-        *self.writer_cache.lock() = None;
+    pub async fn close(&self) -> Result<()> {
+        *self.writer_cache.lock().await = None;
         *self.searcher_cache.write() = None;
         self.index.close()
     }
@@ -361,15 +359,15 @@ mod tests {
         assert!(!store.is_closed());
     }
 
-    #[test]
-    fn test_vectorstore_close() {
+    #[tokio::test]
+    async fn test_vectorstore_close() {
         let storage = Arc::new(MemoryStorage::new(MemoryStorageConfig::default()));
 
         let config = VectorIndexTypeConfig::default();
         let store = VectorStore::with_index_type_config(storage, config).unwrap();
 
         assert!(!store.is_closed());
-        store.close().unwrap();
+        store.close().await.unwrap();
         assert!(store.is_closed());
     }
 }

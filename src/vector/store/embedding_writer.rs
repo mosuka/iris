@@ -11,14 +11,12 @@ use crate::embedding::embedder::{EmbedInput, Embedder};
 use crate::embedding::per_field::PerFieldEmbedder;
 use crate::error::{IrisError, Result};
 use crate::vector::core::vector::Vector;
-use crate::vector::store::embedder::EmbedderExecutor;
 use crate::vector::writer::VectorIndexWriter;
 
 /// A wrapper around a VectorIndexWriter that automatically handles content embedding.
 pub struct EmbeddingVectorIndexWriter {
     inner: Box<dyn VectorIndexWriter>,
     embedder: Arc<dyn Embedder>,
-    executor: Arc<EmbedderExecutor>,
 }
 
 impl EmbeddingVectorIndexWriter {
@@ -26,17 +24,15 @@ impl EmbeddingVectorIndexWriter {
     pub fn new(
         inner: Box<dyn VectorIndexWriter>,
         embedder: Arc<dyn Embedder>,
-        executor: Arc<EmbedderExecutor>,
     ) -> Self {
         Self {
             inner,
             embedder,
-            executor,
         }
     }
 
     /// Add a value (Text, ImageBytes, etc.) to the index, embedding it automatically.
-    pub fn add_value(&mut self, doc_id: u64, field_name: String, value: DataValue) -> Result<()> {
+    pub async fn add_value(&mut self, doc_id: u64, field_name: String, value: DataValue) -> Result<()> {
         // If it's already a vector, bypass embedding
         if let DataValue::Vector(v) = value {
             return self
@@ -76,27 +72,20 @@ impl EmbeddingVectorIndexWriter {
             }
         };
 
-        let embedder = self.embedder.clone();
-        let field_name_for_embed = field_name.clone();
+        let input = if let Some(ref text) = text_owned {
+            EmbedInput::Text(text)
+        } else if let Some(ref bytes) = bytes_owned {
+            EmbedInput::Bytes(bytes, mime_owned.as_deref())
+        } else {
+            return Err(IrisError::internal("Unreachable state in embedding writer"));
+        };
 
-        // Run embedding in the executor
-        // We construct EmbedInput inside the closure to manage lifetimes
-        let vector = self.executor.run(async move {
-            let input = if let Some(ref text) = text_owned {
-                EmbedInput::Text(text)
-            } else if let Some(ref bytes) = bytes_owned {
-                EmbedInput::Bytes(bytes, mime_owned.as_deref())
-            } else {
-                return Err(IrisError::internal("Unreachable state in embedding writer"));
-            };
-
-            // Use field-specific embedder if PerFieldEmbedder, otherwise use default.
-            if let Some(per_field) = embedder.as_any().downcast_ref::<PerFieldEmbedder>() {
-                per_field.embed_field(&field_name_for_embed, &input).await
-            } else {
-                embedder.embed(&input).await
-            }
-        })?;
+        // Use field-specific embedder if PerFieldEmbedder, otherwise use default.
+        let vector = if let Some(per_field) = self.embedder.as_any().downcast_ref::<PerFieldEmbedder>() {
+            per_field.embed_field(&field_name, &input).await?
+        } else {
+            self.embedder.embed(&input).await?
+        };
 
         // Add the resulting vector to the underlying writer
         self.inner.add_vectors(vec![(doc_id, field_name, vector)])
@@ -115,18 +104,19 @@ impl std::fmt::Debug for EmbeddingVectorIndexWriter {
 
 // We can optionally implement VectorIndexWriter for this wrapper too,
 // to allow seamless usage where a Writer is expected.
+#[async_trait::async_trait]
 impl VectorIndexWriter for EmbeddingVectorIndexWriter {
     fn next_vector_id(&self) -> u64 {
         self.inner.next_vector_id()
     }
 
-    fn add_value(
+    async fn add_value(
         &mut self,
         doc_id: u64,
         field_name: String,
         value: crate::data::DataValue,
     ) -> Result<()> {
-        self.add_value(doc_id, field_name, value)
+        self.add_value(doc_id, field_name, value).await
     }
 
     fn build(&mut self, vectors: Vec<(u64, String, Vector)>) -> Result<()> {
@@ -223,8 +213,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_embedding_writer() {
+    #[tokio::test]
+    async fn test_embedding_writer() {
         let storage = Arc::new(MemoryStorage::new(MemoryStorageConfig::default()));
         let mut index_config = FlatIndexConfig::default();
         index_config.dimension = 3;
@@ -240,12 +230,12 @@ mod tests {
         );
 
         let embedder = Arc::new(MockEmbedder);
-        let executor = Arc::new(EmbedderExecutor::new().unwrap());
 
-        let mut writer = EmbeddingVectorIndexWriter::new(inner, embedder, executor);
+        let mut writer = EmbeddingVectorIndexWriter::new(inner, embedder);
 
         writer
             .add_value(1, "field".to_string(), DataValue::Text("hello".to_string()))
+            .await
             .unwrap();
 
         // Finalize to make vectors available? FlatIndexWriter might buffer.

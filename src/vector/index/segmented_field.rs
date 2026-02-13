@@ -1,3 +1,4 @@
+use async_trait::async_trait;
 use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
@@ -186,6 +187,7 @@ impl SegmentedVectorField {
     }
 }
 
+#[async_trait]
 impl VectorField for SegmentedVectorField {
     fn name(&self) -> &str {
         &self.name
@@ -216,11 +218,16 @@ impl VectorField for SegmentedVectorField {
     }
 }
 
+#[async_trait]
 impl VectorFieldWriter for SegmentedVectorField {
-    fn add_stored_vector(&self, doc_id: u64, vector: &StoredVector, _version: u64) -> Result<()> {
+    async fn add_stored_vector(
+        &self,
+        doc_id: u64,
+        vector: &StoredVector,
+        _version: u64,
+    ) -> Result<()> {
         let vec = vector.to_vector();
 
-        // 2. Update memory
         self.ensure_active_segment()?;
         let mut active_opt = self.active_segment.write();
         if let Some((_, writer)) = active_opt.as_mut() {
@@ -233,7 +240,7 @@ impl VectorFieldWriter for SegmentedVectorField {
         Ok(())
     }
 
-    fn has_storage(&self) -> bool {
+    async fn has_storage(&self) -> bool {
         self.active_segment
             .read()
             .as_ref()
@@ -241,7 +248,7 @@ impl VectorFieldWriter for SegmentedVectorField {
             .unwrap_or(false)
     }
 
-    fn vectors(&self) -> Vec<(u64, String, Vector)> {
+    async fn vectors(&self) -> Vec<(u64, String, Vector)> {
         if let Some((_, writer)) = self.active_segment.read().as_ref() {
             writer.vectors().to_vec()
         } else {
@@ -249,19 +256,18 @@ impl VectorFieldWriter for SegmentedVectorField {
         }
     }
 
-    fn rebuild(&self, _vectors: Vec<(u64, String, Vector)>) -> Result<()> {
+    async fn rebuild(&self, _vectors: Vec<(u64, String, Vector)>) -> Result<()> {
         Ok(())
     }
 
-    fn delete_document(&self, doc_id: u64, _version: u64) -> Result<()> {
-        // 2. Update memory
+    async fn delete_document(&self, doc_id: u64, _version: u64) -> Result<()> {
         if let Some((_, writer)) = self.active_segment.write().as_mut() {
             let _ = writer.delete_document(doc_id);
         }
         Ok(())
     }
 
-    fn flush(&self) -> Result<()> {
+    async fn flush(&self) -> Result<()> {
         let mut active_lock = self.active_segment.write();
         if let Some((segment_id, mut writer)) = active_lock.take() {
             writer.finalize()?;
@@ -281,7 +287,7 @@ impl VectorFieldWriter for SegmentedVectorField {
         Ok(())
     }
 
-    fn optimize(&self) -> Result<()> {
+    async fn optimize(&self) -> Result<()> {
         let policy = crate::vector::index::hnsw::segment::merge_policy::ForceMergePolicy::new();
         self.perform_merge_with_policy(&policy)
     }

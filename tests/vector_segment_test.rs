@@ -40,8 +40,8 @@ impl Embedder for MockTextEmbedder {
     }
 }
 
-#[test]
-fn test_vector_segment_integration() {
+#[tokio::test(flavor = "multi_thread")]
+async fn test_vector_segment_integration() {
     // 1. Setup storage and config
     let storage_config = MemoryStorageConfig::default();
     let storage = Arc::new(MemoryStorage::new(storage_config));
@@ -88,11 +88,11 @@ fn test_vector_segment_integration() {
 
     for (i, vec_data) in vectors.into_iter().enumerate() {
         let doc = Document::builder().add_field("vector_field", DataValue::Vector(vec_data)).build();
-        engine.upsert_document_by_internal_id((i + 1) as u64, doc).unwrap();
+        engine.upsert_document_by_internal_id((i + 1) as u64, doc).await.unwrap();
     }
 
     // 3. Flush/Persist explicitly
-    engine.commit().unwrap();
+    engine.commit().await.unwrap();
 
     // 4. Persistence check
     // We drop engine and recreates it.

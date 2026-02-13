@@ -6,6 +6,8 @@
 //! - `FlatIndexWriter` in the `flat` module for exact search
 //! - `IvfIndexWriter` in the `ivf` module for memory-efficient search
 
+use async_trait::async_trait;
+
 use crate::error::Result;
 use crate::vector::core::vector::Vector;
 use serde::{Deserialize, Serialize};
@@ -81,6 +83,7 @@ impl Default for VectorIndexWriterConfig {
 /// // writer.finalize().unwrap();
 /// // writer.write("my_index").unwrap();
 /// ```
+#[async_trait]
 pub trait VectorIndexWriter: Send + Sync + std::fmt::Debug {
     /// Get the next available vector ID (for automatic ID assignment).
     fn next_vector_id(&self) -> u64;
@@ -141,7 +144,7 @@ pub trait VectorIndexWriter: Send + Sync + std::fmt::Debug {
     }
 
     /// Add a value (Text, Bytes, etc.) to the index, embedding it automatically if supported.
-    fn add_value(
+    async fn add_value(
         &mut self,
         doc_id: u64,
         field_name: String,

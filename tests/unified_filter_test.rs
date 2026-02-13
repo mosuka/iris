@@ -11,8 +11,8 @@ use iris::vector::FieldOption as VectorOption;
 use iris::vector::VectorSearchRequestBuilder;
 use iris::{FieldOption, Schema};
 
-#[test]
-fn test_unified_filtering() -> iris::Result<()> {
+#[tokio::test(flavor = "multi_thread")]
+async fn test_unified_filtering() -> iris::Result<()> {
     // 1. Setup Storage
     let temp_dir = TempDir::new().unwrap();
     let storage_config = StorageConfig::File(FileStorageConfig::new(temp_dir.path()));
@@ -29,7 +29,7 @@ fn test_unified_filtering() -> iris::Result<()> {
         .add_field("embedding", FieldOption::Vector(vector_opt))
         .build();
 
-    let engine = Engine::new(storage.clone(), config)?;
+    let engine = Engine::new(storage.clone(), config).await?;
 
     // 3. Index Documents
     // Doc 1: Apple (Fruit), Vector [1.0, 0.0]
@@ -40,7 +40,7 @@ fn test_unified_filtering() -> iris::Result<()> {
             .add_field("category", "fruit")
             .add_field("embedding", vec![1.0, 0.0])
             .build(),
-    )?;
+    ).await?;
 
     // Doc 2: Banana (Fruit), Vector [0.9, 0.1]
     engine.put_document(
@@ -50,7 +50,7 @@ fn test_unified_filtering() -> iris::Result<()> {
             .add_field("category", "fruit")
             .add_field("embedding", vec![0.9, 0.1])
             .build(),
-    )?;
+    ).await?;
 
     // Doc 3: Carrot (Vegetable), Vector [1.0, 0.0] -> Identical vector to Apple!
     engine.put_document(
@@ -60,9 +60,9 @@ fn test_unified_filtering() -> iris::Result<()> {
             .add_field("category", "vegetable")
             .add_field("embedding", vec![1.0, 0.0])
             .build(),
-    )?;
+    ).await?;
 
-    engine.commit()?;
+    engine.commit().await?;
 
     // 4. Test Filtering: Search for [1.0, 0.0] (Apple/Carrot) but filter for "vegetable"
     let vector_req = VectorSearchRequestBuilder::new()
@@ -76,7 +76,7 @@ fn test_unified_filtering() -> iris::Result<()> {
         .filter(filter_query)
         .build();
 
-    let results = engine.search(req)?;
+    let results = engine.search(req).await?;
 
     // Should pass through Engine -> Lexical Filter -> Vector Store allowed_ids
     println!("Filtered Results (Vegetable): {:?}", results);
@@ -101,7 +101,7 @@ fn test_unified_filtering() -> iris::Result<()> {
         .filter(filter_query_fruit)
         .build();
 
-    let results_fruit = engine.search(req_fruit)?;
+    let results_fruit = engine.search(req_fruit).await?;
     println!("Filtered Results (Fruit): {:?}", results_fruit);
     assert_eq!(
         results_fruit.len(),
@@ -112,8 +112,8 @@ fn test_unified_filtering() -> iris::Result<()> {
     Ok(())
 }
 
-#[test]
-fn test_unified_filtering_hnsw() -> iris::Result<()> {
+#[tokio::test(flavor = "multi_thread")]
+async fn test_unified_filtering_hnsw() -> iris::Result<()> {
     // 1. Setup Storage
     let temp_dir = TempDir::new().unwrap();
     let storage_config = StorageConfig::File(FileStorageConfig::new(temp_dir.path()));
@@ -130,7 +130,7 @@ fn test_unified_filtering_hnsw() -> iris::Result<()> {
         .add_field("embedding", FieldOption::Vector(vector_opt))
         .build();
 
-    let engine = Engine::new(storage.clone(), config)?;
+    let engine = Engine::new(storage.clone(), config).await?;
 
     // 3. Index Documents
     engine.put_document(
@@ -140,7 +140,7 @@ fn test_unified_filtering_hnsw() -> iris::Result<()> {
             .add_field("category", "fruit")
             .add_field("embedding", vec![1.0, 0.0])
             .build(),
-    )?;
+    ).await?;
     engine.put_document(
         "doc2",
         Document::builder()
@@ -148,7 +148,7 @@ fn test_unified_filtering_hnsw() -> iris::Result<()> {
             .add_field("category", "fruit")
             .add_field("embedding", vec![0.9, 0.1])
             .build(),
-    )?;
+    ).await?;
     engine.put_document(
         "doc3",
         Document::builder()
@@ -156,8 +156,8 @@ fn test_unified_filtering_hnsw() -> iris::Result<()> {
             .add_field("category", "vegetable")
             .add_field("embedding", vec![1.0, 0.0])
             .build(),
-    )?;
-    engine.commit()?;
+    ).await?;
+    engine.commit().await?;
 
     // 4. Test Filtering: Search for [1.0, 0.0] but filter for "vegetable"
     let vector_req = VectorSearchRequestBuilder::new()
@@ -170,14 +170,14 @@ fn test_unified_filtering_hnsw() -> iris::Result<()> {
         .filter(filter_query)
         .build();
 
-    let results = engine.search(req)?;
+    let results = engine.search(req).await?;
     println!("Filtered Results HNSW (Vegetable): {:?}", results);
     assert_eq!(results.len(), 1, "Should filter down to 1 result");
     Ok(())
 }
 
-#[test]
-fn test_unified_filtering_ivf() -> iris::Result<()> {
+#[tokio::test(flavor = "multi_thread")]
+async fn test_unified_filtering_ivf() -> iris::Result<()> {
     // 1. Setup Storage
     let temp_dir = TempDir::new().unwrap();
     let storage_config = StorageConfig::File(FileStorageConfig::new(temp_dir.path()));
@@ -199,7 +199,7 @@ fn test_unified_filtering_ivf() -> iris::Result<()> {
         .add_field("embedding", FieldOption::Vector(vector_opt))
         .build();
 
-    let engine = Engine::new(storage.clone(), config)?;
+    let engine = Engine::new(storage.clone(), config).await?;
 
     // 3. Index Documents
     engine.put_document(
@@ -209,7 +209,7 @@ fn test_unified_filtering_ivf() -> iris::Result<()> {
             .add_field("category", "fruit")
             .add_field("embedding", vec![1.0, 0.0])
             .build(),
-    )?;
+    ).await?;
     engine.put_document(
         "doc2",
         Document::builder()
@@ -217,7 +217,7 @@ fn test_unified_filtering_ivf() -> iris::Result<()> {
             .add_field("category", "fruit")
             .add_field("embedding", vec![0.9, 0.1])
             .build(),
-    )?;
+    ).await?;
     engine.put_document(
         "doc3",
         Document::builder()
@@ -225,8 +225,8 @@ fn test_unified_filtering_ivf() -> iris::Result<()> {
             .add_field("category", "vegetable")
             .add_field("embedding", vec![1.0, 0.0])
             .build(),
-    )?;
-    engine.commit()?;
+    ).await?;
+    engine.commit().await?;
 
     // 4. Test Filtering: Search for [1.0, 0.0] but filter for "vegetable"
     let vector_req = VectorSearchRequestBuilder::new()
@@ -239,7 +239,7 @@ fn test_unified_filtering_ivf() -> iris::Result<()> {
         .filter(filter_query)
         .build();
 
-    let results = engine.search(req)?;
+    let results = engine.search(req).await?;
     println!("Filtered Results IVF (Vegetable): {:?}", results);
     assert_eq!(results.len(), 1, "Should filter down to 1 result");
     Ok(())

@@ -5,10 +5,10 @@
 //! is used for query analysis before searching.
 //!
 //! The flow is:
-//! Document → DocumentParser → AnalyzedDocument → IndexWriter
+//! Document -> DocumentParser -> AnalyzedDocument -> IndexWriter
 //!
 //! This is symmetric with:
-//! Query String → QueryParser → Query → IndexReader
+//! Query String -> QueryParser -> Query -> IndexReader
 
 use std::sync::Arc;
 
@@ -28,7 +28,8 @@ use iris::storage::file::FileStorage;
 use iris::storage::file::FileStorageConfig;
 use iris::{DataValue, Document};
 
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
     println!("=== Document Parser Example ===\n");
 
     // Step 1: Create per-field analyzer wrapper
@@ -86,7 +87,7 @@ fn main() -> Result<()> {
     for (doc_id, doc) in docs.into_iter().enumerate() {
         println!("Analyzing document {doc_id}:");
 
-        // Use DocumentParser to convert Document → AnalyzedDocument
+        // Use DocumentParser to convert Document -> AnalyzedDocument
         let analyzed_doc = doc_parser.parse(doc)?;
 
         // Show what was analyzed
@@ -141,8 +142,8 @@ fn main() -> Result<()> {
 
     println!("\n=== Summary ===");
     println!("DocumentParser provides symmetric API with QueryParser:");
-    println!("  Index: Document → DocumentParser → AnalyzedDocument → Writer");
-    println!("  Query: String → QueryParser → Query → Reader");
+    println!("  Index: Document -> DocumentParser -> AnalyzedDocument -> Writer");
+    println!("  Query: String -> QueryParser -> Query -> Reader");
     println!("\nThis allows explicit control over document analysis,");
     println!("similar to how QueryParser provides control over query analysis.");
 

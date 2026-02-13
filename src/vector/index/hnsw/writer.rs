@@ -1140,6 +1140,7 @@ impl HnswIndexWriter {
     }
 }
 
+#[async_trait::async_trait]
 impl VectorIndexWriter for HnswIndexWriter {
     fn next_vector_id(&self) -> u64 {
         self.next_vec_id

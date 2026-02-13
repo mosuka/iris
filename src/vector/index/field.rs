@@ -5,8 +5,9 @@ use std::any::Any;
 use std::fmt::Debug;
 use std::sync::Arc;
 
-use parking_lot::Mutex;
+use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
+use tokio::sync::Mutex;
 
 use crate::data::DataValue;
 use crate::error::Result;
@@ -21,6 +22,7 @@ use crate::vector::writer::VectorIndexWriter;
 // ============================================================================
 
 /// Represents a single logical vector field backed by an index implementation.
+#[async_trait]
 pub trait VectorField: Send + Sync + Debug {
     /// Returns the field (column) name.
     fn name(&self) -> &str;
@@ -38,21 +40,27 @@ pub trait VectorField: Send + Sync + Debug {
     fn as_any(&self) -> &dyn Any;
 
     /// Optimize the field storage/index.
-    fn optimize(&self) -> Result<()> {
-        self.writer().optimize()
+    async fn optimize(&self) -> Result<()> {
+        self.writer().optimize().await
     }
 }
 
 /// Writer interface for ingesting doc-centric vectors into a single field index.
+#[async_trait]
 pub trait VectorFieldWriter: Send + Sync + Debug {
     /// Add or replace a vector for the given document and field version.
-    fn add_stored_vector(&self, doc_id: u64, vector: &StoredVector, version: u64) -> Result<()>;
+    async fn add_stored_vector(
+        &self,
+        doc_id: u64,
+        vector: &StoredVector,
+        version: u64,
+    ) -> Result<()>;
     /// Add or replace a value (to be embedded) for the given document and field version.
-    fn add_value(&self, doc_id: u64, value: &DataValue, version: u64) -> Result<()> {
+    async fn add_value(&self, doc_id: u64, value: &DataValue, version: u64) -> Result<()> {
         // Default implementation just errors if not supported/implemented
         if let DataValue::Vector(v) = value {
             let sv = StoredVector::new(v.clone());
-            self.add_stored_vector(doc_id, &sv, version)
+            self.add_stored_vector(doc_id, &sv, version).await
         } else {
             Err(crate::error::IrisError::invalid_argument(
                 "add_value not supported for this field writer (needs embedding helper)",
@@ -60,22 +68,22 @@ pub trait VectorFieldWriter: Send + Sync + Debug {
         }
     }
     /// Delete the vectors associated with the provided document id.
-    fn delete_document(&self, doc_id: u64, version: u64) -> Result<()>;
+    async fn delete_document(&self, doc_id: u64, version: u64) -> Result<()>;
 
     /// Check if the writer has storage configured.
-    fn has_storage(&self) -> bool;
+    async fn has_storage(&self) -> bool;
 
     /// Get access to the stored vectors with field names.
-    fn vectors(&self) -> Vec<(u64, String, Vector)>;
+    async fn vectors(&self) -> Vec<(u64, String, Vector)>;
 
     /// Rebuild the index with the provided vectors, effectively replacing the current content.
-    fn rebuild(&self, vectors: Vec<(u64, String, Vector)>) -> Result<()>;
+    async fn rebuild(&self, vectors: Vec<(u64, String, Vector)>) -> Result<()>;
 
     /// Flush any buffered data to durable storage.
-    fn flush(&self) -> Result<()>;
+    async fn flush(&self) -> Result<()>;
 
     /// Optimize the index (e.g. rebuild, vacuum).
-    fn optimize(&self) -> Result<()>;
+    async fn optimize(&self) -> Result<()>;
 }
 
 /// Reader interface that exposes field-local search/statistics.
@@ -149,24 +157,30 @@ impl<W: VectorIndexWriter> LegacyVectorFieldWriter<W> {
     }
 
     #[cfg(test)]
-    pub(crate) fn pending_vectors(&self) -> Vec<(u64, String, Vector)> {
-        let guard = self.writer.lock();
+    pub(crate) async fn pending_vectors(&self) -> Vec<(u64, String, Vector)> {
+        let guard = self.writer.lock().await;
         guard.vectors().to_vec()
     }
 }
 
+#[async_trait]
 impl<W> VectorFieldWriter for LegacyVectorFieldWriter<W>
 where
     W: VectorIndexWriter,
 {
-    fn add_stored_vector(&self, doc_id: u64, vector: &StoredVector, _version: u64) -> Result<()> {
-        let mut guard = self.writer.lock();
+    async fn add_stored_vector(
+        &self,
+        doc_id: u64,
+        vector: &StoredVector,
+        _version: u64,
+    ) -> Result<()> {
+        let mut guard = self.writer.lock().await;
         let legacy = self.to_legacy_vector(doc_id, vector);
         guard.add_vectors(vec![legacy])
     }
 
-    fn add_value(&self, doc_id: u64, value: &DataValue, _version: u64) -> Result<()> {
-        let mut guard = self.writer.lock();
+    async fn add_value(&self, doc_id: u64, value: &DataValue, _version: u64) -> Result<()> {
+        let mut guard = self.writer.lock().await;
 
         // If it's already a vector, use standard path
         if let DataValue::Vector(v) = value {
@@ -174,72 +188,48 @@ where
             return guard.add_vectors(vec![legacy]);
         }
 
-        // We need to check if the underlying writer is an EmbeddingVectorIndexWriter
-        // but since W is generic and we don't have specialization easily here,
-        // we can try to use a trait-based approach if we want to be clean.
-        // Or just realize that if we wrapped it in EmbeddingVectorIndexWriter,
-        // we should have a way to call its add_value.
-
-        // Actually, we can add add_value to VectorIndexWriter trait (buffered/async-bridged).
-        // Let's add add_value to VectorIndexWriter trait as well.
-        VectorIndexWriter::add_value(&mut *guard, doc_id, self.field_name.clone(), value.clone())
+        // Directly await the async VectorIndexWriter::add_value
+        VectorIndexWriter::add_value(
+            &mut *guard,
+            doc_id,
+            self.field_name.clone(),
+            value.clone(),
+        )
+        .await
     }
 
-    fn has_storage(&self) -> bool {
-        self.writer.lock().has_storage()
+    async fn has_storage(&self) -> bool {
+        self.writer.lock().await.has_storage()
     }
 
-    fn vectors(&self) -> Vec<(u64, String, Vector)> {
-        self.writer.lock().vectors().to_vec()
+    async fn vectors(&self) -> Vec<(u64, String, Vector)> {
+        self.writer.lock().await.vectors().to_vec()
     }
 
-    fn rebuild(&self, vectors: Vec<(u64, String, Vector)>) -> Result<()> {
-        let mut guard = self.writer.lock();
-        // To rebuild, we rely on the writer's capability to reset or build from scratch.
-        // Assuming `build` can be called to populate, but we need to clear first.
-        // `rollback` clears pending vectors and resets state.
+    async fn rebuild(&self, vectors: Vec<(u64, String, Vector)>) -> Result<()> {
+        let mut guard = self.writer.lock().await;
         guard.rollback()?;
         guard.build(vectors)?;
         guard.finalize()?;
-        // If it has storage, we might need to write? `commit` does finalize+write.
-        // But we don't know the path here easily unless stored in config or we let `optimize` caller handle checking?
-        // `LegacyVectorFieldWriter` doesn't know the path.
-        // However, `VectorCollection` keeps track of paths?
-        // Actually `VectorIndexWriter` usually knows where to write if initiated with storage?
-        // `FlatIndexWriter::load` stores `storage` but not `path` (filename). `write(path)` takes path arg.
-
-        // This is a missing piece. The writer might not know its own filename to overwrite.
-        // But `VectorFieldEntry` in Registry has metadata?
-
-        // For now, let's assume `commit` or similar is needed, but `rebuild` just updates memory state.
-        // We will need to ensure persistence later.
-        // But `optimize` implies persistence update.
-
-        // If we can't persist, `optimize` is incomplete.
-        // Let's look at how `VectorCollection` persists.
-        // It uses `field.runtime.writer().flush()`.
-
         Ok(())
     }
 
-    fn delete_document(&self, doc_id: u64, _version: u64) -> Result<()> {
-        let mut guard = self.writer.lock();
+    async fn delete_document(&self, doc_id: u64, _version: u64) -> Result<()> {
+        let mut guard = self.writer.lock().await;
         // Best-effort deletion from in-memory buffer.
-        // We ignore errors here because the index might be finalized/immutable.
-        // Logical deletion is handled by the Registry filter in VectorCollection.
         let _ = guard.delete_document(doc_id);
         Ok(())
     }
 
-    fn flush(&self) -> Result<()> {
-        self.writer.lock().commit()?;
+    async fn flush(&self) -> Result<()> {
+        self.writer.lock().await.commit()?;
         Ok(())
     }
 
-    fn optimize(&self) -> Result<()> {
-        let vectors = self.vectors();
-        self.rebuild(vectors)?;
-        self.flush()
+    async fn optimize(&self) -> Result<()> {
+        let vectors = self.vectors().await;
+        self.rebuild(vectors).await?;
+        self.flush().await
     }
 }
 
@@ -279,6 +269,7 @@ impl AdapterBackedVectorField {
     }
 }
 
+#[async_trait]
 impl VectorField for AdapterBackedVectorField {
     fn name(&self) -> &str {
         &self.name
@@ -348,47 +339,44 @@ mod tests {
         IvfIndexWriter::new(config, VectorIndexWriterConfig::default(), "test_ivf").unwrap()
     }
 
-    #[test]
-    fn test_adapter_flat() {
+    #[tokio::test]
+    async fn test_adapter_flat() {
         let adapter = LegacyVectorFieldWriter::new("body", flat_writer());
         assert_eq!(adapter.field_name(), "body");
-        assert!(!adapter.has_storage());
+        assert!(!adapter.has_storage().await);
     }
 
-    #[test]
-    fn test_adapter_hnsw() {
-        // For HNSW, we need to handle HnswIndexWriter type availability if feature gated?
-        // Assuming HnswIndexWriter is available since we are editing it.
-        // But the test helper hnsw_writer() logic is hidden.
+    #[tokio::test]
+    async fn test_adapter_hnsw() {
         let adapter = LegacyVectorFieldWriter::new("body", hnsw_writer());
         assert_eq!(adapter.field_name(), "body");
     }
 
-    #[test]
-    fn test_adapter_ivf() {
+    #[tokio::test]
+    async fn test_adapter_ivf() {
         let adapter = LegacyVectorFieldWriter::new("body", ivf_writer());
         assert_eq!(adapter.field_name(), "body");
     }
 
-    #[test]
-    fn test_adapter_deletion_error_handling() {
+    #[tokio::test]
+    async fn test_adapter_deletion_error_handling() {
         let adapter = LegacyVectorFieldWriter::new("body", flat_writer());
         let vector = sample_stored_vector();
 
-        adapter.add_stored_vector(3, &vector, 1).unwrap();
+        adapter.add_stored_vector(3, &vector, 1).await.unwrap();
 
-        let result = adapter.delete_document(3, 2);
+        let result = adapter.delete_document(3, 2).await;
         assert!(result.is_ok());
     }
 
-    #[test]
-    fn adapter_stores_vector_with_correct_doc_id() {
+    #[tokio::test]
+    async fn adapter_stores_vector_with_correct_doc_id() {
         let adapter = LegacyVectorFieldWriter::new("body", flat_writer());
         let vector = sample_stored_vector();
 
-        adapter.add_stored_vector(5, &vector, 1).unwrap();
+        adapter.add_stored_vector(5, &vector, 1).await.unwrap();
 
-        let pending = adapter.pending_vectors();
+        let pending = adapter.pending_vectors().await;
         assert_eq!(pending.len(), 1);
         // Verify doc_id and field_name
         assert_eq!(pending[0].0, 5);

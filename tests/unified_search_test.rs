@@ -12,8 +12,8 @@ use iris::vector::VectorSearchRequestBuilder;
 use iris::{DataValue, Document};
 use iris::{FieldOption, Schema};
 
-#[test]
-fn test_unified_search_hybrid() -> iris::Result<()> {
+#[tokio::test(flavor = "multi_thread")]
+async fn test_unified_search_hybrid() -> iris::Result<()> {
     // 1. Setup Storage
     let temp_dir = TempDir::new().unwrap();
     let storage_config = StorageConfig::File(FileStorageConfig::new(temp_dir.path()));
@@ -29,7 +29,7 @@ fn test_unified_search_hybrid() -> iris::Result<()> {
         .add_field("embedding", FieldOption::Vector(vector_opt))
         .build();
 
-    let engine = Engine::new(storage.clone(), config)?;
+    let engine = Engine::new(storage.clone(), config).await?;
 
     // 3. Index Documents
     let doc1 = Document::builder()
@@ -42,9 +42,9 @@ fn test_unified_search_hybrid() -> iris::Result<()> {
         .add_field("embedding", DataValue::Vector(vec![0.0, 1.0, 0.0]))
         .build();
 
-    engine.put_document("doc1", doc1)?;
-    engine.put_document("doc2", doc2)?;
-    engine.commit()?;
+    engine.put_document("doc1", doc1).await?;
+    engine.put_document("doc2", doc2).await?;
+    engine.commit().await?;
 
     // 4. Test Lexical Search (should find "doc1")
     let lexical_query = Box::new(TermQuery::new("title", "rust")) as Box<dyn Query>;
@@ -52,7 +52,7 @@ fn test_unified_search_hybrid() -> iris::Result<()> {
         .with_lexical(lexical_query)
         .build();
 
-    let results = engine.search(req)?;
+    let results = engine.search(req).await?;
     println!("Lexical Results: {:?}", results);
     assert!(
         results.iter().any(|r| r.score > 0.0),
@@ -66,15 +66,15 @@ fn test_unified_search_hybrid() -> iris::Result<()> {
 
     let req = SearchRequestBuilder::new().with_vector(vector_req).build();
 
-    let results = engine.search(req)?;
+    let results = engine.search(req).await?;
     println!("Vector Results: {:?}", results);
     assert!(!results.is_empty(), "Should return vector results");
 
     Ok(())
 }
 
-#[test]
-fn test_unified_search_hybrid_fusion() -> iris::Result<()> {
+#[tokio::test(flavor = "multi_thread")]
+async fn test_unified_search_hybrid_fusion() -> iris::Result<()> {
     let temp_dir = TempDir::new().unwrap();
     let storage_config = StorageConfig::File(FileStorageConfig::new(temp_dir.path()));
     let storage = StorageFactory::create(storage_config)?;
@@ -87,7 +87,7 @@ fn test_unified_search_hybrid_fusion() -> iris::Result<()> {
         )
         .build();
 
-    let engine = Engine::new(storage, config)?;
+    let engine = Engine::new(storage, config).await?;
 
     // Index documents where Lexical and Vector favorites differ
     // Doc 1: "Rust" in title, Vector [1, 0, 0]
@@ -98,15 +98,15 @@ fn test_unified_search_hybrid_fusion() -> iris::Result<()> {
             .add_field("title", "Rust")
             .add_field("embedding", vec![1.0, 0.0, 0.0])
             .build(),
-    )?;
+    ).await?;
     engine.put_document(
         "2",
         Document::builder()
             .add_field("title", "C++")
             .add_field("embedding", vec![0.0, 1.0, 0.0])
             .build(),
-    )?;
-    engine.commit()?;
+    ).await?;
+    engine.commit().await?;
 
     // Search for "Rust" (Lexical) AND [0, 1, 0] (Vector - matches Doc 2)
     use iris::FusionAlgorithm;
@@ -120,7 +120,7 @@ fn test_unified_search_hybrid_fusion() -> iris::Result<()> {
         .fusion(FusionAlgorithm::RRF { k: 60.0 })
         .build();
 
-    let results = engine.search(req)?;
+    let results = engine.search(req).await?;
 
     // In RRF, both Doc 1 and Doc 2 should be present because Doc 1 is top in Lexical, Doc 2 is top in Vector.
     assert_eq!(results.len(), 2);

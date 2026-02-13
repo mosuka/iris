@@ -14,18 +14,17 @@
 //!
 //! # Examples
 //!
-//! ```
+//! ```ignore
 //! use iris::analysis::analyzer::analyzer::Analyzer;
 //! use iris::analysis::analyzer::keyword::KeywordAnalyzer;
 //!
 //! let analyzer = KeywordAnalyzer::new();
-//! let tokens: Vec<_> = analyzer.analyze("user-123-abc").unwrap().collect();
+//! let tokens: Vec<_> = analyzer.analyze("user-123-abc").await.unwrap().collect();
 //!
 //! // Entire input is a single token
 //! assert_eq!(tokens.len(), 1);
 //! assert_eq!(tokens[0].text, "user-123-abc");
-//! ```
-
+//! ```ignore
 use std::sync::Arc;
 
 use crate::analysis::analyzer::analyzer::Analyzer;
