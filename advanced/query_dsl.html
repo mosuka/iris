@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Introduction - Iris Documentation</title>
+        <title>Query DSL - Iris Documentation</title>
 
 
         <!-- Custom HTML head -->
@@ -12,33 +12,33 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="theme-color" content="#ffffff">
 
-        <link rel="icon" href="favicon-de23e50b.svg">
-        <link rel="shortcut icon" href="favicon-8114d1fc.png">
-        <link rel="stylesheet" href="css/variables-8adf115d.css">
-        <link rel="stylesheet" href="css/general-2459343d.css">
-        <link rel="stylesheet" href="css/chrome-ae938929.css">
-        <link rel="stylesheet" href="css/print-9e4910d8.css" media="print">
+        <link rel="icon" href="../favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="../favicon-8114d1fc.png">
+        <link rel="stylesheet" href="../css/variables-8adf115d.css">
+        <link rel="stylesheet" href="../css/general-2459343d.css">
+        <link rel="stylesheet" href="../css/chrome-ae938929.css">
+        <link rel="stylesheet" href="../css/print-9e4910d8.css" media="print">
 
         <!-- Fonts -->
-        <link rel="stylesheet" href="fonts/fonts-9644e21d.css">
+        <link rel="stylesheet" href="../fonts/fonts-9644e21d.css">
 
         <!-- Highlight.js Stylesheets -->
-        <link rel="stylesheet" id="mdbook-highlight-css" href="highlight-493f70e1.css">
-        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="tomorrow-night-4c0ae647.css">
-        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="ayu-highlight-3fdfc3ac.css">
+        <link rel="stylesheet" id="mdbook-highlight-css" href="../highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="../tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="../ayu-highlight-3fdfc3ac.css">
 
         <!-- Custom theme stylesheets -->
 
 
         <!-- Provide site root and default themes to javascript -->
         <script>
-            const path_to_root = "";
+            const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-19c6610d.js";
+            window.path_to_searchindex_js = "../searchindex-19c6610d.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-75fc7776.js"></script>
+        <script src="../toc-75fc7776.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -105,7 +105,7 @@
             <!-- populated by js -->
             <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
             <noscript>
-                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
+                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
             </noscript>
             <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
                 <div class="sidebar-resize-indicator"></div>
@@ -140,7 +140,7 @@
                     <h1 class="menu-title">Iris Documentation</h1>
 
                     <div class="right-buttons">
-                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
                             <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
                         </a>
                         <a href="https://github.com/mosuka/iris" title="Git repository" aria-label="Git repository">
@@ -177,137 +177,261 @@
 
                 <div id="mdbook-content" class="content">
                     <main>
-                        <h1 id="iris"><a class="header" href="#iris">IRiS</a></h1>
-<p><a href="https://crates.io/crates/iris"><img src="https://img.shields.io/crates/v/iris.svg" alt="Crates.io"></a>
-<a href="https://docs.rs/iris"><img src="https://docs.rs/iris/badge.svg" alt="Documentation"></a>
-<a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a></p>
-<p>IRiS is a <strong>high-performance</strong> search core library written in Rust, designed for <strong>Information Retrieval with Semantics</strong>.</p>
-<p>IRiS provides the foundational mechanisms <strong>essential for</strong> advanced search capabilities:</p>
-<ul>
-<li><strong>Lexical search primitives</strong> for precise, exact-match retrieval</li>
-<li><strong>Vector-based similarity search</strong> for deep semantic understanding</li>
-<li><strong>Hybrid scoring and ranking</strong> to synthesize multiple signals into coherent results</li>
-</ul>
-<p>Rather than functioning as a monolithic search engine, IRiS is architected as a <strong>composable search core</strong> — a suite of modular building blocks designed to be embedded into applications, extended with custom logic, or orchestrated within distributed systems.</p>
-<h2 id="documentation"><a class="header" href="#documentation">Documentation</a></h2>
-<p>Comprehensive documentation is available in the <a href="https://github.com/mosuka/iris/tree/main/docs"><code>docs/</code></a> directory and online at <a href="https://mosuka.github.io/iris/">https://mosuka.github.io/iris/</a>:</p>
-<ul>
-<li><a href="https://mosuka.github.io/iris/getting_started/index.html"><strong>Getting Started</strong></a>: Installation and basic usage.</li>
-<li><a href="https://mosuka.github.io/iris/concepts/index.html"><strong>Core Concepts</strong></a>: Architecture, Lexical Search, and Vector Search.</li>
-<li><a href="https://mosuka.github.io/iris/advanced/index.html"><strong>Advanced Features</strong></a>: ID Management, Persistence, and Deletions.</li>
-<li><a href="https://docs.rs/iris"><strong>API Reference</strong></a></li>
-</ul>
-<h2 id="features"><a class="header" href="#features">Features</a></h2>
-<ul>
-<li><strong>Pure Rust Implementation</strong>: Memory-safe and fast performance with zero-cost abstractions.</li>
-<li><strong>Hybrid Search</strong>: Seamlessly combine BM25 lexical search with HNSW vector search using configurable fusion strategies.</li>
-<li><strong>Multimodal capabilities</strong>: Native support for text-to-image and image-to-image search via CLIP embeddings.</li>
-<li><strong>Rich Query DSL</strong>: Term, phrase, boolean, fuzzy, wildcard, range, and geographic queries.</li>
-<li><strong>Flexible Analysis</strong>: Configurable pipelines for tokenization, normalization, and stemming (including CJK support).</li>
-<li><strong>Pluggable Storage</strong>: Interfaces for in-memory, file-system, and memory-mapped storage backends.</li>
-</ul>
-<h2 id="quick-start"><a class="header" href="#quick-start">Quick Start</a></h2>
-<pre class="playground"><code class="language-rust">use iris::{Document, Engine, FieldOption, FusionAlgorithm, Schema, SearchRequestBuilder};
-use iris::analysis::analyzer::standard::StandardAnalyzer;
-use iris::lexical::{FieldOption as LexicalFieldOption, TextOption, TermQuery};
-use iris::vector::{FlatOption, VectorOption, VectorSearchRequestBuilder};
-use iris::storage::{StorageConfig, StorageFactory};
-use iris::storage::memory::MemoryStorageConfig;
-use std::sync::Arc;
+                        <h1 id="query-dsl"><a class="header" href="#query-dsl">Query DSL</a></h1>
+<p>Iris provides a unified query DSL (Domain Specific Language) that allows lexical (keyword) and vector (semantic) search in a single query string. The <code>UnifiedQueryParser</code> splits the input into lexical and vector portions and delegates to the appropriate sub-parser.</p>
+<h2 id="overview"><a class="header" href="#overview">Overview</a></h2>
+<pre><code class="language-text">title:hello AND content:~"cute kitten"^0.8
+|--- lexical --|    |--- vector --------|
+</code></pre>
+<p>The <code>~"</code> pattern distinguishes vector clauses from lexical clauses. Everything else is treated as a lexical query.</p>
+<h2 id="lexical-query-syntax"><a class="header" href="#lexical-query-syntax">Lexical Query Syntax</a></h2>
+<p>Lexical queries search the inverted index using exact or approximate keyword matching.</p>
+<h3 id="term-query"><a class="header" href="#term-query">Term Query</a></h3>
+<p>Match a single term against a field (or the default field):</p>
+<pre><code class="language-text">hello
+title:hello
+</code></pre>
+<h3 id="boolean-operators"><a class="header" href="#boolean-operators">Boolean Operators</a></h3>
+<p>Combine clauses with <code>AND</code> and <code>OR</code> (case-insensitive):</p>
+<pre><code class="language-text">title:hello AND body:world
+title:hello OR title:goodbye
+</code></pre>
+<p>Space-separated clauses without an explicit operator use implicit boolean (behaves like OR with scoring).</p>
+<h3 id="required--prohibited-clauses"><a class="header" href="#required--prohibited-clauses">Required / Prohibited Clauses</a></h3>
+<p>Use <code>+</code> (must match) and <code>-</code> (must not match):</p>
+<pre><code class="language-text">+title:hello -title:goodbye
+</code></pre>
+<h3 id="phrase-query"><a class="header" href="#phrase-query">Phrase Query</a></h3>
+<p>Match an exact phrase using double quotes. Optional proximity (<code>~N</code>) allows N words between terms:</p>
+<pre><code class="language-text">"hello world"
+"hello world"~2
+</code></pre>
+<h3 id="fuzzy-query"><a class="header" href="#fuzzy-query">Fuzzy Query</a></h3>
+<p>Approximate matching with edit distance. Append <code>~</code> and optionally the maximum edit distance:</p>
+<pre><code class="language-text">roam~
+roam~2
+</code></pre>
+<h3 id="wildcard-query"><a class="header" href="#wildcard-query">Wildcard Query</a></h3>
+<p>Use <code>?</code> (single character) and <code>*</code> (zero or more characters):</p>
+<pre><code class="language-text">te?t
+test*
+</code></pre>
+<h3 id="range-query"><a class="header" href="#range-query">Range Query</a></h3>
+<p>Inclusive <code>[]</code> or exclusive <code>{}</code> ranges, useful for numeric and date fields:</p>
+<pre><code class="language-text">price:[100 TO 500]
+date:{2024-01-01 TO 2024-12-31}
+price:[* TO 100]
+</code></pre>
+<h3 id="boost"><a class="header" href="#boost">Boost</a></h3>
+<p>Increase the weight of a clause with <code>^</code>:</p>
+<pre><code class="language-text">title:hello^2
+"important phrase"^1.5
+</code></pre>
+<h3 id="grouping"><a class="header" href="#grouping">Grouping</a></h3>
+<p>Use parentheses for sub-expressions:</p>
+<pre><code class="language-text">(title:hello OR title:hi) AND body:world
+</code></pre>
+<h3 id="peg-grammar"><a class="header" href="#peg-grammar">PEG Grammar</a></h3>
+<p>The full lexical grammar (<a href="https://github.com/mosuka/iris/blob/main/src/lexical/query/parser.pest">parser.pest</a>):</p>
+<pre><code class="language-pest">query          = { SOI ~ boolean_query ~ EOI }
+boolean_query  = { clause ~ (boolean_op ~ clause | clause)* }
+clause         = { required_clause | prohibited_clause | sub_clause }
+required_clause   = { "+" ~ sub_clause }
+prohibited_clause = { "-" ~ sub_clause }
+sub_clause     = { grouped_query | field_query | term_query }
+grouped_query  = { "(" ~ boolean_query ~ ")" ~ boost? }
+boolean_op     = { ^"AND" | ^"OR" }
+field_query    = { field ~ ":" ~ field_value }
+field_value    = { range_query | phrase_query | fuzzy_term
+                 | wildcard_term | simple_term }
+phrase_query   = { "\"" ~ phrase_content ~ "\"" ~ proximity? ~ boost? }
+proximity      = { "~" ~ number }
+fuzzy_term     = { term ~ "~" ~ fuzziness? ~ boost? }
+wildcard_term  = { wildcard_pattern ~ boost? }
+simple_term    = { term ~ boost? }
+boost          = { "^" ~ boost_value }
+</code></pre>
+<h2 id="vector-query-syntax"><a class="header" href="#vector-query-syntax">Vector Query Syntax</a></h2>
+<p>Vector queries embed text into vectors at parse time and perform similarity search.</p>
+<h3 id="basic-syntax"><a class="header" href="#basic-syntax">Basic Syntax</a></h3>
+<pre><code class="language-text">field:~"text"
+field:~"text"^weight
+</code></pre>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Element</th><th style="text-align: center">Required</th><th style="text-align: left">Description</th><th style="text-align: left">Example</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>field:</code></td><td style="text-align: center">No</td><td style="text-align: left">Target vector field name</td><td style="text-align: left"><code>content:</code></td></tr>
+<tr><td style="text-align: left"><code>~</code></td><td style="text-align: center"><strong>Yes</strong></td><td style="text-align: left">Vector query marker</td><td style="text-align: left"></td></tr>
+<tr><td style="text-align: left"><code>"text"</code></td><td style="text-align: center"><strong>Yes</strong></td><td style="text-align: left">Text to embed</td><td style="text-align: left"><code>"cute kitten"</code></td></tr>
+<tr><td style="text-align: left"><code>^weight</code></td><td style="text-align: center">No</td><td style="text-align: left">Score weight (default: 1.0)</td><td style="text-align: left"><code>^0.8</code></td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="examples"><a class="header" href="#examples">Examples</a></h3>
+<pre><code class="language-text"># Single field
+content:~"cute kitten"
 
-fn main() -&gt; iris::Result&lt;()&gt; {
-    // 1. Create storage
-    let storage = StorageFactory::create(StorageConfig::Memory(MemoryStorageConfig::default()))?;
+# With boost weight
+content:~"cute kitten"^0.8
 
-    // 2. Define schema with separate lexical and vector fields
-    let schema = Schema::builder()
-        .add_field("content", FieldOption::Lexical(LexicalFieldOption::Text(TextOption::default())))
-        .add_field("content_vec", FieldOption::Vector(VectorOption::Flat(FlatOption { dimension: 384, ..Default::default() })))
-        .build();
+# Default field (when configured)
+~"cute kitten"
 
-    // 3. Create engine with analyzer and embedder
-    let engine = Engine::builder(storage, schema)
-        .analyzer(Arc::new(StandardAnalyzer::default()))
-        .embedder(Arc::new(MyEmbedder))  // Your embedder implementation
-        .build()?;
+# Multiple clauses
+content:~"cats" image:~"dogs"^0.5
 
-    engine.index(
-        Document::new_with_id("doc1")
-            .add_text("content", "Rust is a systems programming language")
-            .add_text("content_vec", "Rust is a systems programming language")
-    )?;
-    engine.index(
-        Document::new_with_id("doc2")
-            .add_text("content", "Python is great for machine learning")
-            .add_text("content_vec", "Python is great for machine learning")
-    )?;
-    engine.commit()?;
-
-    // 4. Hybrid search (combines lexical keyword match + semantic similarity)
-    let results = engine.search(
-        SearchRequestBuilder::new()
-            .with_lexical(Box::new(TermQuery::new("content", "programming")))
-            .with_vector(VectorSearchRequestBuilder::new().add_text("content_vec", "systems language").build())
-            .fusion(FusionAlgorithm::RRF { k: 60.0 })
-            .build()
-    )?;
-
-    // 5. Display results with document content
-    for hit in results {
-        if let Ok(Some(doc)) = engine.get_document(hit.doc_id) {
-            let id = doc.id().unwrap_or("unknown");
-            let content = doc.fields.get("content").and_then(|v| v.as_text()).unwrap_or("");
-            println!("[{}] {} (internal_id={}, score={:.4})", id, content, hit.doc_id, hit.score);
-        }
-    }
-
-    Ok(())
-}</code></pre>
-<h2 id="examples"><a class="header" href="#examples">Examples</a></h2>
-<p>You can find usage examples in the <a href="https://github.com/mosuka/iris/tree/main/examples"><code>examples/</code></a> directory:</p>
-<h3 id="search"><a class="header" href="#search">Search</a></h3>
-<ul>
-<li><a href="https://github.com/mosuka/iris/blob/main/examples/search.rs">Unified Search</a> - Lexical, Vector, and Hybrid search in one cohesive example</li>
-<li><a href="https://github.com/mosuka/iris/blob/main/examples/multimodal_search.rs">Multimodal Search</a> - Text-to-image and image-to-image search</li>
-</ul>
-<h3 id="query-types"><a class="header" href="#query-types">Query Types</a></h3>
-<ul>
-<li><a href="https://github.com/mosuka/iris/blob/main/examples/term_query.rs">Term Query</a> - Basic keyword search</li>
-<li><a href="https://github.com/mosuka/iris/blob/main/examples/boolean_query.rs">Boolean Query</a> - Complex boolean expressions (AND, OR, NOT)</li>
-<li><a href="https://github.com/mosuka/iris/blob/main/examples/phrase_query.rs">Phrase Query</a> - Exact phrase matching</li>
-<li><a href="https://github.com/mosuka/iris/blob/main/examples/fuzzy_query.rs">Fuzzy Query</a> - Approximate string matching</li>
-<li><a href="https://github.com/mosuka/iris/blob/main/examples/wildcard_query.rs">Wildcard Query</a> - Pattern-based search</li>
-<li><a href="https://github.com/mosuka/iris/blob/main/examples/range_query.rs">Range Query</a> - Numeric and date range queries</li>
-<li><a href="https://github.com/mosuka/iris/blob/main/examples/geo_query.rs">Geo Query</a> - Geographic search</li>
-<li><a href="https://github.com/mosuka/iris/blob/main/examples/span_query.rs">Span Query</a> - Positional queries</li>
-</ul>
-<h3 id="embeddings"><a class="header" href="#embeddings">Embeddings</a></h3>
-<ul>
-<li><a href="https://github.com/mosuka/iris/blob/main/examples/embedding_with_candle.rs">Candle Embedder</a> - Local BERT embeddings</li>
-<li><a href="https://github.com/mosuka/iris/blob/main/examples/embedding_with_openai.rs">OpenAI Embedder</a> - Cloud-based embeddings</li>
-</ul>
-<h2 id="contributing"><a class="header" href="#contributing">Contributing</a></h2>
-<p>We welcome contributions! Please see our <a href="https://github.com/mosuka/iris/blob/main/CONTRIBUTING.md">Contributing Guidelines</a> for details.</p>
+# Nested field name (dot notation)
+metadata.embedding:~"text"
+</code></pre>
+<h3 id="multiple-clauses"><a class="header" href="#multiple-clauses">Multiple Clauses</a></h3>
+<p>Multiple vector clauses are space-separated. All clauses are executed and their scores are combined using the <code>score_mode</code> (default: <code>WeightedSum</code>):</p>
+<pre><code class="language-text">content:~"cats" image:~"dogs"^0.5
+</code></pre>
+<p>This produces:</p>
+<pre><code class="language-text">score = similarity("cats", content) * 1.0
+      + similarity("dogs", image)   * 0.5
+</code></pre>
+<p>There are no <code>AND</code>/<code>OR</code> operators in the vector DSL. Vector search is inherently a ranking operation, and the weight (<code>^</code>) controls the contribution of each clause.</p>
+<h3 id="score-modes"><a class="header" href="#score-modes">Score Modes</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Mode</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>WeightedSum</code> (default)</td><td style="text-align: left">Sum of (similarity * weight) across all clauses</td></tr>
+<tr><td style="text-align: left"><code>MaxSim</code></td><td style="text-align: left">Maximum similarity score across clauses</td></tr>
+<tr><td style="text-align: left"><code>LateInteraction</code></td><td style="text-align: left">Late interaction scoring</td></tr>
+</tbody>
+</table>
+</div>
+<p>Score mode cannot be set from DSL syntax. Use the Rust API to override:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let mut request = parser.parse(r#"content:~"cats" image:~"dogs""#).await?;
+request.score_mode = VectorScoreMode::MaxSim;
+<span class="boring">}</span></code></pre>
+<h3 id="peg-grammar-1"><a class="header" href="#peg-grammar-1">PEG Grammar</a></h3>
+<p>The full vector grammar (<a href="https://github.com/mosuka/iris/blob/main/src/vector/query/parser.pest">parser.pest</a>):</p>
+<pre><code class="language-pest">query          = { SOI ~ vector_clause+ ~ EOI }
+vector_clause  = { field_prefix? ~ "~" ~ quoted_text ~ boost? }
+field_prefix   = { field_name ~ ":" }
+field_name     = @{ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_" | ".")* }
+quoted_text    = ${ "\"" ~ inner_text ~ "\"" }
+inner_text     = @{ (!("\"") ~ ANY)* }
+boost          = { "^" ~ float_value }
+float_value    = @{ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)? }
+</code></pre>
+<h2 id="unified-hybrid-query-syntax"><a class="header" href="#unified-hybrid-query-syntax">Unified (Hybrid) Query Syntax</a></h2>
+<p>The <code>UnifiedQueryParser</code> allows mixing lexical and vector clauses freely in a single query string:</p>
+<pre><code>title:hello content:~"cute kitten"^0.8
+</code></pre>
+<h3 id="how-it-works"><a class="header" href="#how-it-works">How It Works</a></h3>
 <ol>
-<li>Fork the repository</li>
-<li>Create a feature branch (<code>git checkout -b feature/amazing-feature</code>)</li>
-<li>Commit your changes (<code>git commit -m 'Add some amazing feature'</code>)</li>
-<li>Push to the branch (<code>git push origin feature/amazing-feature</code>)</li>
-<li>Open a Pull Request</li>
+<li><strong>Split</strong>: Vector clauses (matching <code>field:~"text"^boost</code> pattern) are extracted via regex.</li>
+<li><strong>Delegate</strong>: Vector portion goes to <code>VectorQueryParser</code>, remainder goes to lexical <code>QueryParser</code>.</li>
+<li><strong>Fuse</strong>: If both lexical and vector results exist, they are combined using a fusion algorithm.</li>
 </ol>
-<h2 id="license"><a class="header" href="#license">License</a></h2>
-<p>This project is licensed under either of</p>
-<ul>
-<li>MIT License (<a href="https://github.com/mosuka/iris/blob/main/LICENSE-MIT">LICENSE-MIT</a> or <a href="http://opensource.org/licenses/MIT">http://opensource.org/licenses/MIT</a>)</li>
-</ul>
-<p>at your option.</p>
+<h3 id="disambiguation"><a class="header" href="#disambiguation">Disambiguation</a></h3>
+<p>The <code>~"</code> pattern unambiguously identifies vector clauses because in lexical syntax, <code>~</code> only appears <em>after</em> a term or phrase (e.g., <code>roam~2</code>, <code>"hello world"~10</code>), never before a quote.</p>
+<h3 id="fusion-algorithms"><a class="header" href="#fusion-algorithms">Fusion Algorithms</a></h3>
+<p>When a query contains both lexical and vector clauses, results are fused:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Algorithm</th><th style="text-align: left">Formula</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><strong>RRF</strong> (default)</td><td style="text-align: left"><code>score = sum(1 / (k + rank))</code></td><td style="text-align: left">Reciprocal Rank Fusion. Robust to different score distributions. Default k=60.</td></tr>
+<tr><td style="text-align: left"><strong>WeightedSum</strong></td><td style="text-align: left"><code>score = lexical * a + vector * b</code></td><td style="text-align: left">Linear combination with configurable weights.</td></tr>
+</tbody>
+</table>
+</div>
+<blockquote>
+<p><strong>Note</strong>: The fusion algorithm cannot be specified in the DSL syntax. It is configured when constructing the <code>UnifiedQueryParser</code> via <code>.with_fusion()</code>. The default is RRF (k=60). See <a href="#custom-fusion">Custom Fusion</a> for a code example.</p>
+</blockquote>
+<h3 id="examples-1"><a class="header" href="#examples-1">Examples</a></h3>
+<pre><code># Lexical only — no fusion
+title:hello AND body:world
+
+# Vector only — no fusion
+content:~"cute kitten"
+
+# Hybrid — fusion applied automatically
+title:hello content:~"cute kitten"
+
+# Hybrid with boolean operators
+title:hello AND category:animal content:~"cute kitten"^0.8
+
+# Multiple vector clauses + lexical
+category:animal content:~"cats" image:~"dogs"^0.5
+
+# Default fields (when configured)
+hello ~"cats"
+</code></pre>
+<h2 id="code-examples"><a class="header" href="#code-examples">Code Examples</a></h2>
+<h3 id="lexical-search-with-dsl"><a class="header" href="#lexical-search-with-dsl">Lexical Search with DSL</a></h3>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use std::sync::Arc;
+use iris::analysis::analyzer::standard::StandardAnalyzer;
+use iris::lexical::query::QueryParser;
+
+let analyzer = Arc::new(StandardAnalyzer::new()?);
+let parser = QueryParser::new(analyzer)
+    .with_default_field("title");
+
+let query = parser.parse("title:hello AND body:world")?;
+<span class="boring">}</span></code></pre>
+<h3 id="vector-search-with-dsl"><a class="header" href="#vector-search-with-dsl">Vector Search with DSL</a></h3>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use std::sync::Arc;
+use iris::vector::query::VectorQueryParser;
+
+let parser = VectorQueryParser::new(embedder)
+    .with_default_field("content");
+
+let request = parser.parse(r#"content:~"cute kitten"^0.8"#).await?;
+<span class="boring">}</span></code></pre>
+<h3 id="hybrid-search-with-unified-dsl"><a class="header" href="#hybrid-search-with-unified-dsl">Hybrid Search with Unified DSL</a></h3>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use iris::engine::query::UnifiedQueryParser;
+
+let unified = UnifiedQueryParser::new(lexical_parser, vector_parser);
+
+let request = unified.parse(
+    r#"title:hello content:~"cute kitten"^0.8"#
+).await?;
+// request.lexical  -&gt; Some(...)  — lexical query
+// request.vector   -&gt; Some(...)  — vector query
+// request.fusion   -&gt; Some(RRF)  — fusion algorithm
+<span class="boring">}</span></code></pre>
+<h3 id="custom-fusion"><a class="header" href="#custom-fusion">Custom Fusion</a></h3>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use iris::engine::search::FusionAlgorithm;
+
+let unified = UnifiedQueryParser::new(lexical_parser, vector_parser)
+    .with_fusion(FusionAlgorithm::WeightedSum {
+        lexical_weight: 0.3,
+        vector_weight: 0.7,
+    });
+<span class="boring">}</span></code></pre>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../advanced.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                            </a>
 
-                            <a rel="next prefetch" href="getting_started.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="../advanced/id_management.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                             </a>
 
@@ -317,8 +441,11 @@ fn main() -&gt; iris::Result&lt;()&gt; {
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../advanced.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                    </a>
 
-                    <a rel="next prefetch" href="getting_started.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="../advanced/id_management.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                     </a>
             </nav>
@@ -338,17 +465,17 @@ fn main() -&gt; iris::Result&lt;()&gt; {
         </script>
 
 
-        <script src="elasticlunr-ef4e11c1.min.js"></script>
-        <script src="mark-09e88c2c.min.js"></script>
-        <script src="searcher-c2a407aa.js"></script>
+        <script src="../elasticlunr-ef4e11c1.min.js"></script>
+        <script src="../mark-09e88c2c.min.js"></script>
+        <script src="../searcher-c2a407aa.js"></script>
 
-        <script src="clipboard-1626706a.min.js"></script>
-        <script src="highlight-abc7f01d.js"></script>
-        <script src="book-a0b12cfe.js"></script>
+        <script src="../clipboard-1626706a.min.js"></script>
+        <script src="../highlight-abc7f01d.js"></script>
+        <script src="../book-a0b12cfe.js"></script>
 
         <!-- Custom JS scripts -->
-        <script src="mermaid-9a6dd17b.min.js"></script>
-        <script src="mermaid-init-ddddd38b.js"></script>
+        <script src="../mermaid-9a6dd17b.min.js"></script>
+        <script src="../mermaid-init-ddddd38b.js"></script>
 
 
 
