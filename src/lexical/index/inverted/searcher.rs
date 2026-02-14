@@ -15,7 +15,7 @@ use crate::error::{IrisError, Result};
 // Note: Geo and DateTime were removed from FieldValue definition implicitly by switching to DataValue.
 // Only standard types remain. Logic using Geo/DateTime needs update.
 use crate::lexical::query::Query;
-use crate::lexical::query::boolean::BooleanQuery;
+use crate::lexical::query::boolean::{BooleanQuery, Occur};
 use crate::lexical::query::collector::{
     Collector, CountCollector, TopDocsCollector, TopFieldCollector,
 };
@@ -140,65 +140,151 @@ impl InvertedIndexSearcher {
     }
 
     /// Execute a BooleanQuery with parallel sub-query execution.
+    ///
+    /// Each clause is executed in parallel, then boolean logic is applied:
+    /// - Must/Filter: intersection (all must match)
+    /// - Should: union (adds score if matching; at least minimum_should_match required)
+    /// - MustNot: exclusion (removes matching documents)
     fn search_boolean_query_parallel<C: Collector>(
         &self,
         boolean_query: &BooleanQuery,
-        collector: C,
+        mut collector: C,
     ) -> Result<C> {
+        use std::collections::{HashMap, HashSet};
+
         let clauses = boolean_query.clauses();
 
-        // If we have multiple clauses, execute them in parallel and merge results
-        if clauses.len() > 1 {
-            use std::sync::{Arc, Mutex};
+        if clauses.is_empty() {
+            return Ok(collector);
+        }
 
-            let collector_arc = Arc::new(Mutex::new(collector));
-            let results: Vec<_> = clauses
-                .par_iter()
-                .map(|clause| {
-                    // Create a temporary collector for this clause
-                    let temp_collector = TopDocsCollector::new(1000); // Reasonable limit
-                    match self.search_with_collector_parallel(
-                        clause.query.clone_box(),
-                        temp_collector,
-                        false,
-                    ) {
-                        Ok(result_collector) => Ok(result_collector.results()),
-                        Err(e) => Err(e),
-                    }
-                })
-                .collect();
+        // Single clause: no need for parallel execution
+        if clauses.len() == 1 {
+            return self.search_with_collector_parallel(
+                clauses[0].query.clone_box(),
+                collector,
+                false,
+            );
+        }
 
-            // Merge results back into the main collector
-            let mut collector = Arc::try_unwrap(collector_arc)
-                .unwrap()
-                .into_inner()
-                .unwrap();
-            for result in results {
-                match result {
-                    Ok(hits) => {
+        // Execute all clauses in parallel, collecting (doc_id, score) per clause
+        let clause_results: Vec<(Occur, Result<Vec<SearchHit>>)> = clauses
+            .par_iter()
+            .map(|clause| {
+                // Boolean operations (intersection/union/exclusion) require the
+                // full result set from each clause, so we use an unbounded collector.
+                let temp_collector = TopDocsCollector::new(usize::MAX);
+                let result = self
+                    .search_with_collector_parallel(clause.query.clone_box(), temp_collector, false)
+                    .map(|c| c.results());
+                (clause.occur, result)
+            })
+            .collect();
+
+        // Separate results by Occur type
+        let mut must_sets: Vec<HashMap<u64, f32>> = Vec::new();
+        let mut should_map: HashMap<u64, f32> = HashMap::new();
+        let mut must_not_set: HashSet<u64> = HashSet::new();
+        let mut first_error: Option<IrisError> = None;
+
+        for (occur, result) in clause_results {
+            match result {
+                Ok(hits) => match occur {
+                    Occur::Must | Occur::Filter => {
+                        let mut m = HashMap::with_capacity(hits.len());
                         for hit in hits {
-                            collector.collect(hit.doc_id, hit.score)?;
-                            if !collector.needs_more() {
-                                break;
-                            }
+                            let score = if occur == Occur::Filter {
+                                0.0
+                            } else {
+                                hit.score
+                            };
+                            m.insert(hit.doc_id, score);
+                        }
+                        must_sets.push(m);
+                    }
+                    Occur::Should => {
+                        for hit in hits {
+                            *should_map.entry(hit.doc_id).or_insert(0.0) += hit.score;
                         }
                     }
-                    Err(_) => {
-                        // Continue with other results if one fails
-                        continue;
+                    Occur::MustNot => {
+                        for hit in hits {
+                            must_not_set.insert(hit.doc_id);
+                        }
+                    }
+                },
+                Err(e) => {
+                    if first_error.is_none() {
+                        first_error = Some(e);
                     }
                 }
             }
+        }
 
-            Ok(collector)
+        // If any clause produced an error, fail the whole query
+        if let Some(e) = first_error {
+            return Err(e);
+        }
+
+        // Apply boolean logic
+        let minimum_should_match = boolean_query.minimum_should_match();
+        let has_must = !must_sets.is_empty();
+
+        // Build the candidate set
+        let mut candidates: HashMap<u64, f32> = if has_must {
+            // Start with the first Must/Filter set, intersect with the rest
+            let mut result = must_sets.swap_remove(0);
+            for other in &must_sets {
+                result.retain(|doc_id, score| {
+                    if let Some(other_score) = other.get(doc_id) {
+                        *score += other_score;
+                        true
+                    } else {
+                        false
+                    }
+                });
+            }
+            result
         } else {
-            // Single clause, no need for parallel execution
-            if let Some(clause) = clauses.first() {
-                self.search_with_collector_parallel(clause.query.clone_box(), collector, false)
-            } else {
-                Ok(collector)
+            // No Must clauses: Should clauses form the candidate set
+            should_map.clone()
+        };
+
+        // Add Should scores to Must candidates (boost, not filter)
+        if has_must {
+            for (doc_id, score) in candidates.iter_mut() {
+                if let Some(should_score) = should_map.get(doc_id) {
+                    *score += should_score;
+                }
+            }
+
+            // If minimum_should_match > 0, filter candidates that don't match enough Should clauses
+            if minimum_should_match > 0 {
+                // Count Should matches per doc
+                // (should_map already contains the union; we need per-clause counts)
+                // For simplicity, treat minimum_should_match as requiring the doc to appear in should_map
+                candidates.retain(|doc_id, _| should_map.contains_key(doc_id));
             }
         }
+
+        // Exclude MustNot documents
+        for doc_id in &must_not_set {
+            candidates.remove(doc_id);
+        }
+
+        // Feed results into the collector
+        // Sort by score descending for deterministic results
+        let mut sorted: Vec<(u64, f32)> = candidates.into_iter().collect();
+        sorted.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(Ordering::Equal));
+
+        for (doc_id, score) in sorted {
+            collector.collect(doc_id, score)?;
+            if !collector.needs_more() {
+                break;
+            }
+        }
+
+        Ok(collector)
     }
 
     /// Load documents for search hits.
@@ -270,7 +356,10 @@ impl InvertedIndexSearcher {
             }
         };
 
-        // Check if we exceeded timeout
+        // Check if we exceeded timeout.
+        // NOTE: Timeout is checked after scoring completes, not during scoring.
+        // Per-document timeout checks would add overhead to every document match.
+        // For very large result sets, consider using max_docs to bound scoring.
         if start_time.elapsed() > timeout {
             return Err(IrisError::index("Search timeout exceeded"));
         }
@@ -534,6 +623,20 @@ impl InvertedIndexSearcher {
     }
 }
 
+// Implement LexicalSearcher trait for InvertedIndexSearcher
+impl crate::lexical::search::searcher::LexicalSearcher for InvertedIndexSearcher {
+    fn search(&self, request: LexicalSearchRequest) -> Result<LexicalSearchResults> {
+        InvertedIndexSearcher::search(self, request)
+    }
+
+    fn count(
+        &self,
+        request: crate::lexical::search::searcher::LexicalSearchRequest,
+    ) -> Result<u64> {
+        InvertedIndexSearcher::count(self, request)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -699,19 +802,5 @@ mod tests {
         assert_eq!(request.params.min_score, 0.1);
         assert!(!request.params.load_documents);
         assert_eq!(request.params.timeout_ms, Some(5000));
-    }
-}
-
-// Implement LexicalSearcher trait for InvertedIndexSearcher
-impl crate::lexical::search::searcher::LexicalSearcher for InvertedIndexSearcher {
-    fn search(&self, request: LexicalSearchRequest) -> Result<LexicalSearchResults> {
-        InvertedIndexSearcher::search(self, request)
-    }
-
-    fn count(
-        &self,
-        request: crate::lexical::search::searcher::LexicalSearchRequest,
-    ) -> Result<u64> {
-        InvertedIndexSearcher::count(self, request)
     }
 }

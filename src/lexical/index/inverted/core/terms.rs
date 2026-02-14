@@ -194,8 +194,10 @@ impl TermsEnum for Box<dyn TermsEnum> {
 // Concrete Implementations for InvertedIndex
 // ============================================================================
 
-use crate::lexical::index::structures::dictionary::{HybridTermDictionary, TermInfo};
+use std::collections::BTreeMap;
 use std::sync::Arc;
+
+use crate::lexical::index::structures::dictionary::{HybridTermDictionary, TermInfo};
 
 /// Iterator over terms in a term dictionary.
 pub struct InvertedIndexTermsEnum {
@@ -373,5 +375,160 @@ impl Terms for InvertedIndexTerms {
 
     fn sum_total_term_freq(&self) -> Option<u64> {
         self.sum_total_term_freq
+    }
+}
+
+// ============================================================================
+// Multi-segment merged Terms implementation
+// ============================================================================
+
+/// Terms merged from multiple segment term dictionaries.
+///
+/// Collects terms from all segments, accumulating `doc_freq` and
+/// `total_term_freq` for the same term across segments.
+pub struct MergedInvertedIndexTerms {
+    /// Sorted merged terms: (term_text, doc_freq, total_term_freq).
+    merged: Vec<(String, u64, u64)>,
+    // Pre-computed statistics.
+    size: u64,
+    sum_doc_freq: u64,
+    sum_total_term_freq: u64,
+}
+
+impl MergedInvertedIndexTerms {
+    /// Create merged terms for `field` from multiple dictionaries.
+    pub fn new(field: &str, dicts: &[Arc<HybridTermDictionary>]) -> Self {
+        let field_prefix = format!("{}:", field);
+        let mut map: BTreeMap<String, (u64, u64)> = BTreeMap::new();
+
+        for dict in dicts {
+            for (term, info) in dict.iter() {
+                if let Some(term_text) = term.strip_prefix(&field_prefix) {
+                    let entry = map.entry(term_text.to_string()).or_insert((0, 0));
+                    entry.0 += info.doc_frequency;
+                    entry.1 += info.total_frequency;
+                }
+            }
+        }
+
+        let mut merged = Vec::with_capacity(map.len());
+        let mut sum_doc_freq = 0u64;
+        let mut sum_total_term_freq = 0u64;
+
+        for (term, (df, ttf)) in map {
+            sum_doc_freq += df;
+            sum_total_term_freq += ttf;
+            merged.push((term, df, ttf));
+        }
+
+        MergedInvertedIndexTerms {
+            size: merged.len() as u64,
+            merged,
+            sum_doc_freq,
+            sum_total_term_freq,
+        }
+    }
+}
+
+impl Terms for MergedInvertedIndexTerms {
+    fn iterator(&self) -> Result<Box<dyn TermsEnum>> {
+        Ok(Box::new(MergedTermsEnum {
+            terms: self.merged.clone(),
+            position: 0,
+            current: None,
+        }))
+    }
+
+    fn size(&self) -> Option<u64> {
+        Some(self.size)
+    }
+
+    fn sum_doc_freq(&self) -> Option<u64> {
+        Some(self.sum_doc_freq)
+    }
+
+    fn sum_total_term_freq(&self) -> Option<u64> {
+        Some(self.sum_total_term_freq)
+    }
+}
+
+/// TermsEnum backed by a pre-merged sorted term list.
+struct MergedTermsEnum {
+    terms: Vec<(String, u64, u64)>,
+    position: usize,
+    current: Option<TermStats>,
+}
+
+impl TermsEnum for MergedTermsEnum {
+    fn next(&mut self) -> Result<Option<TermStats>> {
+        if self.position >= self.terms.len() {
+            self.current = None;
+            return Ok(None);
+        }
+        let (term, df, ttf) = &self.terms[self.position];
+        let stats = TermStats {
+            term: term.clone(),
+            doc_freq: *df,
+            total_term_freq: *ttf,
+        };
+        self.current = Some(stats.clone());
+        self.position += 1;
+        Ok(Some(stats))
+    }
+
+    fn seek(&mut self, target: &str) -> Result<bool> {
+        let result = self
+            .terms
+            .binary_search_by(|(t, _, _)| t.as_str().cmp(target));
+        match result {
+            Ok(idx) => {
+                self.position = idx;
+                let (term, df, ttf) = &self.terms[idx];
+                self.current = Some(TermStats {
+                    term: term.clone(),
+                    doc_freq: *df,
+                    total_term_freq: *ttf,
+                });
+                Ok(true)
+            }
+            Err(idx) => {
+                self.position = idx;
+                if idx < self.terms.len() {
+                    let (term, df, ttf) = &self.terms[idx];
+                    self.current = Some(TermStats {
+                        term: term.clone(),
+                        doc_freq: *df,
+                        total_term_freq: *ttf,
+                    });
+                }
+                Ok(false)
+            }
+        }
+    }
+
+    fn seek_exact(&mut self, term: &str) -> Result<bool> {
+        let result = self
+            .terms
+            .binary_search_by(|(t, _, _)| t.as_str().cmp(term));
+        match result {
+            Ok(idx) => {
+                self.position = idx;
+                let (term, df, ttf) = &self.terms[idx];
+                self.current = Some(TermStats {
+                    term: term.clone(),
+                    doc_freq: *df,
+                    total_term_freq: *ttf,
+                });
+                Ok(true)
+            }
+            Err(_) => {
+                self.current = None;
+                Ok(false)
+            }
+        }
+    }
+
+    fn current(&self) -> Option<&TermStats> {
+        self.current.as_ref()
     }
 }

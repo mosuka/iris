@@ -106,6 +106,7 @@ impl std::fmt::Debug for OpenAIEmbedder {
         f.debug_struct("OpenAIEmbedder")
             .field("model", &self.model)
             .field("dimension", &self.dimension)
+            .field("api_key", &"[REDACTED]")
             .finish()
     }
 }

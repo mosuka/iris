@@ -182,12 +182,11 @@ fn print_results(results: &LexicalSearchResults) {
     println!("Found {} hits:", results.total_hits);
     for (i, hit) in results.hits.iter().enumerate() {
         println!("{}. Doc ID: {}, Score: {:.4}", i + 1, hit.doc_id, hit.score);
-        if let Some(doc) = &hit.document {
-            if let Some(field) = doc.get_field("title")
-                && let DataValue::Text(title) = field
-            {
-                println!("   Title: {}", title);
-            }
+        if let Some(doc) = &hit.document
+            && let Some(field) = doc.get_field("title")
+            && let DataValue::Text(title) = field
+        {
+            println!("   Title: {}", title);
         }
     }
 }

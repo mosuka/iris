@@ -140,7 +140,7 @@ pub trait Analyzer: Send + Sync + std::fmt::Debug {
     /// let analyzer = StandardAnalyzer::new().unwrap();
     /// assert_eq!(analyzer.name(), "standard");
     /// ```
-    fn name(&self) -> &'static str;
+    fn name(&self) -> &str;
 
     /// Provide access to the concrete type for downcasting.
     ///

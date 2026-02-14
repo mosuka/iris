@@ -137,9 +137,11 @@ mod tests {
     #[test]
     fn test_simple_merge_policy_candidates() {
         let policy = SimpleMergePolicy::new();
-        let mut config = SegmentManagerConfig::default();
-        config.max_segments = 5;
-        config.merge_factor = 3;
+        let config = SegmentManagerConfig {
+            max_segments: 5,
+            merge_factor: 3,
+            ..Default::default()
+        };
 
         // Case 1: Not enough segments
         let segments = vec![create_info("1", 100), create_info("2", 100)];

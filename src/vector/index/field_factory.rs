@@ -95,9 +95,10 @@ impl VectorFieldFactory {
             }
         };
 
-        let embedding_writer = EmbeddingVectorIndexWriter::new(inner_writer, embedder);
-        let writer: Arc<dyn VectorFieldWriter> =
-            Arc::new(LegacyVectorFieldWriter::new(field_name, embedding_writer));
+        let embedding_writer = EmbeddingVectorIndexWriter::new(inner_writer, embedder.clone());
+        let writer: Arc<dyn VectorFieldWriter> = Arc::new(
+            LegacyVectorFieldWriter::new(field_name, embedding_writer).with_embedder(embedder),
+        );
 
         Ok(writer)
     }

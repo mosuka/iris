@@ -480,9 +480,11 @@ mod tests {
     #[test]
     fn test_check_merge() {
         let storage = Arc::new(MemoryStorage::new(MemoryStorageConfig::default()));
-        let mut config = SegmentManagerConfig::default();
-        config.max_segments = 5;
-        config.merge_factor = 3;
+        let config = SegmentManagerConfig {
+            max_segments: 5,
+            merge_factor: 3,
+            ..Default::default()
+        };
 
         // We use a temporary config for the manager
         let manager = SegmentManager::new(config, storage).unwrap();

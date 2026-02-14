@@ -34,7 +34,7 @@
 //! assert_eq!(tokens[0].text, "hello");
 //! assert_eq!(tokens[1].text, "world");
 //! assert_eq!(tokens[2].text, "test");
-//! ```ignore
+//! ```
 use std::sync::Arc;
 
 use crate::analysis::analyzer::analyzer::Analyzer;
@@ -141,10 +141,8 @@ impl Analyzer for PipelineAnalyzer {
         Ok(tokens)
     }
 
-    fn name(&self) -> &'static str {
-        // We can't return a reference to self.name because it's not static
-        // Instead, we'll use a default name
-        "pipeline"
+    fn name(&self) -> &str {
+        &self.name
     }
 
     fn as_any(&self) -> &dyn std::any::Any {
@@ -170,9 +168,8 @@ impl PipelineAnalyzer {
                 // If original was longer (orig: 5, new: 3), we added 2 to get to original.
                 // If original was shorter (orig: 3, new: 5), we subtract 2.
                 // corrected = corrected - new_len + original_len
-                // Note: using isize to avoid underflow during calculation, though final result must be usize
-                corrected =
-                    (corrected as isize - new_len as isize + original_len as isize) as usize;
+                // Use saturating arithmetic to prevent underflow wrapping to a huge usize.
+                corrected = corrected.saturating_sub(new_len).saturating_add(original_len);
             } else if offset >= t.new_start {
                 // The point falls STRICTLY inside distinct transformation (new_start <= offset < new_end).
                 // Or if offset == new_end? Captured by first branch if >=.

@@ -84,11 +84,11 @@ impl Engine {
                     let stored_doc = self.filter_stored_fields(&document);
                     self.log.store_document(doc_id, stored_doc);
 
-                    // Re-index into both stores using the recorded doc_id
+                    // Re-index into both stores using the recorded doc_id.
+                    // Update seq only after BOTH stores succeed to maintain atomicity.
                     if record.seq > lexical_last_seq {
                         self.lexical
                             .upsert_document(doc_id, document.clone())?;
-                        self.lexical.set_last_wal_seq(record.seq)?;
                     }
 
                     if record.seq > vector_last_seq {
@@ -107,6 +107,13 @@ impl Engine {
                         self.vector
                             .upsert_document_by_internal_id(doc_id, vector_doc)
                             .await?;
+                    }
+
+                    // Both stores succeeded — now update seq trackers
+                    if record.seq > lexical_last_seq {
+                        self.lexical.set_last_wal_seq(record.seq)?;
+                    }
+                    if record.seq > vector_last_seq {
                         self.vector.set_last_wal_seq(record.seq);
                     }
                 }
@@ -117,12 +124,18 @@ impl Engine {
                     if record.seq > lexical_last_seq {
                         self.lexical
                             .delete_document_by_internal_id(doc_id)?;
-                        self.lexical.set_last_wal_seq(record.seq)?;
                     }
                     if record.seq > vector_last_seq {
                         self.vector
                             .delete_document_by_internal_id(doc_id)
                             .await?;
+                    }
+
+                    // Both stores succeeded — now update seq trackers
+                    if record.seq > lexical_last_seq {
+                        self.lexical.set_last_wal_seq(record.seq)?;
+                    }
+                    if record.seq > vector_last_seq {
                         self.vector.set_last_wal_seq(record.seq);
                     }
                 }
@@ -166,11 +179,7 @@ impl Engine {
         let stored_doc = self.filter_stored_fields(&doc);
         self.log.store_document(doc_id, stored_doc);
 
-        // 4. Update sub-stores sequence tracker
-        self.lexical.set_last_wal_seq(seq)?;
-        self.vector.set_last_wal_seq(seq);
-
-        // 5. Prepare vector document (extract vector fields only)
+        // 4. Prepare vector document (extract vector fields only)
         let mut vector_doc = Document::new();
         for (name, val) in &doc.fields {
             if self
@@ -183,11 +192,16 @@ impl Engine {
             }
         }
 
-        // 6. Index into Lexical and Vector stores
+        // 5. Index into Lexical and Vector stores
         self.lexical.upsert_document(doc_id, doc)?;
         self.vector
             .upsert_document_by_internal_id(doc_id, vector_doc)
             .await?;
+
+        // 6. Update sub-stores sequence tracker AFTER both stores succeed.
+        // This ensures failed index operations are retried on recovery.
+        self.lexical.set_last_wal_seq(seq)?;
+        self.vector.set_last_wal_seq(seq);
 
         Ok(doc_id)
     }
@@ -297,10 +311,10 @@ impl Engine {
 
     /// Resolve external ID from internal doc_id.
     fn resolve_external_id(&self, internal_id: u64) -> Result<String> {
-        if let Some(doc) = self.log.get_document(internal_id)? {
-            if let Some(id) = doc.fields.get("_id").and_then(|v| v.as_text()) {
-                return Ok(id.to_string());
-            }
+        if let Some(doc) = self.log.get_document(internal_id)?
+            && let Some(id) = doc.fields.get("_id").and_then(|v| v.as_text())
+        {
+            return Ok(id.to_string());
         }
         Ok(format!("unknown_{}", internal_id))
     }
@@ -310,7 +324,7 @@ impl Engine {
         schema: &Schema,
         analyzer: Option<Arc<dyn Analyzer>>,
         embedder: Option<Arc<dyn Embedder>>,
-    ) -> (LexicalIndexConfig, VectorIndexConfig) {
+    ) -> Result<(LexicalIndexConfig, VectorIndexConfig)> {
         // Construct Lexical Config
         let analyzer = analyzer.unwrap_or_else(|| Arc::new(StandardAnalyzer::new().unwrap()));
 
@@ -346,17 +360,13 @@ impl Engine {
 
         for (name, field_option) in &schema.fields {
             if let Some(vector_opt) = field_option.as_vector() {
-                vector_builder = vector_builder
-                    .add_field(name, vector_opt.clone())
-                    .unwrap_or_else(|e| panic!("Failed to add field '{}': {}", name, e));
+                vector_builder = vector_builder.add_field(name, vector_opt.clone())?;
             }
         }
 
-        let vector_config = vector_builder
-            .build()
-            .unwrap_or_else(|_| VectorIndexConfig::default());
+        let vector_config = vector_builder.build()?;
 
-        (lexical_config, vector_config)
+        Ok((lexical_config, vector_config))
     }
 
     /// Search the index.
@@ -680,7 +690,7 @@ impl EngineBuilder {
     /// Returns an error if the storage or index initialization fails.
     pub async fn build(self) -> Result<Engine> {
         let (lexical_config, vector_config) =
-            Engine::split_schema(&self.schema, self.analyzer, self.embedder);
+            Engine::split_schema(&self.schema, self.analyzer, self.embedder)?;
 
         let lexical_storage = Arc::new(PrefixedStorage::new("lexical", self.storage.clone()));
         let vector_storage = Arc::new(PrefixedStorage::new("vector", self.storage.clone()));

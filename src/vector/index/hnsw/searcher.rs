@@ -55,10 +55,8 @@ impl VectorIndexSearcher for HnswSearcher {
             return Ok(results);
         }
 
-        // Fallback to Linear Scan
+        // Fallback to Linear Scan (brute-force over all vectors)
         let mut results = VectorIndexSearchResults::new();
-
-        let ef_search = self.ef_search;
 
         let mut vector_ids = self.index_reader.vector_ids()?;
 
@@ -67,13 +65,12 @@ impl VectorIndexSearcher for HnswSearcher {
             vector_ids.retain(|(_, fname)| fname == field_name);
         }
 
-        let max_candidates = ef_search.min(vector_ids.len());
-        results.candidates_examined = max_candidates;
+        results.candidates_examined = vector_ids.len();
 
         let mut candidates: Vec<(u64, String, f32, f32, Vector)> =
-            Vec::with_capacity(max_candidates);
+            Vec::with_capacity(vector_ids.len());
 
-        for (doc_id, field_name) in vector_ids.iter().take(max_candidates) {
+        for (doc_id, field_name) in vector_ids.iter() {
             if let Ok(Some(vector)) = self.index_reader.get_vector(*doc_id, field_name) {
                 let similarity = self
                     .index_reader

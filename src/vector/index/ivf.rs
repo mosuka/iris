@@ -5,7 +5,8 @@ pub mod maintenance;
 pub mod reader;
 pub mod searcher;
 pub mod segment;
-pub mod tests;
+#[cfg(test)]
+mod tests;
 pub mod writer;
 
 use std::path::Path;
@@ -110,6 +111,14 @@ impl IvfIndex {
         }
 
         let metadata = Self::read_metadata(storage.as_ref(), name)?;
+
+        // Validate dimension consistency between stored metadata and config.
+        if metadata.dimension != 0 && metadata.dimension != config.dimension {
+            return Err(IrisError::index(format!(
+                "Dimension mismatch: stored {}, config {}",
+                metadata.dimension, config.dimension
+            )));
+        }
 
         Ok(IvfIndex {
             name: name.to_string(),
@@ -224,6 +233,9 @@ impl VectorIndex for IvfIndex {
         &self.storage
     }
 
+    /// Mark the index as closed.
+    ///
+    /// Callers must call `commit()` before `close()` to persist pending data.
     fn close(&self) -> Result<()> {
         self.closed.store(true, Ordering::SeqCst);
         Ok(())

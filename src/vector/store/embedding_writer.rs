@@ -216,9 +216,11 @@ mod tests {
     #[tokio::test]
     async fn test_embedding_writer() {
         let storage = Arc::new(MemoryStorage::new(MemoryStorageConfig::default()));
-        let mut index_config = FlatIndexConfig::default();
-        index_config.dimension = 3;
-        index_config.normalize_vectors = false;
+        let index_config = FlatIndexConfig {
+            dimension: 3,
+            normalize_vectors: false,
+            ..Default::default()
+        };
         let inner = Box::new(
             FlatIndexWriter::with_storage(
                 index_config,

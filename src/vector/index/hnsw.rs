@@ -111,6 +111,14 @@ impl HnswIndex {
 
         let metadata = Self::read_metadata(storage.as_ref(), name)?;
 
+        // Validate dimension consistency between stored metadata and config.
+        if metadata.dimension != 0 && metadata.dimension != config.dimension {
+            return Err(IrisError::index(format!(
+                "Dimension mismatch: stored {}, config {}",
+                metadata.dimension, config.dimension
+            )));
+        }
+
         Ok(HnswIndex {
             name: name.to_string(),
             storage,
@@ -225,6 +233,10 @@ impl VectorIndex for HnswIndex {
         &self.storage
     }
 
+    /// Mark the index as closed.
+    ///
+    /// Callers must call `commit()` before `close()` to persist pending data.
+    /// This method only sets the closed flag and releases resources.
     fn close(&self) -> Result<()> {
         self.closed.store(true, Ordering::SeqCst);
         Ok(())
@@ -266,4 +278,5 @@ impl VectorIndex for HnswIndex {
         Arc::clone(&self.config.embedder)
     }
 }
+#[cfg(test)]
 mod tests;

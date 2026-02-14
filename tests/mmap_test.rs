@@ -134,6 +134,10 @@ async fn test_mmap_mode_persistence_reload() {
         let results = engine.search(request).unwrap();
 
         assert_eq!(results.hits.len(), 1);
-        // We expect it to match the second vector.
+        // We expect it to match the second vector (doc_id=2, vector [0,1,0]).
+        assert_eq!(
+            results.hits[0].doc_id, 2,
+            "Top result should be doc_id=2 (exact match for [0,1,0])"
+        );
     }
 }

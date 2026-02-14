@@ -13,10 +13,12 @@ async fn test_segmented_field_manual_merge() -> Result<(), Box<dyn std::error::E
     // 1. Setup Storage and Manager with small constraints
     let storage = Arc::new(MemoryStorage::new(MemoryStorageConfig::default()));
 
-    let mut manager_config = SegmentManagerConfig::default();
-    manager_config.max_segments = 2; // Trigger merge when > 2
-    manager_config.merge_factor = 2; // Merge 2 segments at a time
-    manager_config.min_vectors_per_segment = 1; // Allow small segments
+    let manager_config = SegmentManagerConfig {
+        max_segments: 2,       // Trigger merge when > 2
+        merge_factor: 2,       // Merge 2 segments at a time
+        min_vectors_per_segment: 1, // Allow small segments
+        ..Default::default()
+    };
 
     let manager = Arc::new(SegmentManager::new(manager_config, storage.clone())?);
 
@@ -43,15 +45,15 @@ async fn test_segmented_field_manual_merge() -> Result<(), Box<dyn std::error::E
 
     // 3. Add vectors and flush to create segments
     // Segment 1
-    field.add_stored_vector(1, &StoredVector::new(vec![1.0, 0.0, 0.0, 0.0].into()), 0).await?;
+    field.add_stored_vector(1, &StoredVector::new(vec![1.0, 0.0, 0.0, 0.0]), 0).await?;
     field.flush().await?;
 
     // Segment 2
-    field.add_stored_vector(2, &StoredVector::new(vec![0.0, 1.0, 0.0, 0.0].into()), 0).await?;
+    field.add_stored_vector(2, &StoredVector::new(vec![0.0, 1.0, 0.0, 0.0]), 0).await?;
     field.flush().await?;
 
     // Segment 3
-    field.add_stored_vector(3, &StoredVector::new(vec![0.0, 0.0, 1.0, 0.0].into()), 0).await?;
+    field.add_stored_vector(3, &StoredVector::new(vec![0.0, 0.0, 1.0, 0.0]), 0).await?;
     field.flush().await?;
 
     // Check we have 3 segments

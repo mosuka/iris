@@ -227,10 +227,10 @@ impl DocumentLog {
             if record.seq > max_seq {
                 max_seq = record.seq;
             }
-            if let LogEntry::Upsert { doc_id, .. } = &record.entry {
-                if *doc_id > max_doc_id {
-                    max_doc_id = *doc_id;
-                }
+            if let LogEntry::Upsert { doc_id, .. } = &record.entry
+                && *doc_id > max_doc_id
+            {
+                max_doc_id = *doc_id;
             }
             records.push(record);
         }

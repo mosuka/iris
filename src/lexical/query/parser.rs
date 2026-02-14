@@ -140,9 +140,11 @@ impl QueryParser {
 
     /// Parse a field-specific query.
     pub fn parse_field(&self, field: &str, query_str: &str) -> Result<Box<dyn Query>> {
-        // Handle phrase queries specially (preserve quotes)
+        // Handle phrase queries specially (preserve quotes).
+        // Escape embedded double quotes to prevent query injection.
         let full_query = if query_str.contains(' ') && !query_str.starts_with('"') {
-            format!("{field}:\"{query_str}\"")
+            let escaped = query_str.replace('"', "\\\"");
+            format!("{field}:\"{escaped}\"")
         } else {
             format!("{field}:{query_str}")
         };
@@ -184,6 +186,9 @@ impl QueryParser {
                 Rule::clause => {
                     let (occur, query) = self.parse_clause(inner_pair, current_occur)?;
                     terms.push((occur, query));
+                    // Reset to default so that the operator only applies to the
+                    // immediately following clause (e.g. "a AND b c" → a Must, b Must, c default).
+                    current_occur = self.default_occur;
                 }
                 _ => {}
             }

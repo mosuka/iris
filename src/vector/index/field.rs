@@ -10,6 +10,8 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 
 use crate::data::DataValue;
+use crate::embedding::embedder::{EmbedInput, Embedder};
+use crate::embedding::per_field::PerFieldEmbedder;
 use crate::error::Result;
 use crate::vector::core::vector::StoredVector;
 use crate::vector::core::vector::Vector;
@@ -131,10 +133,27 @@ pub struct VectorFieldStats {
 // ============================================================================
 
 /// Bridges the new doc-centric `VectorFieldWriter` trait to existing index writers.
-#[derive(Debug)]
+///
+/// When an `embedder` is provided, embedding is performed **outside** the Mutex
+/// so that I/O-bound embedding (e.g. HTTP calls) does not block other writes.
 pub struct LegacyVectorFieldWriter<W: VectorIndexWriter> {
     field_name: String,
     writer: Mutex<W>,
+    /// Optional embedder for performing embedding outside the lock.
+    embedder: Option<Arc<dyn Embedder>>,
+}
+
+impl<W: VectorIndexWriter> std::fmt::Debug for LegacyVectorFieldWriter<W> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("LegacyVectorFieldWriter")
+            .field("field_name", &self.field_name)
+            .field("writer", &self.writer)
+            .field(
+                "embedder",
+                &self.embedder.as_ref().map(|e| e.name().to_string()),
+            )
+            .finish()
+    }
 }
 
 impl<W: VectorIndexWriter> LegacyVectorFieldWriter<W> {
@@ -143,7 +162,17 @@ impl<W: VectorIndexWriter> LegacyVectorFieldWriter<W> {
         Self {
             field_name: field_name.into(),
             writer: Mutex::new(writer),
+            embedder: None,
         }
+    }
+
+    /// Set an embedder for performing embedding outside the writer lock.
+    ///
+    /// When set, `add_value()` with Text/Bytes data will embed first (no lock),
+    /// then acquire the lock only for `add_vectors()`.
+    pub fn with_embedder(mut self, embedder: Arc<dyn Embedder>) -> Self {
+        self.embedder = Some(embedder);
+        self
     }
 
     /// Returns the owning field name.
@@ -180,15 +209,39 @@ where
     }
 
     async fn add_value(&self, doc_id: u64, value: &DataValue, _version: u64) -> Result<()> {
-        let mut guard = self.writer.lock().await;
-
-        // If it's already a vector, use standard path
+        // If it's already a vector, lock and add directly
         if let DataValue::Vector(v) = value {
+            let mut guard = self.writer.lock().await;
             let legacy = (doc_id, self.field_name.clone(), Vector::new(v.clone()));
             return guard.add_vectors(vec![legacy]);
         }
 
-        // Directly await the async VectorIndexWriter::add_value
+        // For non-vector data: embed OUTSIDE the lock to avoid blocking other writes
+        if let Some(ref embedder) = self.embedder {
+            let input = match value {
+                DataValue::Text(t) => EmbedInput::Text(t),
+                DataValue::Bytes(b, m) => EmbedInput::Bytes(b, m.as_deref()),
+                _ => {
+                    return Err(crate::error::IrisError::invalid_argument(
+                        "Unsupported data type for embedding",
+                    ));
+                }
+            };
+
+            // Embed without holding the lock
+            let vector = if let Some(pf) = embedder.as_any().downcast_ref::<PerFieldEmbedder>() {
+                pf.embed_field(&self.field_name, &input).await?
+            } else {
+                embedder.embed(&input).await?
+            };
+
+            // Now lock briefly to add the resulting vector
+            let mut guard = self.writer.lock().await;
+            return guard.add_vectors(vec![(doc_id, self.field_name.clone(), vector)]);
+        }
+
+        // Fallback: no embedder set, delegate to the writer's add_value (holds lock)
+        let mut guard = self.writer.lock().await;
         VectorIndexWriter::add_value(
             &mut *guard,
             doc_id,
@@ -315,27 +368,29 @@ mod tests {
     }
 
     fn flat_writer() -> FlatIndexWriter {
-        let mut config = FlatIndexConfig::default();
-        config.dimension = 2;
-        config.normalize_vectors = false;
-        config.dimension = 2;
-        config.normalize_vectors = false;
+        let config = FlatIndexConfig {
+            dimension: 2,
+            normalize_vectors: false,
+            ..Default::default()
+        };
         FlatIndexWriter::new(config, VectorIndexWriterConfig::default(), "test_flat").unwrap()
     }
 
     fn hnsw_writer() -> HnswIndexWriter {
-        let mut config = HnswIndexConfig::default();
-        config.dimension = 2;
-        config.normalize_vectors = false;
+        let config = HnswIndexConfig {
+            dimension: 2,
+            normalize_vectors: false,
+            ..Default::default()
+        };
         HnswIndexWriter::new(config, VectorIndexWriterConfig::default(), "test_hnsw").unwrap()
     }
 
     fn ivf_writer() -> IvfIndexWriter {
-        let mut config = IvfIndexConfig::default();
-        config.dimension = 2;
-        config.normalize_vectors = false;
-        config.dimension = 2;
-        config.normalize_vectors = false;
+        let config = IvfIndexConfig {
+            dimension: 2,
+            normalize_vectors: false,
+            ..Default::default()
+        };
         IvfIndexWriter::new(config, VectorIndexWriterConfig::default(), "test_ivf").unwrap()
     }
 

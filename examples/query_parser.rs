@@ -49,7 +49,7 @@ async fn main() -> Result<()> {
         analyzer: Arc::new(per_field_analyzer.clone()),
         ..InvertedIndexConfig::default()
     });
-    let mut lexical_engine = LexicalStore::new(storage, lexical_index_config)?;
+    let lexical_engine = LexicalStore::new(storage, lexical_index_config)?;
 
     // Add sample documents
     let documents = vec![
@@ -109,7 +109,7 @@ async fn main() -> Result<()> {
     println!("PART 2: Search Examples (With Results)");
     println!("{}", "=".repeat(80));
 
-    demo_search(&mut lexical_engine, &parser)?;
+    demo_search(&lexical_engine, &parser)?;
 
     println!("\n{}", "=".repeat(80));
     println!("PART 3: Nested Boolean Queries");
@@ -229,7 +229,7 @@ fn parse_and_show(parser: &QueryParser, queries: Vec<(&str, &str)>) {
     }
 }
 
-fn demo_search(engine: &mut LexicalStore, parser: &QueryParser) -> Result<()> {
+fn demo_search(engine: &LexicalStore, parser: &QueryParser) -> Result<()> {
     println!("\n## 1. Simple OR Query");
     println!("{}", "-".repeat(80));
     execute_search(engine, parser, "Mockingbird OR Gatsby")?;
@@ -257,7 +257,7 @@ fn demo_search(engine: &mut LexicalStore, parser: &QueryParser) -> Result<()> {
     Ok(())
 }
 
-fn execute_search(engine: &mut LexicalStore, parser: &QueryParser, query_str: &str) -> Result<()> {
+fn execute_search(engine: &LexicalStore, parser: &QueryParser, query_str: &str) -> Result<()> {
     println!("Query: {query_str}");
 
     let query = parser.parse(query_str)?;

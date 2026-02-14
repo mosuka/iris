@@ -6,7 +6,17 @@ use crate::error::{IrisError, Result};
 use crate::storage::StorageInput;
 use crate::vector::core::vector::Vector;
 
-/// Storage for vectors (in-memory or on-demand).
+/// Storage for vectors (in-memory or on-demand from disk).
+///
+/// # Thread Safety Notes
+///
+/// In the `OnDemand` variant:
+/// - `offsets` is immutable after construction (`Arc<HashMap>`), so concurrent
+///   reads are safe without locking.
+/// - `input` uses `Mutex` because `StorageInput` requires `&mut self` for
+///   seek + read. This serializes concurrent reads, which is inherent to
+///   single file-handle I/O. For higher throughput, consider opening separate
+///   file handles per thread.
 #[derive(Debug, Clone)]
 pub enum VectorStorage {
     Owned(Arc<HashMap<(u64, String), Vector>>),

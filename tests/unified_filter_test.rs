@@ -82,17 +82,11 @@ async fn test_unified_filtering() -> iris::Result<()> {
     println!("Filtered Results (Vegetable): {:?}", results);
 
     assert_eq!(results.len(), 1, "Should filter down to 1 result");
-
-    // Check it's Carrot (doc_id is internal, but logic holds)
-    // We should load document to verify content if possible, but SearchResult has document loaded?
-    // Engine search loads documents for lexical hits, but for purely vector hits?
-    // Engine search vector hits mapping uses `document: None`.
-    // I need to verify which doc it is. Based on ID?
-    // Or I can check scores.
-
-    // Let's rely on the count.
-    // Without filter, [1.0, 0.0] should match Apple (1.0) and Carrot (1.0) equally.
-    // Banana (0.9) is less relevant.
+    // Verify it's Carrot (the only vegetable)
+    assert_eq!(
+        results[0].id, "doc3",
+        "Filtered result should be doc3 (Carrot, vegetable)"
+    );
 
     // 5. Test Filtering: Search for "fruit"
     let filter_query_fruit = Box::new(TermQuery::new("category", "fruit"));
@@ -108,6 +102,10 @@ async fn test_unified_filtering() -> iris::Result<()> {
         2,
         "Should filter down to 2 results (Apple, Banana)"
     );
+    // Verify both fruits are present
+    let fruit_ids: Vec<&str> = results_fruit.iter().map(|r| r.id.as_str()).collect();
+    assert!(fruit_ids.contains(&"doc1"), "Should contain doc1 (Apple)");
+    assert!(fruit_ids.contains(&"doc2"), "Should contain doc2 (Banana)");
 
     Ok(())
 }
