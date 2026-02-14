@@ -5,6 +5,7 @@ edition = "2024"
 description = "A fast, featureful full-text search library for Rust"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/mosuka/iris"
+autoexamples = false
 
 [dependencies]
 ahash = "0.8.12"
@@ -81,11 +82,26 @@ embeddings-all = [
 ]
 
 [[example]]
-name = "embedding_with_candle"
+name = "quickstart"
+
+[[example]]
+name = "lexical_search"
+
+[[example]]
+name = "vector_search"
+
+[[example]]
+name = "hybrid_search"
+
+[[example]]
+name = "synonym_graph_filter"
+
+[[example]]
+name = "search_with_candle"
 required-features = ["embeddings-candle"]
 
 [[example]]
-name = "embedding_with_openai"
+name = "search_with_openai"
 required-features = ["embeddings-openai"]
 
 [[example]]
