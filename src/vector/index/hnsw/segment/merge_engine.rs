@@ -232,16 +232,18 @@ impl MergeEngine {
         vectors: Vec<Vec<(u64, Vector)>>,
         deleted_ids: &[u64],
     ) -> Vec<(u64, Vector)> {
-        // Flatten all vectors
+        // Flatten all vectors (later segments = newer data)
         let mut all_vectors: Vec<(u64, Vector)> = vectors.into_iter().flatten().collect();
 
         // Filter out deleted vectors
         all_vectors.retain(|(id, _)| !deleted_ids.contains(id));
 
-        // Sort by ID
+        // Reverse so that newer entries (from later segments) come first.
+        // Stable sort then preserves this order for equal keys.
+        all_vectors.reverse();
         all_vectors.sort_by_key(|(id, _)| *id);
 
-        // Deduplicate (keep latest)
+        // dedup_by_key keeps the first of each group = newest vector
         all_vectors.dedup_by_key(|(id, _)| *id);
 
         all_vectors
@@ -278,17 +280,14 @@ mod tests {
         // Since that is complex setup, we will skip the execution part for now or use a simpler verification.
         // Or we could mock storage.
 
-        let _segments = vec![
-            ManagedSegmentInfo {
-                segment_id: "seg1".to_string(),
-                vector_count: 1000,
-                vector_offset: 0,
-                generation: 0,
-                has_deletions: false,
-                size_bytes: 128000,
-            },
-            // ...
-        ];
+        let _segments = [ManagedSegmentInfo {
+            segment_id: "seg1".to_string(),
+            vector_count: 1000,
+            vector_offset: 0,
+            generation: 0,
+            has_deletions: false,
+            size_bytes: 128000,
+        }];
 
         // We comment out actual execution because it will fail on file not found
         // let result = engine.merge_segments(segments, "merged_seg".to_string());

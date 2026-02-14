@@ -85,7 +85,7 @@ fn bench_hnsw_search(c: &mut Criterion) {
     // New persistence mechanism
     let writer_config = VectorIndexWriterConfig::default();
     let mut writer = HnswIndexWriter::new(config, writer_config, "bench_vectors_hnsw").unwrap();
-    let _ = writer.commit().unwrap();
+    writer.commit().unwrap();
 
     let reader = index.reader().unwrap();
 

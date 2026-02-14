@@ -8,13 +8,12 @@ use iris::lexical::span::{SpanQuery, SpanQueryBuilder, SpanQueryWrapper, SpanTer
 use iris::lexical::{InvertedIndexWriter, InvertedIndexWriterConfig};
 use iris::storage::memory::MemoryStorage;
 
-fn create_test_index() -> Result<
-    (
-        Arc<iris::storage::memory::MemoryStorage>,
-        Arc<dyn iris::lexical::LexicalIndexReader>,
-    ),
-    Box<dyn std::error::Error>,
-> {
+type TestIndex = (
+    Arc<iris::storage::memory::MemoryStorage>,
+    Arc<dyn iris::lexical::LexicalIndexReader>,
+);
+
+fn create_test_index() -> Result<TestIndex, Box<dyn std::error::Error>> {
     let storage = Arc::new(MemoryStorage::new(
         iris::storage::memory::MemoryStorageConfig::default(),
     ));

@@ -162,3 +162,83 @@ async fn test_engine_upsert() -> iris::Result<()> {
 
     Ok(())
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_engine_delete_nonexistent() -> iris::Result<()> {
+    let temp_dir = TempDir::new().unwrap();
+    let storage_config = StorageConfig::File(FileStorageConfig::new(temp_dir.path()));
+    let storage = StorageFactory::create(storage_config)?;
+
+    use iris::vector::FlatOption;
+    let config = Schema::builder()
+        .add_field("title", FieldOption::Lexical(LexicalOption::default()))
+        .add_field(
+            "embedding",
+            FieldOption::Vector(VectorOption::Flat(FlatOption {
+                dimension: 2,
+                ..Default::default()
+            })),
+        )
+        .build();
+
+    let engine = Engine::new(storage, config).await?;
+
+    // Deleting a non-existent document should not error
+    let result = engine.delete_documents("nonexistent_doc").await;
+    assert!(result.is_ok(), "Deleting non-existent document should succeed silently");
+
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_engine_double_delete() -> iris::Result<()> {
+    let temp_dir = TempDir::new().unwrap();
+    let storage_config = StorageConfig::File(FileStorageConfig::new(temp_dir.path()));
+    let storage = StorageFactory::create(storage_config)?;
+
+    use iris::vector::FlatOption;
+    let config = Schema::builder()
+        .add_field("title", FieldOption::Lexical(LexicalOption::default()))
+        .add_field(
+            "embedding",
+            FieldOption::Vector(VectorOption::Flat(FlatOption {
+                dimension: 2,
+                ..Default::default()
+            })),
+        )
+        .build();
+
+    let engine = Engine::new(storage, config).await?;
+
+    // Index a document
+    engine
+        .put_document(
+            "doc1",
+            Document::builder()
+                .add_field("title", "Hello")
+                .add_field("embedding", vec![1.0, 0.0])
+                .build(),
+        )
+        .await?;
+    engine.commit().await?;
+
+    // Delete it twice — second delete should succeed silently
+    engine.delete_documents("doc1").await?;
+    engine.commit().await?;
+
+    let result = engine.delete_documents("doc1").await;
+    assert!(result.is_ok(), "Double delete should succeed silently");
+    engine.commit().await?;
+
+    // Verify document is gone
+    let res = engine
+        .search(
+            SearchRequestBuilder::new()
+                .with_lexical(Box::new(TermQuery::new("title", "hello")))
+                .build(),
+        )
+        .await?;
+    assert_eq!(res.len(), 0, "Document should remain deleted");
+
+    Ok(())
+}

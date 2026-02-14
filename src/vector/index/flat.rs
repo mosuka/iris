@@ -110,6 +110,14 @@ impl FlatIndex {
 
         let metadata = Self::read_metadata(storage.as_ref(), name)?;
 
+        // Validate dimension consistency between stored metadata and config.
+        if metadata.dimension != 0 && metadata.dimension != config.dimension {
+            return Err(IrisError::index(format!(
+                "Dimension mismatch: stored {}, config {}",
+                metadata.dimension, config.dimension
+            )));
+        }
+
         Ok(FlatIndex {
             name: name.to_string(),
             storage,
@@ -225,6 +233,9 @@ impl VectorIndex for FlatIndex {
         &self.storage
     }
 
+    /// Mark the index as closed.
+    ///
+    /// Callers must call `commit()` before `close()` to persist pending data.
     fn close(&self) -> Result<()> {
         self.closed.store(true, Ordering::SeqCst);
         Ok(())

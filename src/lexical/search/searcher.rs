@@ -6,9 +6,10 @@ use crate::error::Result;
 use crate::lexical::query::{LexicalSearchResults, Query};
 
 /// Sort order for search results.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum SortOrder {
     /// Ascending order (lowest to highest).
+    #[default]
     Asc,
     /// Descending order (highest to lowest).
     Desc,
@@ -130,11 +131,15 @@ impl LexicalSearchQuery {
         }
     }
 
-    /// Extract the Query object, panics if this is a DSL string.
-    pub fn unwrap_query(self) -> Box<dyn Query> {
+    /// Extract the Query object.
+    ///
+    /// Returns an error if this is a DSL string variant.
+    pub fn unwrap_query(self) -> crate::error::Result<Box<dyn Query>> {
         match self {
-            LexicalSearchQuery::Obj(query) => query,
-            LexicalSearchQuery::Dsl(_) => panic!("Expected Query object, found DSL string"),
+            LexicalSearchQuery::Obj(query) => Ok(query),
+            LexicalSearchQuery::Dsl(_) => Err(crate::error::IrisError::invalid_argument(
+                "Expected Query object, found DSL string",
+            )),
         }
     }
 }

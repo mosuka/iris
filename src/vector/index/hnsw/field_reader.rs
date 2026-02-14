@@ -89,13 +89,10 @@ impl HnswFieldReader {
             })
             .collect();
 
-        // Limit candidates based on ef_search
-        let max_candidates = self.ef_search.min(filtered_ids.len());
+        // Linear scan: examine all filtered vectors (ef_search only applies to graph search)
+        let mut candidates: Vec<(u64, f32, f32)> = Vec::with_capacity(filtered_ids.len());
 
-        // Calculate similarities for candidate vectors
-        let mut candidates: Vec<(u64, f32, f32)> = Vec::with_capacity(max_candidates);
-
-        for (doc_id, field_name) in filtered_ids.iter().take(max_candidates) {
+        for (doc_id, field_name) in filtered_ids.iter() {
             if let Ok(Some(vector)) = self.index_reader.get_vector(*doc_id, field_name) {
                 let similarity = self
                     .index_reader

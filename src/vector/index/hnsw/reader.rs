@@ -49,10 +49,10 @@ impl HnswIndexReader {
         let file_name = format!("{}.hnsw", path);
         let mut input = storage.open_input(&file_name)?;
 
-        // Read metadata
-        let mut num_vectors_buf = [0u8; 4];
+        // Read metadata (vector count stored as u64)
+        let mut num_vectors_buf = [0u8; 8];
         input.read_exact(&mut num_vectors_buf)?;
-        let num_vectors = u32::from_le_bytes(num_vectors_buf) as usize;
+        let num_vectors = u64::from_le_bytes(num_vectors_buf) as usize;
 
         // We already have dimension from argument, but file has it too.
         // Let's read it to advance cursor, and verify?
@@ -88,9 +88,9 @@ impl HnswIndexReader {
                     input.read_exact(&mut max_level_buf)?;
                     let max_level = u32::from_le_bytes(max_level_buf) as usize;
 
-                    let mut node_count_buf = [0u8; 4];
+                    let mut node_count_buf = [0u8; 8];
                     input.read_exact(&mut node_count_buf)?;
-                    let node_count = u32::from_le_bytes(node_count_buf) as usize;
+                    let node_count = u64::from_le_bytes(node_count_buf) as usize;
 
                     let mut nodes = HashMap::with_capacity(node_count);
 
@@ -478,15 +478,17 @@ struct HnswVectorIterator {
 
 impl VectorIterator for HnswVectorIterator {
     fn next(&mut self) -> Result<Option<(u64, String, Vector)>> {
-        if self.current < self.keys.len() {
+        // Use a loop instead of recursion to avoid stack overflow when
+        // many consecutive entries are deleted.
+        while self.current < self.keys.len() {
             let (doc_id, field) = &self.keys[self.current];
 
-            // Check deletion
+            // Skip deleted entries
             if let Some(bitmap) = &self.deletion_bitmap
                 && bitmap.is_deleted(*doc_id)
             {
                 self.current += 1;
-                return self.next(); // Recursively skip deleted
+                continue;
             }
 
             if let Some(vec) = self
@@ -494,16 +496,15 @@ impl VectorIterator for HnswVectorIterator {
                 .get(&(*doc_id, field.clone()), self.dimension)?
             {
                 self.current += 1;
-                Ok(Some((*doc_id, field.clone(), vec)))
+                return Ok(Some((*doc_id, field.clone(), vec)));
             } else {
-                Err(IrisError::internal(format!(
+                return Err(IrisError::internal(format!(
                     "Vector {}:{} found in keys but missing in storage",
                     doc_id, field
-                )))
+                )));
             }
-        } else {
-            Ok(None)
         }
+        Ok(None)
     }
 
     fn skip_to(&mut self, doc_id: u64, field_name: &str) -> Result<bool> {

@@ -182,7 +182,17 @@ impl CandleBertEmbedder {
     }
 
     /// Embed text directly (internal implementation).
+    ///
+    /// The candle inference pipeline is synchronous.  We use `block_in_place`
+    /// so the tokio runtime can schedule other tasks on other threads while
+    /// this thread is blocked on CPU-bound model inference.
     async fn embed_text(&self, text: &str) -> Result<Vector> {
+        let text = text.to_string();
+        tokio::task::block_in_place(|| self.embed_text_sync(&text))
+    }
+
+    /// Synchronous embedding implementation.
+    fn embed_text_sync(&self, text: &str) -> Result<Vector> {
         // Tokenize
         let encoding = self
             .tokenizer

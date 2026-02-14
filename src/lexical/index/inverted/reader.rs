@@ -17,7 +17,7 @@ use crate::lexical::core::document::Document;
 use crate::lexical::core::field::FieldValue;
 use crate::lexical::index::inverted::core::posting::{Posting, PostingList};
 use crate::lexical::index::inverted::core::terms::{
-    InvertedIndexTerms, TermDictionaryAccess, Terms,
+    InvertedIndexTerms, MergedInvertedIndexTerms, TermDictionaryAccess, Terms,
 };
 use crate::lexical::index::inverted::segment::SegmentInfo;
 use crate::lexical::index::structures::bkd_tree::{BKDReader, BKDTree};
@@ -196,11 +196,13 @@ impl InvertedIndexPostingIterator {
                     return Some(i);
                 }
                 if target < block.min_doc_id {
-                    return if i > 0 { Some(i - 1) } else { None };
+                    // Target falls before this block. Start scanning from this
+                    // block since all prior blocks contain only smaller doc_ids.
+                    return Some(i);
                 }
             }
 
-            // Target is beyond all blocks
+            // Target is beyond all blocks — return last block as starting point.
             if !blocks.is_empty() {
                 Some(blocks.len() - 1)
             } else {
@@ -454,7 +456,8 @@ impl SegmentReader {
                         }
                         1 => {
                             // Integer
-                            let num = reader.read_u64()? as i64; // Read as u64, convert to i64 preserving bit pattern
+                            // Stored as u64 via `i64 as u64` (bit-preserving). Reverse with `u64 as i64`.
+                            let num = reader.read_u64()? as i64;
                             FieldValue::Int64(num)
                         }
                         2 => {
@@ -764,11 +767,9 @@ impl SegmentReader {
             let input = self.storage.open_input(&postings_file)?;
             let mut reader = StructReader::new(input)?;
 
-            // Skip to the posting position
-            let mut current_pos = 0u64;
-            while current_pos < term_info.posting_offset {
-                reader.read_u8()?;
-                current_pos += 1;
+            // Seek directly to the posting position
+            if term_info.posting_offset > 0 {
+                reader.seek(std::io::SeekFrom::Start(term_info.posting_offset))?;
             }
 
             // Decode the posting list
@@ -970,15 +971,28 @@ impl CacheManager {
         }
     }
 
-    /// Cache term information.
+    /// Cache term information.  When memory limit is reached, evict ~25% of
+    /// entries (random selection) to make room.
     pub fn cache_term_info(&self, key: String, info: TermInfo) {
-        if self.memory_usage.load(Ordering::Relaxed) < self.memory_limit {
+        if self.memory_usage.load(Ordering::Relaxed) >= self.memory_limit {
+            // Evict roughly 25% of cached entries
             let mut cache = self.term_cache.write().unwrap();
-            cache.insert(key, info);
-
-            // Estimate memory usage (rough approximation)
-            self.memory_usage.fetch_add(64, Ordering::Relaxed);
+            let evict_count = cache.len() / 4;
+            if evict_count > 0 {
+                let keys_to_remove: Vec<String> =
+                    cache.keys().take(evict_count).cloned().collect();
+                for k in &keys_to_remove {
+                    cache.remove(k);
+                }
+                // Reclaim estimated memory
+                self.memory_usage
+                    .fetch_sub(evict_count * 64, Ordering::Relaxed);
+            }
         }
+
+        let mut cache = self.term_cache.write().unwrap();
+        cache.insert(key, info);
+        self.memory_usage.fetch_add(64, Ordering::Relaxed);
     }
 
     /// Get cache statistics.
@@ -1106,10 +1120,15 @@ impl InvertedIndexReader {
 
 impl crate::lexical::reader::LexicalIndexReader for InvertedIndexReader {
     fn doc_count(&self) -> u64 {
-        self.total_doc_count
+        // Sum live doc counts from each segment (accounts for deletions).
+        self.segment_readers
+            .iter()
+            .map(|sr| sr.read().unwrap().doc_count())
+            .sum()
     }
 
     fn max_doc(&self) -> u64 {
+        // max_doc reflects the total allocated doc space (including deleted).
         self.total_doc_count
     }
 
@@ -1343,24 +1362,31 @@ impl crate::lexical::reader::LexicalIndexReader for InvertedIndexReader {
 // Implementation of TermDictionaryAccess for InvertedIndexReader
 impl TermDictionaryAccess for InvertedIndexReader {
     fn terms(&self, field: &str) -> Result<Option<Box<dyn Terms>>> {
-        // Get the first segment's term dictionary
-        // In a multi-segment index, we would need to merge terms from all segments.
-        // For now, we'll use a simplified approach with the first segment.
-        if let Some(seg_lock) = self.segment_readers.first() {
+        // Collect term dictionaries from ALL segments and merge them.
+        let mut dicts = Vec::new();
+        for seg_lock in &self.segment_readers {
             let seg = seg_lock.read().unwrap();
-
-            // Load the term dictionary if not already loaded
             if seg.term_dictionary.read().unwrap().is_none() {
                 seg.load_term_dictionary()?;
             }
-
             if let Some(dict) = seg.term_dictionary.read().unwrap().clone() {
-                let terms = InvertedIndexTerms::new(field, dict);
-                return Ok(Some(Box::new(terms)));
+                dicts.push(dict);
             }
         }
 
-        Ok(None)
+        if dicts.is_empty() {
+            return Ok(None);
+        }
+
+        // If only one segment, use the fast path
+        if dicts.len() == 1 {
+            let terms = InvertedIndexTerms::new(field, dicts.into_iter().next().unwrap());
+            return Ok(Some(Box::new(terms)));
+        }
+
+        // Merge terms across all segments
+        let terms = MergedInvertedIndexTerms::new(field, &dicts);
+        Ok(Some(Box::new(terms)))
     }
 }
 
@@ -1376,6 +1402,11 @@ pub struct MergedPostingIterator {
 
     /// The current document ID of the merged stream.
     current_doc: u64,
+
+    /// Whether next() has been called at least once.
+    /// Matches the same protocol as InvertedIndexPostingIterator:
+    /// first next() positions at the first document without advancing.
+    started: bool,
 }
 
 /// Wrapper for PostingIterator to make it orderable for BinaryHeap.
@@ -1408,6 +1439,11 @@ impl Ord for IteratorWrapper {
 
 impl MergedPostingIterator {
     /// Create a new merged iterator from a list of iterators.
+    ///
+    /// Each sub-iterator is advanced to its first document during construction
+    /// so the heap can be properly ordered. However, `next()` must still be called
+    /// once before reading `doc_id()`, matching the `InvertedIndexPostingIterator`
+    /// protocol (via the `started` flag).
     pub fn new(iterators: Vec<Box<dyn crate::lexical::reader::PostingIterator>>) -> Result<Self> {
         let mut heap = std::collections::BinaryHeap::new();
 
@@ -1428,7 +1464,32 @@ impl MergedPostingIterator {
             u64::MAX
         };
 
-        Ok(MergedPostingIterator { heap, current_doc })
+        Ok(MergedPostingIterator {
+            heap,
+            current_doc,
+            started: false,
+        })
+    }
+
+    /// Internal advance: pop the current top, advance it, push back.
+    /// Used by both `next()` (after the started check) and `skip_to()`.
+    fn advance(&mut self) -> Result<bool> {
+        if let Some(mut wrapper) = self.heap.pop() {
+            if wrapper.iter.next()? {
+                wrapper.current_doc = wrapper.iter.doc_id();
+                self.heap.push(wrapper);
+            }
+            if let Some(new_top) = self.heap.peek() {
+                self.current_doc = new_top.current_doc;
+                Ok(true)
+            } else {
+                self.current_doc = u64::MAX;
+                Ok(false)
+            }
+        } else {
+            self.current_doc = u64::MAX;
+            Ok(false)
+        }
     }
 }
 
@@ -1455,32 +1516,26 @@ impl crate::lexical::reader::PostingIterator for MergedPostingIterator {
     }
 
     fn next(&mut self) -> Result<bool> {
-        if let Some(mut wrapper) = self.heap.pop() {
-            // Advance the current iterator
-            if wrapper.iter.next()? {
-                wrapper.current_doc = wrapper.iter.doc_id();
-                self.heap.push(wrapper);
-            }
-
-            // Update current_doc from the new top of the heap
-            if let Some(new_top) = self.heap.peek() {
-                self.current_doc = new_top.current_doc;
-                Ok(true)
-            } else {
-                self.current_doc = u64::MAX;
-                Ok(false)
-            }
-        } else {
-            self.current_doc = u64::MAX;
-            Ok(false)
+        if !self.started {
+            // First call: just mark as started without advancing.
+            // The heap is already positioned at the first document from new().
+            self.started = true;
+            return Ok(!self.heap.is_empty());
         }
+
+        self.advance()
     }
 
     fn skip_to(&mut self, target: u64) -> Result<bool> {
+        // Ensure started before skipping
+        if !self.started {
+            self.started = true;
+        }
+
         // Naive implementation: just call next until we reach or pass target
-        // A better implementation would potentially seek the underlying iterators
+        // (call the advancing logic directly, not via next() which checks started)
         while self.doc_id() < target {
-            if !self.next()? {
+            if !self.advance()? {
                 return Ok(false);
             }
         }

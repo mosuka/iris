@@ -58,6 +58,11 @@ async fn test_unified_search_hybrid() -> iris::Result<()> {
         results.iter().any(|r| r.score > 0.0),
         "Should match doc1 lexically"
     );
+    // Verify the correct document was found
+    assert!(
+        results.iter().any(|r| r.id == "doc1"),
+        "Should find doc1 ('Rust Programming') for term query 'rust'"
+    );
 
     // 5. Test Vector Search (should find "doc2" which is closer to [0, 1, 0])
     let vector_req = VectorSearchRequestBuilder::new()
@@ -69,6 +74,11 @@ async fn test_unified_search_hybrid() -> iris::Result<()> {
     let results = engine.search(req).await?;
     println!("Vector Results: {:?}", results);
     assert!(!results.is_empty(), "Should return vector results");
+    // The closest vector to [0,1,0] should be doc2's embedding [0,1,0]
+    assert_eq!(
+        results[0].id, "doc2",
+        "Top result should be doc2 (exact match for [0,1,0])"
+    );
 
     Ok(())
 }
