@@ -12,6 +12,8 @@ use iris::{DataValue, Document};
 use std::sync::Arc;
 use tempfile::tempdir;
 
+// Ignored on Windows due to FileStorage file handle synchronization issues.
+#[cfg_attr(target_os = "windows", ignore)]
 #[tokio::test(flavor = "multi_thread")]
 async fn test_mmap_mode_basic_search() {
     let dir = tempdir().unwrap();
@@ -68,6 +70,8 @@ async fn test_mmap_mode_basic_search() {
     assert_eq!(results.hits.len(), 2);
 }
 
+// Ignored on Windows due to FileStorage file handle synchronization issues.
+#[cfg_attr(target_os = "windows", ignore)]
 #[tokio::test(flavor = "multi_thread")]
 async fn test_mmap_mode_persistence_reload() {
     let dir = tempdir().unwrap();

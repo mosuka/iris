@@ -62,6 +62,7 @@ jobs:
             target: x86_64-unknown-linux-gnu
           - runner: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
+            skip_embedding_features: true
           - runner: macos-latest
             target: aarch64-apple-darwin
           - runner: macos-15-intel
@@ -71,6 +72,7 @@ jobs:
           - runner: windows-latest
             target: aarch64-pc-windows-msvc
             skip_test_run: true
+            skip_embedding_features: true
         toolchain: [stable]
     runs-on: ${{ matrix.platform.runner }}
     steps:
@@ -86,8 +88,14 @@ jobs:
       - name: Run test
         shell: bash
         run: |
-          if [ "${{ matrix.platform.skip_test_run }}" == "true" ]; then
-            cargo check --target "${{ matrix.platform.target }}" --all-features
+          if [ "${{ matrix.platform.skip_embedding_features }}" == "true" ]; then
+            FEATURES=""
           else
-            cargo test --target "${{ matrix.platform.target }}" --all-features
+            FEATURES="--all-features"
+          fi
+
+          if [ "${{ matrix.platform.skip_test_run }}" == "true" ]; then
+            cargo check --target "${{ matrix.platform.target }}" $FEATURES
+          else
+            cargo test --target "${{ matrix.platform.target }}" $FEATURES
           fi

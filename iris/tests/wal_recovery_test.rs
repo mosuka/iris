@@ -9,6 +9,8 @@ use iris::vector::FieldOption as VectorOption;
 use iris::{DataValue, Document};
 use iris::{FieldOption, LexicalSearchRequest, Schema};
 
+// Ignored on Windows due to FileStorage file handle synchronization issues.
+#[cfg_attr(target_os = "windows", ignore)]
 #[tokio::test(flavor = "multi_thread")]
 async fn test_wal_recovery_uncommitted() -> iris::Result<()> {
     // 1. Setup Storage

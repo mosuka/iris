@@ -97,27 +97,27 @@ async fn main() -> Result<()> {
     for entry in entries {
         let entry = entry?;
         let path = entry.path();
-        if path.is_file() {
-            if let Some(ext) = path.extension() {
-                if ext == "jpg" || ext == "jpeg" || ext == "png" {
-                    let filename = path.file_name().unwrap().to_string_lossy().to_string();
-                    println!("Indexing image: {}", filename);
+        if path.is_file()
+            && path
+                .extension()
+                .is_some_and(|ext| ext == "jpg" || ext == "jpeg" || ext == "png")
+        {
+            let filename = path.file_name().unwrap().to_string_lossy().to_string();
+            println!("Indexing image: {}", filename);
 
-                    // Read image file into bytes
-                    let bytes = std::fs::read(&path)?;
+            // Read image file into bytes
+            let bytes = std::fs::read(&path)?;
 
-                    let doc = Document::builder()
-                        .add_field("content", DataValue::Bytes(bytes, None))
-                        .add_field("filename", DataValue::Text(filename.clone()))
-                        .add_field("type", DataValue::Text("image".into()))
-                        .build();
+            let doc = Document::builder()
+                .add_field("content", DataValue::Bytes(bytes, None))
+                .add_field("filename", DataValue::Text(filename.clone()))
+                .add_field("type", DataValue::Text("image".into()))
+                .build();
 
-                    indexed_count += 1;
-                    engine
-                        .upsert_document_by_internal_id(indexed_count, doc)
-                        .await?;
-                }
-            }
+            indexed_count += 1;
+            engine
+                .upsert_document_by_internal_id(indexed_count, doc)
+                .await?;
         }
     }
     println!("Indexed {} images.", indexed_count);
