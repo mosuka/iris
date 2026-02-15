@@ -263,10 +263,7 @@ impl FileStorage {
             ))
         })?;
         dir_file.sync_all().map_err(|e| {
-            IrisError::storage(format!(
-                "Failed to sync directory {:?}: {}",
-                dir, e
-            ))
+            IrisError::storage(format!("Failed to sync directory {:?}: {}", dir, e))
         })?;
 
         Ok(())
@@ -754,14 +751,14 @@ impl FileOutput {
             position: 0,
         })
     }
-
 }
 
 impl Write for FileOutput {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        let writer = self.writer.as_mut().ok_or_else(|| {
-            std::io::Error::other("FileOutput already closed")
-        })?;
+        let writer = self
+            .writer
+            .as_mut()
+            .ok_or_else(|| std::io::Error::other("FileOutput already closed"))?;
         let bytes_written = writer.write(buf)?;
         self.position += bytes_written as u64;
 
@@ -774,17 +771,20 @@ impl Write for FileOutput {
     }
 
     fn flush(&mut self) -> std::io::Result<()> {
-        self.writer.as_mut().ok_or_else(|| {
-            std::io::Error::other("FileOutput already closed")
-        })?.flush()
+        self.writer
+            .as_mut()
+            .ok_or_else(|| std::io::Error::other("FileOutput already closed"))?
+            .flush()
     }
 }
 
 impl Seek for FileOutput {
     fn seek(&mut self, pos: SeekFrom) -> std::io::Result<u64> {
-        let new_pos = self.writer.as_mut().ok_or_else(|| {
-            std::io::Error::other("FileOutput already closed")
-        })?.seek(pos)?;
+        let new_pos = self
+            .writer
+            .as_mut()
+            .ok_or_else(|| std::io::Error::other("FileOutput already closed"))?
+            .seek(pos)?;
         self.position = new_pos;
         Ok(new_pos)
     }
@@ -792,9 +792,10 @@ impl Seek for FileOutput {
 
 impl StorageOutput for FileOutput {
     fn flush_and_sync(&mut self) -> Result<()> {
-        let writer = self.writer.as_mut().ok_or_else(|| {
-            IrisError::storage("FileOutput already closed".to_string())
-        })?;
+        let writer = self
+            .writer
+            .as_mut()
+            .ok_or_else(|| IrisError::storage("FileOutput already closed".to_string()))?;
 
         writer
             .flush()
