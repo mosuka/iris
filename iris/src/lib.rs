@@ -1,0 +1,52 @@
+//! # Iris
+//!
+//! Iris is a Rust library for building search engines with support for lexical, vector, and hybrid search. It provides a flexible and efficient way to create powerful search applications.
+//!
+//! ## Features
+//!
+//! - Pure Rust implementation
+//! - Fast indexing and searching
+//! - Flexible text analysis pipeline
+//! - Pluggable storage backends
+//! - Multiple query types
+//! - BM25 scoring
+
+// Core modules
+pub mod analysis;
+mod data;
+pub mod embedding;
+mod engine;
+mod error;
+pub mod lexical;
+mod maintenance;
+pub mod spelling;
+pub mod storage;
+pub mod store;
+mod util;
+pub mod vector;
+
+// Re-exports for the public API
+pub use analysis::analyzer::analyzer::Analyzer;
+pub use data::{DataValue, Document};
+#[cfg(feature = "embeddings-candle")]
+pub use embedding::candle_bert_embedder::CandleBertEmbedder;
+#[cfg(feature = "embeddings-multimodal")]
+pub use embedding::candle_clip_embedder::CandleClipEmbedder;
+pub use embedding::embedder::{EmbedInput, EmbedInputType, Embedder};
+#[cfg(feature = "embeddings-openai")]
+pub use embedding::openai_embedder::OpenAIEmbedder;
+pub use embedding::per_field::PerFieldEmbedder;
+pub use embedding::precomputed::PrecomputedEmbedder;
+pub use engine::Engine;
+pub use engine::EngineBuilder;
+pub use engine::query::UnifiedQueryParser;
+pub use engine::schema::{FieldOption, Schema};
+pub use engine::search::{FusionAlgorithm, SearchRequest, SearchRequestBuilder, SearchResult};
+pub use error::{IrisError, Result};
+pub use lexical::search::searcher::LexicalSearchRequest;
+pub use maintenance::deletion::DeletionConfig;
+pub use parking_lot;
+pub use storage::{Storage, StorageConfig, StorageFactory};
+
+// Version information
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
