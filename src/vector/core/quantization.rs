@@ -25,7 +25,8 @@ pub struct VectorQuantizer {
     // Scalar quantization parameters
     min_values: Option<Vec<f32>>,
     max_values: Option<Vec<f32>>,
-    // Product quantization parameters
+    // Product quantization parameters (reserved for future implementation)
+    #[allow(dead_code)]
     codebooks: Option<Vec<Vec<Vec<f32>>>>,
 }
 
@@ -142,8 +143,20 @@ impl VectorQuantizer {
 
     /// Perform scalar quantization to 8-bit integers.
     fn scalar_quantize(&self, data: &[f32]) -> Result<Vec<u8>> {
-        let min_values = self.min_values.as_ref().unwrap();
-        let max_values = self.max_values.as_ref().unwrap();
+        let min_values = self.min_values.as_ref().ok_or_else(|| {
+            IrisError::InvalidOperation("Quantizer not trained: missing min_values".to_string())
+        })?;
+        let max_values = self.max_values.as_ref().ok_or_else(|| {
+            IrisError::InvalidOperation("Quantizer not trained: missing max_values".to_string())
+        })?;
+
+        if data.len() != self.dimension {
+            return Err(IrisError::InvalidOperation(format!(
+                "Dimension mismatch: expected {}, got {}",
+                self.dimension,
+                data.len()
+            )));
+        }
 
         let quantized: Vec<u8> = data
             .iter()
@@ -167,8 +180,12 @@ impl VectorQuantizer {
 
     /// Dequantize 8-bit integers back to float32.
     fn scalar_dequantize(&self, data: &[u8]) -> Result<Vec<f32>> {
-        let min_values = self.min_values.as_ref().unwrap();
-        let max_values = self.max_values.as_ref().unwrap();
+        let min_values = self.min_values.as_ref().ok_or_else(|| {
+            IrisError::InvalidOperation("Quantizer not trained: missing min_values".to_string())
+        })?;
+        let max_values = self.max_values.as_ref().ok_or_else(|| {
+            IrisError::InvalidOperation("Quantizer not trained: missing max_values".to_string())
+        })?;
 
         let dequantized: Vec<f32> = data
             .iter()
@@ -186,30 +203,29 @@ impl VectorQuantizer {
         Ok(dequantized)
     }
 
-    /// Train product quantization (placeholder implementation).
+    /// Train product quantization.
     fn train_product_quantization(
         &mut self,
         _vectors: &[Vector],
         _subvector_count: usize,
     ) -> Result<()> {
-        // This would implement k-means clustering for each subvector
-        // For now, just a placeholder
-        self.codebooks = Some(vec![vec![vec![0.0; self.dimension / 4]; 256]; 4]);
-        Ok(())
+        Err(IrisError::InvalidOperation(
+            "Product quantization is not yet implemented".to_string(),
+        ))
     }
 
-    /// Perform product quantization (placeholder implementation).
+    /// Perform product quantization.
     fn product_quantize(&self, _data: &[f32]) -> Result<Vec<u8>> {
-        // This would find the nearest codebook entry for each subvector
-        // For now, just a placeholder
-        Ok(vec![0; 4])
+        Err(IrisError::InvalidOperation(
+            "Product quantization is not yet implemented".to_string(),
+        ))
     }
 
-    /// Dequantize product codes (placeholder implementation).
+    /// Dequantize product codes.
     fn product_dequantize(&self, _codes: &[u8]) -> Result<Vec<f32>> {
-        // This would reconstruct the vector from codebook entries
-        // For now, just a placeholder
-        Ok(vec![0.0; self.dimension])
+        Err(IrisError::InvalidOperation(
+            "Product quantization is not yet implemented".to_string(),
+        ))
     }
 
     /// Get the compression ratio achieved by this quantization method.
@@ -218,7 +234,11 @@ impl VectorQuantizer {
             QuantizationMethod::None => 1.0,
             QuantizationMethod::Scalar8Bit => 4.0, // 32-bit to 8-bit
             QuantizationMethod::ProductQuantization { subvector_count } => {
-                (self.dimension * 4) as f32 / subvector_count as f32
+                if subvector_count == 0 {
+                    1.0
+                } else {
+                    (self.dimension * 4) as f32 / subvector_count as f32
+                }
             }
         }
     }

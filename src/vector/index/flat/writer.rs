@@ -371,7 +371,13 @@ impl VectorIndexWriter for FlatIndexWriter {
         let mut output = storage.create_output(&file_name)?;
 
         // Write metadata
-        output.write_all(&(self.vectors.len() as u64 as u32).to_le_bytes())?;
+        let vector_count: u32 = self.vectors.len().try_into().map_err(|_| {
+            IrisError::InvalidOperation(format!(
+                "Vector count {} exceeds u32::MAX",
+                self.vectors.len()
+            ))
+        })?;
+        output.write_all(&vector_count.to_le_bytes())?;
         output.write_all(&(self.index_config.dimension as u32).to_le_bytes())?;
 
         // Write vectors with field names and metadata

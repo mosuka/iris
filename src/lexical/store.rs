@@ -62,7 +62,7 @@ use parking_lot::Mutex;
 /// engine.commit().unwrap();
 ///
 /// // Search using DSL string
-/// let results = engine.search(LexicalSearchRequest::new("title:rust")).unwrap();
+/// let results = engine.search(LexicalSearchRequest::from_dsl("title:rust")).unwrap();
 /// ```
 pub struct LexicalStore {
     /// The underlying lexical index.
@@ -183,7 +183,7 @@ impl LexicalStore {
 
         let query = Box::new(TermQuery::new(field, term)) as Box<dyn Query>;
         let request = LexicalSearchRequest::new(query)
-            .max_docs(usize::MAX) // Retrieve all matches
+            .limit(usize::MAX) // Retrieve all matches
             .load_documents(false);
 
         // Safe to call search while holding writer lock as long as lock order is respected (Writer -> Searcher)
@@ -362,8 +362,8 @@ impl LexicalStore {
     /// # engine.commit().unwrap();
     ///
     /// // Using DSL string
-    /// let request = LexicalSearchRequest::new("title:hello")
-    ///     .max_docs(10)
+    /// let request = LexicalSearchRequest::from_dsl("title:hello")
+    ///     .limit(10)
     ///     .min_score(0.5);
     /// let results = engine.search(request).unwrap();
     ///
@@ -436,12 +436,12 @@ impl LexicalStore {
     /// # let storage = Arc::new(MemoryStorage::new(MemoryStorageConfig::default()));
     /// # let engine = LexicalStore::new(storage, config).unwrap();
     /// // Count all matching documents
-    /// let count = engine.count(LexicalSearchRequest::new("title:hello")).unwrap();
+    /// let count = engine.count(LexicalSearchRequest::from_dsl("title:hello")).unwrap();
     /// println!("Found {} documents", count);
     ///
     /// // Count with min_score threshold
     /// let count = engine.count(
-    ///     LexicalSearchRequest::new("title:hello").min_score(0.5)
+    ///     LexicalSearchRequest::from_dsl("title:hello").min_score(0.5)
     /// ).unwrap();
     /// println!("Found {} documents with score >= 0.5", count);
     /// ```
@@ -785,7 +785,7 @@ mod tests {
 
         let query = Box::new(TermQuery::new("title", "hello")) as Box<dyn Query>;
         let request = LexicalSearchRequest::new(query)
-            .max_docs(5)
+            .limit(5)
             .min_score(0.5)
             .load_documents(false);
 

@@ -38,10 +38,10 @@ pub trait Scorer: Send + Debug {
 pub struct BM25Scorer {
     /// Document frequency of the term.
     doc_freq: u64,
-    /// Total term frequency across all documents.
+    /// Total term frequency across all documents (reserved for BM25F).
     #[allow(dead_code)]
     total_term_freq: u64,
-    /// Number of documents containing the field.
+    /// Number of documents containing the field (reserved for BM25F).
     #[allow(dead_code)]
     field_doc_count: u64,
     /// Average field length.

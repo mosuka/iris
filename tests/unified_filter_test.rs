@@ -33,34 +33,40 @@ async fn test_unified_filtering() -> iris::Result<()> {
 
     // 3. Index Documents
     // Doc 1: Apple (Fruit), Vector [1.0, 0.0]
-    engine.put_document(
-        "doc1",
-        Document::builder()
-            .add_field("name", "Apple")
-            .add_field("category", "fruit")
-            .add_field("embedding", vec![1.0, 0.0])
-            .build(),
-    ).await?;
+    engine
+        .put_document(
+            "doc1",
+            Document::builder()
+                .add_field("name", "Apple")
+                .add_field("category", "fruit")
+                .add_field("embedding", vec![1.0, 0.0])
+                .build(),
+        )
+        .await?;
 
     // Doc 2: Banana (Fruit), Vector [0.9, 0.1]
-    engine.put_document(
-        "doc2",
-        Document::builder()
-            .add_field("name", "Banana")
-            .add_field("category", "fruit")
-            .add_field("embedding", vec![0.9, 0.1])
-            .build(),
-    ).await?;
+    engine
+        .put_document(
+            "doc2",
+            Document::builder()
+                .add_field("name", "Banana")
+                .add_field("category", "fruit")
+                .add_field("embedding", vec![0.9, 0.1])
+                .build(),
+        )
+        .await?;
 
     // Doc 3: Carrot (Vegetable), Vector [1.0, 0.0] -> Identical vector to Apple!
-    engine.put_document(
-        "doc3",
-        Document::builder()
-            .add_field("name", "Carrot")
-            .add_field("category", "vegetable")
-            .add_field("embedding", vec![1.0, 0.0])
-            .build(),
-    ).await?;
+    engine
+        .put_document(
+            "doc3",
+            Document::builder()
+                .add_field("name", "Carrot")
+                .add_field("category", "vegetable")
+                .add_field("embedding", vec![1.0, 0.0])
+                .build(),
+        )
+        .await?;
 
     engine.commit().await?;
 
@@ -72,8 +78,8 @@ async fn test_unified_filtering() -> iris::Result<()> {
     let filter_query = Box::new(TermQuery::new("category", "vegetable"));
 
     let req = SearchRequestBuilder::new()
-        .with_vector(vector_req.clone())
-        .filter(filter_query)
+        .vector_search_request(vector_req.clone())
+        .filter_query(filter_query)
         .build();
 
     let results = engine.search(req).await?;
@@ -91,8 +97,8 @@ async fn test_unified_filtering() -> iris::Result<()> {
     // 5. Test Filtering: Search for "fruit"
     let filter_query_fruit = Box::new(TermQuery::new("category", "fruit"));
     let req_fruit = SearchRequestBuilder::new()
-        .with_vector(vector_req)
-        .filter(filter_query_fruit)
+        .vector_search_request(vector_req)
+        .filter_query(filter_query_fruit)
         .build();
 
     let results_fruit = engine.search(req_fruit).await?;
@@ -131,30 +137,36 @@ async fn test_unified_filtering_hnsw() -> iris::Result<()> {
     let engine = Engine::new(storage.clone(), config).await?;
 
     // 3. Index Documents
-    engine.put_document(
-        "doc1",
-        Document::builder()
-            .add_field("name", "Apple")
-            .add_field("category", "fruit")
-            .add_field("embedding", vec![1.0, 0.0])
-            .build(),
-    ).await?;
-    engine.put_document(
-        "doc2",
-        Document::builder()
-            .add_field("name", "Banana")
-            .add_field("category", "fruit")
-            .add_field("embedding", vec![0.9, 0.1])
-            .build(),
-    ).await?;
-    engine.put_document(
-        "doc3",
-        Document::builder()
-            .add_field("name", "Carrot")
-            .add_field("category", "vegetable")
-            .add_field("embedding", vec![1.0, 0.0])
-            .build(),
-    ).await?;
+    engine
+        .put_document(
+            "doc1",
+            Document::builder()
+                .add_field("name", "Apple")
+                .add_field("category", "fruit")
+                .add_field("embedding", vec![1.0, 0.0])
+                .build(),
+        )
+        .await?;
+    engine
+        .put_document(
+            "doc2",
+            Document::builder()
+                .add_field("name", "Banana")
+                .add_field("category", "fruit")
+                .add_field("embedding", vec![0.9, 0.1])
+                .build(),
+        )
+        .await?;
+    engine
+        .put_document(
+            "doc3",
+            Document::builder()
+                .add_field("name", "Carrot")
+                .add_field("category", "vegetable")
+                .add_field("embedding", vec![1.0, 0.0])
+                .build(),
+        )
+        .await?;
     engine.commit().await?;
 
     // 4. Test Filtering: Search for [1.0, 0.0] but filter for "vegetable"
@@ -164,8 +176,8 @@ async fn test_unified_filtering_hnsw() -> iris::Result<()> {
 
     let filter_query = Box::new(TermQuery::new("category", "vegetable"));
     let req = SearchRequestBuilder::new()
-        .with_vector(vector_req)
-        .filter(filter_query)
+        .vector_search_request(vector_req)
+        .filter_query(filter_query)
         .build();
 
     let results = engine.search(req).await?;
@@ -200,30 +212,36 @@ async fn test_unified_filtering_ivf() -> iris::Result<()> {
     let engine = Engine::new(storage.clone(), config).await?;
 
     // 3. Index Documents
-    engine.put_document(
-        "doc1",
-        Document::builder()
-            .add_field("name", "Apple")
-            .add_field("category", "fruit")
-            .add_field("embedding", vec![1.0, 0.0])
-            .build(),
-    ).await?;
-    engine.put_document(
-        "doc2",
-        Document::builder()
-            .add_field("name", "Banana")
-            .add_field("category", "fruit")
-            .add_field("embedding", vec![0.9, 0.1])
-            .build(),
-    ).await?;
-    engine.put_document(
-        "doc3",
-        Document::builder()
-            .add_field("name", "Carrot")
-            .add_field("category", "vegetable")
-            .add_field("embedding", vec![1.0, 0.0])
-            .build(),
-    ).await?;
+    engine
+        .put_document(
+            "doc1",
+            Document::builder()
+                .add_field("name", "Apple")
+                .add_field("category", "fruit")
+                .add_field("embedding", vec![1.0, 0.0])
+                .build(),
+        )
+        .await?;
+    engine
+        .put_document(
+            "doc2",
+            Document::builder()
+                .add_field("name", "Banana")
+                .add_field("category", "fruit")
+                .add_field("embedding", vec![0.9, 0.1])
+                .build(),
+        )
+        .await?;
+    engine
+        .put_document(
+            "doc3",
+            Document::builder()
+                .add_field("name", "Carrot")
+                .add_field("category", "vegetable")
+                .add_field("embedding", vec![1.0, 0.0])
+                .build(),
+        )
+        .await?;
     engine.commit().await?;
 
     // 4. Test Filtering: Search for [1.0, 0.0] but filter for "vegetable"
@@ -233,8 +251,8 @@ async fn test_unified_filtering_ivf() -> iris::Result<()> {
 
     let filter_query = Box::new(TermQuery::new("category", "vegetable"));
     let req = SearchRequestBuilder::new()
-        .with_vector(vector_req)
-        .filter(filter_query)
+        .vector_search_request(vector_req)
+        .filter_query(filter_query)
         .build();
 
     let results = engine.search(req).await?;

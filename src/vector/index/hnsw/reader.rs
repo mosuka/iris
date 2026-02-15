@@ -177,7 +177,7 @@ impl HnswIndexReader {
                 let mut offsets = HashMap::with_capacity(num_vectors);
                 let mut vector_ids = Vec::with_capacity(num_vectors);
 
-                let start_pos = 4 + 4 + 4 + 4; // num_vectors, dimension, m, ef
+                let start_pos = 8 + 4 + 4 + 4; // num_vectors(u64) + dimension(u32) + m(u32) + ef(u32)
 
                 // Seek to start of vectors
                 input

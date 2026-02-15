@@ -138,9 +138,10 @@ impl SuggestionEngine {
             }
         }
 
-        // Convert to sorted vector and limit results
+        // Convert to sorted vector and limit results.
+        // Suggestion's Ord reverses score comparison (higher score = "smaller"),
+        // so into_sorted_vec() returns highest scores first.
         let mut result: Vec<Suggestion> = suggestions.into_sorted_vec();
-        result.reverse(); // BinaryHeap returns lowest first, we want highest
         result.truncate(self.config.max_suggestions);
         result
     }
@@ -247,10 +248,11 @@ impl SuggestionEngine {
         };
 
         // Frequency score (logarithmic scale to prevent domination by very common words)
-        let frequency_score = if frequency == 0 {
+        let total_freq = self.dictionary.total_frequency();
+        let frequency_score = if frequency == 0 || total_freq <= 1 {
             0.0
         } else {
-            (frequency as f64).ln() / (self.dictionary.total_frequency() as f64).ln()
+            (frequency as f64).ln() / (total_freq as f64).ln()
         };
 
         // Length similarity bonus

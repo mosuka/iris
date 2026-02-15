@@ -35,7 +35,7 @@ use crate::vector::search::searcher::{VectorIndexSearchRequest, VectorIndexSearc
 use crate::vector::writer::VectorIndexWriter;
 
 use self::config::VectorIndexConfig;
-use self::request::VectorSearchRequest;
+use self::request::{VectorScoreMode, VectorSearchRequest};
 use self::response::{VectorHit, VectorSearchResults, VectorStats};
 
 /// A simplified vector storage component following the LexicalStore pattern.
@@ -161,9 +161,9 @@ impl VectorStore {
             *guard = Some(self.index.writer()?);
         }
 
-        // First, delete any existing vectors for this doc_id
+        // First, delete any existing vectors for this doc_id (ignore not-found)
         let writer = guard.as_mut().unwrap();
-        let _ = writer.delete_document(doc_id);
+        writer.delete_document(doc_id)?;
 
         // Add values to index (writer handles embedding automatically)
         for (field_name, value) in &doc.fields {
@@ -241,11 +241,11 @@ impl VectorStore {
         // Process each query vector
         for qv in &request.query_vectors {
             let index_request = VectorIndexSearchRequest::new(Vector::new(qv.vector.clone()))
-                .top_k(request.limit * 2); // Overfetch for better results
+                .top_k(request.limit.saturating_mul(2)); // Overfetch for better results
 
             let results = searcher.search(&index_request)?;
 
-            // Aggregate scores
+            // Aggregate scores based on score_mode
             for result in results.results {
                 // Apply allowed_ids filter if present
                 if request
@@ -261,8 +261,25 @@ impl VectorStore {
                     continue;
                 }
 
+                let weighted_score = result.similarity * qv.weight;
                 let entry = all_hits.entry(result.doc_id).or_insert(0.0);
-                *entry += result.similarity * qv.weight;
+
+                match request.score_mode {
+                    VectorScoreMode::WeightedSum | VectorScoreMode::LateInteraction => {
+                        // WeightedSum: sum of similarity * weight across all query vectors.
+                        // LateInteraction: for each query vector, find the max similarity
+                        // across document vectors, then sum. In the current single-vector-
+                        // per-field architecture, this is equivalent to WeightedSum since
+                        // each query vector already gets a single best match per document.
+                        *entry += weighted_score;
+                    }
+                    VectorScoreMode::MaxSim => {
+                        // MaxSim: take the maximum weighted similarity across query vectors.
+                        if weighted_score > *entry {
+                            *entry = weighted_score;
+                        }
+                    }
+                }
             }
         }
 

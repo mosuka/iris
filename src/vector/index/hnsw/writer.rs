@@ -10,7 +10,7 @@ use crate::vector::index::field::LegacyVectorFieldWriter;
 use crate::vector::index::hnsw::graph::HnswGraph;
 use crate::vector::writer::{VectorIndexWriter, VectorIndexWriterConfig};
 use parking_lot::RwLock;
-use rand::Rng;
+use rand::RngExt;
 use rayon::prelude::*;
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, HashMap, HashSet};
@@ -188,6 +188,11 @@ impl HnswIndexWriter {
         writer_config: VectorIndexWriterConfig,
         path: impl Into<String>,
     ) -> Result<Self> {
+        if index_config.m < 2 {
+            return Err(crate::error::IrisError::InvalidOperation(
+                "HNSW parameter m must be >= 2".to_string(),
+            ));
+        }
         let max_level = Self::calculate_max_level(index_config.m, index_config.ef_construction);
         let _ml = 1.0 / (index_config.m as f64).ln();
 
@@ -215,6 +220,11 @@ impl HnswIndexWriter {
         path: impl Into<String>,
         storage: Arc<dyn Storage>,
     ) -> Result<Self> {
+        if index_config.m < 2 {
+            return Err(crate::error::IrisError::InvalidOperation(
+                "HNSW parameter m must be >= 2".to_string(),
+            ));
+        }
         let max_level = Self::calculate_max_level(index_config.m, index_config.ef_construction);
         let _ml = 1.0 / (index_config.m as f64).ln();
 
@@ -316,6 +326,11 @@ impl HnswIndexWriter {
         let max_id = vectors.iter().map(|(id, _, _)| *id).max().unwrap_or(0);
         let next_vec_id = if num_vectors > 0 { max_id + 1 } else { 0 };
 
+        if index_config.m < 2 {
+            return Err(IrisError::InvalidOperation(
+                "HNSW parameter m must be >= 2".to_string(),
+            ));
+        }
         let max_level = Self::calculate_max_level(index_config.m, index_config.ef_construction);
         let _ml = 1.0 / (index_config.m as f64).ln();
 

@@ -1,26 +1,27 @@
 use crate::lexical::query::Query;
+use crate::lexical::search::searcher::LexicalSearchRequest;
 use crate::vector::store::request::VectorSearchRequest;
 
 /// Unified search request.
 pub struct SearchRequest {
-    /// Lexical query (e.g. BoolQuery, TermQuery).
-    pub lexical: Option<Box<dyn Query>>,
+    /// Lexical search request.
+    pub lexical_search_request: Option<LexicalSearchRequest>,
 
     /// Vector search request.
-    pub vector: Option<VectorSearchRequest>,
+    pub vector_search_request: Option<VectorSearchRequest>,
 
     /// Maximum number of results to return.
     pub limit: usize,
 
+    /// Number of results to skip before returning (for pagination).
+    pub offset: usize,
+
     /// Hybrid fusion algorithm to use (if both queries are present).
-    pub fusion: Option<FusionAlgorithm>,
+    pub fusion_algorithm: Option<FusionAlgorithm>,
 
     /// Filter query (lexical) to restrict search space.
     /// Documents matching this query will be candidates for vector search.
-    pub filter: Option<Box<dyn Query>>,
-
-    /// Field-level boosts for lexical search.
-    pub field_boosts: std::collections::HashMap<String, f32>,
+    pub filter_query: Option<Box<dyn Query>>,
 }
 
 /// Algorithm used to combine lexical and vector scores.
@@ -46,12 +47,12 @@ pub enum FusionAlgorithm {
 impl Default for SearchRequest {
     fn default() -> Self {
         Self {
-            lexical: None,
-            vector: None,
+            lexical_search_request: None,
+            vector_search_request: None,
             limit: 10,
-            fusion: None,
-            filter: None,
-            field_boosts: std::collections::HashMap::new(),
+            offset: 0,
+            fusion_algorithm: None,
+            filter_query: None,
         }
     }
 }
@@ -73,13 +74,15 @@ impl SearchRequestBuilder {
         }
     }
 
-    pub fn with_lexical(mut self, query: Box<dyn Query>) -> Self {
-        self.request.lexical = Some(query);
+    /// Set the lexical search request.
+    pub fn lexical_search_request(mut self, request: LexicalSearchRequest) -> Self {
+        self.request.lexical_search_request = Some(request);
         self
     }
 
-    pub fn with_vector(mut self, request: VectorSearchRequest) -> Self {
-        self.request.vector = Some(request);
+    /// Set the vector search request.
+    pub fn vector_search_request(mut self, request: VectorSearchRequest) -> Self {
+        self.request.vector_search_request = Some(request);
         self
     }
 
@@ -88,18 +91,40 @@ impl SearchRequestBuilder {
         self
     }
 
-    pub fn fusion(mut self, fusion: FusionAlgorithm) -> Self {
-        self.request.fusion = Some(fusion);
+    pub fn offset(mut self, offset: usize) -> Self {
+        self.request.offset = offset;
         self
     }
 
-    pub fn filter(mut self, query: Box<dyn Query>) -> Self {
-        self.request.filter = Some(query);
+    pub fn fusion_algorithm(mut self, fusion: FusionAlgorithm) -> Self {
+        // Clamp weights to valid range to prevent NaN/Inf propagation.
+        let fusion = match fusion {
+            FusionAlgorithm::WeightedSum {
+                lexical_weight,
+                vector_weight,
+            } => FusionAlgorithm::WeightedSum {
+                lexical_weight: lexical_weight.clamp(0.0, 1.0),
+                vector_weight: vector_weight.clamp(0.0, 1.0),
+            },
+            other => other,
+        };
+        self.request.fusion_algorithm = Some(fusion);
         self
     }
 
+    pub fn filter_query(mut self, query: Box<dyn Query>) -> Self {
+        self.request.filter_query = Some(query);
+        self
+    }
+
+    /// Add a field-level boost for lexical search.
+    ///
+    /// Note: This requires `with_lexical()` to have been called first.
+    /// If no lexical query has been set, this is a no-op.
     pub fn add_field_boost(mut self, field: impl Into<String>, boost: f32) -> Self {
-        self.request.field_boosts.insert(field.into(), boost);
+        if let Some(ref mut lex) = self.request.lexical_search_request {
+            lex.field_boosts.insert(field.into(), boost);
+        }
         self
     }
 

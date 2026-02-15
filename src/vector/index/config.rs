@@ -117,8 +117,14 @@ pub mod utils {
             VectorNormalization::MinMax => {
                 vectors.par_iter_mut().for_each(|vector| {
                     if let (Some(&min_val), Some(&max_val)) = (
-                        vector.data.iter().min_by(|a, b| a.partial_cmp(b).unwrap()),
-                        vector.data.iter().max_by(|a, b| a.partial_cmp(b).unwrap()),
+                        vector
+                            .data
+                            .iter()
+                            .min_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal)),
+                        vector
+                            .data
+                            .iter()
+                            .max_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal)),
                     ) {
                         let range = max_val - min_val;
                         if range > 0.0 {
@@ -376,9 +382,7 @@ impl std::fmt::Debug for FlatIndexConfig {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("FlatIndexConfig")
             .field("dimension", &self.dimension)
-            .field("dimension", &self.dimension)
             .field("loading_mode", &self.loading_mode)
-            .field("distance_metric", &self.distance_metric)
             .field("distance_metric", &self.distance_metric)
             .field("normalize_vectors", &self.normalize_vectors)
             .field("max_vectors_per_segment", &self.max_vectors_per_segment)
@@ -474,9 +478,7 @@ impl std::fmt::Debug for HnswIndexConfig {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("HnswIndexConfig")
             .field("dimension", &self.dimension)
-            .field("dimension", &self.dimension)
             .field("loading_mode", &self.loading_mode)
-            .field("distance_metric", &self.distance_metric)
             .field("distance_metric", &self.distance_metric)
             .field("normalize_vectors", &self.normalize_vectors)
             .field("m", &self.m)

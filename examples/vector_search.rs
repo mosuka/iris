@@ -111,7 +111,7 @@ async fn main() -> Result<()> {
     let results = engine
         .search(
             SearchRequestBuilder::new()
-                .with_vector(
+                .vector_search_request(
                     VectorSearchRequestBuilder::new()
                         .add_text("text_vec", "memory safety")
                         .build(),
@@ -131,12 +131,12 @@ async fn main() -> Result<()> {
     let results = engine
         .search(
             SearchRequestBuilder::new()
-                .with_vector(
+                .vector_search_request(
                     VectorSearchRequestBuilder::new()
                         .add_text("text_vec", "memory safety")
                         .build(),
                 )
-                .filter(Box::new(TermQuery::new("category", "concurrency")))
+                .filter_query(Box::new(TermQuery::new("category", "concurrency")))
                 .limit(3)
                 .build(),
         )
@@ -152,12 +152,12 @@ async fn main() -> Result<()> {
     let results = engine
         .search(
             SearchRequestBuilder::new()
-                .with_vector(
+                .vector_search_request(
                     VectorSearchRequestBuilder::new()
                         .add_text("text_vec", "type system")
                         .build(),
                 )
-                .filter(Box::new(NumericRangeQuery::new(
+                .filter_query(Box::new(NumericRangeQuery::new(
                     "page",
                     NumericType::Integer,
                     Some(1.0),
@@ -183,7 +183,7 @@ async fn main() -> Result<()> {
     let results = engine
         .search(
             SearchRequestBuilder::new()
-                .with_vector(vector_parser.parse("text_vec:~\"memory safety\"").await?)
+                .vector_search_request(vector_parser.parse("text_vec:~\"memory safety\"").await?)
                 .limit(3)
                 .build(),
         )

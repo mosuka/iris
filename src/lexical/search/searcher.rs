@@ -1,5 +1,6 @@
 //! Searcher trait for lexical search execution.
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::error::Result;
@@ -33,8 +34,8 @@ pub enum SortField {
 /// Configuration for search operations.
 #[derive(Debug, Clone)]
 pub struct LexicalSearchParams {
-    /// Maximum number of documents to return.
-    pub max_docs: usize,
+    /// Maximum number of results to return.
+    pub limit: usize,
     /// Minimum score threshold.
     pub min_score: f32,
     /// Whether to load document content.
@@ -50,7 +51,7 @@ pub struct LexicalSearchParams {
 impl Default for LexicalSearchParams {
     fn default() -> Self {
         LexicalSearchParams {
-            max_docs: 10,
+            limit: 10,
             min_score: 0.0,
             load_documents: true,
             timeout_ms: None,
@@ -76,6 +77,9 @@ pub struct LexicalSearchRequest {
     pub query: LexicalSearchQuery,
     /// Search configuration.
     pub params: LexicalSearchParams,
+    /// Field-level boosts for lexical scoring.
+    /// Applied at the Engine level before search execution.
+    pub field_boosts: HashMap<String, f32>,
 }
 
 impl Clone for LexicalSearchQuery {
@@ -92,6 +96,7 @@ impl Clone for LexicalSearchRequest {
         LexicalSearchRequest {
             query: self.query.clone(),
             params: self.params.clone(),
+            field_boosts: self.field_boosts.clone(),
         }
     }
 }
@@ -145,22 +150,27 @@ impl LexicalSearchQuery {
 }
 
 impl LexicalSearchRequest {
-    /// Create a new search request from any query type.
-    ///
-    /// Accepts:
-    /// - `&str`: DSL query string
-    /// - `String`: DSL query string
-    /// - `Box<dyn Query>`: Query object
-    pub fn new(query: impl Into<LexicalSearchQuery>) -> Self {
+    /// Create a new search request from a query object.
+    pub fn new(query: Box<dyn Query>) -> Self {
         LexicalSearchRequest {
-            query: query.into(),
+            query: LexicalSearchQuery::Obj(query),
             params: LexicalSearchParams::default(),
+            field_boosts: HashMap::new(),
         }
     }
 
-    /// Set the maximum number of documents to return.
-    pub fn max_docs(mut self, max_docs: usize) -> Self {
-        self.params.max_docs = max_docs;
+    /// Create a new search request from a DSL query string.
+    pub fn from_dsl(dsl: impl Into<String>) -> Self {
+        LexicalSearchRequest {
+            query: LexicalSearchQuery::Dsl(dsl.into()),
+            params: LexicalSearchParams::default(),
+            field_boosts: HashMap::new(),
+        }
+    }
+
+    /// Set the maximum number of results to return.
+    pub fn limit(mut self, limit: usize) -> Self {
+        self.params.limit = limit;
         self
     }
 
@@ -209,6 +219,12 @@ impl LexicalSearchRequest {
     /// Sort results by relevance score (default).
     pub fn sort_by_score(mut self) -> Self {
         self.params.sort_by = SortField::Score;
+        self
+    }
+
+    /// Add a field-level boost for lexical scoring.
+    pub fn with_field_boost(mut self, field: impl Into<String>, boost: f32) -> Self {
+        self.field_boosts.insert(field.into(), boost);
         self
     }
 }

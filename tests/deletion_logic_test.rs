@@ -9,7 +9,7 @@ use iris::storage::file::FileStorageConfig;
 use iris::storage::{StorageConfig, StorageFactory};
 use iris::vector::FieldOption as VectorOption;
 use iris::vector::VectorSearchRequestBuilder;
-use iris::{FieldOption, Schema};
+use iris::{FieldOption, LexicalSearchRequest, Schema};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_engine_unified_deletion() -> iris::Result<()> {
@@ -41,14 +41,14 @@ async fn test_engine_unified_deletion() -> iris::Result<()> {
     // 4. Verify it exists in both
     // Lexical check
     let req_lexical = SearchRequestBuilder::new()
-        .with_lexical(Box::new(TermQuery::new("title", "hello")))
+        .lexical_search_request(LexicalSearchRequest::new(Box::new(TermQuery::new("title", "hello"))))
         .build();
     let res_lexical = engine.search(req_lexical).await?;
     assert_eq!(res_lexical.len(), 1, "Should be found lexically");
 
     // Vector check
     let req_vector = SearchRequestBuilder::new()
-        .with_vector(
+        .vector_search_request(
             VectorSearchRequestBuilder::new()
                 .add_vector("embedding", vec![0.1; 128])
                 .build(),
@@ -64,14 +64,14 @@ async fn test_engine_unified_deletion() -> iris::Result<()> {
     // 6. Verify it is GONE from both
     let res_lexical_after = engine.search(
         SearchRequestBuilder::new()
-            .with_lexical(Box::new(TermQuery::new("title", "hello")))
+            .lexical_search_request(LexicalSearchRequest::new(Box::new(TermQuery::new("title", "hello"))))
             .build(),
     ).await?;
     assert_eq!(res_lexical_after.len(), 0, "Should be deleted lexically");
 
     let res_vector_after = engine.search(
         SearchRequestBuilder::new()
-            .with_vector(
+            .vector_search_request(
                 VectorSearchRequestBuilder::new()
                     .add_vector("embedding", vec![0.1; 128])
                     .build(),
@@ -117,7 +117,7 @@ async fn test_engine_upsert() -> iris::Result<()> {
     // 4. Verify initial version exists
     let res = engine.search(
         SearchRequestBuilder::new()
-            .with_lexical(Box::new(TermQuery::new("title", "initial")))
+            .lexical_search_request(LexicalSearchRequest::new(Box::new(TermQuery::new("title", "initial"))))
             .build(),
     ).await?;
     assert_eq!(res.len(), 1);
@@ -135,7 +135,7 @@ async fn test_engine_upsert() -> iris::Result<()> {
     // Old version lookup should fail
     let res_old = engine.search(
         SearchRequestBuilder::new()
-            .with_lexical(Box::new(TermQuery::new("title", "initial")))
+            .lexical_search_request(LexicalSearchRequest::new(Box::new(TermQuery::new("title", "initial"))))
             .build(),
     ).await?;
     assert_eq!(res_old.len(), 0, "Old version should be replaced");
@@ -143,7 +143,7 @@ async fn test_engine_upsert() -> iris::Result<()> {
     // New version lookup should succeed
     let res_new = engine.search(
         SearchRequestBuilder::new()
-            .with_lexical(Box::new(TermQuery::new("title", "updated")))
+            .lexical_search_request(LexicalSearchRequest::new(Box::new(TermQuery::new("title", "updated"))))
             .build(),
     ).await?;
     assert_eq!(res_new.len(), 1, "New version should be found");
@@ -151,7 +151,7 @@ async fn test_engine_upsert() -> iris::Result<()> {
     // Vector check for new vector
     let res_vec = engine.search(
         SearchRequestBuilder::new()
-            .with_vector(
+            .vector_search_request(
                 VectorSearchRequestBuilder::new()
                     .add_vector("embedding", vec![0.0, 1.0])
                     .build(),
@@ -234,7 +234,7 @@ async fn test_engine_double_delete() -> iris::Result<()> {
     let res = engine
         .search(
             SearchRequestBuilder::new()
-                .with_lexical(Box::new(TermQuery::new("title", "hello")))
+                .lexical_search_request(LexicalSearchRequest::new(Box::new(TermQuery::new("title", "hello"))))
                 .build(),
         )
         .await?;

@@ -161,8 +161,7 @@ fn bench_vector_search(c: &mut Criterion) {
         let query_vector = vectors[0].clone();
 
         b.iter(|| {
-            // Basic vector operations for benchmarking
-            let mut results = Vec::new();
+            let mut results = Vec::with_capacity(50);
             for (i, vector) in vectors.iter().take(50).enumerate() {
                 let distance = DistanceMetric::Cosine
                     .distance(black_box(&query_vector.data), black_box(&vector.data))
@@ -452,4 +451,4 @@ criterion_group!(
 // Separate group for slower benchmarks
 criterion_group!(slow_benches, bench_spell_correction, bench_scalability);
 
-criterion_main!(benches);
+criterion_main!(benches, slow_benches);

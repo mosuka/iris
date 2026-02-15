@@ -330,7 +330,7 @@ impl InvertedIndexSearcher {
                 // Use TopFieldCollector for field-based sorting
                 let ascending = matches!(order, SortOrder::Asc);
                 let collector = TopFieldCollector::with_min_score(
-                    params.max_docs,
+                    params.limit,
                     params.min_score,
                     name.clone(),
                     ascending,
@@ -347,7 +347,7 @@ impl InvertedIndexSearcher {
             }
             SortField::Score => {
                 // Use TopDocsCollector for score-based sorting
-                let collector = TopDocsCollector::with_min_score(params.max_docs, params.min_score);
+                let collector = TopDocsCollector::with_min_score(params.limit, params.min_score);
 
                 let result_collector =
                     self.search_with_collector_parallel(query, collector, params.parallel)?;
@@ -359,7 +359,7 @@ impl InvertedIndexSearcher {
         // Check if we exceeded timeout.
         // NOTE: Timeout is checked after scoring completes, not during scoring.
         // Per-document timeout checks would add overhead to every document match.
-        // For very large result sets, consider using max_docs to bound scoring.
+        // For very large result sets, consider using limit to bound scoring.
         if start_time.elapsed() > timeout {
             return Err(IrisError::index("Search timeout exceeded"));
         }
@@ -430,7 +430,7 @@ impl InvertedIndexSearcher {
                     // Use TopFieldCollector for field-based sorting
                     let ascending = matches!(order, SortOrder::Asc);
                     let collector = TopFieldCollector::with_min_score(
-                        request.params.max_docs,
+                        request.params.limit,
                         request.params.min_score,
                         name.clone(),
                         ascending,
@@ -465,7 +465,7 @@ impl InvertedIndexSearcher {
                 SortField::Score => {
                     // Use TopDocsCollector for score-based sorting
                     let collector = TopDocsCollector::with_min_score(
-                        request.params.max_docs,
+                        request.params.limit,
                         request.params.min_score,
                     );
                     let result_collector = self.search_with_collector_parallel(
@@ -714,7 +714,7 @@ mod tests {
         let query = Box::new(TermQuery::new("title", "hello")) as Box<dyn Query>;
 
         let request = LexicalSearchRequest::new(query)
-            .max_docs(5)
+            .limit(5)
             .min_score(0.5)
             .load_documents(false);
 
@@ -793,12 +793,12 @@ mod tests {
         let query = Box::new(TermQuery::new("title", "hello")) as Box<dyn Query>;
 
         let request = LexicalSearchRequest::new(query)
-            .max_docs(20)
+            .limit(20)
             .min_score(0.1)
             .load_documents(false)
             .timeout_ms(5000);
 
-        assert_eq!(request.params.max_docs, 20);
+        assert_eq!(request.params.limit, 20);
         assert_eq!(request.params.min_score, 0.1);
         assert!(!request.params.load_documents);
         assert_eq!(request.params.timeout_ms, Some(5000));

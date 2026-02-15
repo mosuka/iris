@@ -6,7 +6,7 @@ use iris::lexical::TermQuery;
 use iris::lexical::{FieldOption as LexicalFieldOption, TextOption};
 use iris::storage::memory::MemoryStorageConfig;
 use iris::storage::{StorageConfig, StorageFactory};
-use iris::{FieldOption, Schema};
+use iris::{FieldOption, LexicalSearchRequest, Schema};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_schema_lexical_guardrails() -> Result<()> {
@@ -59,7 +59,7 @@ async fn test_schema_lexical_guardrails() -> Result<()> {
 
     // Case A: Search "indexed_and_stored" -> Should find it
     let req_a = SearchRequestBuilder::new()
-        .with_lexical(Box::new(TermQuery::new("indexed_and_stored", "value1")))
+        .lexical_search_request(LexicalSearchRequest::new(Box::new(TermQuery::new("indexed_and_stored", "value1"))))
         .build();
     let res_a = engine.search(req_a).await?;
     assert_eq!(res_a.len(), 1, "Should find 'indexed_and_stored' field");
@@ -74,7 +74,7 @@ async fn test_schema_lexical_guardrails() -> Result<()> {
 
     // Case B: Search "indexed_only" -> Should find it but value should NOT be in get_documents results
     let req_b = SearchRequestBuilder::new()
-        .with_lexical(Box::new(TermQuery::new("indexed_only", "value2")))
+        .lexical_search_request(LexicalSearchRequest::new(Box::new(TermQuery::new("indexed_only", "value2"))))
         .build();
     let res_b = engine.search(req_b).await?;
     assert_eq!(res_b.len(), 1, "Should find 'indexed_only' field");
@@ -87,7 +87,7 @@ async fn test_schema_lexical_guardrails() -> Result<()> {
 
     // Case C: Search "stored_only" -> Should NOT find it
     let req_c = SearchRequestBuilder::new()
-        .with_lexical(Box::new(TermQuery::new("stored_only", "value3")))
+        .lexical_search_request(LexicalSearchRequest::new(Box::new(TermQuery::new("stored_only", "value3"))))
         .build();
     let res_c = engine.search(req_c).await?;
     assert_eq!(
@@ -106,7 +106,7 @@ async fn test_schema_lexical_guardrails() -> Result<()> {
 
     // Case D: Search "unknown_field" -> Should NOT find it
     let req_d = SearchRequestBuilder::new()
-        .with_lexical(Box::new(TermQuery::new("unknown_field", "should")))
+        .lexical_search_request(LexicalSearchRequest::new(Box::new(TermQuery::new("unknown_field", "should"))))
         .build();
     let res_d = engine.search(req_d).await?;
     assert_eq!(

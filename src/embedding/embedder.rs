@@ -98,7 +98,7 @@ impl<'a> EmbedInput<'a> {
     /// Check if this is an image input.
     pub fn is_image(&self) -> bool {
         match self {
-            EmbedInput::Bytes(_, mime) => mime.is_none_or(|m| m.starts_with("image/")),
+            EmbedInput::Bytes(_, Some(mime)) => mime.starts_with("image/"),
             _ => false,
         }
     }

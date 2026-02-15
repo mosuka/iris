@@ -111,16 +111,14 @@ impl PostingList {
 
     /// Add a posting to this list.
     pub fn add_posting(&mut self, posting: Posting) {
-        self.total_frequency += posting.frequency as u64;
-        self.doc_frequency += 1;
-
         // Insert in sorted order by doc_id
         match self
             .postings
             .binary_search_by_key(&posting.doc_id, |p| p.doc_id)
         {
             Ok(pos) => {
-                // Document already exists, merge the posting
+                // Document already exists, merge the posting.
+                // Only update total_frequency (not doc_frequency, since doc already counted).
                 let existing = &mut self.postings[pos];
                 existing.frequency += posting.frequency;
                 self.total_frequency += posting.frequency as u64;
@@ -133,7 +131,9 @@ impl PostingList {
                 }
             }
             Err(pos) => {
-                // Insert new posting
+                // Insert new posting. Update both counters.
+                self.total_frequency += posting.frequency as u64;
+                self.doc_frequency += 1;
                 self.postings.insert(pos, posting);
             }
         }
@@ -189,10 +189,10 @@ impl PostingList {
                 writer.write_u8(1)?; // Has positions flag
                 writer.write_varint(positions.len() as u64)?;
 
-                // Delta-compress positions
+                // Delta-compress positions (positions must be sorted ascending)
                 let mut prev_pos = 0u32;
                 for &pos in positions {
-                    let delta = pos - prev_pos;
+                    let delta = pos.saturating_sub(prev_pos);
                     writer.write_varint(delta as u64)?;
                     prev_pos = pos;
                 }

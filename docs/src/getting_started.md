@@ -60,8 +60,8 @@ fn main() -> iris::Result<()> {
     // 4. Hybrid search (combines lexical keyword match + semantic similarity)
     let results = engine.search(
         SearchRequestBuilder::new()
-            .with_lexical(Box::new(TermQuery::new("content", "programming")))
-            .with_vector(VectorSearchRequestBuilder::new().add_text("content_vec", "systems language").build())
+            .lexical_search_request(Box::new(TermQuery::new("content", "programming")))
+            .vector_search_request(VectorSearchRequestBuilder::new().add_text("content_vec", "systems language").build())
             .fusion(FusionAlgorithm::RRF { k: 60.0 })
             .build()
     )?;

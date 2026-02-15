@@ -11,7 +11,7 @@
 mod common;
 
 use iris::lexical::{TermQuery, TextOption};
-use iris::{Document, Engine, Schema, SearchRequestBuilder};
+use iris::{Document, Engine, LexicalSearchRequest, Schema, SearchRequestBuilder};
 
 #[tokio::main]
 async fn main() -> iris::Result<()> {
@@ -66,7 +66,7 @@ async fn main() -> iris::Result<()> {
     let results = engine
         .search(
             SearchRequestBuilder::new()
-                .with_lexical(Box::new(TermQuery::new("body", "rust")))
+                .lexical_search_request(LexicalSearchRequest::new(Box::new(TermQuery::new("body", "rust"))))
                 .limit(5)
                 .build(),
         )
@@ -78,7 +78,7 @@ async fn main() -> iris::Result<()> {
     let results = engine
         .search(
             SearchRequestBuilder::new()
-                .with_lexical(Box::new(TermQuery::new("body", "language")))
+                .lexical_search_request(LexicalSearchRequest::new(Box::new(TermQuery::new("body", "language"))))
                 .limit(5)
                 .build(),
         )

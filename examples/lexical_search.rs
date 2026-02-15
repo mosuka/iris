@@ -24,7 +24,7 @@ use iris::lexical::{
     BooleanQuery, FuzzyQuery, GeoQuery, NumericRangeQuery, PhraseQuery, QueryParser, TermQuery,
     TextOption, WildcardQuery,
 };
-use iris::{DataValue, Document, Engine, Result, Schema, SearchRequestBuilder};
+use iris::{DataValue, Document, Engine, LexicalSearchRequest, Result, Schema, SearchRequestBuilder};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -135,7 +135,7 @@ async fn main() -> Result<()> {
     println!("\n[1a] Search for 'rust' in body:");
     let results = engine.search(
         SearchRequestBuilder::new()
-            .with_lexical(Box::new(TermQuery::new("body", "rust")))
+            .lexical_search_request(LexicalSearchRequest::new(Box::new(TermQuery::new("body", "rust"))))
             .limit(5).build(),
     ).await?;
     common::print_search_results(&results);
@@ -143,7 +143,7 @@ async fn main() -> Result<()> {
     println!("\n[1b] Search for 'programming' in category (KeywordAnalyzer — exact):");
     let results = engine.search(
         SearchRequestBuilder::new()
-            .with_lexical(Box::new(TermQuery::new("category", "programming")))
+            .lexical_search_request(LexicalSearchRequest::new(Box::new(TermQuery::new("category", "programming"))))
             .limit(5).build(),
     ).await?;
     common::print_search_results(&results);
@@ -151,7 +151,7 @@ async fn main() -> Result<()> {
     println!("\n[1c] Search for in_print=true (boolean field):");
     let results = engine.search(
         SearchRequestBuilder::new()
-            .with_lexical(Box::new(TermQuery::new("in_print", "true")))
+            .lexical_search_request(LexicalSearchRequest::new(Box::new(TermQuery::new("in_print", "true"))))
             .limit(5).build(),
     ).await?;
     common::print_search_results(&results);
@@ -159,7 +159,7 @@ async fn main() -> Result<()> {
     println!("\n[1d] DSL: 'body:rust'");
     let query = parser.parse("body:rust")?;
     let results = engine.search(
-        SearchRequestBuilder::new().with_lexical(query).limit(5).build(),
+        SearchRequestBuilder::new().lexical_search_request(LexicalSearchRequest::new(query)).limit(5).build(),
     ).await?;
     common::print_search_results(&results);
 
@@ -173,7 +173,7 @@ async fn main() -> Result<()> {
     println!("\n[2a] Phrase 'machine learning' in body:");
     let results = engine.search(
         SearchRequestBuilder::new()
-            .with_lexical(Box::new(PhraseQuery::new("body", vec!["machine".into(), "learning".into()])))
+            .lexical_search_request(LexicalSearchRequest::new(Box::new(PhraseQuery::new("body", vec!["machine".into(), "learning".into()]))))
             .limit(5).build(),
     ).await?;
     common::print_search_results(&results);
@@ -181,7 +181,7 @@ async fn main() -> Result<()> {
     println!("\n[2b] Phrase 'systems programming language' in body:");
     let results = engine.search(
         SearchRequestBuilder::new()
-            .with_lexical(Box::new(PhraseQuery::new("body", vec!["systems".into(), "programming".into(), "language".into()])))
+            .lexical_search_request(LexicalSearchRequest::new(Box::new(PhraseQuery::new("body", vec!["systems".into(), "programming".into(), "language".into()]))))
             .limit(5).build(),
     ).await?;
     common::print_search_results(&results);
@@ -189,7 +189,7 @@ async fn main() -> Result<()> {
     println!("\n[2c] DSL: 'body:\"machine learning\"'");
     let query = parser.parse("body:\"machine learning\"")?;
     let results = engine.search(
-        SearchRequestBuilder::new().with_lexical(query).limit(5).build(),
+        SearchRequestBuilder::new().lexical_search_request(LexicalSearchRequest::new(query)).limit(5).build(),
     ).await?;
     common::print_search_results(&results);
 
@@ -203,7 +203,7 @@ async fn main() -> Result<()> {
     println!("\n[3a] Fuzzy 'programing' (missing 'm', edit distance 2):");
     let results = engine.search(
         SearchRequestBuilder::new()
-            .with_lexical(Box::new(FuzzyQuery::new("body", "programing").max_edits(2)))
+            .lexical_search_request(LexicalSearchRequest::new(Box::new(FuzzyQuery::new("body", "programing").max_edits(2))))
             .limit(5).build(),
     ).await?;
     common::print_search_results(&results);
@@ -211,7 +211,7 @@ async fn main() -> Result<()> {
     println!("\n[3b] Fuzzy 'javascritp' (transposed, edit distance 1):");
     let results = engine.search(
         SearchRequestBuilder::new()
-            .with_lexical(Box::new(FuzzyQuery::new("body", "javascritp").max_edits(1)))
+            .lexical_search_request(LexicalSearchRequest::new(Box::new(FuzzyQuery::new("body", "javascritp").max_edits(1))))
             .limit(5).build(),
     ).await?;
     common::print_search_results(&results);
@@ -219,7 +219,7 @@ async fn main() -> Result<()> {
     println!("\n[3c] DSL: 'programing~2'");
     let query = parser.parse("programing~2")?;
     let results = engine.search(
-        SearchRequestBuilder::new().with_lexical(query).limit(5).build(),
+        SearchRequestBuilder::new().lexical_search_request(LexicalSearchRequest::new(query)).limit(5).build(),
     ).await?;
     common::print_search_results(&results);
 
@@ -233,7 +233,7 @@ async fn main() -> Result<()> {
     println!("\n[4a] Wildcard '*.pdf' in filename:");
     let results = engine.search(
         SearchRequestBuilder::new()
-            .with_lexical(Box::new(WildcardQuery::new("filename", "*.pdf")?))
+            .lexical_search_request(LexicalSearchRequest::new(Box::new(WildcardQuery::new("filename", "*.pdf")?)))
             .limit(5).build(),
     ).await?;
     common::print_search_results(&results);
@@ -241,7 +241,7 @@ async fn main() -> Result<()> {
     println!("\n[4b] Wildcard 'pro*' in body:");
     let results = engine.search(
         SearchRequestBuilder::new()
-            .with_lexical(Box::new(WildcardQuery::new("body", "pro*")?))
+            .lexical_search_request(LexicalSearchRequest::new(Box::new(WildcardQuery::new("body", "pro*")?)))
             .limit(5).build(),
     ).await?;
     common::print_search_results(&results);
@@ -249,7 +249,7 @@ async fn main() -> Result<()> {
     println!("\n[4c] DSL: 'body:pro*'");
     let query = parser.parse("body:pro*")?;
     let results = engine.search(
-        SearchRequestBuilder::new().with_lexical(query).limit(5).build(),
+        SearchRequestBuilder::new().lexical_search_request(LexicalSearchRequest::new(query)).limit(5).build(),
     ).await?;
     common::print_search_results(&results);
 
@@ -263,7 +263,7 @@ async fn main() -> Result<()> {
     println!("\n[5a] Books with price $40–$60:");
     let results = engine.search(
         SearchRequestBuilder::new()
-            .with_lexical(Box::new(NumericRangeQuery::f64_range("price", Some(40.0), Some(60.0))))
+            .lexical_search_request(LexicalSearchRequest::new(Box::new(NumericRangeQuery::f64_range("price", Some(40.0), Some(60.0)))))
             .limit(5).build(),
     ).await?;
     common::print_search_results(&results);
@@ -271,7 +271,7 @@ async fn main() -> Result<()> {
     println!("\n[5b] Books published after 2020:");
     let results = engine.search(
         SearchRequestBuilder::new()
-            .with_lexical(Box::new(NumericRangeQuery::i64_range("year", Some(2021), None)))
+            .lexical_search_request(LexicalSearchRequest::new(Box::new(NumericRangeQuery::i64_range("year", Some(2021), None))))
             .limit(5).build(),
     ).await?;
     common::print_search_results(&results);
@@ -279,7 +279,7 @@ async fn main() -> Result<()> {
     println!("\n[5c] DSL: 'price:[40 TO 60]'");
     let query = parser.parse("price:[40 TO 60]")?;
     let results = engine.search(
-        SearchRequestBuilder::new().with_lexical(query).limit(5).build(),
+        SearchRequestBuilder::new().lexical_search_request(LexicalSearchRequest::new(query)).limit(5).build(),
     ).await?;
     common::print_search_results(&results);
 
@@ -293,7 +293,7 @@ async fn main() -> Result<()> {
     println!("\n[6a] Within 100km of San Francisco (37.77, -122.42):");
     let results = engine.search(
         SearchRequestBuilder::new()
-            .with_lexical(Box::new(GeoQuery::within_radius("location", 37.7749, -122.4194, 100.0)?))
+            .lexical_search_request(LexicalSearchRequest::new(Box::new(GeoQuery::within_radius("location", 37.7749, -122.4194, 100.0)?)))
             .limit(5).build(),
     ).await?;
     common::print_search_results(&results);
@@ -301,7 +301,7 @@ async fn main() -> Result<()> {
     println!("\n[6b] Bounding box — US West Coast (33, -123) to (48, -117):");
     let results = engine.search(
         SearchRequestBuilder::new()
-            .with_lexical(Box::new(GeoQuery::within_bounding_box("location", 33.0, -123.0, 48.0, -117.0)?))
+            .lexical_search_request(LexicalSearchRequest::new(Box::new(GeoQuery::within_bounding_box("location", 33.0, -123.0, 48.0, -117.0)?)))
             .limit(5).build(),
     ).await?;
     common::print_search_results(&results);
@@ -318,7 +318,7 @@ async fn main() -> Result<()> {
     bq.add_must(Box::new(TermQuery::new("body", "programming")));
     bq.add_must(Box::new(TermQuery::new("category", "data-science")));
     let results = engine.search(
-        SearchRequestBuilder::new().with_lexical(Box::new(bq)).limit(5).build(),
+        SearchRequestBuilder::new().lexical_search_request(LexicalSearchRequest::new(Box::new(bq))).limit(5).build(),
     ).await?;
     common::print_search_results(&results);
 
@@ -327,7 +327,7 @@ async fn main() -> Result<()> {
     bq.add_should(Box::new(TermQuery::new("category", "programming")));
     bq.add_should(Box::new(TermQuery::new("category", "web-development")));
     let results = engine.search(
-        SearchRequestBuilder::new().with_lexical(Box::new(bq)).limit(5).build(),
+        SearchRequestBuilder::new().lexical_search_request(LexicalSearchRequest::new(Box::new(bq))).limit(5).build(),
     ).await?;
     common::print_search_results(&results);
 
@@ -336,14 +336,14 @@ async fn main() -> Result<()> {
     bq.add_must(Box::new(TermQuery::new("body", "programming")));
     bq.add_must_not(Box::new(TermQuery::new("body", "python")));
     let results = engine.search(
-        SearchRequestBuilder::new().with_lexical(Box::new(bq)).limit(5).build(),
+        SearchRequestBuilder::new().lexical_search_request(LexicalSearchRequest::new(Box::new(bq))).limit(5).build(),
     ).await?;
     common::print_search_results(&results);
 
     println!("\n[7d] DSL: '+body:programming -body:python'");
     let query = parser.parse("+body:programming -body:python")?;
     let results = engine.search(
-        SearchRequestBuilder::new().with_lexical(query).limit(5).build(),
+        SearchRequestBuilder::new().lexical_search_request(LexicalSearchRequest::new(query)).limit(5).build(),
     ).await?;
     common::print_search_results(&results);
 
@@ -363,7 +363,7 @@ async fn main() -> Result<()> {
     );
     let results = engine.search(
         SearchRequestBuilder::new()
-            .with_lexical(Box::new(SpanQueryWrapper::new(Box::new(span_near))))
+            .lexical_search_request(LexicalSearchRequest::new(Box::new(SpanQueryWrapper::new(Box::new(span_near)))))
             .limit(5).build(),
     ).await?;
     common::print_search_results(&results);
@@ -377,7 +377,7 @@ async fn main() -> Result<()> {
     let containing = sb.containing(Box::new(big), Box::new(little));
     let results = engine.search(
         SearchRequestBuilder::new()
-            .with_lexical(Box::new(SpanQueryWrapper::new(Box::new(containing))))
+            .lexical_search_request(LexicalSearchRequest::new(Box::new(SpanQueryWrapper::new(Box::new(containing)))))
             .limit(5).build(),
     ).await?;
     common::print_search_results(&results);
