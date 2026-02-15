@@ -235,6 +235,43 @@ impl FileStorage {
         }
     }
 
+    /// Recursively fsync a directory and its subdirectories.
+    ///
+    /// Opening a directory and calling `sync_all()` on it ensures that the
+    /// directory entries (file creation, rename, delete) are flushed to disk.
+    /// This is critical on Windows where directory listings may be cached and
+    /// newly created files may not appear in `read_dir()` immediately.
+    fn sync_directory_recursive(dir: &Path) -> Result<()> {
+        if !dir.exists() {
+            return Ok(());
+        }
+
+        // Fsync subdirectories first (depth-first).
+        if let Ok(entries) = std::fs::read_dir(dir) {
+            for entry in entries.flatten() {
+                if entry.path().is_dir() {
+                    Self::sync_directory_recursive(&entry.path())?;
+                }
+            }
+        }
+
+        // Fsync the directory itself.
+        let dir_file = File::open(dir).map_err(|e| {
+            IrisError::storage(format!(
+                "Failed to open directory {:?} for sync: {}",
+                dir, e
+            ))
+        })?;
+        dir_file.sync_all().map_err(|e| {
+            IrisError::storage(format!(
+                "Failed to sync directory {:?}: {}",
+                dir, e
+            ))
+        })?;
+
+        Ok(())
+    }
+
     /// Get or create a memory map for a file.
     fn get_mmap(&self, name: &str) -> Result<Arc<Mmap>> {
         let file_path = self.file_path(name);
@@ -552,8 +589,12 @@ impl Storage for FileStorage {
 
     fn sync(&self) -> Result<()> {
         self.check_closed()?;
-        // For file storage, we don't need to do anything special for sync
-        // Individual files are synced when they are closed
+
+        // Recursively fsync directories to ensure that all file metadata
+        // (creation, rename, size changes) is visible to subsequent readers.
+        // This is essential on Windows where directory listings may be cached.
+        Self::sync_directory_recursive(&self.directory)?;
+
         Ok(())
     }
 
@@ -691,9 +732,14 @@ impl StorageInput for MmapInput {
 }
 
 /// A file output implementation.
+///
+/// Uses `Option<BufWriter<File>>` so that `close()` can explicitly release
+/// the file handle via `take()` + `into_inner()`. This is critical on Windows
+/// where file handles must be fully released before other processes (or the
+/// same process) can read or delete the file.
 #[derive(Debug)]
 pub struct FileOutput {
-    writer: BufWriter<File>,
+    writer: Option<BufWriter<File>>,
     sync_writes: bool,
     position: u64,
 }
@@ -703,33 +749,42 @@ impl FileOutput {
         let writer = BufWriter::with_capacity(buffer_size, file);
 
         Ok(FileOutput {
-            writer,
+            writer: Some(writer),
             sync_writes,
             position: 0,
         })
     }
+
 }
 
 impl Write for FileOutput {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        let bytes_written = self.writer.write(buf)?;
+        let writer = self.writer.as_mut().ok_or_else(|| {
+            std::io::Error::other("FileOutput already closed")
+        })?;
+        let bytes_written = writer.write(buf)?;
         self.position += bytes_written as u64;
 
         if self.sync_writes {
-            self.writer.flush()?;
+            // Re-borrow since position assignment ended the previous borrow.
+            self.writer.as_mut().unwrap().flush()?;
         }
 
         Ok(bytes_written)
     }
 
     fn flush(&mut self) -> std::io::Result<()> {
-        self.writer.flush()
+        self.writer.as_mut().ok_or_else(|| {
+            std::io::Error::other("FileOutput already closed")
+        })?.flush()
     }
 }
 
 impl Seek for FileOutput {
     fn seek(&mut self, pos: SeekFrom) -> std::io::Result<u64> {
-        let new_pos = self.writer.seek(pos)?;
+        let new_pos = self.writer.as_mut().ok_or_else(|| {
+            std::io::Error::other("FileOutput already closed")
+        })?.seek(pos)?;
         self.position = new_pos;
         Ok(new_pos)
     }
@@ -737,11 +792,15 @@ impl Seek for FileOutput {
 
 impl StorageOutput for FileOutput {
     fn flush_and_sync(&mut self) -> Result<()> {
-        self.writer
+        let writer = self.writer.as_mut().ok_or_else(|| {
+            IrisError::storage("FileOutput already closed".to_string())
+        })?;
+
+        writer
             .flush()
             .map_err(|e| IrisError::storage(format!("Failed to flush: {e}")))?;
 
-        self.writer
+        writer
             .get_ref()
             .sync_all()
             .map_err(|e| IrisError::storage(format!("Failed to sync: {e}")))?;
@@ -754,7 +813,18 @@ impl StorageOutput for FileOutput {
     }
 
     fn close(&mut self) -> Result<()> {
-        self.flush_and_sync()?;
+        if let Some(writer) = self.writer.take() {
+            // Flush buffered data and get the underlying File handle.
+            let file = writer
+                .into_inner()
+                .map_err(|e| IrisError::storage(format!("Failed to flush on close: {e}")))?;
+
+            // Sync all data and metadata to disk.
+            file.sync_all()
+                .map_err(|e| IrisError::storage(format!("Failed to sync on close: {e}")))?;
+
+            // `file` is dropped here, explicitly releasing the OS file handle.
+        }
         Ok(())
     }
 }

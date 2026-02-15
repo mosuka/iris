@@ -12,8 +12,6 @@ use iris::vector::VectorSearchRequestBuilder;
 use iris::{DataValue, Document};
 use iris::{FieldOption, LexicalSearchRequest, Schema};
 
-// Ignored on Windows due to FileStorage file handle synchronization issues.
-#[cfg_attr(target_os = "windows", ignore)]
 #[tokio::test(flavor = "multi_thread")]
 async fn test_unified_search_hybrid() -> iris::Result<()> {
     // 1. Setup Storage
@@ -87,8 +85,6 @@ async fn test_unified_search_hybrid() -> iris::Result<()> {
     Ok(())
 }
 
-// Ignored on Windows due to FileStorage file handle synchronization issues.
-#[cfg_attr(target_os = "windows", ignore)]
 #[tokio::test(flavor = "multi_thread")]
 async fn test_unified_search_hybrid_fusion() -> iris::Result<()> {
     let temp_dir = TempDir::new().unwrap();

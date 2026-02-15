@@ -11,9 +11,6 @@ use iris::vector::VectorSearchRequestBuilder;
 use iris::{FieldOption, Schema};
 use iris::{FusionAlgorithm, LexicalSearchRequest, SearchRequestBuilder};
 
-// Ignored on Windows due to FileStorage file handle synchronization issues.
-// See: https://github.com/mosuka/iris/issues/XXX
-#[cfg_attr(target_os = "windows", ignore)]
 #[tokio::test(flavor = "multi_thread")]
 async fn test_advanced_fusion_normalization() -> iris::Result<()> {
     // 1. Setup Storage
@@ -93,9 +90,6 @@ async fn test_advanced_fusion_normalization() -> iris::Result<()> {
     Ok(())
 }
 
-// Ignored on Windows due to FileStorage file handle synchronization issues.
-// See: https://github.com/mosuka/iris/issues/XXX
-#[cfg_attr(target_os = "windows", ignore)]
 #[tokio::test(flavor = "multi_thread")]
 async fn test_field_boosts() -> iris::Result<()> {
     // 1. Setup Storage

@@ -11,8 +11,6 @@ use iris::vector::FieldOption as VectorOption;
 use iris::vector::VectorSearchRequestBuilder;
 use iris::{FieldOption, Schema};
 
-// Ignored on Windows due to FileStorage file handle synchronization issues.
-#[cfg_attr(target_os = "windows", ignore)]
 #[tokio::test(flavor = "multi_thread")]
 async fn test_unified_filtering() -> iris::Result<()> {
     // 1. Setup Storage
@@ -118,8 +116,6 @@ async fn test_unified_filtering() -> iris::Result<()> {
     Ok(())
 }
 
-// Ignored on Windows due to FileStorage file handle synchronization issues.
-#[cfg_attr(target_os = "windows", ignore)]
 #[tokio::test(flavor = "multi_thread")]
 async fn test_unified_filtering_hnsw() -> iris::Result<()> {
     // 1. Setup Storage
@@ -190,8 +186,6 @@ async fn test_unified_filtering_hnsw() -> iris::Result<()> {
     Ok(())
 }
 
-// Ignored on Windows due to FileStorage file handle synchronization issues.
-#[cfg_attr(target_os = "windows", ignore)]
 #[tokio::test(flavor = "multi_thread")]
 async fn test_unified_filtering_ivf() -> iris::Result<()> {
     // 1. Setup Storage

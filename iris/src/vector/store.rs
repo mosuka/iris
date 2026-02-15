@@ -194,6 +194,10 @@ impl VectorStore {
             // commit() calls finalize() then write() to persist to storage
             writer.commit()?;
         }
+        // Sync storage to ensure all file metadata (creation, rename, size) is
+        // flushed to disk. This is critical on Windows where directory listings
+        // and file visibility may be cached until the directory is synced.
+        self.index.storage().sync()?;
         self.index.refresh()?;
         *self.searcher_cache.write() = None;
         Ok(())
