@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Lexical Search - Iris Documentation</title>
+        <title>Embeddings - Iris Documentation</title>
 
 
         <!-- Custom HTML head -->
@@ -35,10 +35,10 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-48168cb1.js";
+            window.path_to_searchindex_js = "../searchindex-35006bd3.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-75fc7776.js"></script>
+        <script src="../toc-2eec5043.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -177,363 +177,206 @@
 
                 <div id="mdbook-content" class="content">
                     <main>
-                        <h1 id="lexical-search"><a class="header" href="#lexical-search">Lexical Search</a></h1>
-<p>Lexical search matches documents based on exact or approximate keyword matches. It is the traditional “search engine” functionality found in Lucene or Elasticsearch.</p>
-<blockquote>
-<p><strong>Note</strong>: In the unified Iris architecture, Lexical Search is handled by the <code>Engine</code>, which orchestrates both lexical (LexicalStore) and vector (VectorStore) components concurrently.</p>
-</blockquote>
-<h2 id="document-structure"><a class="header" href="#document-structure">Document Structure</a></h2>
-<p>In Iris, a <strong>Document</strong> is the fundamental unit of indexing. It follows a <strong>schema-less</strong> design, allowing fields to be added dynamically without defining a schema upfront.</p>
-<p>Each <code>Document</code> consists of multiple <code>Fields</code> stored in a Map where the key is the field name. Each <code>Field</code> has a <strong>Value</strong> and <strong>Options</strong> defining how it should be indexed.</p>
-<pre><code class="language-mermaid">flowchart LR
-    IntID1("Internal ID&lt;br&gt;1") --&gt; Document_Container
-
-    subgraph Document_Container [Document]
-        direction TB
-        
-        ExtID1["Field (External ID)&lt;br&gt;Name: '_id'&lt;br&gt;Value: 'product_123'&lt;br&gt;Type: Text"]
-        F11["Field&lt;br&gt;Name: 'title'&lt;br&gt;Value: 'Apple'&lt;br&gt;Type: Text"]
-        F12["Field&lt;br&gt;Name: 'price'&lt;br&gt;Value: 10.00&lt;br&gt;Type: Float"]
-    end
-    
-    IntID2("Internal ID&lt;br&gt;2") --&gt; Document_Container2
-
-    subgraph Document_Container2 [Document]
-        direction TB
-        
-        ExtID2["Field (External ID)&lt;br&gt;Name: '_id'&lt;br&gt;Value: 'product_456'&lt;br&gt;Type: Text"]
-        F21["Field&lt;br&gt;Name: 'title'&lt;br&gt;Value: 'Orange'&lt;br&gt;Type: Text"]
-        F22["Field&lt;br&gt;Name: 'price'&lt;br&gt;Value: 11.00&lt;br&gt;Type: Float"]
-    end
-</code></pre>
-<h3 id="document"><a class="header" href="#document">Document</a></h3>
-<p>The fundamental unit of indexing in Iris.</p>
-<ul>
-<li><strong>Schema-less</strong>: Fields can be added dynamically without a predefined schema.</li>
-<li><strong>Map Structure</strong>: Fields are stored in a <code>HashMap</code> where the key is the field name (String).</li>
-<li><strong>Flexible</strong>: A single document can contain a mix of different field types (Text, Integer, Blob, etc.).</li>
-</ul>
-<h3 id="field"><a class="header" href="#field">Field</a></h3>
-<p>A container representing a single data point within a document.</p>
-<ul>
-<li><strong>Value</strong>: The actual data content (e.g., “Hello World”, 123, true). Defined by <code>FieldValue</code>.</li>
-<li><strong>Option</strong>: Configuration for how this data should be handled (e.g., indexed, stored). Defined by <code>FieldOption</code>.</li>
-</ul>
-<h3 id="field-values"><a class="header" href="#field-values">Field Values</a></h3>
-<ul>
-<li><strong>Text</strong>: UTF-8 string. Typically analyzed and indexed for full-text search.</li>
-<li><strong>Integer / Float</strong>: Numeric values. Used for range queries (BKD Tree) and sorting.</li>
-<li><strong>Boolean</strong>: True/False values.</li>
-<li><strong>DateTime</strong>: UTC timestamps.</li>
-<li><strong>Geo</strong>: Latitude/Longitude coordinates. Indexed in a 2D BKD tree for efficient spatial queries (distance and bounding box) and stored for precise calculations.</li>
-<li><strong>Blob</strong>: Raw byte data with MIME type. Used for storing binary content (images, etc.) or vector source data. <strong>Stored only</strong>, never indexed by the lexical engine.</li>
-</ul>
-<h3 id="field-options"><a class="header" href="#field-options">Field Options</a></h3>
-<p>Configuration for the field defining how it should be indexed and stored.</p>
-<ul>
-<li><strong>TextOption</strong>:
-<ul>
-<li><code>indexed</code>: If true, the text is analyzed and added to the inverted index (searchable).</li>
-<li><code>stored</code>: If true, the original text is stored in the doc store (retrievable).</li>
-<li><code>term_vectors</code>: If true, stores term positions and offsets (needed for highlighting and “More Like This”).</li>
-</ul>
-</li>
-<li><strong>IntegerOption / FloatOption</strong>:
-<ul>
-<li><code>indexed</code>: If true, the value is added to the BKD tree (range searchable).</li>
-<li><code>stored</code>: If true, the original value is stored.</li>
-</ul>
-</li>
-<li><strong>BooleanOption</strong>:
-<ul>
-<li><code>indexed</code>: If true, the value is indexed.</li>
-<li><code>stored</code>: If true, the original value is stored.</li>
-</ul>
-</li>
-<li><strong>DateTimeOption</strong>:
-<ul>
-<li><code>indexed</code>: If true, the timestamp is added to the BKD tree (range searchable).</li>
-<li><code>stored</code>: If true, the original timestamp is stored.</li>
-</ul>
-</li>
-<li><strong>GeoOption</strong>:
-<ul>
-<li><code>indexed</code>: If true, the coordinates are added to the 2D BKD tree (efficient spatial search).</li>
-<li><code>stored</code>: If true, the original coordinates are stored.</li>
-</ul>
-</li>
-<li><strong>BlobOption</strong>:
-<ul>
-<li><code>stored</code>: If true, the binary data is stored. <strong>Note</strong>: Blobs cannot be indexed by the lexical engine.</li>
-</ul>
-</li>
-</ul>
-<h2 id="indexing-process"><a class="header" href="#indexing-process">Indexing Process</a></h2>
-<p>The lexical indexing process translates documents into inverted indexes and BKD trees.</p>
-<pre><code class="language-mermaid">graph TD
-    subgraph "Indexing Flow"
-        Input["Raw Data"] --&gt; DocBuilder["Document Construction"]
-        
-        subgraph "Processing (InvertedIndexWriter)"
-            DocBuilder --&gt;|Text| CharFilter["Char Filter"]
-            DocBuilder --&gt;|Numeric/Date/Geo| Normalizer["String Normalizer"]
-            DocBuilder --&gt;|Numeric/Date/Geo| PtExt["Point Extractor"]
-            DocBuilder --&gt;|Stored Field| StoreProc["Field Values Collector"]
-            DocBuilder --&gt;|All Fields| LenTracker["Field Length Tracker"]
-            DocBuilder --&gt;|Doc Values| DVTracker["Doc Values Collector"]
-            
-            subgraph "Analysis Chain"
-                CharFilter --&gt; Tokenizer["Tokenizer"]
-                Tokenizer --&gt; TokenFilter["Token Filter"]
-            end
-        end
-        
-        subgraph "In-Memory Buffering"
-            TokenFilter --&gt;|Terms| InvBuffer["Term Posting Index"]
-            Normalizer --&gt;|Terms| InvBuffer
-            PtExt --&gt;|Points| BkdBuffer["Point Values Buffer"]
-            StoreProc --&gt;|Data| DocsBuffer["Stored Docs Buffer"]
-        end
-        
-        subgraph "Segment Flushing (Disk)"
-            InvBuffer --&gt;|Write| Postings[".dict / .post"]
-            BkdBuffer --&gt;|Sort &amp; Write| BKD[".bkd"]
-            DocsBuffer --&gt;|Write| DOCS[".docs"]
-            DVTracker --&gt;|Write| DV[".dv"]
-            LenTracker --&gt;|Write| LENS[".lens"]
-            InvBuffer -.-&gt;|Stats| Meta[".meta / .fstats"]
-        end
-    end
-</code></pre>
-<ol>
-<li><strong>Document Processing</strong>:
-<ul>
-<li><strong>Analysis &amp; Normalization</strong>: Text is processed through the Analysis Chain (<code>Char Filter</code>, <code>Tokenizer</code>, <code>Token Filter</code>). Non-text fields are handled by the <code>String Normalizer</code>.</li>
-<li><strong>Point Extraction</strong>: Multidimensional values (Numeric, Date, and Geo) are extracted by the <code>Point Extractor</code> for spatial indexing (BKD Tree).</li>
-<li><strong>Tracking &amp; Collection</strong>: <code>Field Length Tracker</code> and <code>Doc Values Collector</code> gather metadata and columnar data.</li>
-</ul>
-</li>
-<li><strong>In-Memory Buffering</strong>:
-<ul>
-<li>Terms are added to the <code>Term Posting Index</code>.</li>
-<li>Extracted points and stored fields are staged in the <code>Point Values Buffer</code> and <code>Stored Docs Buffer</code>.</li>
-</ul>
-</li>
-<li><strong>Segment Flushing</strong>:
-<ul>
-<li>Buffered data is periodically sorted and serialized into immutable <strong>Segment</strong> files on disk.</li>
-</ul>
-</li>
-<li><strong>Merging</strong>:
-<ul>
-<li>A background process automatically merges smaller segments into larger ones to optimize read performance and reclaim space from deleted documents.</li>
-</ul>
-</li>
-</ol>
-<h3 id="analyzers"><a class="header" href="#analyzers">Analyzers</a></h3>
-<p>Text analysis is the process of converting raw text into tokens. An Analyzer is typically composed of a pipeline:</p>
-<ol>
-<li><strong>Char Filters</strong>: Transform the raw character stream (e.g., removing HTML tags).</li>
-<li><strong>Tokenizer</strong>: Splits the character stream into a token stream (e.g., splitting by whitespace).</li>
-<li><strong>Token Filters</strong>: Modify the token stream (e.g., lowercasing, stemming, removing stop words).</li>
-</ol>
-<p>Iris provides several built-in analyzers:</p>
-<ul>
-<li><strong>StandardAnalyzer</strong>: Good default for most European languages.</li>
-<li><strong>JapaneseAnalyzer</strong>: Optimized for Japanese text using Lindera (morphological analysis).</li>
-<li><strong>KeywordAnalyzer</strong>: Treats the entire input as a single token.</li>
-<li><strong>PipelineAnalyzer</strong>: A flexible builder for creating custom analysis pipelines.</li>
-</ul>
-<h2 id="core-concepts"><a class="header" href="#core-concepts">Core Concepts</a></h2>
-<h3 id="inverted-index"><a class="header" href="#inverted-index">Inverted Index</a></h3>
-<p>The inverted index is the fundamental structure for full-text search. While a traditional database maps documents to their terms, an inverted index maps <strong>terms to the list of documents</strong> containing them.</p>
-<ul>
-<li><strong>Term Dictionary</strong>: A sorted repository of all unique terms across the index.</li>
-<li><strong>Postings Lists</strong>: For each term, a list of document IDs (postings) where the term appears, along with frequency and position data for scoring.</li>
-</ul>
-<h3 id="bkd-tree"><a class="header" href="#bkd-tree">BKD Tree</a></h3>
-<p>For non-textual data like numbers, dates, and geographic coordinates, Iris uses a <strong>BKD Tree</strong>. It is a multi-dimensional tree structure optimized for block-based storage on disk.
-Unlike an inverted index, a BKD tree is designed for <strong>range search</strong> and <strong>spatial search</strong>. It effectively partitions the data space into hierarchical blocks, allowing the search engine to skip large portions of irrelevant data.</p>
-<h3 id="simd-optimization"><a class="header" href="#simd-optimization">SIMD Optimization</a></h3>
-<p>Iris uses SIMD-accelerated batch scoring for high-throughput ranking. The BM25 scoring algorithm is optimized to process multiple documents simultaneously, leveraging modern CPU instructions to provide a several-fold increase in performance compared to scalar processing.</p>
-<h2 id="engine-architecture"><a class="header" href="#engine-architecture">Engine Architecture</a></h2>
-<h3 id="lexicalstore"><a class="header" href="#lexicalstore">LexicalStore</a></h3>
-<p>The store component that manages indexing and searching for text data. It coordinates between <code>LexicalIndexWriter</code> and <code>LexicalIndexSearcher</code>.
-In the unified architecture, LexicalStore operates as a <strong>sub-component</strong> managed by the <code>Engine</code>, handling the inverted index portions of hybrid documents.</p>
-<h3 id="index-components"><a class="header" href="#index-components">Index Components</a></h3>
-<ul>
-<li><strong>InvertedIndexWriter</strong>: The primary interface for adding documents. It orchestrates analysis, point extraction, and buffering.</li>
-<li><strong>Segment Manager</strong>: Controls the lifecycle and visibility of segments, maintaining the manifest and tracking deletions.</li>
-<li><strong>In-Memory Buffering</strong>: High-performance mapping of terms and staged BKD/Stored data before merging into disk segments.</li>
-</ul>
-<h2 id="index-segment-files"><a class="header" href="#index-segment-files">Index Segment Files</a></h2>
-<p>A single segment is composed of several specialized files:</p>
+                        <h1 id="embeddings"><a class="header" href="#embeddings">Embeddings</a></h1>
+<p>Embeddings convert text (or images) into dense numeric vectors that capture semantic meaning. Two texts with similar meanings produce vectors that are close together in vector space, enabling similarity-based search.</p>
+<h2 id="the-embedder-trait"><a class="header" href="#the-embedder-trait">The Embedder Trait</a></h2>
+<p>All embedders implement the <code>Embedder</code> trait:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>#[async_trait]
+pub trait Embedder: Send + Sync {
+    async fn embed(&amp;self, input: &amp;EmbedInput&lt;'_&gt;) -&gt; Result&lt;Vector&gt;;
+    fn as_any(&amp;self) -&gt; &amp;dyn Any;
+}
+<span class="boring">}</span></code></pre>
+<p>The <code>embed()</code> method returns a <code>Vector</code> (<code>Vec&lt;f32&gt;</code>) directly.</p>
+<p><code>EmbedInput</code> supports two modalities:</p>
 <div class="table-wrapper">
 <table>
 <thead>
-<tr><th style="text-align: left">Extension</th><th style="text-align: left">Component</th><th style="text-align: left">Description</th></tr>
+<tr><th style="text-align: left">Variant</th><th style="text-align: left">Description</th></tr>
 </thead>
 <tbody>
-<tr><td style="text-align: left"><code>.dict</code></td><td style="text-align: left">Term Dictionary</td><td style="text-align: left">Maps terms to their locations in the postings list.</td></tr>
-<tr><td style="text-align: left"><code>.post</code></td><td style="text-align: left">Postings Lists</td><td style="text-align: left">Stores document IDs, frequencies, and positions for each term.</td></tr>
-<tr><td style="text-align: left"><code>.bkd</code></td><td style="text-align: left">BKD Tree</td><td style="text-align: left">Provides multidimensional indexing for numeric and geospatial fields.</td></tr>
-<tr><td style="text-align: left"><code>.docs</code></td><td style="text-align: left">Document Store</td><td style="text-align: left">Stores the original (stored) field values in a compressed format.</td></tr>
-<tr><td style="text-align: left"><code>.dv</code></td><td style="text-align: left">Doc Values</td><td style="text-align: left">Columnar storage for fast sorting and aggregations.</td></tr>
-<tr><td style="text-align: left"><code>.meta</code></td><td style="text-align: left">Segment Metadata</td><td style="text-align: left">Statistics, document count, and configuration.</td></tr>
-<tr><td style="text-align: left"><code>.lens</code></td><td style="text-align: left">Field Lengths</td><td style="text-align: left">Token counts per field per document (used for scoring).</td></tr>
+<tr><td style="text-align: left"><code>EmbedInput::Text(&amp;str)</code></td><td style="text-align: left">Text input</td></tr>
+<tr><td style="text-align: left"><code>EmbedInput::Bytes(&amp;[u8], Option&lt;&amp;str&gt;)</code></td><td style="text-align: left">Binary input with optional MIME type (for images)</td></tr>
 </tbody>
 </table>
 </div>
-<h2 id="search-process"><a class="header" href="#search-process">Search Process</a></h2>
-<p>The search process involves structure-aware traversal and weighted scoring.</p>
-<pre><code class="language-mermaid">graph TD
-    subgraph "Search Flow"
-        UserQuery["User Query"] --&gt; Parser
-        
-        subgraph "Searcher"
-            Parser["Query Parser"] --&gt; QueryObj["Query"]
-            QueryObj --&gt; WeightObj["Weight"]
-            WeightObj --&gt; MatcherObj["Matcher"]
-            WeightObj --&gt; ScorerObj["Scorer"]
-            
-            subgraph "Index Access"
-                MatcherObj -.-&gt;|Look up| II["Inverted Index"]
-                MatcherObj -.-&gt;|Range Scan| BKD["BKD Tree"]
-            end
-            
-            MatcherObj --&gt;|Doc IDs| CollectorObj["Collector"]
-            ScorerObj --&gt;|Scores| CollectorObj
-            CollectorObj -.-&gt;|Sort by Field| DV["Doc Values"]
-            CollectorObj --&gt;|Top Doc IDs| Fetcher["Fetcher"]
-            Fetcher -.-&gt;|Retrieve Fields| Docs
-        end
-        
-        Fetcher --&gt; Result["Search Results"]
-    end
-</code></pre>
-<ol>
-<li><strong>Query Parsing</strong>: Translates a human-friendly string or DSL into a structured <code>Query</code> tree.</li>
-<li><strong>Weight Creation</strong>: Precomputes global statistics (like IDF) to prepare for execution across multiple segments.</li>
-<li><strong>Matching &amp; Scoring</strong>:
-<ul>
-<li><strong>Matcher</strong>: Navigates the Term Dictionary or BKD Tree to identify document IDs.</li>
-<li><strong>Scorer</strong>: Computes the relevance score (BM25) using precomputed weights and segment-local frequencies.</li>
-</ul>
-</li>
-<li><strong>Collection &amp; Fetching</strong>: Aggregates top results into a sorted list and retrieves original field data for the final response.</li>
-</ol>
-<h2 id="query-types"><a class="header" href="#query-types">Query Types</a></h2>
-<p>Iris supports a wide range of queries for different information needs.</p>
-<ul>
-<li><strong>Term Query</strong>: Match a single analyzed term exactly.</li>
-<li><strong>Boolean Query</strong>: Logical combinations (<code>MUST</code>, <code>SHOULD</code>, <code>MUST_NOT</code>).</li>
-<li><strong>Approximate Queries</strong>: <code>Fuzzy</code>, <code>Prefix</code>, <code>Wildcard</code>, and <code>Regexp</code> queries.</li>
-<li><strong>Phrase Query</strong>: Matches terms in a specific order with optional “slop”.</li>
-<li><strong>Numeric Range Query</strong>: High-performance range search using the BKD tree.</li>
-<li><strong>Geospatial Queries</strong>: Distance-based or bounding-box search for geographic points.</li>
-</ul>
-<h2 id="scoring-bm25"><a class="header" href="#scoring-bm25">Scoring (BM25)</a></h2>
-<p>Iris uses <strong>Okapi BM25</strong> as its default scoring function. It improves results by prioritizing rare terms and normalizing for document length, ensuring that matches in shorter, focused documents are ranked appropriately.</p>
-<h2 id="code-examples"><a class="header" href="#code-examples">Code Examples</a></h2>
-<h3 id="1-configuring-engine-for-lexical-search"><a class="header" href="#1-configuring-engine-for-lexical-search">1. Configuring Engine for Lexical Search</a></h3>
-<p>Setting up an engine with a lexical field and default analyzer.</p>
+<h2 id="built-in-embedders"><a class="header" href="#built-in-embedders">Built-in Embedders</a></h2>
+<h3 id="candlebertembedder"><a class="header" href="#candlebertembedder">CandleBertEmbedder</a></h3>
+<p>Runs a BERT model locally using Hugging Face Candle. No API key required.</p>
+<p><strong>Feature flag:</strong> <code>embeddings-candle</code></p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use iris::CandleBertEmbedder;
+
+// Downloads model on first run (~80MB)
+let embedder = CandleBertEmbedder::new(
+    "sentence-transformers/all-MiniLM-L6-v2"  // model name
+).await?;
+// Output: 384-dimensional vector
+<span class="boring">}</span></code></pre>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Property</th><th style="text-align: left">Value</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left">Model</td><td style="text-align: left"><code>sentence-transformers/all-MiniLM-L6-v2</code></td></tr>
+<tr><td style="text-align: left">Dimensions</td><td style="text-align: left">384</td></tr>
+<tr><td style="text-align: left">Runtime</td><td style="text-align: left">Local (CPU)</td></tr>
+<tr><td style="text-align: left">First-run download</td><td style="text-align: left">~80 MB</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="openaiembedder"><a class="header" href="#openaiembedder">OpenAIEmbedder</a></h3>
+<p>Calls the OpenAI Embeddings API. Requires an API key.</p>
+<p><strong>Feature flag:</strong> <code>embeddings-openai</code></p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use iris::OpenAIEmbedder;
+
+let embedder = OpenAIEmbedder::new(
+    api_key,
+    "text-embedding-3-small".to_string()
+).await?;
+// Output: 1536-dimensional vector
+<span class="boring">}</span></code></pre>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Property</th><th style="text-align: left">Value</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left">Model</td><td style="text-align: left"><code>text-embedding-3-small</code> (or any OpenAI model)</td></tr>
+<tr><td style="text-align: left">Dimensions</td><td style="text-align: left">1536 (for text-embedding-3-small)</td></tr>
+<tr><td style="text-align: left">Runtime</td><td style="text-align: left">Remote API call</td></tr>
+<tr><td style="text-align: left">Requires</td><td style="text-align: left"><code>OPENAI_API_KEY</code> environment variable</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="candleclipembedder"><a class="header" href="#candleclipembedder">CandleClipEmbedder</a></h3>
+<p>Runs a CLIP model locally for multimodal (text + image) embeddings.</p>
+<p><strong>Feature flag:</strong> <code>embeddings-multimodal</code></p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use iris::CandleClipEmbedder;
+
+let embedder = CandleClipEmbedder::new(
+    "openai/clip-vit-base-patch32"
+).await?;
+// Text or images → 512-dimensional vector
+<span class="boring">}</span></code></pre>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Property</th><th style="text-align: left">Value</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left">Model</td><td style="text-align: left"><code>openai/clip-vit-base-patch32</code></td></tr>
+<tr><td style="text-align: left">Dimensions</td><td style="text-align: left">512</td></tr>
+<tr><td style="text-align: left">Input types</td><td style="text-align: left">Text AND images</td></tr>
+<tr><td style="text-align: left">Use case</td><td style="text-align: left">Text-to-image search, image-to-image search</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="precomputedembedder"><a class="header" href="#precomputedembedder">PrecomputedEmbedder</a></h3>
+<p>Use pre-computed vectors directly without any embedding computation. Useful when vectors are generated externally.</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use iris::PrecomputedEmbedder;
+
+let embedder = PrecomputedEmbedder::new();  // no parameters needed
+<span class="boring">}</span></code></pre>
+<p>When using <code>PrecomputedEmbedder</code>, you provide vectors directly in documents instead of text for embedding:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let doc = Document::builder()
+    .add_vector("embedding", vec![0.1, 0.2, 0.3, ...])
+    .build();
+<span class="boring">}</span></code></pre>
+<h2 id="perfieldembedder"><a class="header" href="#perfieldembedder">PerFieldEmbedder</a></h2>
+<p><code>PerFieldEmbedder</code> routes embedding requests to field-specific embedders:</p>
+<div class="mermaid">
+graph LR
+    PFE["PerFieldEmbedder"]
+    PFE --&gt;|"text_vec"| BERT["CandleBertEmbedder<br />(384 dim)"]
+    PFE --&gt;|"image_vec"| CLIP["CandleClipEmbedder<br />(512 dim)"]
+    PFE --&gt;|other fields| DEF["Default Embedder"]
+</div>
+
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>use std::sync::Arc;
-use iris::{Engine, Schema};
-use iris::analysis::analyzer::standard::StandardAnalyzer;
-use iris::lexical::{FieldOption, TextOption};
-use iris::storage::{StorageConfig, StorageFactory};
-use iris::storage::memory::MemoryStorageConfig;
+use iris::PerFieldEmbedder;
 
-fn setup_engine() -&gt; iris::Result&lt;Engine&gt; {
-    let storage = StorageFactory::create(StorageConfig::Memory(MemoryStorageConfig::default()))?;
+let bert = Arc::new(CandleBertEmbedder::new("...").await?);
+let clip = Arc::new(CandleClipEmbedder::new("...").await?);
 
-    let schema = Schema::builder()
-        .add_lexical_field("title", FieldOption::Text(TextOption::default()))
-        .add_lexical_field("content", FieldOption::Text(TextOption::default()))
-        .build();
+let mut per_field = PerFieldEmbedder::new(bert.clone());
+per_field.add_embedder("text_vec", bert.clone());
+per_field.add_embedder("image_vec", clip.clone());
 
-    Engine::builder(storage, schema)
-        .analyzer(Arc::new(StandardAnalyzer::default()))
-        .build()
-}
+let engine = Engine::builder(storage, schema)
+    .embedder(Arc::new(per_field))
+    .build()
+    .await?;
 <span class="boring">}</span></code></pre>
-<h3 id="2-adding-documents"><a class="header" href="#2-adding-documents">2. Adding Documents</a></h3>
-<p>Creating and indexing documents with various field types.</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use iris::{Document, DataValue};
-
-fn add_documents(engine: &amp;Engine) -&gt; iris::Result&lt;()&gt; {
-    let doc = Document::new()
-        .add_text("title", "Iris Search")
-        .add_text("content", "Fast and semantic search engine in Rust")
-        .add_field("price", DataValue::Integer(100));
-
-    engine.put_document("doc1", doc)?;
-    engine.commit()?; // Flush and commit to make searchable
-    Ok(())
-}
-<span class="boring">}</span></code></pre>
-<h3 id="3-searching-with-term-query"><a class="header" href="#3-searching-with-term-query">3. Searching with Term Query</a></h3>
-<p>Executing a simple search using a term query.</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use iris::SearchRequestBuilder;
-use iris::lexical::TermQuery;
-
-fn search(engine: &amp;Engine) -&gt; iris::Result&lt;()&gt; {
-    let results = engine.search(
-        SearchRequestBuilder::new()
-            .lexical_search_request(Box::new(TermQuery::new("content", "rust")))
-            .limit(10)
-            .build()
-    )?;
-
-    for hit in results {
-        println!("[{}] Score: {:.4}", hit.id, hit.score);
-    }
-    Ok(())
-}
-<span class="boring">}</span></code></pre>
-<h3 id="4-custom-analyzer-setup"><a class="header" href="#4-custom-analyzer-setup">4. Custom Analyzer Setup</a></h3>
-<p>Configuring a Japanese analyzer for specific fields.</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use iris::analysis::analyzer::japanese::JapaneseAnalyzer;
-
-fn setup_japanese_engine() -&gt; iris::Result&lt;Engine&gt; {
-    let storage = StorageFactory::create(StorageConfig::Memory(MemoryStorageConfig::default()))?;
-
-    // Configure default analyzer to Japanese
-    let analyzer = Arc::new(JapaneseAnalyzer::default());
-    let schema = Schema::builder()
-        .add_lexical_field("content", FieldOption::Text(TextOption::default()))
-        .build();
-
-    Engine::builder(storage, schema)
-        .analyzer(analyzer)
-        .build()
-}
-<span class="boring">}</span></code></pre>
-<h2 id="future-outlook"><a class="header" href="#future-outlook">Future Outlook</a></h2>
+<p>This is especially useful when:</p>
 <ul>
-<li><strong>Advanced Scoring Functions</strong>: Support for BM25F and custom script-based scoring.</li>
-<li><strong>Improved NRT (Near-Real-Time)</strong>: Faster segment flushing and background merging optimizations.</li>
-<li><strong>Multilingual Support</strong>: Integration with more language-specific tokenizers and dictionaries.</li>
-<li><strong>Tiered Storage</strong>: Support for moving older segments to slower/cheaper storage automatically.</li>
+<li>Different vector fields need different models (e.g., BERT for text, CLIP for images)</li>
+<li>Different fields have different vector dimensions</li>
+<li>You want to mix local and remote embedders</li>
 </ul>
+<h2 id="how-embeddings-are-used"><a class="header" href="#how-embeddings-are-used">How Embeddings Are Used</a></h2>
+<h3 id="at-index-time"><a class="header" href="#at-index-time">At Index Time</a></h3>
+<p>When you add a text value to a vector field, the engine automatically embeds it:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let doc = Document::builder()
+    .add_text("text_vec", "Rust is a systems programming language")
+    .build();
+engine.add_document("doc-1", doc).await?;
+// The embedder converts the text to a vector before indexing
+<span class="boring">}</span></code></pre>
+<h3 id="at-search-time"><a class="header" href="#at-search-time">At Search Time</a></h3>
+<p>When you search with text, the engine embeds the query text as well:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Builder API
+let request = VectorSearchRequestBuilder::new()
+    .add_text("text_vec", "systems programming")
+    .build();
+
+// Query DSL
+let request = vector_parser.parse(r#"text_vec:~"systems programming""#).await?;
+<span class="boring">}</span></code></pre>
+<p>Both approaches embed the query text using the same embedder that was used at index time, ensuring consistent vector spaces.</p>
+<h2 id="choosing-an-embedder"><a class="header" href="#choosing-an-embedder">Choosing an Embedder</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Scenario</th><th style="text-align: left">Recommended Embedder</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left">Quick prototyping, offline use</td><td style="text-align: left"><code>CandleBertEmbedder</code></td></tr>
+<tr><td style="text-align: left">Production with high accuracy</td><td style="text-align: left"><code>OpenAIEmbedder</code></td></tr>
+<tr><td style="text-align: left">Text + image search</td><td style="text-align: left"><code>CandleClipEmbedder</code></td></tr>
+<tr><td style="text-align: left">Pre-computed vectors from external pipeline</td><td style="text-align: left"><code>PrecomputedEmbedder</code></td></tr>
+<tr><td style="text-align: left">Multiple models per field</td><td style="text-align: left"><code>PerFieldEmbedder</code> wrapping others</td></tr>
+</tbody>
+</table>
+</div>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="../concepts/architecture.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../concepts/analysis.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
-                            <a rel="next prefetch" href="../concepts/vector_search.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="../concepts/storage.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                             </a>
 
@@ -543,11 +386,11 @@ fn setup_japanese_engine() -&gt; iris::Result&lt;Engine&gt; {
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="../concepts/architecture.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="../concepts/analysis.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 
-                    <a rel="next prefetch" href="../concepts/vector_search.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="../concepts/storage.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                     </a>
             </nav>

@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Installation - Iris Documentation</title>
+        <title>Search - Iris Documentation</title>
 
 
         <!-- Custom HTML head -->
@@ -12,33 +12,33 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="theme-color" content="#ffffff">
 
-        <link rel="icon" href="../favicon-de23e50b.svg">
-        <link rel="shortcut icon" href="../favicon-8114d1fc.png">
-        <link rel="stylesheet" href="../css/variables-8adf115d.css">
-        <link rel="stylesheet" href="../css/general-2459343d.css">
-        <link rel="stylesheet" href="../css/chrome-ae938929.css">
-        <link rel="stylesheet" href="../css/print-9e4910d8.css" media="print">
+        <link rel="icon" href="favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="favicon-8114d1fc.png">
+        <link rel="stylesheet" href="css/variables-8adf115d.css">
+        <link rel="stylesheet" href="css/general-2459343d.css">
+        <link rel="stylesheet" href="css/chrome-ae938929.css">
+        <link rel="stylesheet" href="css/print-9e4910d8.css" media="print">
 
         <!-- Fonts -->
-        <link rel="stylesheet" href="../fonts/fonts-9644e21d.css">
+        <link rel="stylesheet" href="fonts/fonts-9644e21d.css">
 
         <!-- Highlight.js Stylesheets -->
-        <link rel="stylesheet" id="mdbook-highlight-css" href="../highlight-493f70e1.css">
-        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="../tomorrow-night-4c0ae647.css">
-        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="../ayu-highlight-3fdfc3ac.css">
+        <link rel="stylesheet" id="mdbook-highlight-css" href="highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="ayu-highlight-3fdfc3ac.css">
 
         <!-- Custom theme stylesheets -->
 
 
         <!-- Provide site root and default themes to javascript -->
         <script>
-            const path_to_root = "../";
+            const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-35006bd3.js";
+            window.path_to_searchindex_js = "searchindex-35006bd3.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-2eec5043.js"></script>
+        <script src="toc-2eec5043.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -105,7 +105,7 @@
             <!-- populated by js -->
             <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
             <noscript>
-                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
+                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
             </noscript>
             <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
                 <div class="sidebar-resize-indicator"></div>
@@ -140,7 +140,7 @@
                     <h1 class="menu-title">Iris Documentation</h1>
 
                     <div class="right-buttons">
-                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
                             <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
                         </a>
                         <a href="https://github.com/mosuka/iris" title="Git repository" aria-label="Git repository">
@@ -177,68 +177,41 @@
 
                 <div id="mdbook-content" class="content">
                     <main>
-                        <h1 id="installation"><a class="header" href="#installation">Installation</a></h1>
-<h2 id="add-iris-to-your-project"><a class="header" href="#add-iris-to-your-project">Add Iris to Your Project</a></h2>
-<p>Add <code>iris</code> and <code>tokio</code> (async runtime) to your <code>Cargo.toml</code>:</p>
-<pre><code class="language-toml">[dependencies]
-iris = "0.1.0"
-tokio = { version = "1", features = ["full"] }
-</code></pre>
-<h2 id="feature-flags"><a class="header" href="#feature-flags">Feature Flags</a></h2>
-<p>Iris ships with a minimal default feature set. Enable additional features as needed:</p>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th style="text-align: left">Feature</th><th style="text-align: left">Description</th><th style="text-align: left">Use Case</th></tr>
-</thead>
-<tbody>
-<tr><td style="text-align: left"><em>(default)</em></td><td style="text-align: left">Lexical search, in-memory storage, standard analyzer</td><td style="text-align: left">Keyword search only</td></tr>
-<tr><td style="text-align: left"><code>embeddings-candle</code></td><td style="text-align: left">Local BERT embeddings via Hugging Face Candle</td><td style="text-align: left">Vector search without external API</td></tr>
-<tr><td style="text-align: left"><code>embeddings-openai</code></td><td style="text-align: left">OpenAI API embeddings (text-embedding-3-small, etc.)</td><td style="text-align: left">Cloud-based vector search</td></tr>
-<tr><td style="text-align: left"><code>embeddings-multimodal</code></td><td style="text-align: left">CLIP embeddings for text + image via Candle</td><td style="text-align: left">Multimodal (text-to-image) search</td></tr>
-<tr><td style="text-align: left"><code>embeddings-all</code></td><td style="text-align: left">All embedding features above</td><td style="text-align: left">Full embedding support</td></tr>
-</tbody>
-</table>
-</div>
-<h3 id="examples"><a class="header" href="#examples">Examples</a></h3>
-<p><strong>Lexical search only</strong> (no embeddings needed):</p>
-<pre><code class="language-toml">[dependencies]
-iris = "0.1.0"
-</code></pre>
-<p><strong>Vector search with local model</strong> (no API key required):</p>
-<pre><code class="language-toml">[dependencies]
-iris = { version = "0.1.0", features = ["embeddings-candle"] }
-</code></pre>
-<p><strong>Vector search with OpenAI</strong>:</p>
-<pre><code class="language-toml">[dependencies]
-iris = { version = "0.1.0", features = ["embeddings-openai"] }
-</code></pre>
-<p><strong>Everything</strong>:</p>
-<pre><code class="language-toml">[dependencies]
-iris = { version = "0.1.0", features = ["embeddings-all"] }
-</code></pre>
-<h2 id="verify-installation"><a class="header" href="#verify-installation">Verify Installation</a></h2>
-<p>Create a minimal program to verify that Iris compiles:</p>
-<pre class="playground"><code class="language-rust">use iris::Result;
-
-#[tokio::main]
-async fn main() -&gt; Result&lt;()&gt; {
-    println!("Iris version: {}", iris::VERSION);
-    Ok(())
-}</code></pre>
-<pre><code class="language-bash">cargo run
-</code></pre>
-<p>If you see the version printed, you are ready to proceed to the <a href="quickstart.html">Quick Start</a>.</p>
+                        <h1 id="search"><a class="header" href="#search">Search</a></h1>
+<p>This section covers how to query your indexed data. Iris supports three search modes that can be used independently or combined.</p>
+<h2 id="topics"><a class="header" href="#topics">Topics</a></h2>
+<h3 id="lexical-search"><a class="header" href="#lexical-search"><a href="search/lexical_search.html">Lexical Search</a></a></h3>
+<p>Keyword-based search using an inverted index. Covers:</p>
+<ul>
+<li>All query types: Term, Phrase, Boolean, Fuzzy, Wildcard, Range, Geo, Span</li>
+<li>BM25 scoring and field boosts</li>
+<li>Using the Query DSL for text-based queries</li>
+</ul>
+<h3 id="vector-search"><a class="header" href="#vector-search"><a href="search/vector_search.html">Vector Search</a></a></h3>
+<p>Semantic similarity search using vector embeddings. Covers:</p>
+<ul>
+<li>VectorSearchRequestBuilder API</li>
+<li>Multi-field vector search and score modes</li>
+<li>Filtered vector search</li>
+</ul>
+<h3 id="hybrid-search"><a class="header" href="#hybrid-search"><a href="search/hybrid_search.html">Hybrid Search</a></a></h3>
+<p>Combining lexical and vector search for best-of-both-worlds results. Covers:</p>
+<ul>
+<li>SearchRequestBuilder API</li>
+<li>Fusion algorithms (RRF, WeightedSum)</li>
+<li>Filtered hybrid search</li>
+<li>Pagination with offset/limit</li>
+</ul>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="../getting_started.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="indexing/vector_indexing.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
-                            <a rel="next prefetch" href="../getting_started/quickstart.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="search/lexical_search.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                             </a>
 
@@ -248,11 +221,11 @@ async fn main() -&gt; Result&lt;()&gt; {
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="../getting_started.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="indexing/vector_indexing.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 
-                    <a rel="next prefetch" href="../getting_started/quickstart.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="search/lexical_search.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                     </a>
             </nav>
@@ -272,17 +245,17 @@ async fn main() -&gt; Result&lt;()&gt; {
         </script>
 
 
-        <script src="../elasticlunr-ef4e11c1.min.js"></script>
-        <script src="../mark-09e88c2c.min.js"></script>
-        <script src="../searcher-c2a407aa.js"></script>
+        <script src="elasticlunr-ef4e11c1.min.js"></script>
+        <script src="mark-09e88c2c.min.js"></script>
+        <script src="searcher-c2a407aa.js"></script>
 
-        <script src="../clipboard-1626706a.min.js"></script>
-        <script src="../highlight-abc7f01d.js"></script>
-        <script src="../book-a0b12cfe.js"></script>
+        <script src="clipboard-1626706a.min.js"></script>
+        <script src="highlight-abc7f01d.js"></script>
+        <script src="book-a0b12cfe.js"></script>
 
         <!-- Custom JS scripts -->
-        <script src="../mermaid-9a6dd17b.min.js"></script>
-        <script src="../mermaid-init-ddddd38b.js"></script>
+        <script src="mermaid-9a6dd17b.min.js"></script>
+        <script src="mermaid-init-ddddd38b.js"></script>
 
 
 

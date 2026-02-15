@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Architecture - Iris Documentation</title>
+        <title>Text Analysis - Iris Documentation</title>
 
 
         <!-- Custom HTML head -->
@@ -35,10 +35,10 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-48168cb1.js";
+            window.path_to_searchindex_js = "../searchindex-35006bd3.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-75fc7776.js"></script>
+        <script src="../toc-2eec5043.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -177,115 +177,186 @@
 
                 <div id="mdbook-content" class="content">
                     <main>
-                        <h1 id="architecture"><a class="header" href="#architecture">Architecture</a></h1>
-<p>Iris is built on a unified modular architecture where the <strong>Engine</strong> serves as the core orchestrator.</p>
-<h2 id="1-engine-unified"><a class="header" href="#1-engine-unified">1. Engine (Unified)</a></h2>
-<p>The primary engine associated with the library. It unifies vector similarity search with full-text search capabilities.</p>
-<ul>
-<li><strong>Orchestration</strong>: Manages both VectorStore (HNSW/IVF/Flat index) and LexicalStore (Inverted Index).</li>
-<li><strong>Hybrid Search</strong>: Performs unified queries combining vector similarity and keyword relevance.</li>
-<li><strong>ID Management</strong>: Manages external ID to internal integer ID mapping.</li>
-</ul>
-<h2 id="2-lexicalstore-component"><a class="header" href="#2-lexicalstore-component">2. LexicalStore (Component)</a></h2>
-<p>Operates as a component managed by the Engine, handling full-text search.</p>
-<ul>
-<li><strong>Inverted Index</strong>: Standard posting lists for term lookups.</li>
-<li><strong>Analyzers</strong>: Tokenization and normalization pipeline.</li>
-<li><strong>Query Parser</strong>: Supports boolean, phrase, and structured queries.</li>
-</ul>
-<h2 id="3-vectorstore-component"><a class="header" href="#3-vectorstore-component">3. VectorStore (Component)</a></h2>
-<p>Operates as a component managed by the Engine, handling vector similarity search.</p>
-<ul>
-<li><strong>Vector Index</strong>: Supports HNSW, IVF, and Flat index types.</li>
-<li><strong>Embedder</strong>: Automatic text/image to vector embedding.</li>
-<li><strong>Distance Metrics</strong>: Cosine, Euclidean, and DotProduct similarity.</li>
-</ul>
-<pre><code class="language-mermaid">graph TD
-    subgraph "Application Layer"
-        User[User / App]
-        Req[SearchRequest]
-    end
-
-    subgraph "Iris Engine"
-        E[Engine]
-
-        subgraph "Components"
-            VS[VectorStore]
-            LS[LexicalStore]
-            DS[DocumentStore]
-            WAL[Write-Ahead Log]
-        end
-
-        Fusion[Result Fusion]
-    end
-
-    subgraph "Storage Layer"
-        FS[FileStorage / Mmap]
-    end
-
-    %% Flows
-    User --&gt;|index/search| E
-    E --&gt; VS
-    E --&gt; LS
-    E --&gt; DS
-    E --&gt; WAL
-
-    LS --&gt; FS
-    VS --&gt; FS
-    DS --&gt; FS
-    WAL --&gt; FS
-
-    %% Search Flow
-    Req --&gt; E
-    E --&gt;|Vector Query| VS
-    E --&gt;|Keyword Query| LS
-
-    VS --&gt;|Hits| Fusion
-    LS --&gt;|Hits| Fusion
-
-    Fusion --&gt;|Unified Results| User
+                        <h1 id="text-analysis"><a class="header" href="#text-analysis">Text Analysis</a></h1>
+<p>Text analysis is the process of converting raw text into searchable tokens. When a document is indexed, the analyzer breaks text fields into individual terms; when a query is executed, the same analyzer processes the query text to ensure consistency.</p>
+<h2 id="the-analysis-pipeline"><a class="header" href="#the-analysis-pipeline">The Analysis Pipeline</a></h2>
+<div class="mermaid">
+graph LR
+    Input["Raw Text<br />'The quick brown FOX jumps!'"]
+    T["Tokenizer<br />Split into words"]
+    F1["LowercaseFilter"]
+    F2["StopFilter"]
+    F3["StemFilter"]
+    Output["Terms<br />'quick', 'brown', 'fox', 'jump'"]
+<pre><code>Input --&gt; T --&gt; F1 --&gt; F2 --&gt; F3 --&gt; Output
 </code></pre>
-<h2 id="storage-layer"><a class="header" href="#storage-layer">Storage Layer</a></h2>
-<p>All components abstract their storage through a <code>Storage</code> trait, allowing seamless switching between:</p>
-<ul>
-<li><strong>Memory</strong>: For testing and ephemeral data.</li>
-<li><strong>File</strong>: For persistent on-disk storage.</li>
-<li><strong>Mmap</strong>: For high-performance memory-mapped file access.</li>
-</ul>
-<h2 id="component-structure"><a class="header" href="#component-structure">Component Structure</a></h2>
-<p>Each store follows a simplified 4-member structure pattern:</p>
+</div>
+
+<p>The analysis pipeline consists of:</p>
+<ol>
+<li><strong>Tokenizer</strong> — splits text into raw tokens (words, characters, n-grams)</li>
+<li><strong>Token Filters</strong> — transform, remove, or expand tokens (lowercase, stop words, stemming, synonyms)</li>
+</ol>
+<h2 id="the-analyzer-trait"><a class="header" href="#the-analyzer-trait">The Analyzer Trait</a></h2>
+<p>All analyzers implement the <code>Analyzer</code> trait:</p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>pub struct LexicalStore {
-    index: Box&lt;dyn LexicalIndex&gt;,
-    writer_cache: Mutex&lt;Option&lt;Box&lt;dyn LexicalIndexWriter&gt;&gt;&gt;,
-    searcher_cache: RwLock&lt;Option&lt;Box&lt;dyn LexicalIndexSearcher&gt;&gt;&gt;,
-    doc_store: Arc&lt;RwLock&lt;UnifiedDocumentStore&gt;&gt;,
-}
-
-pub struct VectorStore {
-    index: Box&lt;dyn VectorIndex&gt;,
-    writer_cache: Mutex&lt;Option&lt;Box&lt;dyn VectorIndexWriter&gt;&gt;&gt;,
-    searcher_cache: RwLock&lt;Option&lt;Box&lt;dyn VectorIndexSearcher&gt;&gt;&gt;,
-    doc_store: Arc&lt;RwLock&lt;UnifiedDocumentStore&gt;&gt;,
+</span>pub trait Analyzer: Send + Sync {
+    fn analyze(&amp;self, text: &amp;str) -&gt; Result&lt;TokenStream&gt;;
 }
 <span class="boring">}</span></code></pre>
-<p>This pattern provides:</p>
-<ul>
-<li><strong>Lazy Initialization</strong>: Writers and searchers are created on-demand.</li>
-<li><strong>Cache Invalidation</strong>: Searcher cache is invalidated after commit/optimize.</li>
-<li><strong>Shared Document Store</strong>: Both stores share the same document storage.</li>
-</ul>
+<p><code>TokenStream</code> is a <code>Box&lt;dyn Iterator&lt;Item = Token&gt; + Send&gt;</code> — a lazy iterator over tokens.</p>
+<p>A <code>Token</code> contains:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Field</th><th style="text-align: left">Type</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>text</code></td><td style="text-align: left"><code>String</code></td><td style="text-align: left">The token text</td></tr>
+<tr><td style="text-align: left"><code>position</code></td><td style="text-align: left"><code>usize</code></td><td style="text-align: left">Position in the original text</td></tr>
+<tr><td style="text-align: left"><code>position_increment</code></td><td style="text-align: left"><code>usize</code></td><td style="text-align: left">Distance from previous token</td></tr>
+<tr><td style="text-align: left"><code>position_length</code></td><td style="text-align: left"><code>usize</code></td><td style="text-align: left">Span of the token (&gt;1 for synonyms)</td></tr>
+<tr><td style="text-align: left"><code>boost</code></td><td style="text-align: left"><code>f32</code></td><td style="text-align: left">Token-level scoring weight</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="built-in-analyzers"><a class="header" href="#built-in-analyzers">Built-in Analyzers</a></h2>
+<h3 id="standardanalyzer"><a class="header" href="#standardanalyzer">StandardAnalyzer</a></h3>
+<p>The default analyzer. Suitable for most Western languages.</p>
+<p>Pipeline: <code>RegexTokenizer</code> (Unicode word boundaries) → <code>LowercaseFilter</code> → <code>StopFilter</code> (33 common English stop words)</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use iris::analysis::analyzer::standard::StandardAnalyzer;
+
+let analyzer = StandardAnalyzer::default();
+// "The Quick Brown Fox" → ["quick", "brown", "fox"]
+// ("The" is removed by stop word filtering)
+<span class="boring">}</span></code></pre>
+<h3 id="japaneseanalyzer"><a class="header" href="#japaneseanalyzer">JapaneseAnalyzer</a></h3>
+<p>Uses morphological analysis for Japanese text segmentation.</p>
+<p>Pipeline: <code>LinderaTokenizer</code> → <code>LowercaseFilter</code></p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use iris::analysis::analyzer::japanese::JapaneseAnalyzer;
+
+let analyzer = JapaneseAnalyzer::new()?;
+// "東京都に住んでいる" → ["東京", "都", "に", "住ん", "で", "いる"]
+<span class="boring">}</span></code></pre>
+<h3 id="keywordanalyzer"><a class="header" href="#keywordanalyzer">KeywordAnalyzer</a></h3>
+<p>Treats the entire input as a single token. No tokenization or normalization.</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use iris::analysis::analyzer::keyword::KeywordAnalyzer;
+
+let analyzer = KeywordAnalyzer;
+// "Hello World" → ["Hello World"]
+<span class="boring">}</span></code></pre>
+<p>Use this for fields that should match exactly (categories, tags, status codes).</p>
+<h3 id="pipelineanalyzer"><a class="header" href="#pipelineanalyzer">PipelineAnalyzer</a></h3>
+<p>Build a custom pipeline by combining any tokenizer with any sequence of filters:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use iris::analysis::analyzer::pipeline::PipelineAnalyzer;
+use iris::analysis::tokenizer::regex::RegexTokenizer;
+use iris::analysis::token_filter::lowercase::LowercaseFilter;
+use iris::analysis::token_filter::stop::StopFilter;
+use iris::analysis::token_filter::stem::StemFilter;
+
+let analyzer = PipelineAnalyzer::new(Arc::new(RegexTokenizer::new()?))
+    .add_filter(Arc::new(LowercaseFilter::new()))
+    .add_filter(Arc::new(StopFilter::new()))
+    .add_filter(Arc::new(StemFilter::english()));
+<span class="boring">}</span></code></pre>
+<h2 id="perfieldanalyzer"><a class="header" href="#perfieldanalyzer">PerFieldAnalyzer</a></h2>
+<p><code>PerFieldAnalyzer</code> lets you assign different analyzers to different fields within the same engine:</p>
+<div class="mermaid">
+graph LR
+    PFA["PerFieldAnalyzer"]
+    PFA --&gt;|"title"| KW["KeywordAnalyzer"]
+    PFA --&gt;|"body"| STD["StandardAnalyzer"]
+    PFA --&gt;|"description_ja"| JP["JapaneseAnalyzer"]
+    PFA --&gt;|other fields| DEF["Default<br />(StandardAnalyzer)"]
+</div>
+
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use std::sync::Arc;
+use iris::analysis::analyzer::standard::StandardAnalyzer;
+use iris::analysis::analyzer::keyword::KeywordAnalyzer;
+use iris::analysis::per_field::PerFieldAnalyzer;
+
+// Default analyzer for fields not explicitly configured
+let mut per_field = PerFieldAnalyzer::new(
+    Arc::new(StandardAnalyzer::default())
+);
+
+// Use KeywordAnalyzer for exact-match fields
+per_field.add_analyzer("category", Arc::new(KeywordAnalyzer));
+per_field.add_analyzer("status", Arc::new(KeywordAnalyzer));
+
+let engine = Engine::builder(storage, schema)
+    .analyzer(Arc::new(per_field))
+    .build()
+    .await?;
+<span class="boring">}</span></code></pre>
+<blockquote>
+<p><strong>Note:</strong> The <code>_id</code> field is always analyzed with <code>KeywordAnalyzer</code> regardless of configuration.</p>
+</blockquote>
+<h2 id="tokenizers"><a class="header" href="#tokenizers">Tokenizers</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Tokenizer</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>RegexTokenizer</code></td><td style="text-align: left">Unicode word boundaries; splits on whitespace and punctuation</td></tr>
+<tr><td style="text-align: left"><code>WhitespaceTokenizer</code></td><td style="text-align: left">Splits on whitespace only</td></tr>
+<tr><td style="text-align: left"><code>LinderaTokenizer</code></td><td style="text-align: left">Japanese morphological analysis (Lindera/MeCab)</td></tr>
+<tr><td style="text-align: left"><code>NgramTokenizer</code></td><td style="text-align: left">Generates n-gram tokens of configurable size</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="token-filters"><a class="header" href="#token-filters">Token Filters</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Filter</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>LowercaseFilter</code></td><td style="text-align: left">Converts tokens to lowercase</td></tr>
+<tr><td style="text-align: left"><code>StopFilter</code></td><td style="text-align: left">Removes common words (“the”, “is”, “a”)</td></tr>
+<tr><td style="text-align: left"><code>StemFilter</code></td><td style="text-align: left">Reduces words to their root form (“running” → “run”)</td></tr>
+<tr><td style="text-align: left"><code>SynonymGraphFilter</code></td><td style="text-align: left">Expands tokens with synonyms from a dictionary</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="synonym-expansion"><a class="header" href="#synonym-expansion">Synonym Expansion</a></h3>
+<p>The <code>SynonymGraphFilter</code> expands terms using a synonym dictionary:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use iris::analysis::synonym::dictionary::SynonymDictionary;
+use iris::analysis::token_filter::synonym_graph::SynonymGraphFilter;
+
+let mut dict = SynonymDictionary::new(None)?;
+dict.add_synonym_group(vec!["ml".into(), "machine learning".into()]);
+dict.add_synonym_group(vec!["ai".into(), "artificial intelligence".into()]);
+
+// keep_original=true means original token is preserved alongside synonyms
+let filter = SynonymGraphFilter::new(dict, true)
+    .with_boost(0.8);  // synonyms get 80% weight
+<span class="boring">}</span></code></pre>
+<p>The <code>boost</code> parameter controls how much weight synonyms receive relative to original tokens. A value of <code>0.8</code> means synonym matches contribute 80% as much to the score as exact matches.</p>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="../concepts.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../concepts/schema_and_fields.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
-                            <a rel="next prefetch" href="../concepts/lexical_search.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="../concepts/embedding.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                             </a>
 
@@ -295,11 +366,11 @@ pub struct VectorStore {
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="../concepts.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="../concepts/schema_and_fields.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 
-                    <a rel="next prefetch" href="../concepts/lexical_search.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="../concepts/embedding.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                     </a>
             </nav>

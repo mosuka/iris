@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Installation - Iris Documentation</title>
+        <title>Vector Indexing - Iris Documentation</title>
 
 
         <!-- Custom HTML head -->
@@ -177,68 +177,306 @@
 
                 <div id="mdbook-content" class="content">
                     <main>
-                        <h1 id="installation"><a class="header" href="#installation">Installation</a></h1>
-<h2 id="add-iris-to-your-project"><a class="header" href="#add-iris-to-your-project">Add Iris to Your Project</a></h2>
-<p>Add <code>iris</code> and <code>tokio</code> (async runtime) to your <code>Cargo.toml</code>:</p>
-<pre><code class="language-toml">[dependencies]
-iris = "0.1.0"
-tokio = { version = "1", features = ["full"] }
+                        <h1 id="vector-indexing"><a class="header" href="#vector-indexing">Vector Indexing</a></h1>
+<p>Vector indexing powers similarity-based search. When a document’s vector field is indexed, Iris stores the embedding vector in a specialized index structure that enables fast approximate nearest neighbor (ANN) retrieval.</p>
+<h2 id="how-vector-indexing-works"><a class="header" href="#how-vector-indexing-works">How Vector Indexing Works</a></h2>
+<div class="mermaid">
+sequenceDiagram
+    participant Doc as Document
+    participant Embedder
+    participant Normalize as Normalizer
+    participant Index as Vector Index
+<pre><code>Doc-&gt;&gt;Embedder: "Rust is a systems language"
+Embedder--&gt;&gt;Normalize: [0.12, -0.45, 0.78, ...]
+Normalize-&gt;&gt;Normalize: L2 normalize
+Normalize--&gt;&gt;Index: [0.14, -0.52, 0.90, ...]
+Index-&gt;&gt;Index: Insert into index structure
 </code></pre>
-<h2 id="feature-flags"><a class="header" href="#feature-flags">Feature Flags</a></h2>
-<p>Iris ships with a minimal default feature set. Enable additional features as needed:</p>
+</div>
+
+<h3 id="step-by-step"><a class="header" href="#step-by-step">Step by Step</a></h3>
+<ol>
+<li><strong>Embed</strong>: The text (or image) is converted to a vector by the configured embedder</li>
+<li><strong>Normalize</strong>: The vector is L2-normalized (for cosine similarity)</li>
+<li><strong>Index</strong>: The vector is inserted into the configured index structure (Flat, HNSW, or IVF)</li>
+<li><strong>Commit</strong>: On <code>commit()</code>, the index is flushed to persistent storage</li>
+</ol>
+<h2 id="index-types"><a class="header" href="#index-types">Index Types</a></h2>
+<p>Iris supports three vector index types, each with different performance characteristics:</p>
+<h3 id="comparison"><a class="header" href="#comparison">Comparison</a></h3>
 <div class="table-wrapper">
 <table>
 <thead>
-<tr><th style="text-align: left">Feature</th><th style="text-align: left">Description</th><th style="text-align: left">Use Case</th></tr>
+<tr><th style="text-align: left">Property</th><th style="text-align: left">Flat</th><th style="text-align: left">HNSW</th><th style="text-align: left">IVF</th></tr>
 </thead>
 <tbody>
-<tr><td style="text-align: left"><em>(default)</em></td><td style="text-align: left">Lexical search, in-memory storage, standard analyzer</td><td style="text-align: left">Keyword search only</td></tr>
-<tr><td style="text-align: left"><code>embeddings-candle</code></td><td style="text-align: left">Local BERT embeddings via Hugging Face Candle</td><td style="text-align: left">Vector search without external API</td></tr>
-<tr><td style="text-align: left"><code>embeddings-openai</code></td><td style="text-align: left">OpenAI API embeddings (text-embedding-3-small, etc.)</td><td style="text-align: left">Cloud-based vector search</td></tr>
-<tr><td style="text-align: left"><code>embeddings-multimodal</code></td><td style="text-align: left">CLIP embeddings for text + image via Candle</td><td style="text-align: left">Multimodal (text-to-image) search</td></tr>
-<tr><td style="text-align: left"><code>embeddings-all</code></td><td style="text-align: left">All embedding features above</td><td style="text-align: left">Full embedding support</td></tr>
+<tr><td style="text-align: left"><strong>Accuracy</strong></td><td style="text-align: left">100% (exact)</td><td style="text-align: left">~95-99% (approximate)</td><td style="text-align: left">~90-98% (approximate)</td></tr>
+<tr><td style="text-align: left"><strong>Search speed</strong></td><td style="text-align: left">O(n) linear scan</td><td style="text-align: left">O(log n) graph walk</td><td style="text-align: left">O(n/k) cluster scan</td></tr>
+<tr><td style="text-align: left"><strong>Memory usage</strong></td><td style="text-align: left">Low</td><td style="text-align: left">Higher (graph edges)</td><td style="text-align: left">Moderate (centroids)</td></tr>
+<tr><td style="text-align: left"><strong>Index build time</strong></td><td style="text-align: left">Fast</td><td style="text-align: left">Moderate</td><td style="text-align: left">Slower (clustering)</td></tr>
+<tr><td style="text-align: left"><strong>Best for</strong></td><td style="text-align: left">&lt; 10K vectors</td><td style="text-align: left">10K - 10M vectors</td><td style="text-align: left">&gt; 1M vectors</td></tr>
 </tbody>
 </table>
 </div>
-<h3 id="examples"><a class="header" href="#examples">Examples</a></h3>
-<p><strong>Lexical search only</strong> (no embeddings needed):</p>
-<pre><code class="language-toml">[dependencies]
-iris = "0.1.0"
+<h3 id="flat-index"><a class="header" href="#flat-index">Flat Index</a></h3>
+<p>The simplest index. Compares the query vector against every stored vector (brute-force).</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use iris::vector::FlatOption;
+use iris::vector::core::distance::DistanceMetric;
+
+let opt = FlatOption {
+    dimension: 384,
+    distance: DistanceMetric::Cosine,
+    ..Default::default()
+};
+<span class="boring">}</span></code></pre>
+<ul>
+<li><strong>Pros</strong>: 100% recall (exact results), simple, low memory</li>
+<li><strong>Cons</strong>: Slow for large datasets (linear scan)</li>
+<li><strong>Use when</strong>: You have fewer than ~10,000 vectors, or you need exact results</li>
+</ul>
+<h3 id="hnsw-index"><a class="header" href="#hnsw-index">HNSW Index</a></h3>
+<p><strong>Hierarchical Navigable Small World</strong> graph. The default and most commonly used index type.</p>
+<div class="mermaid">
+graph TB
+    subgraph "Layer 2 (sparse)"
+        A2["A"] --- C2["C"]
+    end
+<pre><code>subgraph "Layer 1 (medium)"
+    A1["A"] --- B1["B"]
+    A1 --- C1["C"]
+    B1 --- D1["D"]
+    C1 --- D1
+end
+
+subgraph "Layer 0 (dense - all vectors)"
+    A0["A"] --- B0["B"]
+    A0 --- C0["C"]
+    B0 --- D0["D"]
+    B0 --- E0["E"]
+    C0 --- D0
+    C0 --- F0["F"]
+    D0 --- E0
+    E0 --- F0
+end
+
+A2 -.-&gt;|"entry point"| A1
+A1 -.-&gt; A0
+C2 -.-&gt; C1
+C1 -.-&gt; C0
+B1 -.-&gt; B0
+D1 -.-&gt; D0
 </code></pre>
-<p><strong>Vector search with local model</strong> (no API key required):</p>
-<pre><code class="language-toml">[dependencies]
-iris = { version = "0.1.0", features = ["embeddings-candle"] }
+</div>
+
+<p>The HNSW algorithm searches from the top (sparse) layer down to the bottom (dense) layer, narrowing the search space at each level.</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use iris::vector::HnswOption;
+use iris::vector::core::distance::DistanceMetric;
+
+let opt = HnswOption {
+    dimension: 384,
+    distance: DistanceMetric::Cosine,
+    m: 16,                  // max connections per node per layer
+    ef_construction: 200,   // search width during index building
+    ..Default::default()
+};
+<span class="boring">}</span></code></pre>
+<h4 id="hnsw-parameters"><a class="header" href="#hnsw-parameters">HNSW Parameters</a></h4>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Parameter</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th><th style="text-align: left">Impact</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>m</code></td><td style="text-align: left">16</td><td style="text-align: left">Max bi-directional connections per layer</td><td style="text-align: left">Higher = better recall, more memory</td></tr>
+<tr><td style="text-align: left"><code>ef_construction</code></td><td style="text-align: left">200</td><td style="text-align: left">Search width during index building</td><td style="text-align: left">Higher = better recall, slower build</td></tr>
+<tr><td style="text-align: left"><code>dimension</code></td><td style="text-align: left">128</td><td style="text-align: left">Vector dimensions</td><td style="text-align: left">Must match embedder output</td></tr>
+<tr><td style="text-align: left"><code>distance</code></td><td style="text-align: left">Cosine</td><td style="text-align: left">Distance metric</td><td style="text-align: left">See Distance Metrics below</td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>Tuning tips:</strong></p>
+<ul>
+<li>Increase <code>m</code> (e.g., 32 or 64) for higher recall at the cost of memory</li>
+<li>Increase <code>ef_construction</code> (e.g., 400) for better index quality at the cost of build time</li>
+<li>At search time, the <code>ef_search</code> parameter (set in the search request) controls the search width</li>
+</ul>
+<h3 id="ivf-index"><a class="header" href="#ivf-index">IVF Index</a></h3>
+<p><strong>Inverted File Index</strong>. Partitions vectors into clusters, then only searches relevant clusters.</p>
+<div class="mermaid">
+graph TB
+    Q["Query Vector"]
+    Q --&gt; C1["Cluster 1<br />(centroid)"]
+    Q --&gt; C2["Cluster 2<br />(centroid)"]
+<pre><code>C1 --&gt; V1["vec_3"]
+C1 --&gt; V2["vec_7"]
+C1 --&gt; V3["vec_12"]
+
+C2 --&gt; V4["vec_1"]
+C2 --&gt; V5["vec_9"]
+C2 --&gt; V6["vec_15"]
+
+style C1 fill:#f9f,stroke:#333
+style C2 fill:#f9f,stroke:#333
 </code></pre>
-<p><strong>Vector search with OpenAI</strong>:</p>
-<pre><code class="language-toml">[dependencies]
-iris = { version = "0.1.0", features = ["embeddings-openai"] }
-</code></pre>
-<p><strong>Everything</strong>:</p>
-<pre><code class="language-toml">[dependencies]
-iris = { version = "0.1.0", features = ["embeddings-all"] }
-</code></pre>
-<h2 id="verify-installation"><a class="header" href="#verify-installation">Verify Installation</a></h2>
-<p>Create a minimal program to verify that Iris compiles:</p>
-<pre class="playground"><code class="language-rust">use iris::Result;
+</div>
+
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use iris::vector::IvfOption;
+use iris::vector::core::distance::DistanceMetric;
+
+let opt = IvfOption {
+    dimension: 384,
+    distance: DistanceMetric::Cosine,
+    n_clusters: 100,   // number of clusters
+    n_probe: 10,       // clusters to search at query time
+    ..Default::default()
+};
+<span class="boring">}</span></code></pre>
+<h4 id="ivf-parameters"><a class="header" href="#ivf-parameters">IVF Parameters</a></h4>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Parameter</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th><th style="text-align: left">Impact</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>n_clusters</code></td><td style="text-align: left">100</td><td style="text-align: left">Number of Voronoi cells</td><td style="text-align: left">More clusters = faster search, lower recall</td></tr>
+<tr><td style="text-align: left"><code>n_probe</code></td><td style="text-align: left">1</td><td style="text-align: left">Clusters to search at query time</td><td style="text-align: left">Higher = better recall, slower search</td></tr>
+<tr><td style="text-align: left"><code>dimension</code></td><td style="text-align: left">(required)</td><td style="text-align: left">Vector dimensions</td><td style="text-align: left">Must match embedder output</td></tr>
+<tr><td style="text-align: left"><code>distance</code></td><td style="text-align: left">Cosine</td><td style="text-align: left">Distance metric</td><td style="text-align: left">See Distance Metrics below</td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>Tuning tips:</strong></p>
+<ul>
+<li>Set <code>n_clusters</code> to roughly <code>sqrt(n)</code> where <code>n</code> is the number of vectors</li>
+<li>Set <code>n_probe</code> to 5-20% of <code>n_clusters</code> for a good recall/speed trade-off</li>
+<li>IVF requires a training phase — initial indexing may be slower</li>
+</ul>
+<h2 id="distance-metrics"><a class="header" href="#distance-metrics">Distance Metrics</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Metric</th><th style="text-align: left">Description</th><th style="text-align: left">Range</th><th style="text-align: left">Best For</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>Cosine</code></td><td style="text-align: left">1 - cosine similarity</td><td style="text-align: left">[0, 2]</td><td style="text-align: left">Text embeddings (most common)</td></tr>
+<tr><td style="text-align: left"><code>Euclidean</code></td><td style="text-align: left">L2 distance</td><td style="text-align: left">[0, +inf)</td><td style="text-align: left">Spatial data</td></tr>
+<tr><td style="text-align: left"><code>Manhattan</code></td><td style="text-align: left">L1 distance</td><td style="text-align: left">[0, +inf)</td><td style="text-align: left">Feature vectors</td></tr>
+<tr><td style="text-align: left"><code>DotProduct</code></td><td style="text-align: left">Negative inner product</td><td style="text-align: left">(-inf, +inf)</td><td style="text-align: left">Pre-normalized vectors</td></tr>
+<tr><td style="text-align: left"><code>Angular</code></td><td style="text-align: left">Angular distance</td><td style="text-align: left">[0, pi]</td><td style="text-align: left">Directional similarity</td></tr>
+</tbody>
+</table>
+</div>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use iris::vector::core::distance::DistanceMetric;
+
+let metric = DistanceMetric::Cosine;      // Default for text
+let metric = DistanceMetric::Euclidean;    // For spatial data
+let metric = DistanceMetric::Manhattan;    // L1 distance
+let metric = DistanceMetric::DotProduct;   // For pre-normalized vectors
+let metric = DistanceMetric::Angular;      // Angular distance
+<span class="boring">}</span></code></pre>
+<blockquote>
+<p><strong>Note:</strong> For cosine similarity, vectors are automatically L2-normalized before indexing. Lower distance = more similar.</p>
+</blockquote>
+<h2 id="quantization"><a class="header" href="#quantization">Quantization</a></h2>
+<p>Quantization reduces memory usage by compressing vectors at the cost of some accuracy:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Method</th><th style="text-align: left">Enum Variant</th><th style="text-align: left">Description</th><th style="text-align: left">Memory Reduction</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><strong>Scalar 8-bit</strong></td><td style="text-align: left"><code>Scalar8Bit</code></td><td style="text-align: left">Scalar quantization to 8-bit integers</td><td style="text-align: left">~4x</td></tr>
+<tr><td style="text-align: left"><strong>Product Quantization</strong></td><td style="text-align: left"><code>ProductQuantization</code></td><td style="text-align: left">Splits vectors into sub-vectors and quantizes each</td><td style="text-align: left">~16-64x</td></tr>
+</tbody>
+</table>
+</div>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use iris::vector::HnswOption;
+use iris::vector::core::quantization::QuantizationMethod;
+
+let opt = HnswOption {
+    dimension: 384,
+    quantizer: Some(QuantizationMethod::Scalar8Bit),
+    ..Default::default()
+};
+<span class="boring">}</span></code></pre>
+<h2 id="segment-files"><a class="header" href="#segment-files">Segment Files</a></h2>
+<p>Each vector index type stores its data in a single segment file:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Index Type</th><th style="text-align: left">File Extension</th><th style="text-align: left">Contents</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left">HNSW</td><td style="text-align: left"><code>.hnsw</code></td><td style="text-align: left">Graph structure, vectors, and metadata</td></tr>
+<tr><td style="text-align: left">Flat</td><td style="text-align: left"><code>.flat</code></td><td style="text-align: left">Raw vectors and metadata</td></tr>
+<tr><td style="text-align: left">IVF</td><td style="text-align: left"><code>.ivf</code></td><td style="text-align: left">Cluster centroids, assigned vectors, and metadata</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="code-example"><a class="header" href="#code-example">Code Example</a></h2>
+<pre class="playground"><code class="language-rust">use std::sync::Arc;
+use iris::{Document, Engine, Schema};
+use iris::lexical::TextOption;
+use iris::vector::HnswOption;
+use iris::vector::core::distance::DistanceMetric;
+use iris::storage::memory::MemoryStorage;
 
 #[tokio::main]
-async fn main() -&gt; Result&lt;()&gt; {
-    println!("Iris version: {}", iris::VERSION);
+async fn main() -&gt; iris::Result&lt;()&gt; {
+    let storage = Arc::new(MemoryStorage::new(Default::default()));
+    let schema = Schema::builder()
+        .add_text_field("title", TextOption::default())
+        .add_hnsw_field("embedding", HnswOption {
+            dimension: 384,
+            distance: DistanceMetric::Cosine,
+            m: 16,
+            ef_construction: 200,
+            ..Default::default()
+        })
+        .build();
+
+    // With an embedder, text in vector fields is automatically embedded
+    let engine = Engine::builder(storage, schema)
+        .embedder(my_embedder)
+        .build()
+        .await?;
+
+    // Add text to the vector field — it will be embedded automatically
+    engine.add_document("doc-1", Document::builder()
+        .add_text("title", "Rust Programming")
+        .add_text("embedding", "Rust is a systems programming language.")
+        .build()
+    ).await?;
+
+    engine.commit().await?;
+
     Ok(())
 }</code></pre>
-<pre><code class="language-bash">cargo run
-</code></pre>
-<p>If you see the version printed, you are ready to proceed to the <a href="quickstart.html">Quick Start</a>.</p>
+<h2 id="next-steps"><a class="header" href="#next-steps">Next Steps</a></h2>
+<ul>
+<li>Search the vector index: <a href="../search/vector_search.html">Vector Search</a></li>
+<li>Combine with lexical search: <a href="../search/hybrid_search.html">Hybrid Search</a></li>
+</ul>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="../getting_started.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../indexing/lexical_indexing.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
-                            <a rel="next prefetch" href="../getting_started/quickstart.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="../search.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                             </a>
 
@@ -248,11 +486,11 @@ async fn main() -&gt; Result&lt;()&gt; {
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="../getting_started.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="../indexing/lexical_indexing.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 
-                    <a rel="next prefetch" href="../getting_started/quickstart.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="../search.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                     </a>
             </nav>

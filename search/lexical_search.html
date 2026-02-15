@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Installation - Iris Documentation</title>
+        <title>Lexical Search - Iris Documentation</title>
 
 
         <!-- Custom HTML head -->
@@ -177,68 +177,234 @@
 
                 <div id="mdbook-content" class="content">
                     <main>
-                        <h1 id="installation"><a class="header" href="#installation">Installation</a></h1>
-<h2 id="add-iris-to-your-project"><a class="header" href="#add-iris-to-your-project">Add Iris to Your Project</a></h2>
-<p>Add <code>iris</code> and <code>tokio</code> (async runtime) to your <code>Cargo.toml</code>:</p>
-<pre><code class="language-toml">[dependencies]
-iris = "0.1.0"
-tokio = { version = "1", features = ["full"] }
-</code></pre>
-<h2 id="feature-flags"><a class="header" href="#feature-flags">Feature Flags</a></h2>
-<p>Iris ships with a minimal default feature set. Enable additional features as needed:</p>
+                        <h1 id="lexical-search"><a class="header" href="#lexical-search">Lexical Search</a></h1>
+<p>Lexical search finds documents by matching keywords against an inverted index. Iris provides a rich set of query types that cover exact matching, phrase matching, fuzzy matching, and more.</p>
+<h2 id="basic-usage"><a class="header" href="#basic-usage">Basic Usage</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use iris::{SearchRequestBuilder, LexicalSearchRequest};
+use iris::lexical::TermQuery;
+
+let request = SearchRequestBuilder::new()
+    .lexical_search_request(
+        LexicalSearchRequest::new(
+            Box::new(TermQuery::new("body", "rust"))
+        )
+    )
+    .limit(10)
+    .build();
+
+let results = engine.search(request).await?;
+<span class="boring">}</span></code></pre>
+<h2 id="query-types"><a class="header" href="#query-types">Query Types</a></h2>
+<h3 id="termquery"><a class="header" href="#termquery">TermQuery</a></h3>
+<p>Matches documents containing an exact term in a specific field.</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use iris::lexical::TermQuery;
+
+// Find documents where "body" contains the term "rust"
+let query = TermQuery::new("body", "rust");
+<span class="boring">}</span></code></pre>
+<blockquote>
+<p><strong>Note:</strong> Terms are matched after analysis. If the field uses <code>StandardAnalyzer</code>, both the indexed text and the query term are lowercased, so <code>TermQuery::new("body", "rust")</code> will match “Rust” in the original text.</p>
+</blockquote>
+<h3 id="phrasequery"><a class="header" href="#phrasequery">PhraseQuery</a></h3>
+<p>Matches documents containing an exact sequence of terms.</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use iris::lexical::query::phrase::PhraseQuery;
+
+// Find documents containing the exact phrase "machine learning"
+let query = PhraseQuery::new("body", vec!["machine".to_string(), "learning".to_string()]);
+
+// Or use the convenience method from a phrase string:
+let query = PhraseQuery::from_phrase("body", "machine learning");
+<span class="boring">}</span></code></pre>
+<p>Phrase queries require term positions to be stored (the default for <code>TextOption</code>).</p>
+<h3 id="booleanquery"><a class="header" href="#booleanquery">BooleanQuery</a></h3>
+<p>Combines multiple queries with boolean logic.</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use iris::lexical::query::boolean::{BooleanQuery, BooleanQueryBuilder, Occur};
+
+let query = BooleanQueryBuilder::new()
+    .must(Box::new(TermQuery::new("body", "rust")))       // AND
+    .must(Box::new(TermQuery::new("body", "programming"))) // AND
+    .must_not(Box::new(TermQuery::new("body", "python")))  // NOT
+    .build();
+<span class="boring">}</span></code></pre>
 <div class="table-wrapper">
 <table>
 <thead>
-<tr><th style="text-align: left">Feature</th><th style="text-align: left">Description</th><th style="text-align: left">Use Case</th></tr>
+<tr><th style="text-align: left">Occur</th><th style="text-align: left">Meaning</th><th style="text-align: left">DSL Equivalent</th></tr>
 </thead>
 <tbody>
-<tr><td style="text-align: left"><em>(default)</em></td><td style="text-align: left">Lexical search, in-memory storage, standard analyzer</td><td style="text-align: left">Keyword search only</td></tr>
-<tr><td style="text-align: left"><code>embeddings-candle</code></td><td style="text-align: left">Local BERT embeddings via Hugging Face Candle</td><td style="text-align: left">Vector search without external API</td></tr>
-<tr><td style="text-align: left"><code>embeddings-openai</code></td><td style="text-align: left">OpenAI API embeddings (text-embedding-3-small, etc.)</td><td style="text-align: left">Cloud-based vector search</td></tr>
-<tr><td style="text-align: left"><code>embeddings-multimodal</code></td><td style="text-align: left">CLIP embeddings for text + image via Candle</td><td style="text-align: left">Multimodal (text-to-image) search</td></tr>
-<tr><td style="text-align: left"><code>embeddings-all</code></td><td style="text-align: left">All embedding features above</td><td style="text-align: left">Full embedding support</td></tr>
+<tr><td style="text-align: left"><code>Must</code></td><td style="text-align: left">Document MUST match</td><td style="text-align: left"><code>+term</code> or <code>AND</code></td></tr>
+<tr><td style="text-align: left"><code>Should</code></td><td style="text-align: left">Document SHOULD match (boosts score)</td><td style="text-align: left"><code>term</code> or <code>OR</code></td></tr>
+<tr><td style="text-align: left"><code>MustNot</code></td><td style="text-align: left">Document MUST NOT match</td><td style="text-align: left"><code>-term</code> or <code>NOT</code></td></tr>
+<tr><td style="text-align: left"><code>Filter</code></td><td style="text-align: left">MUST match, but does not affect score</td><td style="text-align: left">(no DSL equivalent)</td></tr>
 </tbody>
 </table>
 </div>
-<h3 id="examples"><a class="header" href="#examples">Examples</a></h3>
-<p><strong>Lexical search only</strong> (no embeddings needed):</p>
-<pre><code class="language-toml">[dependencies]
-iris = "0.1.0"
-</code></pre>
-<p><strong>Vector search with local model</strong> (no API key required):</p>
-<pre><code class="language-toml">[dependencies]
-iris = { version = "0.1.0", features = ["embeddings-candle"] }
-</code></pre>
-<p><strong>Vector search with OpenAI</strong>:</p>
-<pre><code class="language-toml">[dependencies]
-iris = { version = "0.1.0", features = ["embeddings-openai"] }
-</code></pre>
-<p><strong>Everything</strong>:</p>
-<pre><code class="language-toml">[dependencies]
-iris = { version = "0.1.0", features = ["embeddings-all"] }
-</code></pre>
-<h2 id="verify-installation"><a class="header" href="#verify-installation">Verify Installation</a></h2>
-<p>Create a minimal program to verify that Iris compiles:</p>
-<pre class="playground"><code class="language-rust">use iris::Result;
+<h3 id="fuzzyquery"><a class="header" href="#fuzzyquery">FuzzyQuery</a></h3>
+<p>Matches terms within a specified edit distance (Levenshtein distance).</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use iris::lexical::query::fuzzy::FuzzyQuery;
 
-#[tokio::main]
-async fn main() -&gt; Result&lt;()&gt; {
-    println!("Iris version: {}", iris::VERSION);
-    Ok(())
-}</code></pre>
-<pre><code class="language-bash">cargo run
-</code></pre>
-<p>If you see the version printed, you are ready to proceed to the <a href="quickstart.html">Quick Start</a>.</p>
+// Find documents matching "programing" within edit distance 2
+// This will match "programming", "programing", etc.
+let query = FuzzyQuery::new("body", "programing", 2);
+<span class="boring">}</span></code></pre>
+<h3 id="wildcardquery"><a class="header" href="#wildcardquery">WildcardQuery</a></h3>
+<p>Matches terms using wildcard patterns.</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use iris::lexical::query::wildcard::WildcardQuery;
+
+// '?' matches exactly one character, '*' matches zero or more
+let query = WildcardQuery::new("filename", "*.pdf");
+let query = WildcardQuery::new("body", "pro*");
+let query = WildcardQuery::new("body", "col?r");  // matches "color" and "colour"
+<span class="boring">}</span></code></pre>
+<h3 id="numericrangequery"><a class="header" href="#numericrangequery">NumericRangeQuery</a></h3>
+<p>Matches documents with numeric field values within a range.</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use iris::lexical::NumericRangeQuery;
+use iris::lexical::core::field::NumericType;
+
+// Find documents where "price" is between 10.0 and 100.0 (inclusive)
+let query = NumericRangeQuery::new(
+    "price",
+    NumericType::Float,
+    Some(10.0),   // min
+    Some(100.0),  // max
+    true,         // include min
+    true,         // include max
+);
+
+// Open-ended range: price &gt;= 50
+let query = NumericRangeQuery::new(
+    "price",
+    NumericType::Float,
+    Some(50.0),
+    None,     // no upper bound
+    true,
+    false,
+);
+<span class="boring">}</span></code></pre>
+<h3 id="geoquery"><a class="header" href="#geoquery">GeoQuery</a></h3>
+<p>Matches documents by geographic location.</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use iris::lexical::query::geo::GeoQuery;
+
+// Find documents within 10km of Tokyo Station (35.6812, 139.7671)
+let query = GeoQuery::within_radius("location", 35.6812, 139.7671, 10.0)?; // radius in kilometers
+
+// Find documents within a bounding box (min_lat, min_lon, max_lat, max_lon)
+let query = GeoQuery::within_bounding_box(
+    "location",
+    35.0, 139.0,  // min (lat, lon)
+    36.0, 140.0,  // max (lat, lon)
+)?;
+<span class="boring">}</span></code></pre>
+<h3 id="spanquery"><a class="header" href="#spanquery">SpanQuery</a></h3>
+<p>Matches terms based on their proximity within a document. Use <code>SpanTermQuery</code> and <code>SpanNearQuery</code> to build proximity queries:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use iris::lexical::query::span::{SpanQuery, SpanTermQuery, SpanNearQuery};
+
+// Find documents where "quick" appears near "fox" (within 3 positions)
+let query = SpanNearQuery::new(
+    "body",
+    vec![
+        Box::new(SpanTermQuery::new("body", "quick")) as Box&lt;dyn SpanQuery&gt;,
+        Box::new(SpanTermQuery::new("body", "fox")) as Box&lt;dyn SpanQuery&gt;,
+    ],
+    3,    // slop (max distance between terms)
+    true, // in_order (terms must appear in order)
+);
+<span class="boring">}</span></code></pre>
+<h2 id="scoring"><a class="header" href="#scoring">Scoring</a></h2>
+<p>Lexical search results are scored using <strong>BM25</strong>. The score reflects how relevant a document is to the query:</p>
+<ul>
+<li>Higher term frequency in the document increases the score</li>
+<li>Rarer terms across the index increase the score</li>
+<li>Shorter documents are boosted relative to longer ones</li>
+</ul>
+<h3 id="field-boosts"><a class="header" href="#field-boosts">Field Boosts</a></h3>
+<p>You can boost specific fields to influence relevance:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use iris::LexicalSearchRequest;
+
+let mut request = LexicalSearchRequest::new(Box::new(query));
+request.field_boosts.insert("title".to_string(), 2.0);  // title matches count double
+request.field_boosts.insert("body".to_string(), 1.0);
+<span class="boring">}</span></code></pre>
+<h2 id="lexicalsearchrequest-options"><a class="header" href="#lexicalsearchrequest-options">LexicalSearchRequest Options</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Option</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>query</code></td><td style="text-align: left">(required)</td><td style="text-align: left">The query to execute</td></tr>
+<tr><td style="text-align: left"><code>limit</code></td><td style="text-align: left">10</td><td style="text-align: left">Maximum number of results</td></tr>
+<tr><td style="text-align: left"><code>load_documents</code></td><td style="text-align: left">true</td><td style="text-align: left">Whether to load full document content</td></tr>
+<tr><td style="text-align: left"><code>field_boosts</code></td><td style="text-align: left">empty</td><td style="text-align: left">Per-field score multipliers</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="using-the-query-dsl"><a class="header" href="#using-the-query-dsl">Using the Query DSL</a></h2>
+<p>Instead of building queries programmatically, you can use the text-based Query DSL:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use iris::lexical::QueryParser;
+use iris::analysis::analyzer::standard::StandardAnalyzer;
+use std::sync::Arc;
+
+let analyzer = Arc::new(StandardAnalyzer::default());
+let parser = QueryParser::new(analyzer).with_default_field("body");
+
+// Simple term
+let query = parser.parse("rust")?;
+
+// Boolean
+let query = parser.parse("rust AND programming")?;
+
+// Phrase
+let query = parser.parse("\"machine learning\"")?;
+
+// Field-specific
+let query = parser.parse("title:rust AND body:programming")?;
+
+// Fuzzy
+let query = parser.parse("programing~2")?;
+
+// Range
+let query = parser.parse("year:[2020 TO 2024]")?;
+<span class="boring">}</span></code></pre>
+<p>See <a href="../advanced/query_dsl.html">Query DSL</a> for the complete syntax reference.</p>
+<h2 id="next-steps"><a class="header" href="#next-steps">Next Steps</a></h2>
+<ul>
+<li>Semantic similarity search: <a href="vector_search.html">Vector Search</a></li>
+<li>Combine lexical + vector: <a href="hybrid_search.html">Hybrid Search</a></li>
+<li>Full DSL syntax reference: <a href="../advanced/query_dsl.html">Query DSL</a></li>
+</ul>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="../getting_started.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../search.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
-                            <a rel="next prefetch" href="../getting_started/quickstart.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="../search/vector_search.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                             </a>
 
@@ -248,11 +414,11 @@ async fn main() -&gt; Result&lt;()&gt; {
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="../getting_started.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="../search.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 
-                    <a rel="next prefetch" href="../getting_started/quickstart.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="../search/vector_search.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                     </a>
             </nav>

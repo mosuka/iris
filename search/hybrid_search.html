@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Installation - Iris Documentation</title>
+        <title>Hybrid Search - Iris Documentation</title>
 
 
         <!-- Custom HTML head -->
@@ -177,68 +177,286 @@
 
                 <div id="mdbook-content" class="content">
                     <main>
-                        <h1 id="installation"><a class="header" href="#installation">Installation</a></h1>
-<h2 id="add-iris-to-your-project"><a class="header" href="#add-iris-to-your-project">Add Iris to Your Project</a></h2>
-<p>Add <code>iris</code> and <code>tokio</code> (async runtime) to your <code>Cargo.toml</code>:</p>
-<pre><code class="language-toml">[dependencies]
-iris = "0.1.0"
-tokio = { version = "1", features = ["full"] }
-</code></pre>
-<h2 id="feature-flags"><a class="header" href="#feature-flags">Feature Flags</a></h2>
-<p>Iris ships with a minimal default feature set. Enable additional features as needed:</p>
+                        <h1 id="hybrid-search"><a class="header" href="#hybrid-search">Hybrid Search</a></h1>
+<p>Hybrid search combines <strong>lexical search</strong> (keyword matching) with <strong>vector search</strong> (semantic similarity) to deliver results that are both precise and semantically relevant. This is Iris’s most powerful search mode.</p>
+<h2 id="why-hybrid-search"><a class="header" href="#why-hybrid-search">Why Hybrid Search?</a></h2>
 <div class="table-wrapper">
 <table>
 <thead>
-<tr><th style="text-align: left">Feature</th><th style="text-align: left">Description</th><th style="text-align: left">Use Case</th></tr>
+<tr><th style="text-align: left">Search Type</th><th style="text-align: left">Strengths</th><th style="text-align: left">Weaknesses</th></tr>
 </thead>
 <tbody>
-<tr><td style="text-align: left"><em>(default)</em></td><td style="text-align: left">Lexical search, in-memory storage, standard analyzer</td><td style="text-align: left">Keyword search only</td></tr>
-<tr><td style="text-align: left"><code>embeddings-candle</code></td><td style="text-align: left">Local BERT embeddings via Hugging Face Candle</td><td style="text-align: left">Vector search without external API</td></tr>
-<tr><td style="text-align: left"><code>embeddings-openai</code></td><td style="text-align: left">OpenAI API embeddings (text-embedding-3-small, etc.)</td><td style="text-align: left">Cloud-based vector search</td></tr>
-<tr><td style="text-align: left"><code>embeddings-multimodal</code></td><td style="text-align: left">CLIP embeddings for text + image via Candle</td><td style="text-align: left">Multimodal (text-to-image) search</td></tr>
-<tr><td style="text-align: left"><code>embeddings-all</code></td><td style="text-align: left">All embedding features above</td><td style="text-align: left">Full embedding support</td></tr>
+<tr><td style="text-align: left"><strong>Lexical only</strong></td><td style="text-align: left">Exact keyword matching, handles rare terms well</td><td style="text-align: left">Misses synonyms and paraphrases</td></tr>
+<tr><td style="text-align: left"><strong>Vector only</strong></td><td style="text-align: left">Understands meaning, handles synonyms</td><td style="text-align: left">May miss exact keywords, less precise</td></tr>
+<tr><td style="text-align: left"><strong>Hybrid</strong></td><td style="text-align: left">Best of both worlds</td><td style="text-align: left">Slightly more complex to configure</td></tr>
 </tbody>
 </table>
 </div>
-<h3 id="examples"><a class="header" href="#examples">Examples</a></h3>
-<p><strong>Lexical search only</strong> (no embeddings needed):</p>
-<pre><code class="language-toml">[dependencies]
-iris = "0.1.0"
+<h2 id="how-it-works"><a class="header" href="#how-it-works">How It Works</a></h2>
+<div class="mermaid">
+sequenceDiagram
+    participant User
+    participant Engine
+    participant Lexical as LexicalStore
+    participant Vector as VectorStore
+    participant Fusion
+<pre><code>User-&gt;&gt;Engine: SearchRequest&lt;br/&gt;(lexical + vector)
+
+par Execute in parallel
+    Engine-&gt;&gt;Lexical: BM25 keyword search
+    Lexical--&gt;&gt;Engine: Ranked hits (by relevance)
+and
+    Engine-&gt;&gt;Vector: ANN similarity search
+    Vector--&gt;&gt;Engine: Ranked hits (by distance)
+end
+
+Engine-&gt;&gt;Fusion: Merge two result sets
+Note over Fusion: RRF or WeightedSum
+Fusion--&gt;&gt;Engine: Unified ranked list
+Engine--&gt;&gt;User: Vec of SearchResult
 </code></pre>
-<p><strong>Vector search with local model</strong> (no API key required):</p>
-<pre><code class="language-toml">[dependencies]
-iris = { version = "0.1.0", features = ["embeddings-candle"] }
+</div>
+
+<h2 id="basic-usage"><a class="header" href="#basic-usage">Basic Usage</a></h2>
+<h3 id="builder-api"><a class="header" href="#builder-api">Builder API</a></h3>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use iris::{SearchRequestBuilder, LexicalSearchRequest, FusionAlgorithm};
+use iris::lexical::TermQuery;
+use iris::vector::VectorSearchRequestBuilder;
+
+let request = SearchRequestBuilder::new()
+    // Lexical component
+    .lexical_search_request(
+        LexicalSearchRequest::new(
+            Box::new(TermQuery::new("body", "rust"))
+        )
+    )
+    // Vector component
+    .vector_search_request(
+        VectorSearchRequestBuilder::new()
+            .add_text("text_vec", "systems programming")
+            .build()
+    )
+    // Fusion algorithm
+    .fusion_algorithm(FusionAlgorithm::RRF { k: 60.0 })
+    .limit(10)
+    .build();
+
+let results = engine.search(request).await?;
+<span class="boring">}</span></code></pre>
+<h3 id="query-dsl"><a class="header" href="#query-dsl">Query DSL</a></h3>
+<p>Mix lexical and vector clauses in a single query string:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use iris::UnifiedQueryParser;
+use iris::lexical::QueryParser;
+use iris::vector::VectorQueryParser;
+
+let unified = UnifiedQueryParser::new(
+    QueryParser::new(analyzer).with_default_field("body"),
+    VectorQueryParser::new(embedder),
+);
+
+// Lexical + vector in one query
+let request = unified.parse(r#"body:rust text_vec:~"systems programming""#).await?;
+let results = engine.search(request).await?;
+<span class="boring">}</span></code></pre>
+<p>The <code>~"..."</code> syntax identifies vector clauses. Everything else is parsed as lexical.</p>
+<h2 id="fusion-algorithms"><a class="header" href="#fusion-algorithms">Fusion Algorithms</a></h2>
+<p>When both lexical and vector results exist, they must be merged into a single ranked list. Iris supports two fusion algorithms:</p>
+<h3 id="rrf-reciprocal-rank-fusion"><a class="header" href="#rrf-reciprocal-rank-fusion">RRF (Reciprocal Rank Fusion)</a></h3>
+<p>The default algorithm. Combines results based on their rank positions rather than raw scores.</p>
+<pre><code>score(doc) = sum( 1 / (k + rank_i) )
 </code></pre>
-<p><strong>Vector search with OpenAI</strong>:</p>
-<pre><code class="language-toml">[dependencies]
-iris = { version = "0.1.0", features = ["embeddings-openai"] }
+<p>Where <code>rank_i</code> is the position of the document in each result list, and <code>k</code> is a smoothing parameter (default 60).</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use iris::FusionAlgorithm;
+
+let fusion = FusionAlgorithm::RRF { k: 60.0 };
+<span class="boring">}</span></code></pre>
+<p><strong>Advantages:</strong></p>
+<ul>
+<li>Robust to different score distributions between lexical and vector results</li>
+<li>No need to tune weights</li>
+<li>Works well out of the box</li>
+</ul>
+<h3 id="weightedsum"><a class="header" href="#weightedsum">WeightedSum</a></h3>
+<p>Linearly combines normalized lexical and vector scores:</p>
+<pre><code>score(doc) = lexical_weight * lexical_score + vector_weight * vector_score
 </code></pre>
-<p><strong>Everything</strong>:</p>
-<pre><code class="language-toml">[dependencies]
-iris = { version = "0.1.0", features = ["embeddings-all"] }
-</code></pre>
-<h2 id="verify-installation"><a class="header" href="#verify-installation">Verify Installation</a></h2>
-<p>Create a minimal program to verify that Iris compiles:</p>
-<pre class="playground"><code class="language-rust">use iris::Result;
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use iris::FusionAlgorithm;
+
+let fusion = FusionAlgorithm::WeightedSum {
+    lexical_weight: 0.3,
+    vector_weight: 0.7,
+};
+<span class="boring">}</span></code></pre>
+<p><strong>When to use:</strong></p>
+<ul>
+<li>When you want explicit control over the balance between lexical and vector relevance</li>
+<li>When you know one signal is more important than the other</li>
+</ul>
+<h2 id="searchrequest-options"><a class="header" href="#searchrequest-options">SearchRequest Options</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Option</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>lexical_search_request</code></td><td style="text-align: left">None</td><td style="text-align: left">Lexical query component</td></tr>
+<tr><td style="text-align: left"><code>vector_search_request</code></td><td style="text-align: left">None</td><td style="text-align: left">Vector query component</td></tr>
+<tr><td style="text-align: left"><code>filter_query</code></td><td style="text-align: left">None</td><td style="text-align: left">Pre-filter using a lexical query (restricts both lexical and vector results)</td></tr>
+<tr><td style="text-align: left"><code>fusion_algorithm</code></td><td style="text-align: left"><code>None</code> (uses <code>RRF { k: 60.0 }</code> when both results exist)</td><td style="text-align: left">How to merge lexical and vector results</td></tr>
+<tr><td style="text-align: left"><code>limit</code></td><td style="text-align: left">10</td><td style="text-align: left">Maximum number of results to return</td></tr>
+<tr><td style="text-align: left"><code>offset</code></td><td style="text-align: left">0</td><td style="text-align: left">Number of results to skip (for pagination)</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="searchresult"><a class="header" href="#searchresult">SearchResult</a></h2>
+<p>Each result contains:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Field</th><th style="text-align: left">Type</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>id</code></td><td style="text-align: left"><code>String</code></td><td style="text-align: left">External document ID</td></tr>
+<tr><td style="text-align: left"><code>score</code></td><td style="text-align: left"><code>f32</code></td><td style="text-align: left">Fused relevance score</td></tr>
+<tr><td style="text-align: left"><code>document</code></td><td style="text-align: left"><code>Option&lt;Document&gt;</code></td><td style="text-align: left">Full document content (if loaded)</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="filtered-hybrid-search"><a class="header" href="#filtered-hybrid-search">Filtered Hybrid Search</a></h2>
+<p>Apply a filter to restrict both lexical and vector results:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let request = SearchRequestBuilder::new()
+    .lexical_search_request(
+        LexicalSearchRequest::new(Box::new(TermQuery::new("body", "rust")))
+    )
+    .vector_search_request(
+        VectorSearchRequestBuilder::new()
+            .add_text("text_vec", "systems programming")
+            .build()
+    )
+    // Only search within "tutorial" category
+    .filter_query(Box::new(TermQuery::new("category", "tutorial")))
+    .fusion_algorithm(FusionAlgorithm::RRF { k: 60.0 })
+    .limit(10)
+    .build();
+<span class="boring">}</span></code></pre>
+<h3 id="how-filtering-works"><a class="header" href="#how-filtering-works">How Filtering Works</a></h3>
+<ol>
+<li>The filter query runs on the lexical index to produce a set of allowed document IDs</li>
+<li>For lexical search: the filter is combined with the user query as a boolean AND</li>
+<li>For vector search: the allowed IDs are passed to restrict the ANN search</li>
+</ol>
+<h2 id="pagination"><a class="header" href="#pagination">Pagination</a></h2>
+<p>Use <code>offset</code> and <code>limit</code> for pagination:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Page 1: results 0-9
+let page1 = SearchRequestBuilder::new()
+    .lexical_search_request(/* ... */)
+    .vector_search_request(/* ... */)
+    .offset(0)
+    .limit(10)
+    .build();
+
+// Page 2: results 10-19
+let page2 = SearchRequestBuilder::new()
+    .lexical_search_request(/* ... */)
+    .vector_search_request(/* ... */)
+    .offset(10)
+    .limit(10)
+    .build();
+<span class="boring">}</span></code></pre>
+<h2 id="complete-example"><a class="header" href="#complete-example">Complete Example</a></h2>
+<pre class="playground"><code class="language-rust">use std::sync::Arc;
+use iris::{
+    Document, Engine, Schema, SearchRequestBuilder,
+    LexicalSearchRequest, FusionAlgorithm, PerFieldEmbedder,
+};
+use iris::lexical::{TextOption, TermQuery};
+use iris::lexical::core::field::IntegerOption;
+use iris::vector::{HnswOption, VectorSearchRequestBuilder};
+use iris::storage::memory::MemoryStorage;
 
 #[tokio::main]
-async fn main() -&gt; Result&lt;()&gt; {
-    println!("Iris version: {}", iris::VERSION);
+async fn main() -&gt; iris::Result&lt;()&gt; {
+    let storage = Arc::new(MemoryStorage::new(Default::default()));
+
+    // Schema with both lexical and vector fields
+    let schema = Schema::builder()
+        .add_text_field("title", TextOption::default())
+        .add_text_field("body", TextOption::default())
+        .add_text_field("category", TextOption::default())
+        .add_integer_field("year", IntegerOption::default())
+        .add_hnsw_field("body_vec", HnswOption {
+            dimension: 384,
+            ..Default::default()
+        })
+        .build();
+
+    let engine = Engine::builder(storage, schema)
+        .analyzer(analyzer)
+        .embedder(Arc::new(per_field_embedder))
+        .build()
+        .await?;
+
+    // Index documents with both text and vector fields
+    engine.add_document("doc-1", Document::builder()
+        .add_text("title", "Rust Programming Guide")
+        .add_text("body", "Rust is a systems programming language.")
+        .add_text("category", "programming")
+        .add_integer("year", 2024)
+        .add_text("body_vec", "Rust is a systems programming language.")
+        .build()
+    ).await?;
+    engine.commit().await?;
+
+    // Hybrid search: keyword "rust" + semantic "systems language"
+    let results = engine.search(
+        SearchRequestBuilder::new()
+            .lexical_search_request(
+                LexicalSearchRequest::new(Box::new(TermQuery::new("body", "rust")))
+            )
+            .vector_search_request(
+                VectorSearchRequestBuilder::new()
+                    .add_text("body_vec", "systems language")
+                    .build()
+            )
+            .fusion_algorithm(FusionAlgorithm::RRF { k: 60.0 })
+            .limit(10)
+            .build()
+    ).await?;
+
+    for r in &amp;results {
+        println!("{}: score={:.4}", r.id, r.score);
+    }
+
     Ok(())
 }</code></pre>
-<pre><code class="language-bash">cargo run
-</code></pre>
-<p>If you see the version printed, you are ready to proceed to the <a href="quickstart.html">Quick Start</a>.</p>
+<h2 id="next-steps"><a class="header" href="#next-steps">Next Steps</a></h2>
+<ul>
+<li>Full query syntax reference: <a href="../advanced/query_dsl.html">Query DSL</a></li>
+<li>Understand ID resolution: <a href="../advanced/id_management.html">ID Management</a></li>
+<li>Data durability: <a href="../advanced/persistence.html">Persistence &amp; WAL</a></li>
+</ul>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="../getting_started.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../search/vector_search.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
-                            <a rel="next prefetch" href="../getting_started/quickstart.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="../advanced.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                             </a>
 
@@ -248,11 +466,11 @@ async fn main() -&gt; Result&lt;()&gt; {
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="../getting_started.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="../search/vector_search.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 
-                    <a rel="next prefetch" href="../getting_started/quickstart.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="../advanced.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                     </a>
             </nav>

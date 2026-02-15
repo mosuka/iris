@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Installation - Iris Documentation</title>
+        <title>Schema &amp; Fields - Iris Documentation</title>
 
 
         <!-- Custom HTML head -->
@@ -177,68 +177,209 @@
 
                 <div id="mdbook-content" class="content">
                     <main>
-                        <h1 id="installation"><a class="header" href="#installation">Installation</a></h1>
-<h2 id="add-iris-to-your-project"><a class="header" href="#add-iris-to-your-project">Add Iris to Your Project</a></h2>
-<p>Add <code>iris</code> and <code>tokio</code> (async runtime) to your <code>Cargo.toml</code>:</p>
-<pre><code class="language-toml">[dependencies]
-iris = "0.1.0"
-tokio = { version = "1", features = ["full"] }
+                        <h1 id="schema--fields"><a class="header" href="#schema--fields">Schema &amp; Fields</a></h1>
+<p>The <code>Schema</code> defines the structure of your documents — what fields exist and how each field is indexed. It is the single source of truth for the Engine.</p>
+<h2 id="schema"><a class="header" href="#schema">Schema</a></h2>
+<p>A <code>Schema</code> is a collection of named fields. Each field is either a <strong>lexical field</strong> (for keyword search) or a <strong>vector field</strong> (for similarity search).</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use iris::Schema;
+use iris::lexical::TextOption;
+use iris::lexical::core::field::IntegerOption;
+use iris::vector::HnswOption;
+
+let schema = Schema::builder()
+    .add_text_field("title", TextOption::default())
+    .add_text_field("body", TextOption::default())
+    .add_integer_field("year", IntegerOption::default())
+    .add_hnsw_field("embedding", HnswOption::default())
+    .add_default_field("body")
+    .build();
+<span class="boring">}</span></code></pre>
+<h3 id="default-fields"><a class="header" href="#default-fields">Default Fields</a></h3>
+<p><code>add_default_field()</code> specifies which field(s) are searched when a query does not explicitly name a field. This is used by the <a href="../advanced/query_dsl.html">Query DSL</a> parser.</p>
+<h2 id="field-types"><a class="header" href="#field-types">Field Types</a></h2>
+<div class="mermaid">
+graph TB
+    FO["FieldOption"]
+    FO --&gt; LEX["Lexical"]
+    FO --&gt; VEC["Vector"]
+<pre><code>LEX --&gt; T["Text"]
+LEX --&gt; I["Integer"]
+LEX --&gt; FL["Float"]
+LEX --&gt; B["Boolean"]
+LEX --&gt; DT["DateTime"]
+LEX --&gt; G["Geo"]
+LEX --&gt; BY["Bytes"]
+
+VEC --&gt; FLAT["Flat"]
+VEC --&gt; HNSW["HNSW"]
+VEC --&gt; IVF["IVF"]
 </code></pre>
-<h2 id="feature-flags"><a class="header" href="#feature-flags">Feature Flags</a></h2>
-<p>Iris ships with a minimal default feature set. Enable additional features as needed:</p>
+</div>
+
+<h3 id="lexical-fields"><a class="header" href="#lexical-fields">Lexical Fields</a></h3>
+<p>Lexical fields are indexed using an inverted index and support keyword-based queries.</p>
 <div class="table-wrapper">
 <table>
 <thead>
-<tr><th style="text-align: left">Feature</th><th style="text-align: left">Description</th><th style="text-align: left">Use Case</th></tr>
+<tr><th style="text-align: left">Type</th><th style="text-align: left">Rust Type</th><th style="text-align: left">SchemaBuilder Method</th><th style="text-align: left">Description</th></tr>
 </thead>
 <tbody>
-<tr><td style="text-align: left"><em>(default)</em></td><td style="text-align: left">Lexical search, in-memory storage, standard analyzer</td><td style="text-align: left">Keyword search only</td></tr>
-<tr><td style="text-align: left"><code>embeddings-candle</code></td><td style="text-align: left">Local BERT embeddings via Hugging Face Candle</td><td style="text-align: left">Vector search without external API</td></tr>
-<tr><td style="text-align: left"><code>embeddings-openai</code></td><td style="text-align: left">OpenAI API embeddings (text-embedding-3-small, etc.)</td><td style="text-align: left">Cloud-based vector search</td></tr>
-<tr><td style="text-align: left"><code>embeddings-multimodal</code></td><td style="text-align: left">CLIP embeddings for text + image via Candle</td><td style="text-align: left">Multimodal (text-to-image) search</td></tr>
-<tr><td style="text-align: left"><code>embeddings-all</code></td><td style="text-align: left">All embedding features above</td><td style="text-align: left">Full embedding support</td></tr>
+<tr><td style="text-align: left"><strong>Text</strong></td><td style="text-align: left"><code>TextOption</code></td><td style="text-align: left"><code>add_text_field()</code></td><td style="text-align: left">Full-text searchable; tokenized by the analyzer</td></tr>
+<tr><td style="text-align: left"><strong>Integer</strong></td><td style="text-align: left"><code>IntegerOption</code></td><td style="text-align: left"><code>add_integer_field()</code></td><td style="text-align: left">64-bit signed integer; supports range queries</td></tr>
+<tr><td style="text-align: left"><strong>Float</strong></td><td style="text-align: left"><code>FloatOption</code></td><td style="text-align: left"><code>add_float_field()</code></td><td style="text-align: left">64-bit floating point; supports range queries</td></tr>
+<tr><td style="text-align: left"><strong>Boolean</strong></td><td style="text-align: left"><code>BooleanOption</code></td><td style="text-align: left"><code>add_boolean_field()</code></td><td style="text-align: left"><code>true</code> / <code>false</code></td></tr>
+<tr><td style="text-align: left"><strong>DateTime</strong></td><td style="text-align: left"><code>DateTimeOption</code></td><td style="text-align: left"><code>add_datetime_field()</code></td><td style="text-align: left">UTC timestamp; supports range queries</td></tr>
+<tr><td style="text-align: left"><strong>Geo</strong></td><td style="text-align: left"><code>GeoOption</code></td><td style="text-align: left"><code>add_geo_field()</code></td><td style="text-align: left">Latitude/longitude pair; supports radius and bounding box queries</td></tr>
+<tr><td style="text-align: left"><strong>Bytes</strong></td><td style="text-align: left"><code>BytesOption</code></td><td style="text-align: left"><code>add_bytes_field()</code></td><td style="text-align: left">Raw binary data</td></tr>
 </tbody>
 </table>
 </div>
-<h3 id="examples"><a class="header" href="#examples">Examples</a></h3>
-<p><strong>Lexical search only</strong> (no embeddings needed):</p>
-<pre><code class="language-toml">[dependencies]
-iris = "0.1.0"
-</code></pre>
-<p><strong>Vector search with local model</strong> (no API key required):</p>
-<pre><code class="language-toml">[dependencies]
-iris = { version = "0.1.0", features = ["embeddings-candle"] }
-</code></pre>
-<p><strong>Vector search with OpenAI</strong>:</p>
-<pre><code class="language-toml">[dependencies]
-iris = { version = "0.1.0", features = ["embeddings-openai"] }
-</code></pre>
-<p><strong>Everything</strong>:</p>
-<pre><code class="language-toml">[dependencies]
-iris = { version = "0.1.0", features = ["embeddings-all"] }
-</code></pre>
-<h2 id="verify-installation"><a class="header" href="#verify-installation">Verify Installation</a></h2>
-<p>Create a minimal program to verify that Iris compiles:</p>
-<pre class="playground"><code class="language-rust">use iris::Result;
+<h4 id="text-field-options"><a class="header" href="#text-field-options">Text Field Options</a></h4>
+<p><code>TextOption</code> controls how text is indexed:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use iris::lexical::TextOption;
 
-#[tokio::main]
-async fn main() -&gt; Result&lt;()&gt; {
-    println!("Iris version: {}", iris::VERSION);
-    Ok(())
-}</code></pre>
-<pre><code class="language-bash">cargo run
-</code></pre>
-<p>If you see the version printed, you are ready to proceed to the <a href="quickstart.html">Quick Start</a>.</p>
+// Default: indexed + stored
+let opt = TextOption::default();
+
+// Customize: indexed + stored + term vectors
+let opt = TextOption::default()
+    .set_indexed(true)
+    .set_stored(true)
+    .set_term_vectors(true);
+<span class="boring">}</span></code></pre>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Option</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>indexed</code></td><td style="text-align: left"><code>true</code></td><td style="text-align: left">Whether the field is searchable</td></tr>
+<tr><td style="text-align: left"><code>stored</code></td><td style="text-align: left"><code>true</code></td><td style="text-align: left">Whether the original value is stored for retrieval</td></tr>
+<tr><td style="text-align: left"><code>term_vectors</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Whether term positions are stored (needed for phrase queries)</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="vector-fields"><a class="header" href="#vector-fields">Vector Fields</a></h3>
+<p>Vector fields are indexed using vector indexes for approximate nearest neighbor (ANN) search.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Type</th><th style="text-align: left">Rust Type</th><th style="text-align: left">SchemaBuilder Method</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><strong>Flat</strong></td><td style="text-align: left"><code>FlatOption</code></td><td style="text-align: left"><code>add_flat_field()</code></td><td style="text-align: left">Brute-force linear scan; exact results</td></tr>
+<tr><td style="text-align: left"><strong>HNSW</strong></td><td style="text-align: left"><code>HnswOption</code></td><td style="text-align: left"><code>add_hnsw_field()</code></td><td style="text-align: left">Hierarchical Navigable Small World graph; fast approximate</td></tr>
+<tr><td style="text-align: left"><strong>IVF</strong></td><td style="text-align: left"><code>IvfOption</code></td><td style="text-align: left"><code>add_ivf_field()</code></td><td style="text-align: left">Inverted File Index; cluster-based approximate</td></tr>
+</tbody>
+</table>
+</div>
+<h4 id="hnsw-field-options-most-common"><a class="header" href="#hnsw-field-options-most-common">HNSW Field Options (most common)</a></h4>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use iris::vector::HnswOption;
+use iris::vector::core::distance::DistanceMetric;
+
+let opt = HnswOption {
+    dimension: 384,                          // vector dimensions
+    distance: DistanceMetric::Cosine,        // distance metric
+    m: 16,                                   // max connections per layer
+    ef_construction: 200,                    // construction search width
+    base_weight: 1.0,                        // default scoring weight
+    quantizer: None,                         // optional quantization
+};
+<span class="boring">}</span></code></pre>
+<p>See <a href="../indexing/vector_indexing.html">Vector Indexing</a> for detailed parameter guidance.</p>
+<h2 id="document"><a class="header" href="#document">Document</a></h2>
+<p>A <code>Document</code> is a collection of named field values. Use <code>DocumentBuilder</code> to construct documents:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use iris::Document;
+
+let doc = Document::builder()
+    .add_text("title", "Introduction to Rust")
+    .add_text("body", "Rust is a systems programming language.")
+    .add_integer("year", 2024)
+    .add_float("rating", 4.8)
+    .add_boolean("published", true)
+    .build();
+<span class="boring">}</span></code></pre>
+<h3 id="documentbuilder-methods"><a class="header" href="#documentbuilder-methods">DocumentBuilder Methods</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Method</th><th style="text-align: left">Value Type</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>add_text(name, value)</code></td><td style="text-align: left"><code>String</code></td><td style="text-align: left">Add a text field</td></tr>
+<tr><td style="text-align: left"><code>add_integer(name, value)</code></td><td style="text-align: left"><code>i64</code></td><td style="text-align: left">Add an integer field</td></tr>
+<tr><td style="text-align: left"><code>add_float(name, value)</code></td><td style="text-align: left"><code>f64</code></td><td style="text-align: left">Add a float field</td></tr>
+<tr><td style="text-align: left"><code>add_boolean(name, value)</code></td><td style="text-align: left"><code>bool</code></td><td style="text-align: left">Add a boolean field</td></tr>
+<tr><td style="text-align: left"><code>add_datetime(name, value)</code></td><td style="text-align: left"><code>DateTime&lt;Utc&gt;</code></td><td style="text-align: left">Add a datetime field</td></tr>
+<tr><td style="text-align: left"><code>add_vector(name, value)</code></td><td style="text-align: left"><code>Vec&lt;f32&gt;</code></td><td style="text-align: left">Add a pre-computed vector field</td></tr>
+<tr><td style="text-align: left"><code>add_geo(name, lat, lon)</code></td><td style="text-align: left"><code>(f64, f64)</code></td><td style="text-align: left">Add a geographic point</td></tr>
+<tr><td style="text-align: left"><code>add_bytes(name, data)</code></td><td style="text-align: left"><code>Vec&lt;u8&gt;</code></td><td style="text-align: left">Add binary data</td></tr>
+<tr><td style="text-align: left"><code>add_field(name, value)</code></td><td style="text-align: left"><code>DataValue</code></td><td style="text-align: left">Add any value type</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="datavalue"><a class="header" href="#datavalue">DataValue</a></h2>
+<p><code>DataValue</code> is the unified value enum that represents any field value in Iris:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub enum DataValue {
+    Null,
+    Bool(bool),
+    Int64(i64),
+    Float64(f64),
+    Text(String),
+    Bytes(Vec&lt;u8&gt;, Option&lt;String&gt;),  // (data, optional MIME type)
+    Vector(Vec&lt;f32&gt;),
+    DateTime(DateTime&lt;Utc&gt;),
+    Geo(f64, f64),          // (latitude, longitude)
+}
+<span class="boring">}</span></code></pre>
+<p><code>DataValue</code> implements <code>From&lt;T&gt;</code> for common types, so you can use <code>.into()</code> conversions:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use iris::DataValue;
+
+let v: DataValue = "hello".into();       // Text
+let v: DataValue = 42i64.into();         // Int64
+let v: DataValue = 3.14f64.into();       // Float64
+let v: DataValue = true.into();          // Bool
+let v: DataValue = vec![0.1f32, 0.2].into(); // Vector
+<span class="boring">}</span></code></pre>
+<h2 id="reserved-fields"><a class="header" href="#reserved-fields">Reserved Fields</a></h2>
+<p>The <code>_id</code> field is reserved by Iris for internal use. It stores the external document ID and is always indexed with <code>KeywordAnalyzer</code> (exact match). You do not need to add it to your schema — it is managed automatically.</p>
+<h2 id="schema-design-tips"><a class="header" href="#schema-design-tips">Schema Design Tips</a></h2>
+<ol>
+<li>
+<p><strong>Separate lexical and vector fields</strong> — a field is either lexical or vector, never both. For hybrid search, create separate fields (e.g., <code>body</code> for text, <code>body_vec</code> for vector).</p>
+</li>
+<li>
+<p><strong>Use <code>KeywordAnalyzer</code> for exact-match fields</strong> — category, status, and tag fields should use <code>KeywordAnalyzer</code> via <code>PerFieldAnalyzer</code> to avoid tokenization.</p>
+</li>
+<li>
+<p><strong>Choose the right vector index</strong> — use HNSW for most cases, Flat for small datasets, IVF for very large datasets. See <a href="../indexing/vector_indexing.html">Vector Indexing</a>.</p>
+</li>
+<li>
+<p><strong>Set default fields</strong> — if you use the Query DSL, set default fields so users can write <code>hello</code> instead of <code>body:hello</code>.</p>
+</li>
+</ol>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="../getting_started.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../concepts.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
-                            <a rel="next prefetch" href="../getting_started/quickstart.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="../concepts/analysis.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                             </a>
 
@@ -248,11 +389,11 @@ async fn main() -&gt; Result&lt;()&gt; {
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="../getting_started.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="../concepts.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 
-                    <a rel="next prefetch" href="../getting_started/quickstart.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="../concepts/analysis.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                     </a>
             </nav>

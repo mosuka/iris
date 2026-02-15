@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-48168cb1.js";
+            window.path_to_searchindex_js = "searchindex-35006bd3.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-75fc7776.js"></script>
+        <script src="toc-2eec5043.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -177,12 +177,27 @@
 
                 <div id="mdbook-content" class="content">
                     <main>
-                        
+                        <h1 id="advanced-features"><a class="header" href="#advanced-features">Advanced Features</a></h1>
+<p>This section covers advanced topics for users who want to go deeper into Iris’s capabilities.</p>
+<h2 id="topics"><a class="header" href="#topics">Topics</a></h2>
+<h3 id="query-dsl"><a class="header" href="#query-dsl"><a href="advanced/query_dsl.html">Query DSL</a></a></h3>
+<p>A human-readable query language for lexical, vector, and hybrid search. Supports boolean operators, phrase matching, fuzzy search, range queries, and more — all in a single query string.</p>
+<h3 id="id-management"><a class="header" href="#id-management"><a href="advanced/id_management.html">ID Management</a></a></h3>
+<p>How Iris manages document identity with a dual-tiered ID system:</p>
+<ul>
+<li>External IDs (user-provided strings)</li>
+<li>Internal IDs (shard-prefixed <code>u64</code> for performance)</li>
+</ul>
+<h3 id="persistence--wal"><a class="header" href="#persistence--wal"><a href="advanced/persistence.html">Persistence &amp; WAL</a></a></h3>
+<p>How Iris ensures data durability through Write-Ahead Logging (WAL) and the commit lifecycle.</p>
+<h3 id="deletions--compaction"><a class="header" href="#deletions--compaction"><a href="advanced/deletions.html">Deletions &amp; Compaction</a></a></h3>
+<p>How documents are deleted (logical deletion via bitmaps) and how space is reclaimed (compaction).</p>
+
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="concepts/vector_search.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="search/hybrid_search.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
@@ -196,7 +211,7 @@
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="concepts/vector_search.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="search/hybrid_search.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 

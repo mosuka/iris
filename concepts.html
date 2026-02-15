@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-48168cb1.js";
+            window.path_to_searchindex_js = "searchindex-35006bd3.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-75fc7776.js"></script>
+        <script src="toc-2eec5043.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -178,120 +178,50 @@
                 <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="core-concepts"><a class="header" href="#core-concepts">Core Concepts</a></h1>
-<p>This section details the internal architecture and design philosophy of IRiS, based on its current Rust implementation.</p>
-<h2 id="unified-vector-engine-architecture"><a class="header" href="#unified-vector-engine-architecture">Unified Vector Engine Architecture</a></h2>
-<p>At the heart of IRiS is the <code>VectorEngine</code> (<code>src/vector/engine.rs</code>), which acts as the unified coordinator for all search operations. Unlike traditional systems that treat vector search and keyword search as separate silos, IRiS integrates them into a single cohesive system.</p>
-<h3 id="key-components"><a class="header" href="#key-components">Key Components</a></h3>
-<ol>
-<li>
-<p><strong>VectorEngine</strong>:</p>
+<p>This section covers the foundational building blocks of Iris. Understanding these concepts will help you design effective schemas and configure your search engine.</p>
+<h2 id="topics"><a class="header" href="#topics">Topics</a></h2>
+<h3 id="schema--fields"><a class="header" href="#schema--fields"><a href="concepts/schema_and_fields.html">Schema &amp; Fields</a></a></h3>
+<p>How to define the structure of your documents. Covers:</p>
 <ul>
-<li><strong>Responsibility</strong>: Manages the lifecycle of documents, handles persistence (WAL &amp; Snapshots), and coordinates search queries.</li>
-<li><strong>Unified Indexing</strong>: When a document is indexed, <code>VectorEngine</code> splits it into:
+<li><code>Schema</code> and <code>SchemaBuilder</code></li>
+<li>Lexical field types (Text, Integer, Float, Boolean, DateTime, Geo, Bytes)</li>
+<li>Vector field types (Flat, HNSW, IVF)</li>
+<li><code>Document</code> and <code>DocumentBuilder</code></li>
+<li><code>DataValue</code> — the unified value type</li>
+</ul>
+<h3 id="text-analysis"><a class="header" href="#text-analysis"><a href="concepts/analysis.html">Text Analysis</a></a></h3>
+<p>How text is processed before indexing. Covers:</p>
 <ul>
-<li><strong>Vector Data</strong>: Stored in field-specific indices (HNSW, Flat, IVF).</li>
-<li><strong>Lexical Data</strong>: Stored in a managed <code>LexicalEngine</code> instance (<code>metadata_index</code>).</li>
+<li>The <code>Analyzer</code> trait and the analysis pipeline</li>
+<li>Built-in analyzers (Standard, Japanese, Keyword, Pipeline)</li>
+<li><code>PerFieldAnalyzer</code> — different analyzers for different fields</li>
+<li>Tokenizers and token filters</li>
 </ul>
-</li>
-<li><strong>Implicit Schema</strong>: By default, fields are registered dynamically upon insertion (<code>implicit_schema: true</code>), allowing for a schemaless-like experience while maintaining strict typing internally.</li>
-</ul>
-</li>
-<li>
-<p><strong>LexicalEngine</strong> (<code>src/lexical/engine.rs</code>):</p>
+<h3 id="embeddings"><a class="header" href="#embeddings"><a href="concepts/embedding.html">Embeddings</a></a></h3>
+<p>How text and images are converted to vectors. Covers:</p>
 <ul>
-<li><strong>Role</strong>: Serves as an internal component of <code>VectorEngine</code> to handle:
+<li>The <code>Embedder</code> trait</li>
+<li>Built-in embedders (Candle BERT, OpenAI, CLIP, Precomputed)</li>
+<li><code>PerFieldEmbedder</code> — different embedders for different fields</li>
+</ul>
+<h3 id="storage"><a class="header" href="#storage"><a href="concepts/storage.html">Storage</a></a></h3>
+<p>Where index data is stored. Covers:</p>
 <ul>
-<li><strong>Inverted Indices</strong>: For <code>Term</code>, <code>Phrase</code>, and <code>Boolean</code> queries.</li>
-<li><strong>ID Mapping</strong>: Maps external string IDs (e.g., “product-123”) to internal 64-bit integer IDs (<code>u64</code>).</li>
-<li><strong>Metadata Storage</strong>: Stores non-vector document fields (JSON-like metadata).</li>
+<li>The <code>Storage</code> trait</li>
+<li>Storage backends (Memory, File, Mmap)</li>
+<li><code>PrefixedStorage</code> for component isolation</li>
+<li>Choosing the right backend for your use case</li>
 </ul>
-</li>
-<li><strong>Design</strong>: Uses a “Near Real-Time” (NRT) architecture with a <code>writer_cache</code> for uncommitted changes and a <code>searcher_cache</code> for committed views.</li>
-</ul>
-</li>
-<li>
-<p><strong>Storage Abstraction</strong> (<code>src/storage.rs</code>):</p>
-<ul>
-<li>All components interact with data through the <code>Storage</code> trait, enabling seamless switching between backends:
-<ul>
-<li><code>MemoryStorage</code>: Pure in-memory usage (great for testing/embedded).</li>
-<li><code>FileStorage</code>: Standard disk-based persistence.</li>
-<li><code>MmapStorage</code>: Memory-mapped files for high-performance large datasets.</li>
-</ul>
-</li>
-</ul>
-</li>
-</ol>
-<h2 id="data-model"><a class="header" href="#data-model">Data Model</a></h2>
-<p>IRiS uses a flexible data model centered around the <code>DocumentVector</code> structure.</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>pub struct DocumentVector {
-    /// Vector fields (e.g., "embedding", "image_vec")
-    pub fields: HashMap&lt;String, StoredVector&gt;,
-    /// Metadata fields (e.g., "title", "category", "_id")
-    pub metadata: HashMap&lt;String, String&gt;,
-}
-<span class="boring">}</span></code></pre>
-<ul>
-<li><strong>External ID (<code>_id</code>)</strong>: Every document has a unique string ID. Internally, this is mapped to a dense <code>u64</code> ID for performance.</li>
-<li><strong>Vector Fields</strong>: Store high-dimensional vectors. Supported formats include:
-<ul>
-<li><strong>Flat</strong>: Brute-force exact search.</li>
-<li><strong>HNSW</strong>: Hierarchical Navigable Small World graphs for approximate nearest neighbor search.</li>
-<li><strong>IVF</strong>: Inverted File Index for quantized search.</li>
-</ul>
-</li>
-<li><strong>Payloads</strong>: You can index raw text or images. The engine uses configured <code>Embedder</code>s (e.g., CLIP, BERT) to convert these payloads into vectors on the fly.</li>
-</ul>
-<h2 id="hybrid-search--fusion"><a class="header" href="#hybrid-search--fusion">Hybrid Search &amp; Fusion</a></h2>
-<p>One of IRiS’s core strengths is its ability to perform <strong>Hybrid Search</strong>—combining semantic similarity (Vector) with keyword relevance (Lexical).</p>
-<h3 id="search-flow"><a class="header" href="#search-flow">Search Flow</a></h3>
-<ol>
-<li><strong>Request</strong>: The user sends a <code>VectorSearchRequest</code> containing both a query vector and a lexical query (e.g., “find red shoes” + <code>category:"sale"</code>).</li>
-<li><strong>Parallel Execution</strong>:
-<ul>
-<li>The <strong>Vector Searcher</strong> scans the HNSW index to find nearest neighbors.</li>
-<li>The <strong>Lexical Searcher</strong> scans the Inverted Index to find matching terms.</li>
-</ul>
-</li>
-<li><strong>Fusion</strong>: The results are merged using a configurable strategy (<code>FusionAlgorithm</code>):
-<ul>
-<li><strong>RRF (Reciprocal Rank Fusion)</strong>: Ranks documents based on their positional rank in each result set. Robust and parameter-free.</li>
-<li><strong>Weighted Sum</strong>: Linearly combines normalized scores (<code>alpha * vector_score + beta * lexical_score</code>).</li>
-</ul>
-</li>
-</ol>
-<h2 id="persistence--durability"><a class="header" href="#persistence--durability">Persistence &amp; durability</a></h2>
-<p>IRiS ensures data safety through a combination of <strong>Write-Ahead Logging (WAL)</strong> and <strong>Snapshots</strong>.</p>
-<ul>
-<li><strong>WAL (<code>src/vector/index/wal.rs</code>)</strong>: Every write operation (Upsert/Delete) is appended to a log file immediately. This ensures that even if the process crashes, recent changes can be replayed on startup.</li>
-<li><strong>Snapshots</strong>: Periodically, the in-memory state of the registry and documents is serialized to disk (<code>document_snapshot.bin</code>). This speeds up recovery by avoiding full WAL replay.</li>
-<li><strong>Commit</strong>: Calling <code>commit()</code> forces a flush of all in-memory buffers to persistent storage and rotates the logs.</li>
-</ul>
-<pre><code class="language-mermaid">graph TD
-    User[User Update] --&gt;|1. Write| WAL[Write-Ahead Log]
-    User --&gt;|2. Update| Mem[In-Memory Index]
-    
-    subgraph "Persistence"
-        WAL
-        Snapshot[Snapshot File]
-    end
-    
-    Mem --&gt;|Commit/Flush| Snapshot
-    WAL --&gt;|Recovery| Mem
-    Snapshot --&gt;|Recovery| Mem
-</code></pre>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="getting_started/installation.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="architecture.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
-                            <a rel="next prefetch" href="concepts/architecture.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="concepts/schema_and_fields.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                             </a>
 
@@ -301,11 +231,11 @@
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="getting_started/installation.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="architecture.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 
-                    <a rel="next prefetch" href="concepts/architecture.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="concepts/schema_and_fields.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                     </a>
             </nav>

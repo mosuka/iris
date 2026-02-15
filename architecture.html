@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Installation - Iris Documentation</title>
+        <title>Architecture - Iris Documentation</title>
 
 
         <!-- Custom HTML head -->
@@ -12,33 +12,33 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="theme-color" content="#ffffff">
 
-        <link rel="icon" href="../favicon-de23e50b.svg">
-        <link rel="shortcut icon" href="../favicon-8114d1fc.png">
-        <link rel="stylesheet" href="../css/variables-8adf115d.css">
-        <link rel="stylesheet" href="../css/general-2459343d.css">
-        <link rel="stylesheet" href="../css/chrome-ae938929.css">
-        <link rel="stylesheet" href="../css/print-9e4910d8.css" media="print">
+        <link rel="icon" href="favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="favicon-8114d1fc.png">
+        <link rel="stylesheet" href="css/variables-8adf115d.css">
+        <link rel="stylesheet" href="css/general-2459343d.css">
+        <link rel="stylesheet" href="css/chrome-ae938929.css">
+        <link rel="stylesheet" href="css/print-9e4910d8.css" media="print">
 
         <!-- Fonts -->
-        <link rel="stylesheet" href="../fonts/fonts-9644e21d.css">
+        <link rel="stylesheet" href="fonts/fonts-9644e21d.css">
 
         <!-- Highlight.js Stylesheets -->
-        <link rel="stylesheet" id="mdbook-highlight-css" href="../highlight-493f70e1.css">
-        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="../tomorrow-night-4c0ae647.css">
-        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="../ayu-highlight-3fdfc3ac.css">
+        <link rel="stylesheet" id="mdbook-highlight-css" href="highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="ayu-highlight-3fdfc3ac.css">
 
         <!-- Custom theme stylesheets -->
 
 
         <!-- Provide site root and default themes to javascript -->
         <script>
-            const path_to_root = "../";
+            const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-35006bd3.js";
+            window.path_to_searchindex_js = "searchindex-35006bd3.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-2eec5043.js"></script>
+        <script src="toc-2eec5043.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -105,7 +105,7 @@
             <!-- populated by js -->
             <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
             <noscript>
-                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
+                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
             </noscript>
             <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
                 <div class="sidebar-resize-indicator"></div>
@@ -140,7 +140,7 @@
                     <h1 class="menu-title">Iris Documentation</h1>
 
                     <div class="right-buttons">
-                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
                             <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
                         </a>
                         <a href="https://github.com/mosuka/iris" title="Git repository" aria-label="Git repository">
@@ -177,68 +177,242 @@
 
                 <div id="mdbook-content" class="content">
                     <main>
-                        <h1 id="installation"><a class="header" href="#installation">Installation</a></h1>
-<h2 id="add-iris-to-your-project"><a class="header" href="#add-iris-to-your-project">Add Iris to Your Project</a></h2>
-<p>Add <code>iris</code> and <code>tokio</code> (async runtime) to your <code>Cargo.toml</code>:</p>
-<pre><code class="language-toml">[dependencies]
-iris = "0.1.0"
-tokio = { version = "1", features = ["full"] }
+                        <h1 id="architecture"><a class="header" href="#architecture">Architecture</a></h1>
+<p>This page explains how Iris is structured internally. Understanding the architecture will help you make better decisions about schema design, analyzer selection, and search strategies.</p>
+<h2 id="high-level-overview"><a class="header" href="#high-level-overview">High-Level Overview</a></h2>
+<p>Iris is organized around a single <code>Engine</code> that coordinates four internal components:</p>
+<div class="mermaid">
+graph TB
+    subgraph Engine
+        SCH["Schema"]
+        LS["LexicalStore<br />(Inverted Index)"]
+        VS["VectorStore<br />(HNSW / Flat / IVF)"]
+        DL["DocumentLog<br />(WAL + Document Storage)"]
+    end
+<pre><code>Storage["Storage (trait)&lt;br/&gt;Memory / File / Mmap"]
+
+LS --- Storage
+VS --- Storage
+DL --- Storage
 </code></pre>
-<h2 id="feature-flags"><a class="header" href="#feature-flags">Feature Flags</a></h2>
-<p>Iris ships with a minimal default feature set. Enable additional features as needed:</p>
+</div>
+
 <div class="table-wrapper">
 <table>
 <thead>
-<tr><th style="text-align: left">Feature</th><th style="text-align: left">Description</th><th style="text-align: left">Use Case</th></tr>
+<tr><th style="text-align: left">Component</th><th style="text-align: left">Responsibility</th></tr>
 </thead>
 <tbody>
-<tr><td style="text-align: left"><em>(default)</em></td><td style="text-align: left">Lexical search, in-memory storage, standard analyzer</td><td style="text-align: left">Keyword search only</td></tr>
-<tr><td style="text-align: left"><code>embeddings-candle</code></td><td style="text-align: left">Local BERT embeddings via Hugging Face Candle</td><td style="text-align: left">Vector search without external API</td></tr>
-<tr><td style="text-align: left"><code>embeddings-openai</code></td><td style="text-align: left">OpenAI API embeddings (text-embedding-3-small, etc.)</td><td style="text-align: left">Cloud-based vector search</td></tr>
-<tr><td style="text-align: left"><code>embeddings-multimodal</code></td><td style="text-align: left">CLIP embeddings for text + image via Candle</td><td style="text-align: left">Multimodal (text-to-image) search</td></tr>
-<tr><td style="text-align: left"><code>embeddings-all</code></td><td style="text-align: left">All embedding features above</td><td style="text-align: left">Full embedding support</td></tr>
+<tr><td style="text-align: left"><strong>Schema</strong></td><td style="text-align: left">Declares fields and their types; determines how each field is routed</td></tr>
+<tr><td style="text-align: left"><strong>LexicalStore</strong></td><td style="text-align: left">Inverted index for keyword search (BM25 scoring)</td></tr>
+<tr><td style="text-align: left"><strong>VectorStore</strong></td><td style="text-align: left">Vector index for similarity search (Flat, HNSW, or IVF)</td></tr>
+<tr><td style="text-align: left"><strong>DocumentLog</strong></td><td style="text-align: left">Write-ahead log (WAL) for durability + raw document storage</td></tr>
 </tbody>
 </table>
 </div>
-<h3 id="examples"><a class="header" href="#examples">Examples</a></h3>
-<p><strong>Lexical search only</strong> (no embeddings needed):</p>
-<pre><code class="language-toml">[dependencies]
-iris = "0.1.0"
+<p>All three stores share a single <code>Storage</code> backend, isolated by key prefixes (<code>lexical/</code>, <code>vector/</code>, <code>documents/</code>).</p>
+<h2 id="engine-lifecycle"><a class="header" href="#engine-lifecycle">Engine Lifecycle</a></h2>
+<h3 id="building-an-engine"><a class="header" href="#building-an-engine">Building an Engine</a></h3>
+<p>The <code>EngineBuilder</code> assembles the engine from its parts:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let engine = Engine::builder(storage, schema)
+    .analyzer(analyzer)      // optional: for text fields
+    .embedder(embedder)      // optional: for vector fields
+    .build()
+    .await?;
+<span class="boring">}</span></code></pre>
+<div class="mermaid">
+sequenceDiagram
+    participant User
+    participant EngineBuilder
+    participant Engine
+<pre><code>User-&gt;&gt;EngineBuilder: new(storage, schema)
+User-&gt;&gt;EngineBuilder: .analyzer(analyzer)
+User-&gt;&gt;EngineBuilder: .embedder(embedder)
+User-&gt;&gt;EngineBuilder: .build().await
+EngineBuilder-&gt;&gt;EngineBuilder: split_schema()
+Note over EngineBuilder: Separate fields into&lt;br/&gt;LexicalIndexConfig&lt;br/&gt;+ VectorIndexConfig
+EngineBuilder-&gt;&gt;Engine: Create LexicalStore
+EngineBuilder-&gt;&gt;Engine: Create VectorStore
+EngineBuilder-&gt;&gt;Engine: Create DocumentLog
+EngineBuilder-&gt;&gt;Engine: Recover from WAL
+EngineBuilder--&gt;&gt;User: Engine ready
 </code></pre>
-<p><strong>Vector search with local model</strong> (no API key required):</p>
-<pre><code class="language-toml">[dependencies]
-iris = { version = "0.1.0", features = ["embeddings-candle"] }
-</code></pre>
-<p><strong>Vector search with OpenAI</strong>:</p>
-<pre><code class="language-toml">[dependencies]
-iris = { version = "0.1.0", features = ["embeddings-openai"] }
-</code></pre>
-<p><strong>Everything</strong>:</p>
-<pre><code class="language-toml">[dependencies]
-iris = { version = "0.1.0", features = ["embeddings-all"] }
-</code></pre>
-<h2 id="verify-installation"><a class="header" href="#verify-installation">Verify Installation</a></h2>
-<p>Create a minimal program to verify that Iris compiles:</p>
-<pre class="playground"><code class="language-rust">use iris::Result;
+</div>
 
-#[tokio::main]
-async fn main() -&gt; Result&lt;()&gt; {
-    println!("Iris version: {}", iris::VERSION);
-    Ok(())
-}</code></pre>
-<pre><code class="language-bash">cargo run
+<p>During <code>build()</code>, the engine:</p>
+<ol>
+<li><strong>Splits the schema</strong> — lexical fields go to <code>LexicalIndexConfig</code>, vector fields go to <code>VectorIndexConfig</code></li>
+<li><strong>Creates prefixed storage</strong> — each component gets an isolated namespace (<code>lexical/</code>, <code>vector/</code>, <code>documents/</code>)</li>
+<li><strong>Initializes stores</strong> — <code>LexicalStore</code> and <code>VectorStore</code> are constructed with their configs</li>
+<li><strong>Recovers from WAL</strong> — replays any uncommitted operations from a previous session</li>
+</ol>
+<h3 id="schema-splitting"><a class="header" href="#schema-splitting">Schema Splitting</a></h3>
+<p>The <code>Schema</code> contains both lexical and vector fields. At build time, <code>split_schema()</code> separates them:</p>
+<div class="mermaid">
+graph LR
+    S["Schema<br />title: Text<br />body: Text<br />category: Text<br />page: Integer<br />content_vec: HNSW"]
+<pre><code>S --&gt; LC["LexicalIndexConfig&lt;br/&gt;title: TextOption&lt;br/&gt;body: TextOption&lt;br/&gt;category: TextOption&lt;br/&gt;page: IntegerOption&lt;br/&gt;_id: KeywordAnalyzer"]
+
+S --&gt; VC["VectorIndexConfig&lt;br/&gt;content_vec: HnswOption&lt;br/&gt;(dim=384, m=16, ef=200)"]
 </code></pre>
-<p>If you see the version printed, you are ready to proceed to the <a href="quickstart.html">Quick Start</a>.</p>
+</div>
+
+<p>Key details:</p>
+<ul>
+<li>The reserved <code>_id</code> field is always added to the lexical config with <code>KeywordAnalyzer</code> (exact match)</li>
+<li>A <code>PerFieldAnalyzer</code> wraps per-field analyzer settings; if you pass a simple <code>StandardAnalyzer</code>, it becomes the default for all text fields</li>
+<li>A <code>PerFieldEmbedder</code> works the same way for vector fields</li>
+</ul>
+<h2 id="indexing-data-flow"><a class="header" href="#indexing-data-flow">Indexing Data Flow</a></h2>
+<p>When you call <code>engine.add_document(id, doc)</code>:</p>
+<div class="mermaid">
+sequenceDiagram
+    participant User
+    participant Engine
+    participant WAL as DocumentLog (WAL)
+    participant Lexical as LexicalStore
+    participant Vector as VectorStore
+<pre><code>User-&gt;&gt;Engine: add_document("doc-1", doc)
+Engine-&gt;&gt;WAL: Append to WAL
+Engine-&gt;&gt;Engine: Assign internal ID (u64)
+
+loop For each field in document
+    alt Lexical field (text, integer, etc.)
+        Engine-&gt;&gt;Lexical: Analyze + index field
+    else Vector field
+        Engine-&gt;&gt;Vector: Embed + index field
+    end
+end
+
+Note over Engine: Document is buffered&lt;br/&gt;but NOT yet searchable
+
+User-&gt;&gt;Engine: commit()
+Engine-&gt;&gt;Lexical: Flush segments to storage
+Engine-&gt;&gt;Vector: Flush segments to storage
+Engine-&gt;&gt;WAL: Mark checkpoint
+Note over Engine: Documents are&lt;br/&gt;now searchable
+</code></pre>
+</div>
+
+<p>Key points:</p>
+<ul>
+<li><strong>WAL-first</strong>: every write is logged before modifying in-memory structures</li>
+<li><strong>Dual indexing</strong>: each field is routed to either the lexical or vector store based on the schema</li>
+<li><strong>Commit required</strong>: documents become searchable only after <code>commit()</code></li>
+</ul>
+<h2 id="search-data-flow"><a class="header" href="#search-data-flow">Search Data Flow</a></h2>
+<p>When you call <code>engine.search(request)</code>:</p>
+<div class="mermaid">
+sequenceDiagram
+    participant User
+    participant Engine
+    participant Lexical as LexicalStore
+    participant Vector as VectorStore
+    participant Fusion
+<pre><code>User-&gt;&gt;Engine: search(request)
+
+opt Filter query present
+    Engine-&gt;&gt;Lexical: Execute filter query
+    Lexical--&gt;&gt;Engine: Allowed document IDs
+end
+
+par Lexical search
+    Engine-&gt;&gt;Lexical: Execute lexical query
+    Lexical--&gt;&gt;Engine: Ranked hits (BM25)
+and Vector search
+    Engine-&gt;&gt;Vector: Execute vector query
+    Vector--&gt;&gt;Engine: Ranked hits (similarity)
+end
+
+alt Both lexical and vector results
+    Engine-&gt;&gt;Fusion: Fuse results (RRF or WeightedSum)
+    Fusion--&gt;&gt;Engine: Merged ranked list
+end
+
+Engine-&gt;&gt;Engine: Apply offset + limit
+Engine--&gt;&gt;User: Vec of SearchResult
+</code></pre>
+</div>
+
+<p>The search pipeline has three stages:</p>
+<ol>
+<li><strong>Filter</strong> (optional) — execute a filter query on the lexical index to get a set of allowed document IDs</li>
+<li><strong>Search</strong> — run lexical and/or vector queries in parallel</li>
+<li><strong>Fusion</strong> — if both query types are present, merge results using RRF (default, k=60) or WeightedSum</li>
+</ol>
+<h2 id="storage-architecture"><a class="header" href="#storage-architecture">Storage Architecture</a></h2>
+<p>All components share a single <code>Storage</code> trait implementation, but use key prefixes to isolate their data:</p>
+<div class="mermaid">
+graph TB
+    Engine --&gt; PS1["PrefixedStorage<br />prefix: 'lexical/'"]
+    Engine --&gt; PS2["PrefixedStorage<br />prefix: 'vector/'"]
+    Engine --&gt; PS3["PrefixedStorage<br />prefix: 'documents/'"]
+<pre><code>PS1 --&gt; S["Storage Backend&lt;br/&gt;(Memory / File / Mmap)"]
+PS2 --&gt; S
+PS3 --&gt; S
+</code></pre>
+</div>
+
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Backend</th><th style="text-align: left">Description</th><th style="text-align: left">Best For</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>MemoryStorage</code></td><td style="text-align: left">All data in memory</td><td style="text-align: left">Testing, small datasets, ephemeral use</td></tr>
+<tr><td style="text-align: left"><code>FileStorage</code></td><td style="text-align: left">Standard file I/O</td><td style="text-align: left">General production use</td></tr>
+<tr><td style="text-align: left"><code>MmapStorage</code></td><td style="text-align: left">Memory-mapped files</td><td style="text-align: left">Large datasets, read-heavy workloads</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="per-field-dispatch"><a class="header" href="#per-field-dispatch">Per-Field Dispatch</a></h2>
+<p>When a <code>PerFieldAnalyzer</code> is provided, the engine dispatches analysis to field-specific analyzers. The same pattern applies to <code>PerFieldEmbedder</code>.</p>
+<div class="mermaid">
+graph LR
+    PFA["PerFieldAnalyzer"]
+    PFA --&gt;|"title"| KA["KeywordAnalyzer"]
+    PFA --&gt;|"body"| SA["StandardAnalyzer"]
+    PFA --&gt;|"description"| JA["JapaneseAnalyzer"]
+    PFA --&gt;|"_id"| KA2["KeywordAnalyzer<br />(always)"]
+    PFA --&gt;|other fields| DEF["Default Analyzer<br />(StandardAnalyzer)"]
+</div>
+
+<p>This allows different fields to use different analysis strategies within the same engine.</p>
+<h2 id="summary"><a class="header" href="#summary">Summary</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Aspect</th><th style="text-align: left">Detail</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><strong>Core struct</strong></td><td style="text-align: left"><code>Engine</code> — coordinates all operations</td></tr>
+<tr><td style="text-align: left"><strong>Builder</strong></td><td style="text-align: left"><code>EngineBuilder</code> — assembles Engine from Storage + Schema + Analyzer + Embedder</td></tr>
+<tr><td style="text-align: left"><strong>Schema split</strong></td><td style="text-align: left">Lexical fields → <code>LexicalIndexConfig</code>, Vector fields → <code>VectorIndexConfig</code></td></tr>
+<tr><td style="text-align: left"><strong>Write path</strong></td><td style="text-align: left">WAL → in-memory buffers → <code>commit()</code> → persistent storage</td></tr>
+<tr><td style="text-align: left"><strong>Read path</strong></td><td style="text-align: left">Query → parallel lexical/vector search → fusion → ranked results</td></tr>
+<tr><td style="text-align: left"><strong>Storage isolation</strong></td><td style="text-align: left"><code>PrefixedStorage</code> with <code>lexical/</code>, <code>vector/</code>, <code>documents/</code> prefixes</td></tr>
+<tr><td style="text-align: left"><strong>Per-field dispatch</strong></td><td style="text-align: left"><code>PerFieldAnalyzer</code> and <code>PerFieldEmbedder</code> route to field-specific implementations</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="next-steps"><a class="header" href="#next-steps">Next Steps</a></h2>
+<ul>
+<li>Understand field types and schema design: <a href="concepts/schema_and_fields.html">Schema &amp; Fields</a></li>
+<li>Learn about text analysis: <a href="concepts/analysis.html">Text Analysis</a></li>
+<li>Learn about embeddings: <a href="concepts/embedding.html">Embeddings</a></li>
+</ul>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="../getting_started.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="getting_started/quickstart.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
-                            <a rel="next prefetch" href="../getting_started/quickstart.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="concepts.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                             </a>
 
@@ -248,11 +422,11 @@ async fn main() -&gt; Result&lt;()&gt; {
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="../getting_started.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="getting_started/quickstart.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 
-                    <a rel="next prefetch" href="../getting_started/quickstart.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="concepts.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                     </a>
             </nav>
@@ -272,17 +446,17 @@ async fn main() -&gt; Result&lt;()&gt; {
         </script>
 
 
-        <script src="../elasticlunr-ef4e11c1.min.js"></script>
-        <script src="../mark-09e88c2c.min.js"></script>
-        <script src="../searcher-c2a407aa.js"></script>
+        <script src="elasticlunr-ef4e11c1.min.js"></script>
+        <script src="mark-09e88c2c.min.js"></script>
+        <script src="searcher-c2a407aa.js"></script>
 
-        <script src="../clipboard-1626706a.min.js"></script>
-        <script src="../highlight-abc7f01d.js"></script>
-        <script src="../book-a0b12cfe.js"></script>
+        <script src="clipboard-1626706a.min.js"></script>
+        <script src="highlight-abc7f01d.js"></script>
+        <script src="book-a0b12cfe.js"></script>
 
         <!-- Custom JS scripts -->
-        <script src="../mermaid-9a6dd17b.min.js"></script>
-        <script src="../mermaid-init-ddddd38b.js"></script>
+        <script src="mermaid-9a6dd17b.min.js"></script>
+        <script src="mermaid-init-ddddd38b.js"></script>
 
 
 
