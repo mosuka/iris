@@ -179,24 +179,111 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="persistence--wal"><a class="header" href="#persistence--wal">Persistence &amp; WAL</a></h1>
-<p>To ensure data durability and fast recovery, Iris implements a <strong>Write-Ahead Log (WAL)</strong> system.</p>
+<p>Iris uses a <strong>Write-Ahead Log (WAL)</strong> to ensure data durability. Every write operation is persisted to the WAL before modifying in-memory structures, guaranteeing that no data is lost even if the process crashes.</p>
+<h2 id="write-path"><a class="header" href="#write-path">Write Path</a></h2>
+<div class="mermaid">
+sequenceDiagram
+    participant App as Application
+    participant Engine
+    participant WAL as DocumentLog (WAL)
+    participant Mem as In-Memory Buffers
+    participant Disk as Storage (segments)
+<pre><code>App-&gt;&gt;Engine: add_document() / delete_document()
+Engine-&gt;&gt;WAL: 1. Append operation to WAL
+Engine-&gt;&gt;Mem: 2. Update in-memory buffers
+
+Note over Mem: Document is buffered but&lt;br/&gt;NOT yet searchable
+
+App-&gt;&gt;Engine: commit()
+Engine-&gt;&gt;Disk: 3. Flush segments to storage
+Engine-&gt;&gt;WAL: 4. Record checkpoint
+Note over Disk: Documents are now&lt;br/&gt;searchable and durable
+</code></pre>
+</div>
+<h3 id="key-principles"><a class="header" href="#key-principles">Key Principles</a></h3>
+<ol>
+<li><strong>WAL-first</strong>: Every write (add or delete) is appended to the WAL before updating in-memory structures</li>
+<li><strong>Buffered writes</strong>: In-memory buffers accumulate changes until <code>commit()</code> is called</li>
+<li><strong>Atomic commit</strong>: <code>commit()</code> flushes all buffered changes to segment files and records a checkpoint in the WAL</li>
+<li><strong>Crash safety</strong>: If the process crashes between writes and commit, the WAL is replayed on the next startup</li>
+</ol>
 <h2 id="write-ahead-log-wal"><a class="header" href="#write-ahead-log-wal">Write-Ahead Log (WAL)</a></h2>
+<p>The WAL is managed by the <code>DocumentLog</code> component and stored under the <code>documents/</code> prefix in the storage backend.</p>
+<h3 id="wal-entry-types"><a class="header" href="#wal-entry-types">WAL Entry Types</a></h3>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Entry Type</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: left"><strong>Add</strong></td><td style="text-align: left">Document content + external ID + assigned internal ID</td></tr>
+<tr><td style="text-align: left"><strong>Delete</strong></td><td style="text-align: left">External ID of the document to remove</td></tr>
+<tr><td style="text-align: left"><strong>Checkpoint</strong></td><td style="text-align: left">Marks a successful commit; entries before this are safely in segments</td></tr>
+</tbody></table>
+</div>
+<h3 id="wal-file"><a class="header" href="#wal-file">WAL File</a></h3>
+<p>The WAL file (<code>engine.wal</code>) is an append-only binary log. Each entry is self-contained with:</p>
 <ul>
-<li>All incoming write operations (Add, Delete) are immediately appended to a disk-based log file.</li>
-<li>This happens <strong>before</strong> memory structures (like HNSW graph or Inverted Index) are updated.</li>
-<li>In case of a crash, Iris replays the WAL on startup to restore the in-memory state.</li>
+<li>Operation type (add/delete)</li>
+<li>Sequence number</li>
+<li>Payload (document data or ID)</li>
 </ul>
-<h2 id="segments"><a class="header" href="#segments">Segments</a></h2>
-<p>Indexes can be split into segments (though currently, the implementation focuses on a global segment model with potential for expansion).</p>
-<ul>
-<li>Larger indexes are safer to manage as smaller, immutable segments that are periodically merged.</li>
-</ul>
-<h2 id="checkpointing"><a class="header" href="#checkpointing">Checkpointing</a></h2>
-<p>Currently, explicit commits flush the in-memory state to durable index files.</p>
+<h2 id="recovery"><a class="header" href="#recovery">Recovery</a></h2>
+<p>When an engine is built (<code>Engine::builder(...).build().await</code>), it automatically checks for uncommitted WAL entries and replays them:</p>
+<div class="mermaid">
+graph TD
+    Start["Engine::build()"] --> Check["Check WAL for<br/>uncommitted entries"]
+    Check -->|"Entries found"| Replay["Replay operations<br/>into in-memory buffers"]
+    Replay --> Ready["Engine ready"]
+    Check -->|"No entries"| Ready
+</div>
+<p>Recovery is transparent — you do not need to handle it manually.</p>
+<h2 id="the-commit-lifecycle"><a class="header" href="#the-commit-lifecycle">The Commit Lifecycle</a></h2>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>engine.commit()?;  // Flush and persist all changes
+</span>// 1. Add documents (buffered, not yet searchable)
+engine.add_document("doc-1", doc1).await?;
+engine.add_document("doc-2", doc2).await?;
+
+// 2. Commit — flush to persistent storage
+engine.commit().await?;
+// Documents are now searchable
+
+// 3. Add more documents
+engine.add_document("doc-3", doc3).await?;
+
+// 4. If the process crashes here, doc-3 is in the WAL
+//    and will be recovered on next startup
 <span class="boring">}</span></code></pre></pre>
+<h3 id="when-to-commit"><a class="header" href="#when-to-commit">When to Commit</a></h3>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Strategy</th><th style="text-align: left">Description</th><th style="text-align: left">Use Case</th></tr></thead><tbody>
+<tr><td style="text-align: left"><strong>After each document</strong></td><td style="text-align: left">Maximum durability, minimum search latency</td><td style="text-align: left">Real-time search with few writes</td></tr>
+<tr><td style="text-align: left"><strong>After a batch</strong></td><td style="text-align: left">Good balance of throughput and latency</td><td style="text-align: left">Bulk indexing</td></tr>
+<tr><td style="text-align: left"><strong>Periodically</strong></td><td style="text-align: left">Maximum write throughput</td><td style="text-align: left">High-volume ingestion</td></tr>
+</tbody></table>
+</div>
+<blockquote>
+<p><strong>Tip:</strong> Commits are relatively expensive because they flush segments to storage. For bulk indexing, batch many documents before calling <code>commit()</code>.</p>
+</blockquote>
+<h2 id="storage-layout"><a class="header" href="#storage-layout">Storage Layout</a></h2>
+<p>The engine uses <code>PrefixedStorage</code> to organize data:</p>
+<pre><code>&lt;storage root&gt;/
+├── lexical/          # Inverted index segments
+│   ├── seg-000/
+│   │   ├── terms.dict
+│   │   ├── postings.post
+│   │   └── ...
+│   └── metadata.json
+├── vector/           # Vector index segments
+│   ├── seg-000/
+│   │   ├── graph.hnsw
+│   │   ├── vectors.vecs
+│   │   └── ...
+│   └── metadata.json
+├── documents/        # Document storage
+│   └── ...
+└── engine.wal        # Write-ahead log
+</code></pre>
+<h2 id="next-steps"><a class="header" href="#next-steps">Next Steps</a></h2>
+<ul>
+<li>How deletions are handled: <a href="deletions.html">Deletions &amp; Compaction</a></li>
+<li>Storage backends: <a href="../concepts/storage.html">Storage</a></li>
+</ul>
 
                     </main>
 

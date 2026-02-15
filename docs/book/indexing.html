@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Advanced Features - Iris Documentation</title>
+        <title>Indexing - Iris Documentation</title>
 
 
         <!-- Custom HTML head -->
@@ -178,31 +178,35 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="advanced-features"><a class="header" href="#advanced-features">Advanced Features</a></h1>
-<p>This section covers advanced topics for users who want to go deeper into Iris's capabilities.</p>
+                        <h1 id="indexing"><a class="header" href="#indexing">Indexing</a></h1>
+<p>This section explains how Iris stores and organizes data internally. Understanding the indexing layer will help you choose the right field types and tune performance.</p>
 <h2 id="topics"><a class="header" href="#topics">Topics</a></h2>
-<h3 id="query-dsl"><a class="header" href="#query-dsl"><a href="advanced/query_dsl.html">Query DSL</a></a></h3>
-<p>A human-readable query language for lexical, vector, and hybrid search. Supports boolean operators, phrase matching, fuzzy search, range queries, and more — all in a single query string.</p>
-<h3 id="id-management"><a class="header" href="#id-management"><a href="advanced/id_management.html">ID Management</a></a></h3>
-<p>How Iris manages document identity with a dual-tiered ID system:</p>
+<h3 id="lexical-indexing"><a class="header" href="#lexical-indexing"><a href="indexing/lexical_indexing.html">Lexical Indexing</a></a></h3>
+<p>How text, numeric, and geographic fields are indexed using an inverted index. Covers:</p>
 <ul>
-<li>External IDs (user-provided strings)</li>
-<li>Internal IDs (shard-prefixed <code>u64</code> for performance)</li>
+<li>The inverted index structure (term dictionary, posting lists)</li>
+<li>BKD trees for numeric range queries</li>
+<li>Segment files and their formats</li>
+<li>BM25 scoring</li>
 </ul>
-<h3 id="persistence--wal"><a class="header" href="#persistence--wal"><a href="advanced/persistence.html">Persistence &amp; WAL</a></a></h3>
-<p>How Iris ensures data durability through Write-Ahead Logging (WAL) and the commit lifecycle.</p>
-<h3 id="deletions--compaction"><a class="header" href="#deletions--compaction"><a href="advanced/deletions.html">Deletions &amp; Compaction</a></a></h3>
-<p>How documents are deleted (logical deletion via bitmaps) and how space is reclaimed (compaction).</p>
+<h3 id="vector-indexing"><a class="header" href="#vector-indexing"><a href="indexing/vector_indexing.html">Vector Indexing</a></a></h3>
+<p>How vector fields are indexed for approximate nearest neighbor search. Covers:</p>
+<ul>
+<li>Index types: Flat, HNSW, IVF</li>
+<li>Parameter tuning (m, ef_construction, n_clusters, n_probe)</li>
+<li>Distance metrics (Cosine, Euclidean, DotProduct)</li>
+<li>Quantization (SQ8, PQ)</li>
+</ul>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="search/hybrid_search.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="concepts/storage.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <i class="fa fa-angle-left"></i>
                             </a>
 
-                            <a rel="next prefetch" href="advanced/query_dsl.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="indexing/lexical_indexing.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <i class="fa fa-angle-right"></i>
                             </a>
 
@@ -212,11 +216,11 @@
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="search/hybrid_search.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="concepts/storage.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <i class="fa fa-angle-left"></i>
                     </a>
 
-                    <a rel="next prefetch" href="advanced/query_dsl.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="indexing/lexical_indexing.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <i class="fa fa-angle-right"></i>
                     </a>
             </nav>

@@ -1,137 +1,114 @@
-# IRiS
+# Iris
 
-[![Crates.io](https://img.shields.io/crates/v/iris.svg)](https://crates.io/crates/iris)
-[![Documentation](https://docs.rs/iris/badge.svg)](https://docs.rs/iris)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+**A fast, featureful hybrid search library for Rust.**
 
-IRiS is a **high-performance** search core library written in Rust, designed for **Information Retrieval with Semantics**.
+Iris is a pure-Rust library that combines **lexical search** (keyword matching via inverted index) and **vector search** (semantic similarity via embeddings) into a single, unified engine. It is designed to be embedded directly into your Rust application — no external server required.
 
-IRiS provides the foundational mechanisms **essential for** advanced search capabilities:
+## Key Features
 
-- **Lexical search primitives** for precise, exact-match retrieval
-- **Vector-based similarity search** for deep semantic understanding
-- **Hybrid scoring and ranking** to synthesize multiple signals into coherent results
+| Feature | Description |
+| :--- | :--- |
+| **Lexical Search** | Full-text search powered by an inverted index with BM25 scoring |
+| **Vector Search** | Approximate nearest neighbor (ANN) search using Flat, HNSW, or IVF indexes |
+| **Hybrid Search** | Combine lexical and vector results with fusion algorithms (RRF, WeightedSum) |
+| **Text Analysis** | Pluggable analyzer pipeline — tokenizers, filters, stemmers, synonyms |
+| **Embeddings** | Built-in support for Candle (local BERT/CLIP), OpenAI API, or custom embedders |
+| **Storage** | Pluggable backends — in-memory, file-based, or memory-mapped |
+| **Query DSL** | Human-readable query syntax for lexical, vector, and hybrid search |
+| **Pure Rust** | No C/C++ dependencies in the core — safe, portable, easy to build |
 
-Rather than functioning as a monolithic search engine, IRiS is architected as a **composable search core** — a suite of modular building blocks designed to be embedded into applications, extended with custom logic, or orchestrated within distributed systems.
+## How It Works
 
-## Documentation
+<div class="mermaid">
+graph LR
+    subgraph Your Application
+        D["Document"]
+        Q["Query"]
+    end
 
-Comprehensive documentation is available in the [`docs/`](https://github.com/mosuka/iris/tree/main/docs) directory and online at [https://mosuka.github.io/iris/](https://mosuka.github.io/iris/):
+    subgraph Iris Engine
+        SCH["Schema"]
+        AN["Analyzer"]
+        EM["Embedder"]
+        LI["Lexical Index<br/>(Inverted Index)"]
+        VI["Vector Index<br/>(HNSW / Flat / IVF)"]
+        FU["Fusion<br/>(RRF / WeightedSum)"]
+    end
 
-- [**Getting Started**](https://mosuka.github.io/iris/getting_started/index.html): Installation and basic usage.
-- [**Core Concepts**](https://mosuka.github.io/iris/concepts/index.html): Architecture, Lexical Search, and Vector Search.
-- [**Advanced Features**](https://mosuka.github.io/iris/advanced/index.html): ID Management, Persistence, and Deletions.
-- [**API Reference**](https://docs.rs/iris)
+    D --> SCH
+    SCH --> AN --> LI
+    SCH --> EM --> VI
+    Q --> LI --> FU
+    Q --> VI --> FU
+    FU --> R["Ranked Results"]
+</div>
 
-## Features
+1. **Define a Schema** — declare your fields and their types (text, integer, vector, etc.)
+2. **Build an Engine** — attach an analyzer for text and an embedder for vectors
+3. **Index Documents** — the engine routes each field to the correct index automatically
+4. **Search** — run lexical, vector, or hybrid queries and get ranked results
 
-- **Pure Rust Implementation**: Memory-safe and fast performance with zero-cost abstractions.
-- **Hybrid Search**: Seamlessly combine BM25 lexical search with HNSW vector search using configurable fusion strategies.
-- **Multimodal capabilities**: Native support for text-to-image and image-to-image search via CLIP embeddings.
-- **Rich Query DSL**: Term, phrase, boolean, fuzzy, wildcard, range, and geographic queries.
-- **Flexible Analysis**: Configurable pipelines for tokenization, normalization, and stemming (including CJK support).
-- **Pluggable Storage**: Interfaces for in-memory, file-system, and memory-mapped storage backends.
+## Document Map
 
-## Quick Start
+| Section | What You Will Learn |
+| :--- | :--- |
+| [Getting Started](getting_started.md) | Install Iris and run your first search in minutes |
+| [Architecture](architecture.md) | Understand the Engine, its components, and data flow |
+| [Core Concepts](concepts.md) | Schema, text analysis, embeddings, and storage |
+| [Indexing](indexing/lexical_indexing.md) | How inverted indexes and vector indexes work internally |
+| [Search](search/lexical_search.md) | Query types, vector search, and hybrid fusion |
+| [Advanced Features](advanced.md) | Query DSL, ID management, WAL, and compaction |
+| [API Reference](api_reference.md) | Key types and methods at a glance |
+
+## Quick Example
 
 ```rust
-use iris::{Document, Engine, FieldOption, FusionAlgorithm, Schema, SearchRequestBuilder};
-use iris::analysis::analyzer::standard::StandardAnalyzer;
-use iris::lexical::{FieldOption as LexicalFieldOption, TextOption, TermQuery};
-use iris::vector::{FlatOption, VectorOption, VectorSearchRequestBuilder};
-use iris::storage::{StorageConfig, StorageFactory};
-use iris::storage::memory::MemoryStorageConfig;
 use std::sync::Arc;
+use iris::{Document, Engine, Schema, SearchRequestBuilder, Result};
+use iris::lexical::{TextOption, TermQuery};
+use iris::storage::memory::MemoryStorage;
 
-fn main() -> iris::Result<()> {
-    // 1. Create storage
-    let storage = StorageFactory::create(StorageConfig::Memory(MemoryStorageConfig::default()))?;
+#[tokio::main]
+async fn main() -> Result<()> {
+    // 1. Storage
+    let storage = Arc::new(MemoryStorage::new(Default::default()));
 
-    // 2. Define schema with separate lexical and vector fields
+    // 2. Schema
     let schema = Schema::builder()
-        .add_field("content", FieldOption::Lexical(LexicalFieldOption::Text(TextOption::default())))
-        .add_field("content_vec", FieldOption::Vector(VectorOption::Flat(FlatOption { dimension: 384, ..Default::default() })))
+        .add_text_field("title", TextOption::default())
+        .add_text_field("body", TextOption::default())
+        .add_default_field("body")
         .build();
 
-    // 3. Create engine with analyzer and embedder
-    let engine = Engine::builder(storage, schema)
-        .analyzer(Arc::new(StandardAnalyzer::default()))
-        .embedder(Arc::new(MyEmbedder))  // Your embedder implementation
-        .build()?;
+    // 3. Engine
+    let engine = Engine::builder(storage, schema).build().await?;
 
-    engine.index(
-        Document::new_with_id("doc1")
-            .add_text("content", "Rust is a systems programming language")
-            .add_text("content_vec", "Rust is a systems programming language")
-    )?;
-    engine.index(
-        Document::new_with_id("doc2")
-            .add_text("content", "Python is great for machine learning")
-            .add_text("content_vec", "Python is great for machine learning")
-    )?;
-    engine.commit()?;
+    // 4. Index a document
+    let doc = Document::builder()
+        .add_text("title", "Hello Iris")
+        .add_text("body", "A fast search library for Rust")
+        .build();
+    engine.add_document("doc-1", doc).await?;
+    engine.commit().await?;
 
-    // 4. Hybrid search (combines lexical keyword match + semantic similarity)
-    let results = engine.search(
-        SearchRequestBuilder::new()
-            .lexical_search_request(Box::new(TermQuery::new("content", "programming")))
-            .vector_search_request(VectorSearchRequestBuilder::new().add_text("content_vec", "systems language").build())
-            .fusion(FusionAlgorithm::RRF { k: 60.0 })
-            .build()
-    )?;
+    // 5. Search
+    let request = SearchRequestBuilder::new()
+        .lexical_search_request(
+            iris::LexicalSearchRequest::new(
+                Box::new(TermQuery::new("body", "rust"))
+            )
+        )
+        .limit(10)
+        .build();
+    let results = engine.search(request).await?;
 
-    // 5. Display results with document content
-    for hit in results {
-        if let Ok(Some(doc)) = engine.get_document(hit.doc_id) {
-            let id = doc.id().unwrap_or("unknown");
-            let content = doc.fields.get("content").and_then(|v| v.as_text()).unwrap_or("");
-            println!("[{}] {} (internal_id={}, score={:.4})", id, content, hit.doc_id, hit.score);
-        }
+    for r in &results {
+        println!("{}: score={:.4}", r.id, r.score);
     }
-
     Ok(())
 }
 ```
 
-## Examples
-
-You can find usage examples in the [`examples/`](https://github.com/mosuka/iris/tree/main/examples) directory:
-
-### Search
-
-- [Unified Search](https://github.com/mosuka/iris/blob/main/examples/search.rs) - Lexical, Vector, and Hybrid search in one cohesive example
-- [Multimodal Search](https://github.com/mosuka/iris/blob/main/examples/multimodal_search.rs) - Text-to-image and image-to-image search
-
-### Query Types
-
-- [Term Query](https://github.com/mosuka/iris/blob/main/examples/term_query.rs) - Basic keyword search
-- [Boolean Query](https://github.com/mosuka/iris/blob/main/examples/boolean_query.rs) - Complex boolean expressions (AND, OR, NOT)
-- [Phrase Query](https://github.com/mosuka/iris/blob/main/examples/phrase_query.rs) - Exact phrase matching
-- [Fuzzy Query](https://github.com/mosuka/iris/blob/main/examples/fuzzy_query.rs) - Approximate string matching
-- [Wildcard Query](https://github.com/mosuka/iris/blob/main/examples/wildcard_query.rs) - Pattern-based search
-- [Range Query](https://github.com/mosuka/iris/blob/main/examples/range_query.rs) - Numeric and date range queries
-- [Geo Query](https://github.com/mosuka/iris/blob/main/examples/geo_query.rs) - Geographic search
-- [Span Query](https://github.com/mosuka/iris/blob/main/examples/span_query.rs) - Positional queries
-
-### Embeddings
-
-- [Candle Embedder](https://github.com/mosuka/iris/blob/main/examples/embedding_with_candle.rs) - Local BERT embeddings
-- [OpenAI Embedder](https://github.com/mosuka/iris/blob/main/examples/embedding_with_openai.rs) - Cloud-based embeddings
-
-## Contributing
-
-We welcome contributions! Please see our [Contributing Guidelines](https://github.com/mosuka/iris/blob/main/CONTRIBUTING.md) for details.
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
 ## License
 
-This project is licensed under either of
-
-- MIT License ([LICENSE-MIT](https://github.com/mosuka/iris/blob/main/LICENSE-MIT) or <http://opensource.org/licenses/MIT>)
-
-at your option.
+Iris is dual-licensed under [MIT](https://opensource.org/licenses/MIT) and [Apache 2.0](https://www.apache.org/licenses/LICENSE-2.0).
