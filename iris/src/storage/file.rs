@@ -237,10 +237,13 @@ impl FileStorage {
 
     /// Recursively fsync a directory and its subdirectories.
     ///
-    /// Opening a directory and calling `sync_all()` on it ensures that the
+    /// On Unix, opening a directory and calling `sync_all()` ensures that
     /// directory entries (file creation, rename, delete) are flushed to disk.
-    /// This is critical on Windows where directory listings may be cached and
-    /// newly created files may not appear in `read_dir()` immediately.
+    ///
+    /// On Windows, directories cannot be opened as regular files, so directory
+    /// fsync is not applicable. Instead, the file-level `sync_all()` in
+    /// `FileOutput::close()` ensures data durability, and the explicit handle
+    /// release ensures file visibility for subsequent reads.
     fn sync_directory_recursive(dir: &Path) -> Result<()> {
         if !dir.exists() {
             return Ok(());
@@ -255,16 +258,20 @@ impl FileStorage {
             }
         }
 
-        // Fsync the directory itself.
-        let dir_file = File::open(dir).map_err(|e| {
-            IrisError::storage(format!(
-                "Failed to open directory {:?} for sync: {}",
-                dir, e
-            ))
-        })?;
-        dir_file.sync_all().map_err(|e| {
-            IrisError::storage(format!("Failed to sync directory {:?}: {}", dir, e))
-        })?;
+        // Fsync the directory itself (Unix only).
+        // Windows does not support opening directories as files for fsync.
+        #[cfg(unix)]
+        {
+            let dir_file = File::open(dir).map_err(|e| {
+                IrisError::storage(format!(
+                    "Failed to open directory {:?} for sync: {}",
+                    dir, e
+                ))
+            })?;
+            dir_file.sync_all().map_err(|e| {
+                IrisError::storage(format!("Failed to sync directory {:?}: {}", dir, e))
+            })?;
+        }
 
         Ok(())
     }
