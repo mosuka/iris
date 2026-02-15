@@ -272,8 +272,7 @@ impl<'a> Collector for TopFieldCollector<'a> {
 
 impl PartialEq for FieldScoredDoc {
     fn eq(&self, other: &Self) -> bool {
-        // For heap purposes, equality is based on ordering
-        self.doc_id == other.doc_id
+        self.field_value == other.field_value && self.doc_id == other.doc_id
     }
 }
 

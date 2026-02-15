@@ -73,9 +73,16 @@ pub enum FieldSelector {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum VectorScoreMode {
+    /// Sum of `similarity * weight` across all query vectors.
     #[default]
     WeightedSum,
+    /// Maximum `similarity * weight` across all query vectors.
+    /// Useful when multiple query vectors represent alternative interpretations
+    /// and only the best-matching one should determine the score.
     MaxSim,
+    /// For each query vector, find the max similarity across all document vectors,
+    /// then sum. Inspired by ColBERT's late interaction mechanism.
+    /// Best suited for multi-vector document representations.
     LateInteraction,
 }
 

@@ -25,9 +25,9 @@
 
 use std::io::{Read, Write};
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
-use parking_lot::RwLock;
+use parking_lot::{Mutex, RwLock};
 use serde::{Deserialize, Serialize};
 
 use crate::data::Document;
@@ -108,7 +108,7 @@ impl DocumentLog {
 
     /// Open or create the WAL file for appending.
     fn ensure_writer(&self) -> Result<()> {
-        let mut writer_guard = self.wal_writer.lock().unwrap();
+        let mut writer_guard = self.wal_writer.lock();
         if writer_guard.is_none() {
             let writer = self.wal_storage.create_output_append(&self.wal_path)?;
             *writer_guard = Some(writer);
@@ -127,7 +127,7 @@ impl DocumentLog {
     pub fn append(&self, external_id: &str, doc: Document) -> Result<(u64, SeqNumber)> {
         self.ensure_writer()?;
 
-        let mut writer_guard = self.wal_writer.lock().unwrap();
+        let mut writer_guard = self.wal_writer.lock();
 
         let doc_id = self.next_doc_id.fetch_add(1, Ordering::SeqCst);
         let seq = self.next_seq.fetch_add(1, Ordering::SeqCst);
@@ -152,7 +152,7 @@ impl DocumentLog {
     pub fn append_delete(&self, doc_id: u64, external_id: &str) -> Result<SeqNumber> {
         self.ensure_writer()?;
 
-        let mut writer_guard = self.wal_writer.lock().unwrap();
+        let mut writer_guard = self.wal_writer.lock();
 
         let seq = self.next_seq.fetch_add(1, Ordering::SeqCst);
 
@@ -175,7 +175,12 @@ impl DocumentLog {
         record: &LogRecord,
     ) -> Result<()> {
         let bytes = serde_json::to_vec(record)?;
-        let len = bytes.len() as u32;
+        let len: u32 = bytes.len().try_into().map_err(|_| {
+            crate::error::IrisError::InvalidOperation(format!(
+                "WAL record size {} exceeds u32::MAX",
+                bytes.len()
+            ))
+        })?;
 
         if let Some(writer) = writer_guard.as_mut() {
             writer.write_all(&len.to_le_bytes())?;
@@ -257,7 +262,7 @@ impl DocumentLog {
     /// Called after a successful commit to discard processed entries.
     pub fn truncate(&self) -> Result<()> {
         {
-            let mut writer_guard = self.wal_writer.lock().unwrap();
+            let mut writer_guard = self.wal_writer.lock();
             *writer_guard = None;
         }
 

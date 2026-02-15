@@ -5,7 +5,9 @@
 
 use serde::{Deserialize, Serialize};
 use std::io::Write;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
+
+use parking_lot::RwLock;
 
 use crate::error::Result;
 use crate::storage::Storage;
@@ -190,7 +192,7 @@ impl SegmentManager {
 
         let segments_info: Vec<ManagedSegmentInfo> = serde_json::from_slice(&content)?;
 
-        let mut segments = self.segments.write().unwrap();
+        let mut segments = self.segments.write();
         *segments = segments_info;
 
         let max_id = segments
@@ -200,13 +202,13 @@ impl SegmentManager {
             .max()
             .unwrap_or(0);
 
-        *self.next_segment_id.write().unwrap() = max_id + 1;
+        *self.next_segment_id.write() = max_id + 1;
 
         Ok(())
     }
 
     pub fn save_state(&self) -> Result<()> {
-        let segments = self.segments.read().unwrap();
+        let segments = self.segments.read();
         let content = serde_json::to_vec_pretty(&*segments)?;
 
         let mut writer = self.storage.create_output("segments.json")?;
@@ -218,7 +220,7 @@ impl SegmentManager {
 
     /// Add a new segment.
     pub fn add_segment(&self, info: ManagedSegmentInfo) -> Result<()> {
-        let mut segments = self.segments.write().unwrap();
+        let mut segments = self.segments.write();
         segments.push(info);
         drop(segments);
         self.save_state()
@@ -226,7 +228,7 @@ impl SegmentManager {
 
     /// Remove a segment.
     pub fn remove_segment(&self, segment_id: &str) -> Result<()> {
-        let mut segments = self.segments.write().unwrap();
+        let mut segments = self.segments.write();
         if let Some(pos) = segments.iter().position(|s| s.segment_id == segment_id) {
             segments.remove(pos);
             drop(segments);
@@ -247,7 +249,7 @@ impl SegmentManager {
 
     /// Update a segment info.
     pub fn update_segment(&self, info: ManagedSegmentInfo) -> Result<()> {
-        let mut segments = self.segments.write().unwrap();
+        let mut segments = self.segments.write();
         if let Some(idx) = segments
             .iter()
             .position(|s| s.segment_id == info.segment_id)
@@ -260,7 +262,7 @@ impl SegmentManager {
 
     /// Get segment information.
     pub fn get_segment(&self, segment_id: &str) -> Option<ManagedSegmentInfo> {
-        let segments = self.segments.read().unwrap();
+        let segments = self.segments.read();
         segments
             .iter()
             .find(|s| s.segment_id == segment_id)
@@ -269,13 +271,13 @@ impl SegmentManager {
 
     /// List all segments.
     pub fn list_segments(&self) -> Vec<ManagedSegmentInfo> {
-        let segments = self.segments.read().unwrap();
+        let segments = self.segments.read();
         segments.clone()
     }
 
     /// Check if any segments need merging.
     pub fn check_merge(&self, policy: &dyn MergePolicy) -> Option<MergeCandidate> {
-        let segments_lock = self.segments.read().unwrap();
+        let segments_lock = self.segments.read();
 
         if let Some(candidate_ids) = policy.candidates(&segments_lock, &self.config) {
             let mut total_vectors = 0;
@@ -305,7 +307,7 @@ impl SegmentManager {
         candidate: MergeCandidate,
         merged_segment: ManagedSegmentInfo,
     ) -> Result<()> {
-        let mut segments_lock = self.segments.write().unwrap();
+        let mut segments_lock = self.segments.write();
 
         // 1. Remove source segments
         let ids_to_remove: std::collections::HashSet<_> =
@@ -330,7 +332,6 @@ impl SegmentManager {
     pub fn total_vectors(&self) -> u64 {
         self.segments
             .read()
-            .unwrap()
             .iter()
             .map(|s| s.vector_count)
             .sum()
@@ -338,7 +339,7 @@ impl SegmentManager {
 
     /// Generate a new segment ID.
     pub fn generate_segment_id(&self) -> String {
-        let mut next_id = self.next_segment_id.write().unwrap();
+        let mut next_id = self.next_segment_id.write();
         let id = *next_id;
         *next_id += 1;
         format!("segment_{:06}", id)
@@ -346,13 +347,13 @@ impl SegmentManager {
 
     /// Check if merging is needed.
     pub fn needs_merge(&self) -> bool {
-        let segments = self.segments.read().unwrap();
+        let segments = self.segments.read();
         segments.len() as u32 > self.config.max_segments
     }
 
     /// Create a merge plan.
     pub fn create_merge_plan(&self, strategy: MergeStrategy) -> Option<MergePlan> {
-        let segments = self.segments.read().unwrap();
+        let segments = self.segments.read();
 
         if segments.len() <= 1 {
             return None;
@@ -401,7 +402,7 @@ impl SegmentManager {
 
     /// Get statistics.
     pub fn stats(&self) -> SegmentManagerStats {
-        let segments = self.segments.read().unwrap();
+        let segments = self.segments.read();
         let segment_count = segments.len() as u32;
         let total_vectors: u64 = segments.iter().map(|s| s.vector_count).sum();
         let total_size: u64 = segments.iter().map(|s| s.size_bytes).sum();

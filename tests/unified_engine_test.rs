@@ -10,7 +10,7 @@ use iris::SearchRequestBuilder;
 use iris::lexical::TermQuery;
 use iris::vector::VectorSearchRequestBuilder;
 use iris::{DataValue, Document};
-use iris::{FieldOption, Schema};
+use iris::{FieldOption, LexicalSearchRequest, Schema};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_unified_engine_indexing() -> iris::Result<()> {
@@ -142,14 +142,14 @@ async fn test_unified_engine_concurrent_reads() -> iris::Result<()> {
         handles.push(tokio::spawn(async move {
             // Lexical search
             let req = SearchRequestBuilder::new()
-                .with_lexical(Box::new(TermQuery::new("title", "document")))
+                .lexical_search_request(LexicalSearchRequest::new(Box::new(TermQuery::new("title", "document"))))
                 .build();
             let results = engine.search(req).await.unwrap();
             assert!(!results.is_empty(), "Task {i}: lexical search should return results");
 
             // Vector search
             let req = SearchRequestBuilder::new()
-                .with_vector(
+                .vector_search_request(
                     VectorSearchRequestBuilder::new()
                         .add_vector("embedding", vec![i as f32, 0.0, 0.0])
                         .limit(3)

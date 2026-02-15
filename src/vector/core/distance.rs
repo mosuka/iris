@@ -52,7 +52,8 @@ impl DistanceMetric {
                 if norm_a == 0.0 || norm_b == 0.0 {
                     1.0 // Maximum distance for zero vectors
                 } else {
-                    1.0 - (dot_product / (norm_a * norm_b))
+                    let cosine = (dot_product / (norm_a * norm_b)).clamp(-1.0, 1.0);
+                    1.0 - cosine
                 }
             }
             DistanceMetric::Euclidean => self.simd_euclidean_sq(a, b).sqrt(),

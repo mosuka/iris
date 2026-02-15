@@ -320,6 +320,10 @@ impl SimilarityAggregator {
             weighted_sum += similarity * weight;
         }
 
+        if total_weight == 0.0 {
+            return Ok(0.0);
+        }
+
         Ok(weighted_sum / total_weight)
     }
 }

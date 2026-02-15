@@ -51,7 +51,7 @@ impl Span {
         } else if self.end <= other.start {
             other.start - self.end
         } else {
-            self.start - other.end
+            self.start.saturating_sub(other.end)
         }
     }
 }

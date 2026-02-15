@@ -92,7 +92,11 @@ impl VectorIndexOptimizer {
 
         report.final_memory_bytes = final_memory;
         report.optimization_time_ms = elapsed.as_secs_f64() * 1000.0;
-        report.memory_reduction_ratio = initial_memory as f32 / final_memory as f32;
+        report.memory_reduction_ratio = if final_memory > 0 {
+            initial_memory as f32 / final_memory as f32
+        } else {
+            1.0
+        };
 
         Ok(report)
     }

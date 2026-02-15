@@ -123,9 +123,12 @@ impl GeoBoundingBox {
 
     /// Get the center point of this bounding box.
     pub fn center(&self) -> GeoPoint {
-        let center_lat = (self.top_left.lat + self.bottom_right.lat) / 2.0;
-        let center_lon = (self.top_left.lon + self.bottom_right.lon) / 2.0;
-        GeoPoint::new(center_lat, center_lon).unwrap() // Should always be valid
+        let center_lat =
+            ((self.top_left.lat + self.bottom_right.lat) / 2.0).clamp(-90.0, 90.0);
+        let center_lon =
+            ((self.top_left.lon + self.bottom_right.lon) / 2.0).clamp(-180.0, 180.0);
+        // Clamped values are always valid
+        GeoPoint::new(center_lat, center_lon).expect("clamped center must be valid")
     }
 
     /// Get the width and height of the bounding box in degrees.
@@ -138,12 +141,11 @@ impl GeoBoundingBox {
     /// Get the maximum distance from the center to any corner of the bounding box.
     pub fn max_distance_from_center(&self) -> f64 {
         let center = self.center();
-        let corners = [
-            &self.top_left,
-            &self.bottom_right,
-            &GeoPoint::new(self.top_left.lat, self.bottom_right.lon).unwrap(),
-            &GeoPoint::new(self.bottom_right.lat, self.top_left.lon).unwrap(),
-        ];
+        let corner_tr =
+            GeoPoint::new(self.top_left.lat, self.bottom_right.lon).unwrap_or(self.top_left);
+        let corner_bl =
+            GeoPoint::new(self.bottom_right.lat, self.top_left.lon).unwrap_or(self.bottom_right);
+        let corners = [&self.top_left, &self.bottom_right, &corner_tr, &corner_bl];
 
         corners
             .iter()
@@ -237,8 +239,12 @@ impl GeoDistanceQuery {
         matches.sort_by(|a, b| {
             a.distance_km
                 .partial_cmp(&b.distance_km)
-                .unwrap()
-                .then_with(|| b.relevance_score.partial_cmp(&a.relevance_score).unwrap())
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| {
+                    b.relevance_score
+                        .partial_cmp(&a.relevance_score)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                })
         });
 
         Ok(matches)
@@ -248,7 +254,8 @@ impl GeoDistanceQuery {
     fn create_bounding_box(&self) -> GeoBoundingBox {
         // Approximate degree distance at the center latitude
         let lat_deg_km = 111.0; // ~111 km per degree latitude
-        let lon_deg_km = 111.0 * self.center.lat.to_radians().cos(); // Longitude varies by latitude
+        // At poles cos(lat) ≈ 0 → clamp to avoid division by zero
+        let lon_deg_km = (111.0 * self.center.lat.to_radians().cos()).max(0.001);
 
         let lat_delta = self.distance_km / lat_deg_km;
         let lon_delta = self.distance_km / lon_deg_km;
@@ -266,12 +273,19 @@ impl GeoDistanceQuery {
         .unwrap_or(self.center);
 
         GeoBoundingBox::new(top_left, bottom_right).unwrap_or_else(|_| {
-            // Fallback to a small box around center
-            let fallback_top_left =
-                GeoPoint::new(self.center.lat + 0.01, self.center.lon - 0.01).unwrap();
-            let fallback_bottom_right =
-                GeoPoint::new(self.center.lat - 0.01, self.center.lon + 0.01).unwrap();
-            GeoBoundingBox::new(fallback_top_left, fallback_bottom_right).unwrap()
+            // Fallback to a small box around center (clamp to valid ranges)
+            let fallback_top_left = GeoPoint::new(
+                (self.center.lat + 0.01).min(90.0),
+                (self.center.lon - 0.01).max(-180.0),
+            )
+            .unwrap_or(self.center);
+            let fallback_bottom_right = GeoPoint::new(
+                (self.center.lat - 0.01).max(-90.0),
+                (self.center.lon + 0.01).min(180.0),
+            )
+            .unwrap_or(self.center);
+            GeoBoundingBox::new(fallback_top_left, fallback_bottom_right)
+                .unwrap_or(GeoBoundingBox { top_left: self.center, bottom_right: self.center })
         })
     }
 
@@ -280,7 +294,7 @@ impl GeoDistanceQuery {
         &self,
         reader: &dyn LexicalIndexReader,
         bounding_box: &GeoBoundingBox,
-    ) -> Result<Vec<(u32, GeoPoint)>> {
+    ) -> Result<Vec<(u64, GeoPoint)>> {
         let mut candidates = Vec::new();
 
         // Try to use BKD tree for efficient candidate retrieval
@@ -303,7 +317,7 @@ impl GeoDistanceQuery {
                     && let Some((lat, lon)) = field_value.as_geo()
                 {
                     let geo_point = GeoPoint::new(lat, lon)?;
-                    candidates.push((doc_id as u32, geo_point));
+                    candidates.push((doc_id, geo_point));
                 }
             }
             return Ok(candidates);
@@ -326,7 +340,7 @@ impl GeoDistanceQuery {
                             let distance = self.center.distance_to(&geo_point);
                             // Double-check with exact distance calculation
                             if distance <= self.distance_km {
-                                candidates.push((doc_id as u32, geo_point));
+                                candidates.push((doc_id, geo_point));
                             }
                         }
                     }
@@ -337,8 +351,11 @@ impl GeoDistanceQuery {
         Ok(candidates)
     }
 
+}
+
+#[cfg(test)]
+impl GeoDistanceQuery {
     /// Calculate relevance score based on distance (closer = higher score).
-    #[allow(dead_code)]
     fn calculate_distance_score(&self, distance_km: f64) -> f32 {
         if distance_km > self.distance_km {
             return 0.0;
@@ -350,7 +367,6 @@ impl GeoDistanceQuery {
     }
 
     /// Calculate enhanced relevance score with multiple factors.
-    #[allow(dead_code)]
     fn calculate_distance_score_enhanced(&self, distance_km: f64, point: &GeoPoint) -> f32 {
         if distance_km > self.distance_km {
             return 0.0;
@@ -373,7 +389,6 @@ impl GeoDistanceQuery {
     }
 
     /// Calculate geographic relevance based on point characteristics.
-    #[allow(dead_code)]
     fn calculate_geographic_relevance(&self, point: &GeoPoint) -> f32 {
         // Bonus for points in certain latitudinal zones (e.g., temperate zones)
         let lat_abs = point.lat.abs();
@@ -395,7 +410,6 @@ impl GeoDistanceQuery {
     }
 
     /// Estimate population density bonus (simplified simulation).
-    #[allow(dead_code)]
     fn estimate_population_density(&self, point: &GeoPoint) -> f32 {
         // Simplified heuristic: higher density near major coordinates
         let lat_density = (1.0 - (point.lat.abs() / 90.0)) as f32;
@@ -562,7 +576,7 @@ impl GeoBoundingBoxQuery {
     fn get_candidates_in_bounds(
         &self,
         reader: &dyn LexicalIndexReader,
-    ) -> Result<Vec<(u32, GeoPoint)>> {
+    ) -> Result<Vec<(u64, GeoPoint)>> {
         let mut candidates = Vec::new();
 
         // Try to use BKD tree for efficient candidate retrieval
@@ -584,7 +598,7 @@ impl GeoBoundingBoxQuery {
                     && let Some((lat, lon)) = field_value.as_geo()
                 {
                     let geo_point = GeoPoint::new(lat, lon)?;
-                    candidates.push((doc_id as u32, geo_point));
+                    candidates.push((doc_id, geo_point));
                 }
             }
             return Ok(candidates);
@@ -604,7 +618,7 @@ impl GeoBoundingBoxQuery {
                         let geo_point = GeoPoint::new(lat, lon)?;
                         // Check if the point is within the bounding box
                         if self.bounding_box.contains(&geo_point) {
-                            candidates.push((doc_id as u32, geo_point));
+                            candidates.push((doc_id, geo_point));
                         }
                     }
                 }
@@ -614,9 +628,12 @@ impl GeoBoundingBoxQuery {
         Ok(candidates)
     }
 
+}
+
+#[cfg(test)]
+impl GeoBoundingBoxQuery {
     /// Generate candidates within and around the bounding box.
-    #[allow(dead_code)]
-    fn generate_bounding_box_candidates(&self) -> Vec<(u32, GeoPoint)> {
+    fn generate_bounding_box_candidates(&self) -> Vec<(u64, GeoPoint)> {
         let mut candidates = Vec::new();
         let (width, height) = self.bounding_box.dimensions();
 
@@ -631,7 +648,7 @@ impl GeoBoundingBoxQuery {
                 let lon = self.bounding_box.top_left.lon + lon_ratio * width;
 
                 if let Ok(point) = GeoPoint::new(lat, lon) {
-                    let doc_id = (i * grid_size + j + 2000) as u32;
+                    let doc_id = (i * grid_size + j + 2000) as u64;
                     candidates.push((doc_id, point));
                 }
             }
@@ -649,7 +666,7 @@ impl GeoBoundingBoxQuery {
 
             let center = self.bounding_box.center();
             if let Ok(point) = GeoPoint::new(center.lat + lat_offset, center.lon + lon_offset) {
-                let doc_id = (i + 3000) as u32;
+                let doc_id = (i + 3000) as u64;
                 candidates.push((doc_id, point));
             }
         }
@@ -658,7 +675,6 @@ impl GeoBoundingBoxQuery {
     }
 
     /// Calculate relevance score for points within the bounding box.
-    #[allow(dead_code)]
     fn calculate_bounding_box_score(&self, point: &GeoPoint) -> f32 {
         let center = self.bounding_box.center();
         let (width, height) = self.bounding_box.dimensions();
@@ -681,7 +697,6 @@ impl GeoBoundingBoxQuery {
     }
 
     /// Calculate bonus for points near edges of the bounding box.
-    #[allow(dead_code)]
     fn calculate_edge_proximity_bonus(&self, point: &GeoPoint) -> f32 {
         let (width, height) = self.bounding_box.dimensions();
         let edge_threshold = 0.1; // 10% of dimension
@@ -706,7 +721,6 @@ impl GeoBoundingBoxQuery {
     }
 
     /// Calculate bonus for points near corners of the bounding box.
-    #[allow(dead_code)]
     fn calculate_corner_bonus(&self, point: &GeoPoint) -> f32 {
         let corners = [
             self.bounding_box.top_left,
@@ -788,7 +802,7 @@ impl Query for GeoBoundingBoxQuery {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GeoMatch {
     /// Document ID
-    pub doc_id: u32,
+    pub doc_id: u64,
     /// Geographical point of the document
     pub point: GeoPoint,
     /// Distance from query center in kilometers
@@ -828,7 +842,7 @@ impl Matcher for GeoMatcher {
         if self.current_index >= self.matches.len() {
             u64::MAX
         } else {
-            self.matches[self.current_index].doc_id as u64
+            self.matches[self.current_index].doc_id
         }
     }
 
@@ -845,7 +859,7 @@ impl Matcher for GeoMatcher {
     fn skip_to(&mut self, target: u64) -> Result<bool> {
         // Find first document ID >= target in order
         while self.current_index < self.matches.len() {
-            let doc_id = self.matches[self.current_index].doc_id as u64;
+            let doc_id = self.matches[self.current_index].doc_id;
             if doc_id >= target {
                 return Ok(true);
             }
@@ -867,7 +881,7 @@ impl Matcher for GeoMatcher {
 #[derive(Debug)]
 pub struct GeoScorer {
     /// Document scores based on geographical relevance
-    doc_scores: HashMap<u32, f32>,
+    doc_scores: HashMap<u64, f32>,
     /// Query boost factor
     boost: f32,
 }
@@ -887,7 +901,7 @@ impl GeoScorer {
 
 impl Scorer for GeoScorer {
     fn score(&self, doc_id: u64, _term_freq: f32, _field_length: Option<f32>) -> f32 {
-        self.doc_scores.get(&(doc_id as u32)).unwrap_or(&0.0) * self.boost
+        self.doc_scores.get(&doc_id).unwrap_or(&0.0) * self.boost
     }
 
     fn boost(&self) -> f32 {

@@ -174,9 +174,9 @@ impl VectorQueryParser {
         }
 
         // Resolve field name.
-        // TODO: Support multiple default fields by generating a QueryVector per
-        // field (similar to how the lexical QueryParser creates BooleanQuery for
-        // multiple default fields). Currently only the first default field is used.
+        // NOTE: When no field is specified, only the first default field is used.
+        // Multi-default-field support (generating a QueryVector per field) is not
+        // yet implemented.
         let field = match field_name {
             Some(f) => f,
             None => {

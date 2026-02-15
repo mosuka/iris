@@ -278,13 +278,13 @@ impl SpellingCorrector {
         for word in words {
             // Only learn words that look like they could be correct
             if word.len() >= 3 && word.chars().all(|c| c.is_alphabetic()) {
-                let count = *self.query_history.entry(word.clone()).or_insert(0) + 1;
-                self.query_history.insert(word.clone(), count);
+                let entry = self.query_history.entry(word.clone()).or_insert(0);
+                *entry = entry.saturating_add(1);
+                let count = *entry;
 
                 // If we've seen this word enough times, consider it correct
                 if count >= 5 {
-                    // TODO: Add word to dictionary
-                    // This would require a mutable dictionary interface
+                    self.engine.add_word(&word, count);
                 }
             }
         }

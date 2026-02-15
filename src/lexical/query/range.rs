@@ -4,7 +4,7 @@ use std::fmt::Debug;
 
 use chrono::{DateTime, Utc};
 
-use crate::error::Result;
+use crate::error::{IrisError, Result};
 use crate::lexical::core::field::NumericType;
 use crate::lexical::query::Query;
 use crate::lexical::query::matcher::{EmptyMatcher, Matcher, PreComputedMatcher};
@@ -419,10 +419,20 @@ impl NumericRangeQuery {
             .as_ref()
             .map(|bytes| match self.numeric_type {
                 NumericType::Float => {
-                    f64::from_be_bytes(bytes.as_slice().try_into().unwrap_or([0; 8]))
+                    f64::from_be_bytes(
+                        bytes
+                            .as_slice()
+                            .try_into()
+                            .expect("numeric bound must be 8 bytes"),
+                    )
                 }
                 NumericType::Integer => {
-                    i64::from_be_bytes(bytes.as_slice().try_into().unwrap_or([0; 8])) as f64
+                    i64::from_be_bytes(
+                        bytes
+                            .as_slice()
+                            .try_into()
+                            .expect("numeric bound must be 8 bytes"),
+                    ) as f64
                 }
             })
     }
@@ -433,10 +443,20 @@ impl NumericRangeQuery {
             .as_ref()
             .map(|bytes| match self.numeric_type {
                 NumericType::Float => {
-                    f64::from_be_bytes(bytes.as_slice().try_into().unwrap_or([0; 8]))
+                    f64::from_be_bytes(
+                        bytes
+                            .as_slice()
+                            .try_into()
+                            .expect("numeric bound must be 8 bytes"),
+                    )
                 }
                 NumericType::Integer => {
-                    i64::from_be_bytes(bytes.as_slice().try_into().unwrap_or([0; 8])) as f64
+                    i64::from_be_bytes(
+                        bytes
+                            .as_slice()
+                            .try_into()
+                            .expect("numeric bound must be 8 bytes"),
+                    ) as f64
                 }
             })
     }
@@ -1170,15 +1190,15 @@ impl Matcher for DateTimeRangeMatcher {
     }
 
     fn next(&mut self) -> Result<bool> {
-        // Implementation would iterate through document postings
-        // and check if datetime values fall within range
-        Ok(false)
+        Err(IrisError::InvalidOperation(
+            "DateTime range matching is not yet implemented".to_string(),
+        ))
     }
 
     fn skip_to(&mut self, _target: u64) -> Result<bool> {
-        // Implementation would skip to target document
-        // and check subsequent documents
-        Ok(false)
+        Err(IrisError::InvalidOperation(
+            "DateTime range matching is not yet implemented".to_string(),
+        ))
     }
 
     fn cost(&self) -> u64 {

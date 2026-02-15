@@ -381,15 +381,17 @@ struct FlatVectorIterator {
 
 impl VectorIterator for FlatVectorIterator {
     fn next(&mut self) -> Result<Option<(u64, String, Vector)>> {
-        if self.current < self.keys.len() {
+        // Use a loop instead of recursion to avoid stack overflow when
+        // many consecutive entries are deleted.
+        while self.current < self.keys.len() {
             let (doc_id, field) = &self.keys[self.current];
 
-            // Check deletion
+            // Skip deleted entries
             if let Some(bitmap) = &self.deletion_bitmap
                 && bitmap.is_deleted(*doc_id)
             {
                 self.current += 1;
-                return self.next(); // Recursively skip deleted
+                continue;
             }
 
             if let Some(vec) = self
@@ -397,19 +399,16 @@ impl VectorIterator for FlatVectorIterator {
                 .get(&(*doc_id, field.clone()), self.dimension)?
             {
                 self.current += 1;
-                Ok(Some((*doc_id, field.clone(), vec)))
+                return Ok(Some((*doc_id, field.clone(), vec)));
             } else {
-                // Skip or error? If index says it exists but retrieval fails -> Error ideally.
-                // But for next(), maybe skipping is okay?
-                // If get() returns Ok(None), it means not found, which contradicts consistency.
-                Err(IrisError::internal(format!(
+                return Err(IrisError::internal(format!(
                     "Vector {}:{} found in keys but missing in storage",
                     doc_id, field
-                )))
+                )));
             }
-        } else {
-            Ok(None)
         }
+
+        Ok(None)
     }
 
     fn skip_to(&mut self, doc_id: u64, field_name: &str) -> Result<bool> {

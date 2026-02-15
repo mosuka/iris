@@ -7,7 +7,7 @@ use iris::storage::file::FileStorageConfig;
 use iris::storage::{StorageConfig, StorageFactory};
 use iris::vector::FieldOption as VectorOption;
 use iris::{DataValue, Document};
-use iris::{FieldOption, Schema};
+use iris::{FieldOption, LexicalSearchRequest, Schema};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_wal_recovery_uncommitted() -> iris::Result<()> {
@@ -32,7 +32,7 @@ async fn test_wal_recovery_uncommitted() -> iris::Result<()> {
         // Initial state
         let query = Box::new(TermQuery::new("title", "rust"));
         let search_request = iris::SearchRequestBuilder::new()
-            .with_lexical(query)
+            .lexical_search_request(LexicalSearchRequest::new(query))
             .build();
         let search_results = engine.search(search_request).await?;
         assert_eq!(search_results.len(), 0);
@@ -58,7 +58,7 @@ async fn test_wal_recovery_uncommitted() -> iris::Result<()> {
         // Should have recovered doc1 from WAL and now committed
         let query = Box::new(TermQuery::new("title", "rust"));
         let search_request = iris::SearchRequestBuilder::new()
-            .with_lexical(query)
+            .lexical_search_request(LexicalSearchRequest::new(query))
             .build();
         let search_results = engine.search(search_request).await?;
         assert_eq!(

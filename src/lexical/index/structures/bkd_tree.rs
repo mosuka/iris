@@ -361,6 +361,14 @@ impl BKDReader {
         let left_offset = reader.read_u64()?;
         let right_offset = reader.read_u64()?;
 
+        // Validate split_dim against number of dimensions
+        if split_dim >= self.header.num_dims as usize {
+            return Err(crate::error::IrisError::index(format!(
+                "Invalid split dimension {} (num_dims={})",
+                split_dim, self.header.num_dims
+            )));
+        }
+
         // Logic check for split dimension
         let min = ctx.mins[split_dim];
         let max = ctx.maxs[split_dim];
@@ -454,6 +462,16 @@ impl BKDTree for BKDReader {
     ) -> Result<Vec<u64>> {
         if self.header.total_point_count == 0 {
             return Ok(Vec::new());
+        }
+
+        let num_dims = self.header.num_dims as usize;
+        if mins.len() != num_dims || maxs.len() != num_dims {
+            return Err(crate::error::IrisError::index(format!(
+                "Dimension mismatch: expected {} dims, got mins={} maxs={}",
+                num_dims,
+                mins.len(),
+                maxs.len()
+            )));
         }
 
         let mut doc_ids = Vec::new();

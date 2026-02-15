@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use crate::error::Result;
+use crate::error::{IrisError, Result};
 use crate::vector::core::vector::Vector;
 use crate::vector::reader::VectorIndexReader;
 use crate::vector::search::searcher::VectorIndexSearcher;
@@ -67,9 +67,10 @@ impl IvfSearcher {
                 .map(|(i, _)| i)
                 .collect())
         } else {
-            // Fallback: return first n_probe indices
-            let n_clusters = 10; // Default assumption
-            Ok((0..n_probe.min(n_clusters)).collect())
+            Err(IrisError::InvalidOperation(
+                "IVF searcher requires an IvfIndexReader, but a different reader type was provided"
+                    .to_string(),
+            ))
         }
     }
 }

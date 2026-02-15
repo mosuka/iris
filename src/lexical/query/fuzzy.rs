@@ -155,28 +155,7 @@ impl FuzzyQuery {
         Ok(None)
     }
 
-    /// Estimate document frequency for a term.
-    #[allow(dead_code)]
-    fn estimate_doc_frequency(&self, term: &str, _reader: &dyn LexicalIndexReader) -> Result<u32> {
-        // Simplified estimation based on term characteristics
-        // In a real implementation, this would query the actual index
 
-        let base_frequency = match term.len() {
-            1..=3 => 50,
-            4..=6 => 25,
-            7..=10 => 10,
-            _ => 5,
-        };
-
-        // Reduce frequency for longer terms or terms with rare characters
-        let rarity_factor = if term.chars().any(|c| "qxz".contains(c)) {
-            0.5
-        } else {
-            1.0
-        };
-
-        Ok((base_frequency as f32 * rarity_factor) as u32)
-    }
 }
 
 impl MultiTermQuery for FuzzyQuery {

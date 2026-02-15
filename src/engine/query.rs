@@ -33,11 +33,14 @@
 //! assert!(request.vector.is_some());
 //! ```
 
+use std::sync::LazyLock;
+
 use regex::Regex;
 
 use crate::engine::search::{FusionAlgorithm, SearchRequest};
 use crate::error::{IrisError, Result};
 use crate::lexical::query::parser::QueryParser;
+use crate::lexical::search::searcher::LexicalSearchRequest;
 use crate::vector::query::parser::VectorQueryParser;
 
 /// Unified query parser that composes lexical and vector parsers.
@@ -115,9 +118,9 @@ impl UnifiedQueryParser {
         };
 
         Ok(SearchRequest {
-            lexical,
-            vector,
-            fusion,
+            lexical_search_request: lexical.map(LexicalSearchRequest::new),
+            vector_search_request: vector,
+            fusion_algorithm: fusion,
             ..Default::default()
         })
     }
@@ -127,18 +130,19 @@ impl UnifiedQueryParser {
     /// Uses regex to identify vector clauses (`field:~"text"^boost` or `~"text"`)
     /// and extracts them. The remainder is treated as lexical query text.
     fn split_query(&self, input: &str) -> (Option<String>, Option<String>) {
-        // Pattern: optional field prefix + ~"text" + optional boost
-        // - (?:[\w][\w.]*:)? — optional field name with colon
-        // - ~"[^"]*"         — tilde + quoted text
-        // - (?:\^[\d]+(?:\.[\d]+)?)? — optional boost value
-        let vector_re =
-            Regex::new(r#"(?:[\w][\w.]*:)?~"[^"]*"(?:\^[\d]+(?:\.[\d]+)?)?"#).unwrap();
+        static VECTOR_RE: LazyLock<Regex> = LazyLock::new(|| {
+            // Pattern: optional field prefix + ~"text" + optional boost
+            // - (?:[\w][\w.]*:)? — optional field name with colon
+            // - ~"[^"]*"         — tilde + quoted text
+            // - (?:\^[\d]+(?:\.[\d]+)?)? — optional boost value
+            Regex::new(r#"(?:[\w][\w.]*:)?~"[^"]*"(?:\^[\d]+(?:\.[\d]+)?)?"#).unwrap()
+        });
 
         // Collect vector clauses
-        let vector_clauses: Vec<&str> = vector_re.find_iter(input).map(|m| m.as_str()).collect();
+        let vector_clauses: Vec<&str> = VECTOR_RE.find_iter(input).map(|m| m.as_str()).collect();
 
         // Remove vector clauses from input to get lexical part
-        let lexical_raw = vector_re.replace_all(input, " ");
+        let lexical_raw = VECTOR_RE.replace_all(input, " ");
         let lexical_cleaned = clean_lexical_string(&lexical_raw);
 
         let lexical = if lexical_cleaned.is_empty() {
@@ -164,9 +168,10 @@ impl UnifiedQueryParser {
 /// 2. Remove leading/trailing boolean operators (AND, OR)
 /// 3. Collapse consecutive boolean operators (AND AND → AND)
 fn clean_lexical_string(s: &str) -> String {
+    static WHITESPACE_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\s+").unwrap());
+
     // Collapse multiple whitespace
-    let ws_re = Regex::new(r"\s+").unwrap();
-    let s = ws_re.replace_all(s, " ");
+    let s = WHITESPACE_RE.replace_all(s, " ");
     let s = s.trim();
 
     if s.is_empty() {
@@ -252,9 +257,9 @@ mod tests {
         let parser = make_parser();
         let request = parser.parse("title:hello").await.unwrap();
 
-        assert!(request.lexical.is_some());
-        assert!(request.vector.is_none());
-        assert!(request.fusion.is_none());
+        assert!(request.lexical_search_request.is_some());
+        assert!(request.vector_search_request.is_none());
+        assert!(request.fusion_algorithm.is_none());
     }
 
     #[tokio::test]
@@ -262,11 +267,11 @@ mod tests {
         let parser = make_parser();
         let request = parser.parse(r#"content:~"cats""#).await.unwrap();
 
-        assert!(request.lexical.is_none());
-        assert!(request.vector.is_some());
-        assert!(request.fusion.is_none());
+        assert!(request.lexical_search_request.is_none());
+        assert!(request.vector_search_request.is_some());
+        assert!(request.fusion_algorithm.is_none());
 
-        let vector = request.vector.unwrap();
+        let vector = request.vector_search_request.unwrap();
         assert_eq!(vector.query_vectors.len(), 1);
         assert_eq!(
             vector.query_vectors[0].fields.as_ref().unwrap()[0],
@@ -282,12 +287,12 @@ mod tests {
             .await
             .unwrap();
 
-        assert!(request.lexical.is_some());
-        assert!(request.vector.is_some());
-        assert!(request.fusion.is_some());
+        assert!(request.lexical_search_request.is_some());
+        assert!(request.vector_search_request.is_some());
+        assert!(request.fusion_algorithm.is_some());
 
         // Fusion defaults to RRF
-        if let Some(FusionAlgorithm::RRF { k }) = request.fusion {
+        if let Some(FusionAlgorithm::RRF { k }) = request.fusion_algorithm {
             assert!((k - 60.0).abs() < f64::EPSILON);
         } else {
             panic!("Expected RRF fusion");
@@ -299,7 +304,7 @@ mod tests {
         let parser = make_parser();
         let request = parser.parse(r#"content:~"text"^0.8"#).await.unwrap();
 
-        let vector = request.vector.unwrap();
+        let vector = request.vector_search_request.unwrap();
         assert!((vector.query_vectors[0].weight - 0.8).abs() < f32::EPSILON);
     }
 
@@ -308,8 +313,8 @@ mod tests {
         let parser = make_parser();
         let request = parser.parse(r#"a:~"x" b:~"y"^0.5"#).await.unwrap();
 
-        assert!(request.lexical.is_none());
-        let vector = request.vector.unwrap();
+        assert!(request.lexical_search_request.is_none());
+        let vector = request.vector_search_request.unwrap();
         assert_eq!(vector.query_vectors.len(), 2);
         assert_eq!(vector.query_vectors[0].fields.as_ref().unwrap()[0], "a");
         assert_eq!(vector.query_vectors[1].fields.as_ref().unwrap()[0], "b");
@@ -324,9 +329,9 @@ mod tests {
             .await
             .unwrap();
 
-        assert!(request.lexical.is_some());
-        assert!(request.vector.is_some());
-        assert!(request.fusion.is_some());
+        assert!(request.lexical_search_request.is_some());
+        assert!(request.vector_search_request.is_some());
+        assert!(request.fusion_algorithm.is_some());
     }
 
     #[tokio::test]
@@ -339,8 +344,8 @@ mod tests {
             .await
             .unwrap();
 
-        assert!(request.lexical.is_some());
-        assert!(request.vector.is_some());
+        assert!(request.lexical_search_request.is_some());
+        assert!(request.vector_search_request.is_some());
     }
 
     #[tokio::test]
@@ -349,10 +354,10 @@ mod tests {
         // Lexical uses default field "title", vector uses default field "content"
         let request = parser.parse(r#"hello ~"cats""#).await.unwrap();
 
-        assert!(request.lexical.is_some());
-        assert!(request.vector.is_some());
+        assert!(request.lexical_search_request.is_some());
+        assert!(request.vector_search_request.is_some());
 
-        let vector = request.vector.unwrap();
+        let vector = request.vector_search_request.unwrap();
         assert_eq!(
             vector.query_vectors[0].fields.as_ref().unwrap()[0],
             "content"
@@ -372,12 +377,11 @@ mod tests {
         let lexical = QueryParser::new(analyzer).with_default_field("title");
         let embedder: Arc<dyn Embedder> = Arc::new(MockEmbedder);
         let vector = VectorQueryParser::new(embedder).with_default_field("content");
-        let parser = UnifiedQueryParser::new(lexical, vector).with_fusion(
-            FusionAlgorithm::WeightedSum {
+        let parser =
+            UnifiedQueryParser::new(lexical, vector).with_fusion(FusionAlgorithm::WeightedSum {
                 lexical_weight: 0.7,
                 vector_weight: 0.3,
-            },
-        );
+            });
 
         let request = parser
             .parse(r#"title:hello content:~"cats""#)
@@ -387,7 +391,7 @@ mod tests {
         if let Some(FusionAlgorithm::WeightedSum {
             lexical_weight,
             vector_weight,
-        }) = request.fusion
+        }) = request.fusion_algorithm
         {
             assert!((lexical_weight - 0.7).abs() < f32::EPSILON);
             assert!((vector_weight - 0.3).abs() < f32::EPSILON);
@@ -399,12 +403,9 @@ mod tests {
     #[tokio::test]
     async fn test_unicode_vector_text() {
         let parser = make_parser();
-        let request = parser
-            .parse(r#"content:~"日本語テスト""#)
-            .await
-            .unwrap();
+        let request = parser.parse(r#"content:~"日本語テスト""#).await.unwrap();
 
-        let vector = request.vector.unwrap();
+        let vector = request.vector_search_request.unwrap();
         assert_eq!(vector.query_vectors.len(), 1);
         assert_eq!(
             vector.query_vectors[0].fields.as_ref().unwrap()[0],
@@ -433,10 +434,7 @@ mod tests {
             clean_lexical_string("hello AND AND world"),
             "hello AND world"
         );
-        assert_eq!(
-            clean_lexical_string("hello OR OR world"),
-            "hello OR world"
-        );
+        assert_eq!(clean_lexical_string("hello OR OR world"), "hello OR world");
         assert_eq!(
             clean_lexical_string("hello AND OR world"),
             "hello AND world"

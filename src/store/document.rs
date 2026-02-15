@@ -75,7 +75,12 @@ impl DocumentSegmentWriter {
         // [u32: doc_count]
         // [u64: doc_id][bytes: json_data] * doc_count
 
-        writer.write_u32(doc_count as u32)?;
+        let doc_count_u32: u32 = doc_count.try_into().map_err(|_| {
+            IrisError::InvalidOperation(format!(
+                "document count {doc_count} exceeds u32::MAX"
+            ))
+        })?;
+        writer.write_u32(doc_count_u32)?;
         for id in sorted_ids {
             let doc = docs.get(&id).unwrap();
             let json = serde_json::to_vec(doc)

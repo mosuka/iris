@@ -42,6 +42,7 @@ pub use engine::EngineBuilder;
 pub use engine::schema::{FieldOption, Schema};
 pub use engine::query::UnifiedQueryParser;
 pub use engine::search::{FusionAlgorithm, SearchRequest, SearchRequestBuilder, SearchResult};
+pub use lexical::search::searcher::LexicalSearchRequest;
 pub use error::{IrisError, Result};
 pub use maintenance::deletion::DeletionConfig;
 pub use parking_lot;

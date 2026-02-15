@@ -304,7 +304,7 @@ use iris::lexical::TermQuery;
 fn search(engine: &Engine) -> iris::Result<()> {
     let results = engine.search(
         SearchRequestBuilder::new()
-            .with_lexical(Box::new(TermQuery::new("content", "rust")))
+            .lexical_search_request(Box::new(TermQuery::new("content", "rust")))
             .limit(10)
             .build()
     )?;

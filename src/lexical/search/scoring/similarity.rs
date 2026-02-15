@@ -382,7 +382,12 @@ impl SimilaritySearchEngine {
             let df = self
                 .estimate_document_frequency(&term, reader)
                 .unwrap_or(1.0);
-            let idf = (total_doc_count / df).ln() + 1.0;
+            // Guard against total_doc_count=0 which would produce ln(0)=-inf
+            let idf = if total_doc_count > 0.0 {
+                (total_doc_count / df).ln() + 1.0
+            } else {
+                1.0
+            };
 
             // TF-IDF weight
             let tfidf_weight = tf_normalized * idf;
@@ -638,6 +643,11 @@ impl SimilaritySearchEngine {
         let doc_len1 = vector1.features.values().sum::<f32>();
         let doc_len2 = vector2.features.values().sum::<f32>();
         let avg_doc_len = (doc_len1 + doc_len2) / 2.0;
+
+        // Guard against zero average document length (both vectors empty)
+        if avg_doc_len == 0.0 {
+            return Ok(0.0);
+        }
 
         for (term, &tf1) in &vector1.features {
             if let Some(&tf2) = vector2.features.get(term) {

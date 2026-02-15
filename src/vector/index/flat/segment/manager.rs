@@ -5,7 +5,9 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
+
+use parking_lot::RwLock;
 
 use crate::error::Result;
 
@@ -167,33 +169,33 @@ impl SegmentManager {
 
     /// Add a new segment.
     pub fn add_segment(&self, info: ManagedSegmentInfo) -> Result<()> {
-        let mut segments = self.segments.write().unwrap();
+        let mut segments = self.segments.write();
         segments.insert(info.segment_id.clone(), info);
         Ok(())
     }
 
     /// Remove a segment.
     pub fn remove_segment(&self, segment_id: &str) -> Result<()> {
-        let mut segments = self.segments.write().unwrap();
+        let mut segments = self.segments.write();
         segments.remove(segment_id);
         Ok(())
     }
 
     /// Get segment information.
     pub fn get_segment(&self, segment_id: &str) -> Option<ManagedSegmentInfo> {
-        let segments = self.segments.read().unwrap();
+        let segments = self.segments.read();
         segments.get(segment_id).cloned()
     }
 
     /// List all segments.
     pub fn list_segments(&self) -> Vec<ManagedSegmentInfo> {
-        let segments = self.segments.read().unwrap();
+        let segments = self.segments.read();
         segments.values().cloned().collect()
     }
 
     /// Generate a new segment ID.
     pub fn generate_segment_id(&self) -> String {
-        let mut next_id = self.next_segment_id.write().unwrap();
+        let mut next_id = self.next_segment_id.write();
         let id = *next_id;
         *next_id += 1;
         format!("segment_{:06}", id)
@@ -201,13 +203,13 @@ impl SegmentManager {
 
     /// Check if merging is needed.
     pub fn needs_merge(&self) -> bool {
-        let segments = self.segments.read().unwrap();
+        let segments = self.segments.read();
         segments.len() as u32 > self.config.max_segments
     }
 
     /// Create a merge plan.
     pub fn create_merge_plan(&self, strategy: MergeStrategy) -> Option<MergePlan> {
-        let segments = self.segments.read().unwrap();
+        let segments = self.segments.read();
 
         if segments.len() <= 1 {
             return None;
@@ -256,7 +258,7 @@ impl SegmentManager {
 
     /// Get statistics.
     pub fn stats(&self) -> SegmentManagerStats {
-        let segments = self.segments.read().unwrap();
+        let segments = self.segments.read();
         let segment_count = segments.len() as u32;
         let total_vectors: u64 = segments.values().map(|s| s.vector_count).sum();
         let total_size: u64 = segments.values().map(|s| s.size_bytes).sum();

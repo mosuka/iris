@@ -27,8 +27,8 @@ use iris::lexical::{NumericRangeQuery, QueryParser, TermQuery, TextOption};
 use iris::vector::{FlatOption, VectorQueryParser, VectorSearchRequestBuilder};
 #[cfg(feature = "embeddings-openai")]
 use iris::{
-    Document, Engine, FusionAlgorithm, OpenAIEmbedder, PerFieldEmbedder, Result, Schema,
-    SearchRequestBuilder, UnifiedQueryParser,
+    Document, Engine, FusionAlgorithm, LexicalSearchRequest, OpenAIEmbedder, PerFieldEmbedder,
+    Result, Schema, SearchRequestBuilder, UnifiedQueryParser,
 };
 #[cfg(feature = "embeddings-openai")]
 use serde_json::json;
@@ -141,7 +141,7 @@ async fn main() -> Result<()> {
     let results = engine
         .search(
             SearchRequestBuilder::new()
-                .with_vector(
+                .vector_search_request(
                     VectorSearchRequestBuilder::new()
                         .add_text("text_vec", "memory safety")
                         .build(),
@@ -157,12 +157,12 @@ async fn main() -> Result<()> {
     let results = engine
         .search(
             SearchRequestBuilder::new()
-                .with_vector(
+                .vector_search_request(
                     VectorSearchRequestBuilder::new()
                         .add_text("text_vec", "memory safety")
                         .build(),
                 )
-                .filter(Box::new(TermQuery::new("category", "concurrency")))
+                .filter_query(Box::new(TermQuery::new("category", "concurrency")))
                 .limit(3)
                 .build(),
         )
@@ -174,12 +174,12 @@ async fn main() -> Result<()> {
     let results = engine
         .search(
             SearchRequestBuilder::new()
-                .with_vector(
+                .vector_search_request(
                     VectorSearchRequestBuilder::new()
                         .add_text("text_vec", "type system")
                         .build(),
                 )
-                .filter(Box::new(NumericRangeQuery::new(
+                .filter_query(Box::new(NumericRangeQuery::new(
                     "page",
                     NumericType::Integer,
                     Some(1.0),
@@ -198,7 +198,10 @@ async fn main() -> Result<()> {
     let results = engine
         .search(
             SearchRequestBuilder::new()
-                .with_lexical(Box::new(TermQuery::new("text", "ownership")))
+                .lexical_search_request(LexicalSearchRequest::new(Box::new(TermQuery::new(
+                    "text",
+                    "ownership",
+                ))))
                 .limit(3)
                 .build(),
         )
@@ -210,13 +213,15 @@ async fn main() -> Result<()> {
     let results = engine
         .search(
             SearchRequestBuilder::new()
-                .with_vector(
+                .vector_search_request(
                     VectorSearchRequestBuilder::new()
                         .add_text("text_vec", "concurrent")
                         .build(),
                 )
-                .with_lexical(Box::new(TermQuery::new("text", "async")))
-                .fusion(FusionAlgorithm::RRF { k: 60.0 })
+                .lexical_search_request(LexicalSearchRequest::new(Box::new(TermQuery::new(
+                    "text", "async",
+                ))))
+                .fusion_algorithm(FusionAlgorithm::RRF { k: 60.0 })
                 .limit(3)
                 .build(),
         )
@@ -241,7 +246,7 @@ async fn main() -> Result<()> {
     let results = engine
         .search(
             SearchRequestBuilder::new()
-                .with_vector(vector_parser.parse("text_vec:~\"memory safety\"").await?)
+                .vector_search_request(vector_parser.parse("text_vec:~\"memory safety\"").await?)
                 .limit(3)
                 .build(),
         )
@@ -266,9 +271,7 @@ async fn main() -> Result<()> {
 
     // Case I: Vector-only via DSL
     println!("\n[I] Vector DSL: text_vec:~\"type system\"");
-    let mut request = unified_parser
-        .parse("text_vec:~\"type system\"")
-        .await?;
+    let mut request = unified_parser.parse("text_vec:~\"type system\"").await?;
     request.limit = 3;
     let results = engine.search(request).await?;
     common::print_search_results(&results);
@@ -281,8 +284,6 @@ async fn main() -> Result<()> {
 #[cfg(not(feature = "embeddings-openai"))]
 fn main() {
     eprintln!("This example requires the 'embeddings-openai' feature.");
-    eprintln!(
-        "Run with: cargo run --example search_with_openai --features embeddings-openai"
-    );
+    eprintln!("Run with: cargo run --example search_with_openai --features embeddings-openai");
     std::process::exit(1);
 }

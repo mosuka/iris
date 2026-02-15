@@ -20,8 +20,8 @@ use iris::lexical::core::field::IntegerOption;
 use iris::lexical::{QueryParser, TermQuery, TextOption};
 use iris::vector::{FlatOption, VectorQueryParser, VectorSearchRequestBuilder};
 use iris::{
-    Document, Engine, FusionAlgorithm, PerFieldEmbedder, Result, Schema, SearchRequestBuilder,
-    UnifiedQueryParser,
+    Document, Engine, FusionAlgorithm, LexicalSearchRequest, PerFieldEmbedder, Result, Schema,
+    SearchRequestBuilder, UnifiedQueryParser,
 };
 use serde_json::json;
 
@@ -118,7 +118,7 @@ async fn main() -> Result<()> {
     let results = engine
         .search(
             SearchRequestBuilder::new()
-                .with_lexical(Box::new(TermQuery::new("text", "ownership")))
+                .lexical_search_request(LexicalSearchRequest::new(Box::new(TermQuery::new("text", "ownership"))))
                 .limit(3)
                 .build(),
         )
@@ -134,7 +134,7 @@ async fn main() -> Result<()> {
     let results = engine
         .search(
             SearchRequestBuilder::new()
-                .with_vector(
+                .vector_search_request(
                     VectorSearchRequestBuilder::new()
                         .add_text("text_vec", "memory safety")
                         .build(),
@@ -154,13 +154,13 @@ async fn main() -> Result<()> {
     let results = engine
         .search(
             SearchRequestBuilder::new()
-                .with_vector(
+                .vector_search_request(
                     VectorSearchRequestBuilder::new()
                         .add_text("text_vec", "concurrent")
                         .build(),
                 )
-                .with_lexical(Box::new(TermQuery::new("text", "async")))
-                .fusion(FusionAlgorithm::RRF { k: 60.0 })
+                .lexical_search_request(LexicalSearchRequest::new(Box::new(TermQuery::new("text", "async"))))
+                .fusion_algorithm(FusionAlgorithm::RRF { k: 60.0 })
                 .limit(3)
                 .build(),
         )
@@ -195,14 +195,14 @@ async fn main() -> Result<()> {
     let results = engine
         .search(
             SearchRequestBuilder::new()
-                .with_vector(
+                .vector_search_request(
                     VectorSearchRequestBuilder::new()
                         .add_text("text_vec", "type system")
                         .build(),
                 )
-                .with_lexical(Box::new(TermQuery::new("text", "trait")))
-                .filter(Box::new(TermQuery::new("category", "type-system")))
-                .fusion(FusionAlgorithm::RRF { k: 60.0 })
+                .lexical_search_request(LexicalSearchRequest::new(Box::new(TermQuery::new("text", "trait"))))
+                .filter_query(Box::new(TermQuery::new("category", "type-system")))
+                .fusion_algorithm(FusionAlgorithm::RRF { k: 60.0 })
                 .limit(3)
                 .build(),
         )

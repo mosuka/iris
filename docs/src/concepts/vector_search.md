@@ -353,7 +353,7 @@ use iris::vector::VectorSearchRequestBuilder;
 fn search(engine: &Engine) -> iris::Result<()> {
     let results = engine.search(
         SearchRequestBuilder::new()
-            .with_vector(
+            .vector_search_request(
                 VectorSearchRequestBuilder::new()
                     .add_text("embedding", "semantic search")
                     .build()
@@ -383,13 +383,13 @@ fn hybrid_search(engine: &Engine) -> iris::Result<()> {
     let results = engine.search(
         SearchRequestBuilder::new()
             // Vector search (semantic) on vector field
-            .with_vector(
+            .vector_search_request(
                 VectorSearchRequestBuilder::new()
                     .add_text("content_vec", "fast semantic search")
                     .build()
             )
             // Lexical search (keyword) on lexical field
-            .with_lexical(Box::new(TermQuery::new("content", "rust")))
+            .lexical_search_request(Box::new(TermQuery::new("content", "rust")))
             // Fusion strategy
             .fusion(FusionAlgorithm::RRF { k: 60.0 })
             .limit(10)
@@ -412,12 +412,12 @@ Example using weighted sum fusion for fine-grained control.
 fn weighted_hybrid_search(engine: &Engine) -> iris::Result<()> {
     let results = engine.search(
         SearchRequestBuilder::new()
-            .with_vector(
+            .vector_search_request(
                 VectorSearchRequestBuilder::new()
                     .add_text("content_vec", "machine learning")
                     .build()
             )
-            .with_lexical(Box::new(TermQuery::new("content", "python")))
+            .lexical_search_request(Box::new(TermQuery::new("content", "python")))
             .fusion(FusionAlgorithm::WeightedSum {
                 vector_weight: 0.7,  // 70% semantic
                 lexical_weight: 0.3, // 30% keyword

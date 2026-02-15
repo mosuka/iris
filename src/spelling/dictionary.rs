@@ -37,8 +37,8 @@ impl SpellingDictionary {
         self.words.insert(normalized.clone(), frequency);
         self.word_set.insert(normalized);
 
-        // Update total count
-        self.total_count = self.total_count - old_freq as u64 + frequency as u64;
+        // Update total count (saturating_sub prevents underflow on data inconsistency)
+        self.total_count = self.total_count.saturating_sub(old_freq as u64) + frequency as u64;
     }
 
     /// Increment the frequency of a word by 1.

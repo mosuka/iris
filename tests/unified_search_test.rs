@@ -10,7 +10,7 @@ use iris::storage::{StorageConfig, StorageFactory};
 use iris::vector::FieldOption as VectorOption;
 use iris::vector::VectorSearchRequestBuilder;
 use iris::{DataValue, Document};
-use iris::{FieldOption, Schema};
+use iris::{FieldOption, LexicalSearchRequest, Schema};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_unified_search_hybrid() -> iris::Result<()> {
@@ -49,7 +49,7 @@ async fn test_unified_search_hybrid() -> iris::Result<()> {
     // 4. Test Lexical Search (should find "doc1")
     let lexical_query = Box::new(TermQuery::new("title", "rust")) as Box<dyn Query>;
     let req = SearchRequestBuilder::new()
-        .with_lexical(lexical_query)
+        .lexical_search_request(LexicalSearchRequest::new(lexical_query))
         .build();
 
     let results = engine.search(req).await?;
@@ -69,7 +69,9 @@ async fn test_unified_search_hybrid() -> iris::Result<()> {
         .add_vector("embedding", vec![0.0, 1.0, 0.0])
         .build();
 
-    let req = SearchRequestBuilder::new().with_vector(vector_req).build();
+    let req = SearchRequestBuilder::new()
+        .vector_search_request(vector_req)
+        .build();
 
     let results = engine.search(req).await?;
     println!("Vector Results: {:?}", results);
@@ -102,32 +104,38 @@ async fn test_unified_search_hybrid_fusion() -> iris::Result<()> {
     // Index documents where Lexical and Vector favorites differ
     // Doc 1: "Rust" in title, Vector [1, 0, 0]
     // Doc 2: "C++" in title, Vector [0, 1, 0]
-    engine.put_document(
-        "1",
-        Document::builder()
-            .add_field("title", "Rust")
-            .add_field("embedding", vec![1.0, 0.0, 0.0])
-            .build(),
-    ).await?;
-    engine.put_document(
-        "2",
-        Document::builder()
-            .add_field("title", "C++")
-            .add_field("embedding", vec![0.0, 1.0, 0.0])
-            .build(),
-    ).await?;
+    engine
+        .put_document(
+            "1",
+            Document::builder()
+                .add_field("title", "Rust")
+                .add_field("embedding", vec![1.0, 0.0, 0.0])
+                .build(),
+        )
+        .await?;
+    engine
+        .put_document(
+            "2",
+            Document::builder()
+                .add_field("title", "C++")
+                .add_field("embedding", vec![0.0, 1.0, 0.0])
+                .build(),
+        )
+        .await?;
     engine.commit().await?;
 
     // Search for "Rust" (Lexical) AND [0, 1, 0] (Vector - matches Doc 2)
     use iris::FusionAlgorithm;
     let req = SearchRequestBuilder::new()
-        .with_lexical(Box::new(TermQuery::new("title", "rust")))
-        .with_vector(
+        .lexical_search_request(LexicalSearchRequest::new(Box::new(TermQuery::new(
+            "title", "rust",
+        ))))
+        .vector_search_request(
             VectorSearchRequestBuilder::new()
                 .add_vector("embedding", vec![0.0, 1.0, 0.0])
                 .build(),
         )
-        .fusion(FusionAlgorithm::RRF { k: 60.0 })
+        .fusion_algorithm(FusionAlgorithm::RRF { k: 60.0 })
         .build();
 
     let results = engine.search(req).await?;

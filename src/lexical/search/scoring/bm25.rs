@@ -145,14 +145,25 @@ impl ScoringFunction for BM25ScoringFunction {
                 .document_frequencies
                 .get(term)
                 .unwrap_or(&1) as f32;
-            let idf = ((collection_stats.total_docs as f32 - df + 0.5) / (df + 0.5)).ln();
+            let idf_ratio = (collection_stats.total_docs as f32 - df + 0.5) / (df + 0.5);
+            // Guard against non-positive ratio (total_docs=0 or df > total_docs)
+            if idf_ratio <= 0.0 {
+                continue;
+            }
+            let idf = idf_ratio.ln();
 
             // BM25 formula
             let doc_len = doc_stats.doc_length as f32;
             let avg_len = collection_stats.avg_doc_length as f32;
 
+            // Guard against zero average document length
+            let len_ratio = if avg_len > 0.0 {
+                doc_len / avg_len
+            } else {
+                1.0
+            };
             let tf_component = (tf * (config.k1 + 1.0))
-                / (tf + config.k1 * (1.0 - config.b + config.b * (doc_len / avg_len)));
+                / (tf + config.k1 * (1.0 - config.b + config.b * len_ratio));
 
             total_score += idf * tf_component;
         }
@@ -198,13 +209,23 @@ impl ScoringFunction for TfIdfScoringFunction {
                 .document_frequencies
                 .get(term)
                 .unwrap_or(&1) as f32;
-            let idf = (collection_stats.total_docs as f32 / df).ln();
+            let total_docs = collection_stats.total_docs as f32;
+            // Guard against total_docs=0 which would produce ln(0)=-inf
+            if total_docs == 0.0 {
+                continue;
+            }
+            let idf = (total_docs / df).ln();
 
             // Apply field length normalization if enabled
             let norm_factor = if config.enable_field_norm {
                 let doc_len = doc_stats.doc_length as f32;
                 let avg_len = collection_stats.avg_doc_length as f32;
-                (avg_len / doc_len).sqrt()
+                // Guard against zero document length
+                if doc_len > 0.0 {
+                    (avg_len / doc_len).sqrt()
+                } else {
+                    1.0
+                }
             } else {
                 1.0
             };
@@ -249,7 +270,13 @@ impl ScoringFunction for VectorSpaceScoringFunction {
                 .document_frequencies
                 .get(term)
                 .unwrap_or(&1) as f32;
-            let idf = (collection_stats.total_docs as f32 / df).ln();
+            let total_docs = collection_stats.total_docs as f32;
+            // Guard against total_docs=0 which would produce ln(0)=-inf
+            let idf = if total_docs > 0.0 {
+                (total_docs / df).ln()
+            } else {
+                0.0
+            };
 
             doc_vector.push(tf * idf);
         }
@@ -448,24 +475,18 @@ impl AdvancedScorer {
             return Ok(base_score);
         }
 
-        let mut boost_factor = 1.0;
-        let mut total_weight = 0.0;
+        let mut max_boost = 1.0f32;
 
         for (field, boost) in &self.config.field_boosts {
             if let Some(field_term_freqs) = doc_stats.field_term_frequencies.get(field) {
                 let field_score: u64 = field_term_freqs.values().sum();
                 if field_score > 0 {
-                    boost_factor += boost;
-                    total_weight += boost;
+                    max_boost = max_boost.max(*boost);
                 }
             }
         }
 
-        if total_weight > 0.0 {
-            boost_factor /= total_weight;
-        }
-
-        Ok(base_score * boost_factor)
+        Ok(base_score * max_boost)
     }
 
     /// Apply coordination factor (ratio of matched terms to total query terms).

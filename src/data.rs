@@ -35,9 +35,10 @@ impl<D: rkyv::rancor::Fallible + ?Sized>
         archived: &rkyv::Archived<i64>,
         _deserializer: &mut D,
     ) -> Result<DateTime<Utc>, D::Error> {
-        use chrono::TimeZone;
         let ts: i64 = (*archived).into();
-        Ok(chrono::Utc.timestamp_micros(ts).single().unwrap())
+        // DateTime::from_timestamp_micros returns None only for out-of-range values.
+        // Fall back to UNIX epoch for corrupted timestamps to avoid panics.
+        Ok(DateTime::from_timestamp_micros(ts).unwrap_or_default())
     }
 }
 
@@ -117,7 +118,7 @@ impl DataValue {
     }
 
     /// Returns the vector data if this is a Vector variant.
-    pub fn as_vector_ref(&self) -> Option<&Vec<f32>> {
+    pub fn as_vector(&self) -> Option<&Vec<f32>> {
         match self {
             DataValue::Vector(v) => Some(v),
             _ => None,
@@ -125,7 +126,7 @@ impl DataValue {
     }
 
     /// Returns the bytes data if this is a Bytes variant.
-    pub fn as_bytes_ref(&self) -> Option<&[u8]> {
+    pub fn as_bytes(&self) -> Option<&[u8]> {
         match self {
             DataValue::Bytes(b, _) => Some(b),
             _ => None,

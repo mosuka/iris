@@ -18,7 +18,9 @@ pub mod segmented_field;
 pub mod storage;
 pub mod wal;
 
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
+
+use parking_lot::RwLock;
 
 use crate::embedding::embedder::Embedder;
 use crate::error::{IrisError, Result};
@@ -211,29 +213,29 @@ impl ManagedVectorIndex {
 
     /// Add vectors to the index.
     pub fn add_vectors(&mut self, vectors: Vec<(u64, String, Vector)>) -> Result<()> {
-        let finalized = *self.is_finalized.read().unwrap();
+        let finalized = *self.is_finalized.read();
         if finalized {
             return Err(IrisError::InvalidOperation(
                 "Cannot add vectors to finalized index".to_string(),
             ));
         }
 
-        let mut builder = self.builder.write().unwrap();
+        let mut builder = self.builder.write();
         builder.add_vectors(vectors)?;
         Ok(())
     }
 
     /// Finalize the index construction.
     pub fn finalize(&mut self) -> Result<()> {
-        let mut builder = self.builder.write().unwrap();
+        let mut builder = self.builder.write();
         builder.finalize()?;
-        *self.is_finalized.write().unwrap() = true;
+        *self.is_finalized.write() = true;
         Ok(())
     }
 
     /// Delete a document by its ID.
     pub fn delete_document(&self, doc_id: u64) -> Result<()> {
-        let mut builder = self.builder.write().unwrap();
+        let mut builder = self.builder.write();
         builder.delete_document(doc_id)
     }
 
@@ -244,46 +246,46 @@ impl ManagedVectorIndex {
 
     /// Get build progress (0.0 to 1.0).
     pub fn progress(&self) -> f32 {
-        let builder = self.builder.read().unwrap();
+        let builder = self.builder.read();
         builder.progress()
     }
 
     /// Get estimated memory usage.
     pub fn estimated_memory_usage(&self) -> usize {
-        let builder = self.builder.read().unwrap();
+        let builder = self.builder.read();
         builder.estimated_memory_usage()
     }
 
     /// Check if the index is finalized.
     pub fn is_finalized(&self) -> bool {
-        *self.is_finalized.read().unwrap()
+        *self.is_finalized.read()
     }
 
     /// Get vectors from this index.
     /// Returns a copy of all vectors stored in the index.
     pub fn vectors(&self) -> Result<Vec<(u64, String, Vector)>> {
-        let finalized = *self.is_finalized.read().unwrap();
+        let finalized = *self.is_finalized.read();
         if !finalized {
             return Err(IrisError::InvalidOperation(
                 "Index must be finalized before accessing vectors".to_string(),
             ));
         }
 
-        let builder = self.builder.read().unwrap();
+        let builder = self.builder.read();
         Ok(builder.vectors().to_vec())
     }
 
     /// Write the index to storage.
     /// The index must be finalized before calling this method.
     pub fn write(&self) -> Result<()> {
-        let finalized = *self.is_finalized.read().unwrap();
+        let finalized = *self.is_finalized.read();
         if !finalized {
             return Err(IrisError::InvalidOperation(
                 "Index must be finalized before writing".to_string(),
             ));
         }
 
-        let builder = self.builder.read().unwrap();
+        let builder = self.builder.read();
         if !builder.has_storage() {
             return Err(IrisError::InvalidOperation(
                 "Index was not created with storage support".to_string(),
@@ -302,7 +304,7 @@ impl ManagedVectorIndex {
     /// Create a reader for this index.
     /// Returns a boxed VectorIndexReader that can be used for searching.
     pub fn reader(&self) -> Result<Arc<dyn crate::vector::reader::VectorIndexReader>> {
-        let finalized = *self.is_finalized.read().unwrap();
+        let finalized = *self.is_finalized.read();
         if !finalized {
             return Err(IrisError::InvalidOperation(
                 "Index must be finalized before creating a reader".to_string(),
@@ -311,7 +313,7 @@ impl ManagedVectorIndex {
 
         // If storage is available, load from storage
         if let Some(storage) = &self.storage {
-            let path_guard = self.index_path.read().unwrap();
+            let path_guard = self.index_path.read();
             if let Some(path) = &*path_guard {
                 return match &self.config {
                     VectorIndexTypeConfig::Flat(c) => Ok(Arc::new(FlatVectorIndexReader::load(

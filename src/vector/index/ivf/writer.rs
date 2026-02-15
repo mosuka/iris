@@ -345,13 +345,21 @@ impl IvfIndexWriter {
             // Select next centroid based on weighted probability
             let target = rng.random::<f32>() * total_weight;
             let mut cumsum = 0.0;
+            let mut selected = false;
 
             for (i, &weight) in distances.iter().enumerate() {
                 cumsum += weight;
                 if cumsum >= target {
                     self.centroids.push(self.vectors[i].2.clone());
+                    selected = true;
                     break;
                 }
+            }
+
+            // Fallback: floating-point precision may prevent cumsum from reaching target
+            if !selected {
+                self.centroids
+                    .push(self.vectors[self.vectors.len() - 1].2.clone());
             }
         }
 
@@ -774,6 +782,9 @@ impl IvfIndexWriter {
     /// Calculate the mean vector for a list of vectors.
     fn calculate_mean_vector(&self, list: &[(u64, String, Vector)]) -> Vector {
         let dim = self.index_config.dimension;
+        if list.is_empty() {
+            return Vector::new(vec![0.0; dim]);
+        }
         let mut sum = vec![0.0; dim];
         for (_, _, vec) in list {
             for (j, &val) in vec.data.iter().enumerate() {
@@ -925,7 +936,13 @@ impl VectorIndexWriter for IvfIndexWriter {
         let mut output = storage.create_output(&file_name)?;
 
         // Write metadata
-        output.write_all(&(self.vectors.len() as u64 as u32).to_le_bytes())?;
+        let vector_count: u32 = self.vectors.len().try_into().map_err(|_| {
+            IrisError::InvalidOperation(format!(
+                "Vector count {} exceeds u32::MAX",
+                self.vectors.len()
+            ))
+        })?;
+        output.write_all(&vector_count.to_le_bytes())?;
         output.write_all(&(self.index_config.dimension as u32).to_le_bytes())?;
         output.write_all(&(self.index_config.n_clusters as u32).to_le_bytes())?;
         output.write_all(&(self.index_config.n_probe as u32).to_le_bytes())?;

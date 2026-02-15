@@ -13,7 +13,7 @@ use iris::vector::{QueryVector, VectorSearchRequest};
 use iris::{DataValue, Document};
 use iris::{EmbedInput, EmbedInputType, Embedder};
 use iris::{FieldOption, Schema};
-use iris::{FusionAlgorithm, SearchRequestBuilder};
+use iris::{FusionAlgorithm, LexicalSearchRequest, SearchRequestBuilder};
 
 #[derive(Debug, Clone)]
 struct MockEmbedder {
@@ -132,7 +132,7 @@ async fn test_hybrid_search_unification() -> std::result::Result<(), Box<dyn std
 
     // Test 1: Vector Search (query closest to apple [0.9, 0.1, 0.0])
     let req_vector = SearchRequestBuilder::new()
-        .with_vector(VectorSearchRequest {
+        .vector_search_request(VectorSearchRequest {
             query_vectors: vec![QueryVector {
                 vector: vec![0.9, 0.1, 0.0],
                 weight: 1.0,
@@ -150,7 +150,7 @@ async fn test_hybrid_search_unification() -> std::result::Result<(), Box<dyn std
 
     // Test 2: Lexical Search ("banana")
     let req_lexical = SearchRequestBuilder::new()
-        .with_lexical(Box::new(TermQuery::new("title", "banana")))
+        .lexical_search_request(LexicalSearchRequest::new(Box::new(TermQuery::new("title", "banana"))))
         .limit(10)
         .build();
 
@@ -163,7 +163,7 @@ async fn test_hybrid_search_unification() -> std::result::Result<(), Box<dyn std
 
     // Test 3: Hybrid Search (RRF)
     let req_hybrid = SearchRequestBuilder::new()
-        .with_vector(VectorSearchRequest {
+        .vector_search_request(VectorSearchRequest {
             query_vectors: vec![QueryVector {
                 vector: vec![0.0, 1.0, 0.0],
                 weight: 1.0,
@@ -172,8 +172,8 @@ async fn test_hybrid_search_unification() -> std::result::Result<(), Box<dyn std
             limit: 10,
             ..Default::default()
         })
-        .with_lexical(Box::new(TermQuery::new("title", "banana")))
-        .fusion(FusionAlgorithm::RRF { k: 60.0 })
+        .lexical_search_request(LexicalSearchRequest::new(Box::new(TermQuery::new("title", "banana"))))
+        .fusion_algorithm(FusionAlgorithm::RRF { k: 60.0 })
         .limit(10)
         .build();
 

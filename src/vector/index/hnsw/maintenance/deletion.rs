@@ -4,7 +4,9 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
+
+use parking_lot::RwLock;
 
 use crate::error::Result;
 
@@ -29,10 +31,10 @@ impl DeletionManager {
 
     /// Mark a vector as deleted.
     pub fn delete(&self, vector_id: u64) -> Result<bool> {
-        let mut deleted_ids = self.deleted_ids.write().unwrap();
+        let mut deleted_ids = self.deleted_ids.write();
         let inserted = deleted_ids.insert(vector_id);
         if inserted {
-            let mut count = self.deletion_count.write().unwrap();
+            let mut count = self.deletion_count.write();
             *count += 1;
         }
         Ok(inserted)
@@ -40,8 +42,8 @@ impl DeletionManager {
 
     /// Mark multiple vectors as deleted.
     pub fn delete_batch(&self, vector_ids: &[u64]) -> Result<u64> {
-        let mut deleted_ids = self.deleted_ids.write().unwrap();
-        let mut count = self.deletion_count.write().unwrap();
+        let mut deleted_ids = self.deleted_ids.write();
+        let mut count = self.deletion_count.write();
         let mut deleted_count = 0;
 
         for &vector_id in vector_ids {
@@ -56,25 +58,25 @@ impl DeletionManager {
 
     /// Check if a vector is deleted.
     pub fn is_deleted(&self, vector_id: u64) -> bool {
-        let deleted_ids = self.deleted_ids.read().unwrap();
+        let deleted_ids = self.deleted_ids.read();
         deleted_ids.contains(&vector_id)
     }
 
     /// Get total number of deletions.
     pub fn deletion_count(&self) -> u64 {
-        *self.deletion_count.read().unwrap()
+        *self.deletion_count.read()
     }
 
     /// Get all deleted vector IDs.
     pub fn deleted_ids(&self) -> Vec<u64> {
-        let deleted_ids = self.deleted_ids.read().unwrap();
+        let deleted_ids = self.deleted_ids.read();
         deleted_ids.iter().copied().collect()
     }
 
     /// Clear all deletions.
     pub fn clear(&self) -> Result<()> {
-        let mut deleted_ids = self.deleted_ids.write().unwrap();
-        let mut count = self.deletion_count.write().unwrap();
+        let mut deleted_ids = self.deleted_ids.write();
+        let mut count = self.deletion_count.write();
         deleted_ids.clear();
         *count = 0;
         Ok(())
@@ -82,10 +84,10 @@ impl DeletionManager {
 
     /// Remove a vector ID from the deletion set (e.g., after compaction).
     pub fn undelete(&self, vector_id: u64) -> Result<bool> {
-        let mut deleted_ids = self.deleted_ids.write().unwrap();
+        let mut deleted_ids = self.deleted_ids.write();
         let removed = deleted_ids.remove(&vector_id);
         if removed {
-            let mut count = self.deletion_count.write().unwrap();
+            let mut count = self.deletion_count.write();
             *count = count.saturating_sub(1);
         }
         Ok(removed)

@@ -10,7 +10,9 @@ pub mod writer;
 
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
+
+use parking_lot::RwLock;
 
 use crate::embedding::embedder::Embedder;
 use crate::error::{IrisError, Result};
@@ -77,7 +79,7 @@ impl std::fmt::Debug for HnswIndex {
             .field("storage", &self.storage)
             .field("config", &self.config)
             .field("closed", &self.closed.load(Ordering::SeqCst))
-            .field("metadata", &*self.metadata.read().unwrap())
+            .field("metadata", &*self.metadata.read())
             .finish()
     }
 }
@@ -152,10 +154,7 @@ impl HnswIndex {
 
     /// Write metadata to storage.
     fn write_metadata(&self) -> Result<()> {
-        let metadata = self
-            .metadata
-            .read()
-            .map_err(|_| IrisError::index("Failed to acquire metadata read lock"))?;
+        let metadata = self.metadata.read();
         let metadata_json = serde_json::to_string_pretty(&*metadata)
             .map_err(|e| IrisError::index(format!("Failed to serialize metadata: {e}")))?;
         drop(metadata);
@@ -180,10 +179,7 @@ impl HnswIndex {
     /// Update metadata.
     fn update_metadata(&self) -> Result<()> {
         {
-            let mut metadata = self
-                .metadata
-                .write()
-                .map_err(|_| IrisError::index("Failed to acquire metadata write lock"))?;
+            let mut metadata = self.metadata.write();
             metadata.modified = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
@@ -249,10 +245,7 @@ impl VectorIndex for HnswIndex {
     fn stats(&self) -> Result<VectorIndexStats> {
         self.check_closed()?;
 
-        let metadata = self
-            .metadata
-            .read()
-            .map_err(|_| IrisError::index("Failed to acquire metadata read lock"))?;
+        let metadata = self.metadata.read();
         Ok(VectorIndexStats {
             vector_count: metadata.vector_count,
             dimension: metadata.dimension,

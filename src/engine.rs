@@ -87,8 +87,7 @@ impl Engine {
                     // Re-index into both stores using the recorded doc_id.
                     // Update seq only after BOTH stores succeed to maintain atomicity.
                     if record.seq > lexical_last_seq {
-                        self.lexical
-                            .upsert_document(doc_id, document.clone())?;
+                        self.lexical.upsert_document(doc_id, document.clone())?;
                     }
 
                     if record.seq > vector_last_seq {
@@ -122,13 +121,10 @@ impl Engine {
                     external_id: _,
                 } => {
                     if record.seq > lexical_last_seq {
-                        self.lexical
-                            .delete_document_by_internal_id(doc_id)?;
+                        self.lexical.delete_document_by_internal_id(doc_id)?;
                     }
                     if record.seq > vector_last_seq {
-                        self.vector
-                            .delete_document_by_internal_id(doc_id)
-                            .await?;
+                        self.vector.delete_document_by_internal_id(doc_id).await?;
                     }
 
                     // Both stores succeeded — now update seq trackers
@@ -194,9 +190,15 @@ impl Engine {
 
         // 5. Index into Lexical and Vector stores
         self.lexical.upsert_document(doc_id, doc)?;
-        self.vector
+        if let Err(e) = self
+            .vector
             .upsert_document_by_internal_id(doc_id, vector_doc)
-            .await?;
+            .await
+        {
+            // Rollback lexical insert to maintain consistency
+            let _ = self.lexical.delete_document_by_internal_id(doc_id);
+            return Err(e);
+        }
 
         // 6. Update sub-stores sequence tracker AFTER both stores succeed.
         // This ensures failed index operations are retried on recovery.
@@ -212,13 +214,14 @@ impl Engine {
         for doc_id in doc_ids {
             // 1. Write to log
             let seq = self.log.append_delete(doc_id, id)?;
-            // 2. Update trackers
+            // 2. Delete from Lexical
+            self.lexical.delete_document_by_internal_id(doc_id)?;
+            // 3. Delete from Vector
+            self.vector.delete_document_by_internal_id(doc_id).await?;
+            // 4. Update trackers AFTER both deletes succeed.
+            // This ensures failed deletes are retried on recovery.
             self.lexical.set_last_wal_seq(seq)?;
             self.vector.set_last_wal_seq(seq);
-            // 3. Delete from Lexical
-            self.lexical.delete_document_by_internal_id(doc_id)?;
-            // 4. Delete from Vector
-            self.vector.delete_document_by_internal_id(doc_id).await?;
         }
         Ok(())
     }
@@ -326,7 +329,10 @@ impl Engine {
         embedder: Option<Arc<dyn Embedder>>,
     ) -> Result<(LexicalIndexConfig, VectorIndexConfig)> {
         // Construct Lexical Config
-        let analyzer = analyzer.unwrap_or_else(|| Arc::new(StandardAnalyzer::new().unwrap()));
+        let analyzer = match analyzer {
+            Some(a) => a,
+            None => Arc::new(StandardAnalyzer::new()?),
+        };
 
         // If the user passed a PerFieldAnalyzer, clone it and ensure _id uses KeywordAnalyzer.
         // Otherwise, wrap the simple analyzer in a new PerFieldAnalyzer.
@@ -377,55 +383,66 @@ impl Engine {
         request: self::search::SearchRequest,
     ) -> Result<Vec<self::search::SearchResult>> {
         // 0. Pre-process Filter
-        let (allowed_ids, lexical_query_override) = if let Some(filter_query) = &request.filter {
-            use crate::lexical::search::searcher::LexicalSearchRequest;
-            let req = LexicalSearchRequest::new(filter_query.clone_box())
-                .max_docs(1_000_000)
+        let (allowed_ids, lexical_query_override) =
+            if let Some(filter_query) = &request.filter_query {
+                let req = crate::lexical::search::searcher::LexicalSearchRequest::new(
+                    filter_query.clone_box(),
+                )
+                .limit(1_000_000)
                 .load_documents(false);
 
-            let filter_hits = self.lexical.search(req)?.hits;
-            let ids: Vec<u64> = filter_hits.into_iter().map(|h| h.doc_id).collect();
+                let filter_hits = self.lexical.search(req)?.hits;
+                let ids: Vec<u64> = filter_hits.into_iter().map(|h| h.doc_id).collect();
 
-            if ids.is_empty() {
-                return Ok(Vec::new());
-            }
+                if ids.is_empty() {
+                    return Ok(Vec::new());
+                }
 
-            let new_lexical_query: Option<Box<dyn crate::lexical::query::Query>> =
-                if let Some(user_query) = &request.lexical {
-                    use crate::lexical::query::boolean::BooleanQueryBuilder;
-                    let bool_query = BooleanQueryBuilder::new()
-                        .must(user_query.clone_box())
-                        .filter(filter_query.clone_box())
-                        .build();
-                    Some(Box::new(bool_query))
-                } else {
-                    None
-                };
+                let new_lexical_query: Option<Box<dyn crate::lexical::query::Query>> =
+                    if let Some(lex_req) = &request.lexical_search_request {
+                        use crate::lexical::query::boolean::BooleanQueryBuilder;
+                        let user_query = lex_req.query.clone().unwrap_query()?;
+                        let bool_query = BooleanQueryBuilder::new()
+                            .must(user_query)
+                            .filter(filter_query.clone_box())
+                            .build();
+                        Some(Box::new(bool_query))
+                    } else {
+                        None
+                    };
 
-            (Some(ids), new_lexical_query)
-        } else {
-            (None, None)
-        };
+                (Some(ids), new_lexical_query)
+            } else {
+                (None, None)
+            };
 
         // 1. Execute Lexical Search
-        let mut lexical_query_to_use =
-            lexical_query_override.or_else(|| request.lexical.as_ref().map(|q| q.clone_box()));
+        let mut lexical_query_to_use = if lexical_query_override.is_some() {
+            lexical_query_override
+        } else if let Some(lex_req) = &request.lexical_search_request {
+            Some(lex_req.query.clone().unwrap_query()?)
+        } else {
+            None
+        };
 
         if let Some(query) = &mut lexical_query_to_use
-            && !request.field_boosts.is_empty()
+            && let Some(lex_req) = &request.lexical_search_request
+            && !lex_req.field_boosts.is_empty()
         {
-            query.apply_field_boosts(&request.field_boosts);
+            query.apply_field_boosts(&lex_req.field_boosts);
         }
 
+        let fetch_count = request.offset.saturating_add(request.limit);
+
         let lexical_hits = if let Some(query) = &lexical_query_to_use {
-            use crate::lexical::search::searcher::LexicalSearchRequest;
             let q = query.clone_box();
-            let overfetch_limit = if request.vector.is_some() {
-                request.limit * 2
+            let overfetch_limit = if request.vector_search_request.is_some() {
+                fetch_count.saturating_mul(2)
             } else {
-                request.limit
+                fetch_count
             };
-            let req = LexicalSearchRequest::new(q).max_docs(overfetch_limit);
+            let req = crate::lexical::search::searcher::LexicalSearchRequest::new(q)
+                .limit(overfetch_limit);
 
             self.lexical.search(req)?.hits
         } else {
@@ -433,10 +450,12 @@ impl Engine {
         };
 
         // 2. Execute Vector Search
-        let vector_hits = if let Some(vector_req) = &request.vector {
+        let vector_hits = if let Some(vector_req) = &request.vector_search_request {
             let mut vreq = vector_req.clone();
-            if request.lexical.is_some() && vreq.limit < request.limit * 2 {
-                vreq.limit = request.limit * 2;
+            if request.lexical_search_request.is_some()
+                && vreq.limit < fetch_count.saturating_mul(2)
+            {
+                vreq.limit = fetch_count.saturating_mul(2);
             }
             if let Some(ids) = &allowed_ids {
                 vreq.allowed_ids = Some(ids.clone());
@@ -485,13 +504,25 @@ impl Engine {
         };
 
         // 3. Fusion
-        if request.lexical.is_some() && request.vector.is_some() {
-            let algorithm = request.fusion.unwrap_or(FusionAlgorithm::RRF { k: 60.0 });
-            self.fuse_results(lexical_hits, vector_hits, algorithm, request.limit)
+        if request.lexical_search_request.is_some() && request.vector_search_request.is_some() {
+            let algorithm = request
+                .fusion_algorithm
+                .unwrap_or(FusionAlgorithm::RRF { k: 60.0 });
+            let mut results =
+                self.fuse_results(lexical_hits, vector_hits, algorithm, fetch_count)?;
+            if request.offset > 0 {
+                results = results.into_iter().skip(request.offset).collect();
+            }
+            results.truncate(request.limit);
+            Ok(results)
         } else if !vector_hits.is_empty() {
             // Only vector results — resolve external IDs and load documents
-            let mut results = Vec::with_capacity(vector_hits.len().min(request.limit));
-            for hit in vector_hits.into_iter().take(request.limit) {
+            let mut results = Vec::with_capacity(request.limit);
+            for hit in vector_hits
+                .into_iter()
+                .skip(request.offset)
+                .take(request.limit)
+            {
                 let external_id = self.resolve_external_id(hit.doc_id)?;
                 let document = self.get_document_by_internal_id(hit.doc_id)?;
                 results.push(SearchResult {
@@ -503,8 +534,12 @@ impl Engine {
             Ok(results)
         } else {
             // Only lexical results (or both empty)
-            let mut results = Vec::with_capacity(lexical_hits.len().min(request.limit));
-            for hit in lexical_hits.into_iter().take(request.limit) {
+            let mut results = Vec::with_capacity(request.limit);
+            for hit in lexical_hits
+                .into_iter()
+                .skip(request.offset)
+                .take(request.limit)
+            {
                 let external_id = self.resolve_external_id(hit.doc_id)?;
                 results.push(SearchResult {
                     id: external_id,
@@ -593,10 +628,7 @@ impl Engine {
             .collect();
 
         // Sort by fused score descending
-        intermediate.sort_by(|a, b| {
-            b.1.partial_cmp(&a.1)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
+        intermediate.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
         // Limit results
         if intermediate.len() > limit {
