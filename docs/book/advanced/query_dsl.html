@@ -181,7 +181,7 @@
                         <h1 id="query-dsl"><a class="header" href="#query-dsl">Query DSL</a></h1>
 <p>Iris provides a unified query DSL (Domain Specific Language) that allows lexical (keyword) and vector (semantic) search in a single query string. The <code>UnifiedQueryParser</code> splits the input into lexical and vector portions and delegates to the appropriate sub-parser.</p>
 <h2 id="overview"><a class="header" href="#overview">Overview</a></h2>
-<pre><code>title:hello AND content:~"cute kitten"^0.8
+<pre><code class="language-text">title:hello AND content:~"cute kitten"^0.8
 |--- lexical --|    |--- vector --------|
 </code></pre>
 <p>The <code>~"</code> pattern distinguishes vector clauses from lexical clauses. Everything else is treated as a lexical query.</p>
@@ -189,48 +189,48 @@
 <p>Lexical queries search the inverted index using exact or approximate keyword matching.</p>
 <h3 id="term-query"><a class="header" href="#term-query">Term Query</a></h3>
 <p>Match a single term against a field (or the default field):</p>
-<pre><code>hello
+<pre><code class="language-text">hello
 title:hello
 </code></pre>
 <h3 id="boolean-operators"><a class="header" href="#boolean-operators">Boolean Operators</a></h3>
 <p>Combine clauses with <code>AND</code> and <code>OR</code> (case-insensitive):</p>
-<pre><code>title:hello AND body:world
+<pre><code class="language-text">title:hello AND body:world
 title:hello OR title:goodbye
 </code></pre>
 <p>Space-separated clauses without an explicit operator use implicit boolean (behaves like OR with scoring).</p>
 <h3 id="required--prohibited-clauses"><a class="header" href="#required--prohibited-clauses">Required / Prohibited Clauses</a></h3>
 <p>Use <code>+</code> (must match) and <code>-</code> (must not match):</p>
-<pre><code>+title:hello -title:goodbye
+<pre><code class="language-text">+title:hello -title:goodbye
 </code></pre>
 <h3 id="phrase-query"><a class="header" href="#phrase-query">Phrase Query</a></h3>
 <p>Match an exact phrase using double quotes. Optional proximity (<code>~N</code>) allows N words between terms:</p>
-<pre><code>"hello world"
+<pre><code class="language-text">"hello world"
 "hello world"~2
 </code></pre>
 <h3 id="fuzzy-query"><a class="header" href="#fuzzy-query">Fuzzy Query</a></h3>
 <p>Approximate matching with edit distance. Append <code>~</code> and optionally the maximum edit distance:</p>
-<pre><code>roam~
+<pre><code class="language-text">roam~
 roam~2
 </code></pre>
 <h3 id="wildcard-query"><a class="header" href="#wildcard-query">Wildcard Query</a></h3>
 <p>Use <code>?</code> (single character) and <code>*</code> (zero or more characters):</p>
-<pre><code>te?t
+<pre><code class="language-text">te?t
 test*
 </code></pre>
 <h3 id="range-query"><a class="header" href="#range-query">Range Query</a></h3>
 <p>Inclusive <code>[]</code> or exclusive <code>{}</code> ranges, useful for numeric and date fields:</p>
-<pre><code>price:[100 TO 500]
+<pre><code class="language-text">price:[100 TO 500]
 date:{2024-01-01 TO 2024-12-31}
 price:[* TO 100]
 </code></pre>
 <h3 id="boost"><a class="header" href="#boost">Boost</a></h3>
 <p>Increase the weight of a clause with <code>^</code>:</p>
-<pre><code>title:hello^2
+<pre><code class="language-text">title:hello^2
 "important phrase"^1.5
 </code></pre>
 <h3 id="grouping"><a class="header" href="#grouping">Grouping</a></h3>
 <p>Use parentheses for sub-expressions:</p>
-<pre><code>(title:hello OR title:hi) AND body:world
+<pre><code class="language-text">(title:hello OR title:hi) AND body:world
 </code></pre>
 <h3 id="peg-grammar"><a class="header" href="#peg-grammar">PEG Grammar</a></h3>
 <p>The full lexical grammar (<a href="https://github.com/mosuka/iris/blob/main/src/lexical/query/parser.pest">parser.pest</a>):</p>
@@ -255,7 +255,7 @@ boost          = { "^" ~ boost_value }
 <h2 id="vector-query-syntax"><a class="header" href="#vector-query-syntax">Vector Query Syntax</a></h2>
 <p>Vector queries embed text into vectors at parse time and perform similarity search.</p>
 <h3 id="basic-syntax"><a class="header" href="#basic-syntax">Basic Syntax</a></h3>
-<pre><code>field:~"text"
+<pre><code class="language-text">field:~"text"
 field:~"text"^weight
 </code></pre>
 <div class="table-wrapper"><table><thead><tr><th style="text-align: left">Element</th><th style="text-align: center">Required</th><th style="text-align: left">Description</th><th style="text-align: left">Example</th></tr></thead><tbody>
@@ -266,7 +266,7 @@ field:~"text"^weight
 </tbody></table>
 </div>
 <h3 id="examples"><a class="header" href="#examples">Examples</a></h3>
-<pre><code># Single field
+<pre><code class="language-text"># Single field
 content:~"cute kitten"
 
 # With boost weight
@@ -283,10 +283,10 @@ metadata.embedding:~"text"
 </code></pre>
 <h3 id="multiple-clauses"><a class="header" href="#multiple-clauses">Multiple Clauses</a></h3>
 <p>Multiple vector clauses are space-separated. All clauses are executed and their scores are combined using the <code>score_mode</code> (default: <code>WeightedSum</code>):</p>
-<pre><code>content:~"cats" image:~"dogs"^0.5
+<pre><code class="language-text">content:~"cats" image:~"dogs"^0.5
 </code></pre>
 <p>This produces:</p>
-<pre><code>score = similarity("cats", content) * 1.0
+<pre><code class="language-text">score = similarity("cats", content) * 1.0
       + similarity("dogs", image)   * 0.5
 </code></pre>
 <p>There are no <code>AND</code>/<code>OR</code> operators in the vector DSL. Vector search is inherently a ranking operation, and the weight (<code>^</code>) controls the contribution of each clause.</p>
@@ -333,6 +333,9 @@ float_value    = @{ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)? }
 <tr><td style="text-align: left"><strong>WeightedSum</strong></td><td style="text-align: left"><code>score = lexical * a + vector * b</code></td><td style="text-align: left">Linear combination with configurable weights.</td></tr>
 </tbody></table>
 </div>
+<blockquote>
+<p><strong>Note</strong>: The fusion algorithm cannot be specified in the DSL syntax. It is configured when constructing the <code>UnifiedQueryParser</code> via <code>.with_fusion()</code>. The default is RRF (k=60). See <a href="#custom-fusion">Custom Fusion</a> for a code example.</p>
+</blockquote>
 <h3 id="examples-1"><a class="header" href="#examples-1">Examples</a></h3>
 <pre><code># Lexical only — no fusion
 title:hello AND body:world
@@ -340,7 +343,7 @@ title:hello AND body:world
 # Vector only — no fusion
 content:~"cute kitten"
 
-# Hybrid — RRF fusion (default)
+# Hybrid — fusion applied automatically
 title:hello content:~"cute kitten"
 
 # Hybrid with boolean operators

@@ -1,76 +1,43 @@
 # Getting Started
 
-Welcome to the Iris getting started guide. This section is designed to try out Iris quickly.
+Welcome to Iris! This section will help you install the library and run your first search.
+
+## What You Will Build
+
+By the end of this guide, you will have a working search engine that can:
+
+- Index text documents
+- Perform keyword (lexical) search
+- Perform semantic (vector) search
+- Combine both with hybrid search
+
+## Prerequisites
+
+- **Rust** 1.85 or later (edition 2024)
+- **Cargo** (included with Rust)
+- **Tokio** runtime (Iris uses async APIs)
+
+## Steps
+
+1. **[Installation](getting_started/installation.md)** — Add Iris to your project and choose feature flags
+2. **[Quick Start](getting_started/quickstart.md)** — Build a complete search engine in 5 steps
 
 ## Workflow Overview
 
-Building a search application with Iris typically involves the following steps:
+Building a search application with Iris follows a consistent pattern:
 
-1. **Installation**: Adding `iris` to your project dependencies.
-2. **Configuration**: Setting up the `Engine` with `Schema` and choosing a storage backend (Memory, File, or Mmap).
-3. **Indexing**: Inserting documents that contain both text (for lexical search) and vectors (for semantic search).
-4. **Searching**: Executing queries to retrieve relevant results.
+<div class="mermaid">
+graph LR
+    A["1. Create<br/>Storage"] --> B["2. Define<br/>Schema"]
+    B --> C["3. Build<br/>Engine"]
+    C --> D["4. Index<br/>Documents"]
+    D --> E["5. Search"]
+</div>
 
-## In this Section
-
-* **[Installation](./getting_started/installation.md)**
-Learn how to add Iris to your Rust project and configure necessary feature flags (e.g., for different tokenizer support).
-
-## Quick Example
-
-For a complete, runnable example of how to set up a Hybrid Search (combining vector and text search), please refer to the **[Unified Search Example](https://github.com/mosuka/iris/blob/main/examples/search.rs)** in the repository.
-
-```rust
-use iris::{Document, Engine, FieldOption, FusionAlgorithm, Schema, SearchRequestBuilder};
-use iris::analysis::analyzer::standard::StandardAnalyzer;
-use iris::lexical::{FieldOption as LexicalFieldOption, TextOption, TermQuery};
-use iris::vector::{FlatOption, VectorOption, VectorSearchRequestBuilder};
-use iris::storage::{StorageConfig, StorageFactory};
-use iris::storage::memory::MemoryStorageConfig;
-use std::sync::Arc;
-
-fn main() -> iris::Result<()> {
-    // 1. Create storage
-    let storage = StorageFactory::create(StorageConfig::Memory(MemoryStorageConfig::default()))?;
-
-    // 2. Define schema with separate lexical and vector fields
-    let schema = Schema::builder()
-        .add_field("content", FieldOption::Lexical(LexicalFieldOption::Text(TextOption::default())))
-        .add_field("content_vec", FieldOption::Vector(VectorOption::Flat(FlatOption { dimension: 384, ..Default::default() })))
-        .build();
-
-    // 3. Create engine with analyzer and embedder
-    let engine = Engine::builder(storage, schema)
-        .analyzer(Arc::new(StandardAnalyzer::default()))
-        .embedder(Arc::new(MyEmbedder))  // Your embedder implementation
-        .build()?;
-
-    engine.put_document("doc1",
-        Document::new()
-            .add_text("content", "Rust is a systems programming language")
-            .add_text("content_vec", "Rust is a systems programming language")
-    )?;
-    engine.put_document("doc2",
-        Document::new()
-            .add_text("content", "Python is great for machine learning")
-            .add_text("content_vec", "Python is great for machine learning")
-    )?;
-    engine.commit()?;
-
-    // 4. Hybrid search (combines lexical keyword match + semantic similarity)
-    let results = engine.search(
-        SearchRequestBuilder::new()
-            .lexical_search_request(Box::new(TermQuery::new("content", "programming")))
-            .vector_search_request(VectorSearchRequestBuilder::new().add_text("content_vec", "systems language").build())
-            .fusion(FusionAlgorithm::RRF { k: 60.0 })
-            .build()
-    )?;
-
-    // 5. Display results
-    for hit in results {
-        println!("[{}] score={:.4}", hit.id, hit.score);
-    }
-
-    Ok(())
-}
-```
+| Step | What Happens |
+| :--- | :--- |
+| **Create Storage** | Choose where data lives — in memory, on disk, or memory-mapped |
+| **Define Schema** | Declare fields and their types (text, integer, vector, etc.) |
+| **Build Engine** | Attach an analyzer (for text) and an embedder (for vectors) |
+| **Index Documents** | Add documents; the engine routes fields to the correct index |
+| **Search** | Run lexical, vector, or hybrid queries and get ranked results |
