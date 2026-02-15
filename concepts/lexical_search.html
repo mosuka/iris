@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-19c6610d.js";
+            window.path_to_searchindex_js = "../searchindex-48168cb1.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-75fc7776.js"></script>
@@ -486,7 +486,7 @@ use iris::lexical::TermQuery;
 fn search(engine: &amp;Engine) -&gt; iris::Result&lt;()&gt; {
     let results = engine.search(
         SearchRequestBuilder::new()
-            .with_lexical(Box::new(TermQuery::new("content", "rust")))
+            .lexical_search_request(Box::new(TermQuery::new("content", "rust")))
             .limit(10)
             .build()
     )?;

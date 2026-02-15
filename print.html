@@ -36,7 +36,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-19c6610d.js";
+            window.path_to_searchindex_js = "searchindex-48168cb1.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-75fc7776.js"></script>
@@ -247,8 +247,8 @@ fn main() -&gt; iris::Result&lt;()&gt; {
     // 4. Hybrid search (combines lexical keyword match + semantic similarity)
     let results = engine.search(
         SearchRequestBuilder::new()
-            .with_lexical(Box::new(TermQuery::new("content", "programming")))
-            .with_vector(VectorSearchRequestBuilder::new().add_text("content_vec", "systems language").build())
+            .lexical_search_request(Box::new(TermQuery::new("content", "programming")))
+            .vector_search_request(VectorSearchRequestBuilder::new().add_text("content_vec", "systems language").build())
             .fusion(FusionAlgorithm::RRF { k: 60.0 })
             .build()
     )?;
@@ -359,8 +359,8 @@ fn main() -&gt; iris::Result&lt;()&gt; {
     // 4. Hybrid search (combines lexical keyword match + semantic similarity)
     let results = engine.search(
         SearchRequestBuilder::new()
-            .with_lexical(Box::new(TermQuery::new("content", "programming")))
-            .with_vector(VectorSearchRequestBuilder::new().add_text("content_vec", "systems language").build())
+            .lexical_search_request(Box::new(TermQuery::new("content", "programming")))
+            .vector_search_request(VectorSearchRequestBuilder::new().add_text("content_vec", "systems language").build())
             .fusion(FusionAlgorithm::RRF { k: 60.0 })
             .build()
     )?;
@@ -905,7 +905,7 @@ use iris::lexical::TermQuery;
 fn search(engine: &amp;Engine) -&gt; iris::Result&lt;()&gt; {
     let results = engine.search(
         SearchRequestBuilder::new()
-            .with_lexical(Box::new(TermQuery::new("content", "rust")))
+            .lexical_search_request(Box::new(TermQuery::new("content", "rust")))
             .limit(10)
             .build()
     )?;
@@ -1279,7 +1279,7 @@ use iris::vector::VectorSearchRequestBuilder;
 fn search(engine: &amp;Engine) -&gt; iris::Result&lt;()&gt; {
     let results = engine.search(
         SearchRequestBuilder::new()
-            .with_vector(
+            .vector_search_request(
                 VectorSearchRequestBuilder::new()
                     .add_text("embedding", "semantic search")
                     .build()
@@ -1307,13 +1307,13 @@ fn hybrid_search(engine: &amp;Engine) -&gt; iris::Result&lt;()&gt; {
     let results = engine.search(
         SearchRequestBuilder::new()
             // Vector search (semantic) on vector field
-            .with_vector(
+            .vector_search_request(
                 VectorSearchRequestBuilder::new()
                     .add_text("content_vec", "fast semantic search")
                     .build()
             )
             // Lexical search (keyword) on lexical field
-            .with_lexical(Box::new(TermQuery::new("content", "rust")))
+            .lexical_search_request(Box::new(TermQuery::new("content", "rust")))
             // Fusion strategy
             .fusion(FusionAlgorithm::RRF { k: 60.0 })
             .limit(10)
@@ -1334,12 +1334,12 @@ fn hybrid_search(engine: &amp;Engine) -&gt; iris::Result&lt;()&gt; {
 </span>fn weighted_hybrid_search(engine: &amp;Engine) -&gt; iris::Result&lt;()&gt; {
     let results = engine.search(
         SearchRequestBuilder::new()
-            .with_vector(
+            .vector_search_request(
                 VectorSearchRequestBuilder::new()
                     .add_text("content_vec", "machine learning")
                     .build()
             )
-            .with_lexical(Box::new(TermQuery::new("content", "python")))
+            .lexical_search_request(Box::new(TermQuery::new("content", "python")))
             .fusion(FusionAlgorithm::WeightedSum {
                 vector_weight: 0.7,  // 70% semantic
                 lexical_weight: 0.3, // 30% keyword
