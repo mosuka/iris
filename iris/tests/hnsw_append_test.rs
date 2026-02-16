@@ -6,8 +6,6 @@ use iris::vector::{
 use std::sync::Arc;
 use tempfile::tempdir;
 
-// Ignored on Windows due to FileStorage file handle synchronization issues.
-#[cfg_attr(target_os = "windows", ignore)]
 #[test]
 fn test_hnsw_append_persistence() -> Result<(), Box<dyn std::error::Error>> {
     let dir = tempdir()?;
@@ -76,8 +74,6 @@ fn test_hnsw_append_persistence() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-// Ignored on Windows due to FileStorage file handle synchronization issues.
-#[cfg_attr(target_os = "windows", ignore)]
 #[test]
 fn test_hnsw_append_search_verification() -> Result<(), Box<dyn std::error::Error>> {
     let dir = tempdir()?;

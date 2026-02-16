@@ -12,8 +12,6 @@ use iris::vector::VectorSearchRequestBuilder;
 use iris::{DataValue, Document};
 use iris::{FieldOption, LexicalSearchRequest, Schema};
 
-// Ignored on Windows due to FileStorage file handle synchronization issues.
-#[cfg_attr(target_os = "windows", ignore)]
 #[tokio::test(flavor = "multi_thread")]
 async fn test_unified_engine_indexing() -> iris::Result<()> {
     // 1. Setup Storage
@@ -104,8 +102,6 @@ async fn test_unified_engine_dimension_mismatch() -> iris::Result<()> {
     Ok(())
 }
 
-// Ignored on Windows due to FileStorage file handle synchronization issues.
-#[cfg_attr(target_os = "windows", ignore)]
 #[tokio::test(flavor = "multi_thread")]
 async fn test_unified_engine_concurrent_reads() -> iris::Result<()> {
     use std::sync::Arc;
