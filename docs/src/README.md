@@ -30,9 +30,9 @@ graph LR
         SCH["Schema"]
         AN["Analyzer"]
         EM["Embedder"]
-        LI["Lexical Index<br/>(Inverted Index)"]
-        VI["Vector Index<br/>(HNSW / Flat / IVF)"]
-        FU["Fusion<br/>(RRF / WeightedSum)"]
+        LI["Lexical Index<br>(Inverted Index)"]
+        VI["Vector Index<br>(HNSW / Flat / IVF)"]
+        FU["Fusion<br>(RRF / WeightedSum)"]
     end
 
     D --> SCH
