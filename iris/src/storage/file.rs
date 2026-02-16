@@ -497,7 +497,10 @@ impl Storage for FileStorage {
                     && let Ok(rel) = path.strip_prefix(&self.directory)
                     && let Some(name) = rel.to_str()
                 {
-                    files.push(name.to_string());
+                    // Normalize path separators to forward slashes for
+                    // cross-platform consistency. PrefixedStorage and other
+                    // consumers expect '/' separators regardless of OS.
+                    files.push(name.replace('\\', "/"));
                 }
             }
         }
