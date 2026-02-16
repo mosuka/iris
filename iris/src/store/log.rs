@@ -268,6 +268,11 @@ impl DocumentLog {
 
         let mut writer = self.wal_storage.create_output(&self.wal_path)?;
         writer.flush_and_sync()?;
+        writer.close()?;
+
+        // Sync storage to ensure the truncated WAL file is visible.
+        // Critical on Windows where file metadata may be cached.
+        self.wal_storage.sync()?;
 
         Ok(())
     }

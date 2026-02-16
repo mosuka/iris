@@ -246,6 +246,12 @@ impl UnifiedDocumentStore {
         writer.close()?;
 
         self.storage.rename_file(&tmp_file, MANIFEST_FILE)?;
+
+        // Sync storage to ensure directory metadata (new segment files, renamed
+        // manifest) is visible to subsequent reads. Critical on Windows where
+        // directory listings may be cached.
+        self.storage.sync()?;
+
         Ok(())
     }
 
