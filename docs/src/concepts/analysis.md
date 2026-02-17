@@ -4,17 +4,17 @@ Text analysis is the process of converting raw text into searchable tokens. When
 
 ## The Analysis Pipeline
 
-<div class="mermaid">
+```mermaid
 graph LR
-    Input["Raw Text<br/>'The quick brown FOX jumps!'"]
-    T["Tokenizer<br/>Split into words"]
+    Input["Raw Text\n'The quick brown FOX jumps!'"]
+    T["Tokenizer\nSplit into words"]
     F1["LowercaseFilter"]
     F2["StopFilter"]
     F3["StemFilter"]
-    Output["Terms<br/>'quick', 'brown', 'fox', 'jump'"]
+    Output["Terms\n'quick', 'brown', 'fox', 'jump'"]
 
     Input --> T --> F1 --> F2 --> F3 --> Output
-</div>
+```
 
 The analysis pipeline consists of:
 
@@ -106,14 +106,14 @@ let analyzer = PipelineAnalyzer::new(Arc::new(RegexTokenizer::new()?))
 
 `PerFieldAnalyzer` lets you assign different analyzers to different fields within the same engine:
 
-<div class="mermaid">
+```mermaid
 graph LR
     PFA["PerFieldAnalyzer"]
     PFA -->|"title"| KW["KeywordAnalyzer"]
     PFA -->|"body"| STD["StandardAnalyzer"]
     PFA -->|"description_ja"| JP["JapaneseAnalyzer"]
-    PFA -->|other fields| DEF["Default<br/>(StandardAnalyzer)"]
-</div>
+    PFA -->|other fields| DEF["Default\n(StandardAnalyzer)"]
+```
 
 ```rust
 use std::sync::Arc;

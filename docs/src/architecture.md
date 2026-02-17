@@ -6,21 +6,21 @@ This page explains how Iris is structured internally. Understanding the architec
 
 Iris is organized around a single `Engine` that coordinates four internal components:
 
-<div class="mermaid">
+```mermaid
 graph TB
     subgraph Engine
         SCH["Schema"]
-        LS["LexicalStore<br/>(Inverted Index)"]
-        VS["VectorStore<br/>(HNSW / Flat / IVF)"]
-        DL["DocumentLog<br/>(WAL + Document Storage)"]
+        LS["LexicalStore\n(Inverted Index)"]
+        VS["VectorStore\n(HNSW / Flat / IVF)"]
+        DL["DocumentLog\n(WAL + Document Storage)"]
     end
 
-    Storage["Storage (trait)<br/>Memory / File / Mmap"]
+    Storage["Storage (trait)\nMemory / File / Mmap"]
 
     LS --- Storage
     VS --- Storage
     DL --- Storage
-</div>
+```
 
 | Component | Responsibility |
 | :--- | :--- |
@@ -45,7 +45,7 @@ let engine = Engine::builder(storage, schema)
     .await?;
 ```
 
-<div class="mermaid">
+```mermaid
 sequenceDiagram
     participant User
     participant EngineBuilder
@@ -56,13 +56,13 @@ sequenceDiagram
     User->>EngineBuilder: .embedder(embedder)
     User->>EngineBuilder: .build().await
     EngineBuilder->>EngineBuilder: split_schema()
-    Note over EngineBuilder: Separate fields into<br/>LexicalIndexConfig<br/>+ VectorIndexConfig
+    Note over EngineBuilder: Separate fields into\nLexicalIndexConfig\n+ VectorIndexConfig
     EngineBuilder->>Engine: Create LexicalStore
     EngineBuilder->>Engine: Create VectorStore
     EngineBuilder->>Engine: Create DocumentLog
     EngineBuilder->>Engine: Recover from WAL
     EngineBuilder-->>User: Engine ready
-</div>
+```
 
 During `build()`, the engine:
 
@@ -75,14 +75,14 @@ During `build()`, the engine:
 
 The `Schema` contains both lexical and vector fields. At build time, `split_schema()` separates them:
 
-<div class="mermaid">
+```mermaid
 graph LR
-    S["Schema<br/>title: Text<br/>body: Text<br/>category: Text<br/>page: Integer<br/>content_vec: HNSW"]
+    S["Schema\ntitle: Text\nbody: Text\ncategory: Text\npage: Integer\ncontent_vec: HNSW"]
 
-    S --> LC["LexicalIndexConfig<br/>title: TextOption<br/>body: TextOption<br/>category: TextOption<br/>page: IntegerOption<br/>_id: KeywordAnalyzer"]
+    S --> LC["LexicalIndexConfig\ntitle: TextOption\nbody: TextOption\ncategory: TextOption\npage: IntegerOption\n_id: KeywordAnalyzer"]
 
-    S --> VC["VectorIndexConfig<br/>content_vec: HnswOption<br/>(dim=384, m=16, ef=200)"]
-</div>
+    S --> VC["VectorIndexConfig\ncontent_vec: HnswOption\n(dim=384, m=16, ef=200)"]
+```
 
 Key details:
 
@@ -94,7 +94,7 @@ Key details:
 
 When you call `engine.add_document(id, doc)`:
 
-<div class="mermaid">
+```mermaid
 sequenceDiagram
     participant User
     participant Engine
@@ -114,14 +114,14 @@ sequenceDiagram
         end
     end
 
-    Note over Engine: Document is buffered<br/>but NOT yet searchable
+    Note over Engine: Document is buffered\nbut NOT yet searchable
 
     User->>Engine: commit()
     Engine->>Lexical: Flush segments to storage
     Engine->>Vector: Flush segments to storage
     Engine->>WAL: Mark checkpoint
-    Note over Engine: Documents are<br/>now searchable
-</div>
+    Note over Engine: Documents are\nnow searchable
+```
 
 Key points:
 
@@ -133,7 +133,7 @@ Key points:
 
 When you call `engine.search(request)`:
 
-<div class="mermaid">
+```mermaid
 sequenceDiagram
     participant User
     participant Engine
@@ -163,7 +163,7 @@ sequenceDiagram
 
     Engine->>Engine: Apply offset + limit
     Engine-->>User: Vec of SearchResult
-</div>
+```
 
 The search pipeline has three stages:
 
@@ -175,16 +175,16 @@ The search pipeline has three stages:
 
 All components share a single `Storage` trait implementation, but use key prefixes to isolate their data:
 
-<div class="mermaid">
+```mermaid
 graph TB
-    Engine --> PS1["PrefixedStorage<br/>prefix: 'lexical/'"]
-    Engine --> PS2["PrefixedStorage<br/>prefix: 'vector/'"]
-    Engine --> PS3["PrefixedStorage<br/>prefix: 'documents/'"]
+    Engine --> PS1["PrefixedStorage\nprefix: 'lexical/'"]
+    Engine --> PS2["PrefixedStorage\nprefix: 'vector/'"]
+    Engine --> PS3["PrefixedStorage\nprefix: 'documents/'"]
 
-    PS1 --> S["Storage Backend<br/>(Memory / File / Mmap)"]
+    PS1 --> S["Storage Backend\n(Memory / File / Mmap)"]
     PS2 --> S
     PS3 --> S
-</div>
+```
 
 | Backend | Description | Best For |
 | :--- | :--- | :--- |
@@ -196,15 +196,15 @@ graph TB
 
 When a `PerFieldAnalyzer` is provided, the engine dispatches analysis to field-specific analyzers. The same pattern applies to `PerFieldEmbedder`.
 
-<div class="mermaid">
+```mermaid
 graph LR
     PFA["PerFieldAnalyzer"]
     PFA -->|"title"| KA["KeywordAnalyzer"]
     PFA -->|"body"| SA["StandardAnalyzer"]
     PFA -->|"description"| JA["JapaneseAnalyzer"]
-    PFA -->|"_id"| KA2["KeywordAnalyzer<br/>(always)"]
-    PFA -->|other fields| DEF["Default Analyzer<br/>(StandardAnalyzer)"]
-</div>
+    PFA -->|"_id"| KA2["KeywordAnalyzer\n(always)"]
+    PFA -->|other fields| DEF["Default Analyzer\n(StandardAnalyzer)"]
+```
 
 This allows different fields to use different analysis strategies within the same engine.
 

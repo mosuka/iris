@@ -4,7 +4,7 @@ Vector indexing powers similarity-based search. When a document's vector field i
 
 ## How Vector Indexing Works
 
-<div class="mermaid">
+```mermaid
 sequenceDiagram
     participant Doc as Document
     participant Embedder
@@ -16,7 +16,7 @@ sequenceDiagram
     Normalize->>Normalize: L2 normalize
     Normalize-->>Index: [0.14, -0.52, 0.90, ...]
     Index->>Index: Insert into index structure
-</div>
+```
 
 ### Step by Step
 
@@ -62,7 +62,7 @@ let opt = FlatOption {
 
 **Hierarchical Navigable Small World** graph. The default and most commonly used index type.
 
-<div class="mermaid">
+```mermaid
 graph TB
     subgraph "Layer 2 (sparse)"
         A2["A"] --- C2["C"]
@@ -92,7 +92,7 @@ graph TB
     C1 -.-> C0
     B1 -.-> B0
     D1 -.-> D0
-</div>
+```
 
 The HNSW algorithm searches from the top (sparse) layer down to the bottom (dense) layer, narrowing the search space at each level.
 
@@ -128,11 +128,11 @@ let opt = HnswOption {
 
 **Inverted File Index**. Partitions vectors into clusters, then only searches relevant clusters.
 
-<div class="mermaid">
+```mermaid
 graph TB
     Q["Query Vector"]
-    Q --> C1["Cluster 1<br/>(centroid)"]
-    Q --> C2["Cluster 2<br/>(centroid)"]
+    Q --> C1["Cluster 1\n(centroid)"]
+    Q --> C2["Cluster 2\n(centroid)"]
 
     C1 --> V1["vec_3"]
     C1 --> V2["vec_7"]
@@ -144,7 +144,7 @@ graph TB
 
     style C1 fill:#f9f,stroke:#333
     style C2 fill:#f9f,stroke:#333
-</div>
+```
 
 ```rust
 use iris::vector::IvfOption;

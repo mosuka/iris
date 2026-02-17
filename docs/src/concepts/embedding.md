@@ -115,13 +115,13 @@ let doc = Document::builder()
 
 `PerFieldEmbedder` routes embedding requests to field-specific embedders:
 
-<div class="mermaid">
+```mermaid
 graph LR
     PFE["PerFieldEmbedder"]
-    PFE -->|"text_vec"| BERT["CandleBertEmbedder<br/>(384 dim)"]
-    PFE -->|"image_vec"| CLIP["CandleClipEmbedder<br/>(512 dim)"]
+    PFE -->|"text_vec"| BERT["CandleBertEmbedder\n(384 dim)"]
+    PFE -->|"image_vec"| CLIP["CandleClipEmbedder\n(512 dim)"]
     PFE -->|other fields| DEF["Default Embedder"]
-</div>
+```
 
 ```rust
 use std::sync::Arc;

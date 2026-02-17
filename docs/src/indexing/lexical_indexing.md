@@ -4,7 +4,7 @@ Lexical indexing powers keyword-based search. When a document's text field is in
 
 ## How Lexical Indexing Works
 
-<div class="mermaid">
+```mermaid
 sequenceDiagram
     participant Doc as Document
     participant Analyzer
@@ -16,7 +16,7 @@ sequenceDiagram
     Analyzer-->>Writer: ["quick", "brown", "fox"]
     Writer->>Writer: Buffer in memory
     Writer->>Seg: Flush to segment on commit()
-</div>
+```
 
 ### Step by Step
 
@@ -28,7 +28,7 @@ sequenceDiagram
 
 An inverted index is essentially a map from terms to document lists:
 
-<div class="mermaid">
+```mermaid
 graph LR
     subgraph "Term Dictionary"
         T1["'brown'"]
@@ -48,7 +48,7 @@ graph LR
     T2 --> P2
     T3 --> P3
     T4 --> P4
-</div>
+```
 
 | Component | Description |
 | :--- | :--- |
@@ -71,7 +71,7 @@ Each entry in a posting list contains:
 
 Integer, float, and datetime fields are indexed using a **BKD tree** — a space-partitioning data structure optimized for range queries:
 
-<div class="mermaid">
+```mermaid
 graph TB
     Root["BKD Root"]
     Root --> L["values < 50"]
@@ -80,7 +80,7 @@ graph TB
     L --> LR["25 <= values < 50"]
     R --> RL["50 <= values < 75"]
     R --> RR["values >= 75"]
-</div>
+```
 
 BKD trees allow efficient evaluation of range queries like `price:[10 TO 100]` or `date:[2024-01-01 TO 2024-12-31]`.
 
@@ -95,7 +95,7 @@ Geographic fields store latitude/longitude pairs. They are indexed using a spati
 
 The lexical index is organized into **segments**. Each segment is an immutable, self-contained mini-index:
 
-<div class="mermaid">
+```mermaid
 graph TB
     LI["Lexical Index"]
     LI --> S1["Segment 0"]
@@ -109,7 +109,7 @@ graph TB
     S1 --- F5[".dv (doc values)"]
     S1 --- F6[".meta (metadata)"]
     S1 --- F7[".lens (field lengths)"]
-</div>
+```
 
 | File Extension | Contents |
 | :--- | :--- |

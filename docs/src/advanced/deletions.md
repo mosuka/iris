@@ -14,11 +14,11 @@ engine.commit().await?;
 
 When a document is deleted, it is **not** immediately removed from the index files. Instead:
 
-<div class="mermaid">
+```mermaid
 graph LR
-    Del["delete_document('doc-1')"] --> Bitmap["Add internal ID<br/>to Deletion Bitmap"]
-    Bitmap --> Search["Search skips<br/>deleted IDs"]
-</div>
+    Del["delete_document('doc-1')"] --> Bitmap["Add internal ID\nto Deletion Bitmap"]
+    Bitmap --> Search["Search skips\ndeleted IDs"]
+```
 
 1. The document's internal ID is added to a **deletion bitmap**
 2. The bitmap is checked during every search, filtering out deleted documents from results
@@ -54,23 +54,23 @@ engine.commit().await?;
 
 Over time, logically deleted documents accumulate and waste space. Compaction reclaims this space by rewriting segment files without the deleted entries.
 
-<div class="mermaid">
+```mermaid
 graph LR
     subgraph "Before Compaction"
-        S1["Segment 0<br/>doc-1 (deleted)<br/>doc-2<br/>doc-3 (deleted)"]
-        S2["Segment 1<br/>doc-4<br/>doc-5"]
+        S1["Segment 0\ndoc-1 (deleted)\ndoc-2\ndoc-3 (deleted)"]
+        S2["Segment 1\ndoc-4\ndoc-5"]
     end
 
     Compact["Compaction"]
 
     subgraph "After Compaction"
-        S3["Segment 0<br/>doc-2<br/>doc-4<br/>doc-5"]
+        S3["Segment 0\ndoc-2\ndoc-4\ndoc-5"]
     end
 
     S1 --> Compact
     S2 --> Compact
     Compact --> S3
-</div>
+```
 
 ### What Compaction Does
 

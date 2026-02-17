@@ -101,16 +101,16 @@ let storage = StorageFactory::create(
 
 The engine uses `PrefixedStorage` to isolate components within a single storage backend:
 
-<div class="mermaid">
+```mermaid
 graph TB
     E["Engine"]
-    E --> P1["PrefixedStorage<br/>prefix = 'lexical/'"]
-    E --> P2["PrefixedStorage<br/>prefix = 'vector/'"]
-    E --> P3["PrefixedStorage<br/>prefix = 'documents/'"]
+    E --> P1["PrefixedStorage\nprefix = 'lexical/'"]
+    E --> P2["PrefixedStorage\nprefix = 'vector/'"]
+    E --> P3["PrefixedStorage\nprefix = 'documents/'"]
     P1 --> S["Storage Backend"]
     P2 --> S
     P3 --> S
-</div>
+```
 
 When the lexical store writes a key `segments/seg-001.dict`, it is actually stored as `lexical/segments/seg-001.dict` in the underlying backend. This ensures no key collisions between components.
 

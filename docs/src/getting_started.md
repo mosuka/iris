@@ -26,13 +26,13 @@ By the end of this guide, you will have a working search engine that can:
 
 Building a search application with Iris follows a consistent pattern:
 
-<div class="mermaid">
+```mermaid
 graph LR
-    A["1. Create<br/>Storage"] --> B["2. Define<br/>Schema"]
-    B --> C["3. Build<br/>Engine"]
-    C --> D["4. Index<br/>Documents"]
+    A["1. Create\nStorage"] --> B["2. Define\nSchema"]
+    B --> C["3. Build\nEngine"]
+    C --> D["4. Index\nDocuments"]
     D --> E["5. Search"]
-</div>
+```
 
 | Step | What Happens |
 | :--- | :--- |

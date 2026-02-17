@@ -4,7 +4,7 @@ Iris uses a **Write-Ahead Log (WAL)** to ensure data durability. Every write ope
 
 ## Write Path
 
-<div class="mermaid">
+```mermaid
 sequenceDiagram
     participant App as Application
     participant Engine
@@ -16,13 +16,13 @@ sequenceDiagram
     Engine->>WAL: 1. Append operation to WAL
     Engine->>Mem: 2. Update in-memory buffers
 
-    Note over Mem: Document is buffered but<br/>NOT yet searchable
+    Note over Mem: Document is buffered but\nNOT yet searchable
 
     App->>Engine: commit()
     Engine->>Disk: 3. Flush segments to storage
     Engine->>WAL: 4. Record checkpoint
-    Note over Disk: Documents are now<br/>searchable and durable
-</div>
+    Note over Disk: Documents are now\nsearchable and durable
+```
 
 ### Key Principles
 
@@ -55,13 +55,13 @@ The WAL file (`engine.wal`) is an append-only binary log. Each entry is self-con
 
 When an engine is built (`Engine::builder(...).build().await`), it automatically checks for uncommitted WAL entries and replays them:
 
-<div class="mermaid">
+```mermaid
 graph TD
-    Start["Engine::build()"] --> Check["Check WAL for<br/>uncommitted entries"]
-    Check -->|"Entries found"| Replay["Replay operations<br/>into in-memory buffers"]
+    Start["Engine::build()"] --> Check["Check WAL for\nuncommitted entries"]
+    Check -->|"Entries found"| Replay["Replay operations\ninto in-memory buffers"]
     Replay --> Ready["Engine ready"]
     Check -->|"No entries"| Ready
-</div>
+```
 
 Recovery is transparent — you do not need to handle it manually.
 

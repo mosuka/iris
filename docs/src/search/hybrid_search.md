@@ -12,7 +12,7 @@ Hybrid search combines **lexical search** (keyword matching) with **vector searc
 
 ## How It Works
 
-<div class="mermaid">
+```mermaid
 sequenceDiagram
     participant User
     participant Engine
@@ -20,7 +20,7 @@ sequenceDiagram
     participant Vector as VectorStore
     participant Fusion
 
-    User->>Engine: SearchRequest<br/>(lexical + vector)
+    User->>Engine: SearchRequest\n(lexical + vector)
 
     par Execute in parallel
         Engine->>Lexical: BM25 keyword search
@@ -34,7 +34,7 @@ sequenceDiagram
     Note over Fusion: RRF or WeightedSum
     Fusion-->>Engine: Unified ranked list
     Engine-->>User: Vec of SearchResult
-</div>
+```
 
 ## Basic Usage
 

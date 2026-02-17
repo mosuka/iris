@@ -27,7 +27,7 @@ let schema = Schema::builder()
 
 ## Field Types
 
-<div class="mermaid">
+```mermaid
 graph TB
     FO["FieldOption"]
     FO --> LEX["Lexical"]
@@ -44,7 +44,7 @@ graph TB
     VEC --> FLAT["Flat"]
     VEC --> HNSW["HNSW"]
     VEC --> IVF["IVF"]
-</div>
+```
 
 ### Lexical Fields
 
