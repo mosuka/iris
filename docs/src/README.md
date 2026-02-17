@@ -19,7 +19,7 @@ Iris is a pure-Rust library that combines **lexical search** (keyword matching v
 
 ## How It Works
 
-<div class="mermaid">
+```mermaid
 graph LR
     subgraph Your Application
         D["Document"]
@@ -41,7 +41,7 @@ graph LR
     Q --> LI --> FU
     Q --> VI --> FU
     FU --> R["Ranked Results"]
-</div>
+```
 
 1. **Define a Schema** — declare your fields and their types (text, integer, vector, etc.)
 2. **Build an Engine** — attach an analyzer for text and an embedder for vectors
