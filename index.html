@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-68d96437.js";
+            window.path_to_searchindex_js = "searchindex-771af21f.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-2eec5043.js"></script>
@@ -199,30 +199,28 @@
 </table>
 </div>
 <h2 id="how-it-works"><a class="header" href="#how-it-works">How It Works</a></h2>
-<div class="mermaid">
-graph LR
+<pre><code class="language-mermaid">graph LR
     subgraph Your Application
         D["Document"]
         Q["Query"]
     end
-<pre><code>subgraph Iris Engine
-    SCH["Schema"]
-    AN["Analyzer"]
-    EM["Embedder"]
-    LI["Lexical Index\n(Inverted Index)"]
-    VI["Vector Index\n(HNSW / Flat / IVF)"]
-    FU["Fusion\n(RRF / WeightedSum)"]
-end
 
-D --&gt; SCH
-SCH --&gt; AN --&gt; LI
-SCH --&gt; EM --&gt; VI
-Q --&gt; LI --&gt; FU
-Q --&gt; VI --&gt; FU
-FU --&gt; R["Ranked Results"]
+    subgraph Iris Engine
+        SCH["Schema"]
+        AN["Analyzer"]
+        EM["Embedder"]
+        LI["Lexical Index\n(Inverted Index)"]
+        VI["Vector Index\n(HNSW / Flat / IVF)"]
+        FU["Fusion\n(RRF / WeightedSum)"]
+    end
+
+    D --&gt; SCH
+    SCH --&gt; AN --&gt; LI
+    SCH --&gt; EM --&gt; VI
+    Q --&gt; LI --&gt; FU
+    Q --&gt; VI --&gt; FU
+    FU --&gt; R["Ranked Results"]
 </code></pre>
-</div>
-
 <ol>
 <li><strong>Define a Schema</strong> — declare your fields and their types (text, integer, vector, etc.)</li>
 <li><strong>Build an Engine</strong> — attach an analyzer for text and an embedder for vectors</li>
