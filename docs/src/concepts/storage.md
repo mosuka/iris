@@ -52,10 +52,8 @@ use std::sync::Arc;
 use iris::Storage;
 use iris::storage::file::{FileStorage, FileStorageConfig};
 
-let config = FileStorageConfig {
-    base_path: "/tmp/iris-data".into(),
-};
-let storage: Arc<dyn Storage> = Arc::new(FileStorage::new(config)?);
+let config = FileStorageConfig::new("/tmp/iris-data");
+let storage: Arc<dyn Storage> = Arc::new(FileStorage::new("/tmp/iris-data", config)?);
 ```
 
 | Property | Value |
@@ -75,7 +73,7 @@ use iris::storage::file::{FileStorage, FileStorageConfig};
 
 let mut config = FileStorageConfig::new("/tmp/iris-data");
 config.use_mmap = true;  // enable memory-mapped I/O
-let storage: Arc<dyn Storage> = Arc::new(FileStorage::new(config)?);
+let storage: Arc<dyn Storage> = Arc::new(FileStorage::new("/tmp/iris-data", config)?);
 ```
 
 | Property | Value |

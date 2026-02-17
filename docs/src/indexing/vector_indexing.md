@@ -203,7 +203,7 @@ Quantization reduces memory usage by compressing vectors at the cost of some acc
 | Method | Enum Variant | Description | Memory Reduction |
 | :--- | :--- | :--- | :--- |
 | **Scalar 8-bit** | `Scalar8Bit` | Scalar quantization to 8-bit integers | ~4x |
-| **Product Quantization** | `ProductQuantization` | Splits vectors into sub-vectors and quantizes each | ~16-64x |
+| **Product Quantization** | `ProductQuantization { subvector_count }` | Splits vectors into sub-vectors and quantizes each | ~16-64x |
 
 ```rust
 use iris::vector::HnswOption;

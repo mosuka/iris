@@ -232,9 +232,12 @@ async fn main() -> iris::Result<()> {
         })
         .build();
 
+    // Configure analyzer and embedder (see Text Analysis and Embeddings docs)
+    // let analyzer = Arc::new(StandardAnalyzer::new()?);
+    // let embedder = Arc::new(CandleBertEmbedder::new("sentence-transformers/all-MiniLM-L6-v2")?);
     let engine = Engine::builder(storage, schema)
-        .analyzer(analyzer)
-        .embedder(Arc::new(per_field_embedder))
+        // .analyzer(analyzer)
+        // .embedder(embedder)
         .build()
         .await?;
 

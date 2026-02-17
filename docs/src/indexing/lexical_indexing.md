@@ -65,7 +65,7 @@ Each entry in a posting list contains:
 | Document ID | Internal `u64` identifier |
 | Term Frequency | How many times the term appears in this document |
 | Positions (optional) | Where in the document the term appears (needed for phrase queries) |
-| Field Length | Total number of terms in the field (used for BM25 normalization) |
+| Weight | Score weight for this posting |
 
 ## Numeric and Date Fields
 
@@ -146,7 +146,7 @@ Where `k1 = 1.2` and `b = 0.75` are the default tuning parameters.
 
 ## SIMD Optimization
 
-Posting list intersection and scoring operations leverage SIMD (Single Instruction, Multiple Data) instructions when available, providing significant speedups for large indexes.
+Vector distance calculations leverage SIMD (Single Instruction, Multiple Data) instructions when available, providing significant speedups for similarity computations in vector search.
 
 ## Code Example
 

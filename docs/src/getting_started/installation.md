@@ -16,7 +16,7 @@ Iris ships with a minimal default feature set. Enable additional features as nee
 
 | Feature | Description | Use Case |
 | :--- | :--- | :--- |
-| *(default)* | Lexical search, in-memory storage, standard analyzer | Keyword search only |
+| *(default)* | Core library (lexical search, storage, analyzers — no embedding) | Keyword search only |
 | `embeddings-candle` | Local BERT embeddings via Hugging Face Candle | Vector search without external API |
 | `embeddings-openai` | OpenAI API embeddings (text-embedding-3-small, etc.) | Cloud-based vector search |
 | `embeddings-multimodal` | CLIP embeddings for text + image via Candle | Multimodal (text-to-image) search |

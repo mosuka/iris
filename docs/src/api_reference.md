@@ -146,7 +146,7 @@ A collection of named field values.
 | `TermQuery::new(field, term)` | Exact term match | `TermQuery::new("body", "rust")` |
 | `PhraseQuery::new(field, terms)` | Exact phrase | `PhraseQuery::new("body", vec!["machine".into(), "learning".into()])` |
 | `BooleanQueryBuilder::new()` | Boolean combination | `.must(q1).should(q2).must_not(q3).build()` |
-| `FuzzyQuery::new(field, term, dist)` | Fuzzy match | `FuzzyQuery::new("body", "programing", 2)` |
+| `FuzzyQuery::new(field, term)` | Fuzzy match (default max_edits=2) | `FuzzyQuery::new("body", "programing").max_edits(1)` |
 | `WildcardQuery::new(field, pattern)` | Wildcard | `WildcardQuery::new("file", "*.pdf")` |
 | `NumericRangeQuery::new(...)` | Numeric range | See [Lexical Search](search/lexical_search.md) |
 | `GeoQuery::within_radius(...)` | Geo radius | See [Lexical Search](search/lexical_search.md) |
