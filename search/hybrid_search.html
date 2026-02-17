@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-bde4d09e.js";
+            window.path_to_searchindex_js = "../searchindex-e37c9676.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-2eec5043.js"></script>
@@ -400,9 +400,12 @@ async fn main() -&gt; iris::Result&lt;()&gt; {
         })
         .build();
 
+    // Configure analyzer and embedder (see Text Analysis and Embeddings docs)
+    // let analyzer = Arc::new(StandardAnalyzer::new()?);
+    // let embedder = Arc::new(CandleBertEmbedder::new("sentence-transformers/all-MiniLM-L6-v2")?);
     let engine = Engine::builder(storage, schema)
-        .analyzer(analyzer)
-        .embedder(Arc::new(per_field_embedder))
+        // .analyzer(analyzer)
+        // .embedder(embedder)
         .build()
         .await?;
 

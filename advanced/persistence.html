@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-bde4d09e.js";
+            window.path_to_searchindex_js = "../searchindex-e37c9676.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-2eec5043.js"></script>
@@ -187,7 +187,7 @@
     participant Mem as In-Memory Buffers
     participant Disk as Storage (segments)
 
-    App-&gt;&gt;Engine: add_document() / delete_document()
+    App-&gt;&gt;Engine: add_document() / delete_documents()
     Engine-&gt;&gt;WAL: 1. Append operation to WAL
     Engine-&gt;&gt;Mem: 2. Update in-memory buffers
 
@@ -195,18 +195,18 @@
 
     App-&gt;&gt;Engine: commit()
     Engine-&gt;&gt;Disk: 3. Flush segments to storage
-    Engine-&gt;&gt;WAL: 4. Record checkpoint
+    Engine-&gt;&gt;WAL: 4. Truncate WAL
     Note over Disk: Documents are now\nsearchable and durable
 </code></pre>
 <h3 id="key-principles"><a class="header" href="#key-principles">Key Principles</a></h3>
 <ol>
 <li><strong>WAL-first</strong>: Every write (add or delete) is appended to the WAL before updating in-memory structures</li>
 <li><strong>Buffered writes</strong>: In-memory buffers accumulate changes until <code>commit()</code> is called</li>
-<li><strong>Atomic commit</strong>: <code>commit()</code> flushes all buffered changes to segment files and records a checkpoint in the WAL</li>
+<li><strong>Atomic commit</strong>: <code>commit()</code> flushes all buffered changes to segment files and truncates the WAL</li>
 <li><strong>Crash safety</strong>: If the process crashes between writes and commit, the WAL is replayed on the next startup</li>
 </ol>
 <h2 id="write-ahead-log-wal"><a class="header" href="#write-ahead-log-wal">Write-Ahead Log (WAL)</a></h2>
-<p>The WAL is managed by the <code>DocumentLog</code> component and stored under the <code>documents/</code> prefix in the storage backend.</p>
+<p>The WAL is managed by the <code>DocumentLog</code> component and stored at the root level of the storage backend (<code>engine.wal</code>).</p>
 <h3 id="wal-entry-types"><a class="header" href="#wal-entry-types">WAL Entry Types</a></h3>
 <div class="table-wrapper">
 <table>
@@ -214,9 +214,8 @@
 <tr><th style="text-align: left">Entry Type</th><th style="text-align: left">Description</th></tr>
 </thead>
 <tbody>
-<tr><td style="text-align: left"><strong>Add</strong></td><td style="text-align: left">Document content + external ID + assigned internal ID</td></tr>
+<tr><td style="text-align: left"><strong>Upsert</strong></td><td style="text-align: left">Document content + external ID + assigned internal ID</td></tr>
 <tr><td style="text-align: left"><strong>Delete</strong></td><td style="text-align: left">External ID of the document to remove</td></tr>
-<tr><td style="text-align: left"><strong>Checkpoint</strong></td><td style="text-align: left">Marks a successful commit; entries before this are safely in segments</td></tr>
 </tbody>
 </table>
 </div>
@@ -228,7 +227,7 @@
 <li>Payload (document data or ID)</li>
 </ul>
 <h2 id="recovery"><a class="header" href="#recovery">Recovery</a></h2>
-<p>When an engine is built (<code>Engine::builder(...).build().await</code>), it automatically checks for uncommitted WAL entries and replays them:</p>
+<p>When an engine is built (<code>Engine::builder(...).build().await</code>), it automatically checks for remaining WAL entries and replays them (the WAL is truncated on commit, so any remaining entries are from a crashed session):</p>
 <pre><code class="language-mermaid">graph TD
     Start["Engine::build()"] --&gt; Check["Check WAL for\nuncommitted entries"]
     Check --&gt;|"Entries found"| Replay["Replay operations\ninto in-memory buffers"]

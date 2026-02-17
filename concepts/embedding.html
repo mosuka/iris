@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-bde4d09e.js";
+            window.path_to_searchindex_js = "../searchindex-e37c9676.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-2eec5043.js"></script>
@@ -184,12 +184,15 @@
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>#[async_trait]
-pub trait Embedder: Send + Sync {
+pub trait Embedder: Send + Sync + Debug {
     async fn embed(&amp;self, input: &amp;EmbedInput&lt;'_&gt;) -&gt; Result&lt;Vector&gt;;
+    async fn embed_batch(&amp;self, inputs: &amp;[EmbedInput&lt;'_&gt;]) -&gt; Result&lt;Vec&lt;Vector&gt;&gt;;
+    fn supported_input_types(&amp;self) -&gt; Vec&lt;EmbedInputType&gt;;
+    fn name(&amp;self) -&gt; &amp;str;
     fn as_any(&amp;self) -&gt; &amp;dyn Any;
 }
 <span class="boring">}</span></code></pre>
-<p>The <code>embed()</code> method returns a <code>Vector</code> (<code>Vec&lt;f32&gt;</code>) directly.</p>
+<p>The <code>embed()</code> method returns a <code>Vector</code> (a struct wrapping <code>Vec&lt;f32&gt;</code>).</p>
 <p><code>EmbedInput</code> supports two modalities:</p>
 <div class="table-wrapper">
 <table>
@@ -213,7 +216,7 @@ pub trait Embedder: Send + Sync {
 // Downloads model on first run (~80MB)
 let embedder = CandleBertEmbedder::new(
     "sentence-transformers/all-MiniLM-L6-v2"  // model name
-).await?;
+)?;
 // Output: 384-dimensional vector
 <span class="boring">}</span></code></pre>
 <div class="table-wrapper">
@@ -264,7 +267,7 @@ let embedder = OpenAIEmbedder::new(
 
 let embedder = CandleClipEmbedder::new(
     "openai/clip-vit-base-patch32"
-).await?;
+)?;
 // Text or images → 512-dimensional vector
 <span class="boring">}</span></code></pre>
 <div class="table-wrapper">
@@ -308,8 +311,9 @@ let embedder = PrecomputedEmbedder::new();  // no parameters needed
 </span>use std::sync::Arc;
 use iris::PerFieldEmbedder;
 
-let bert = Arc::new(CandleBertEmbedder::new("...").await?);
-let clip = Arc::new(CandleClipEmbedder::new("...").await?);
+let bert = Arc::new(CandleBertEmbedder::new("...")?);
+let clip = Arc::new(CandleClipEmbedder::new("...")?);
+
 
 let mut per_field = PerFieldEmbedder::new(bert.clone());
 per_field.add_embedder("text_vec", bert.clone());

@@ -36,7 +36,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-bde4d09e.js";
+            window.path_to_searchindex_js = "searchindex-e37c9676.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-2eec5043.js"></script>
@@ -352,7 +352,7 @@ tokio = { version = "1", features = ["full"] }
 <tr><th style="text-align: left">Feature</th><th style="text-align: left">Description</th><th style="text-align: left">Use Case</th></tr>
 </thead>
 <tbody>
-<tr><td style="text-align: left"><em>(default)</em></td><td style="text-align: left">Lexical search, in-memory storage, standard analyzer</td><td style="text-align: left">Keyword search only</td></tr>
+<tr><td style="text-align: left"><em>(default)</em></td><td style="text-align: left">Core library (lexical search, storage, analyzers — no embedding)</td><td style="text-align: left">Keyword search only</td></tr>
 <tr><td style="text-align: left"><code>embeddings-candle</code></td><td style="text-align: left">Local BERT embeddings via Hugging Face Candle</td><td style="text-align: left">Vector search without external API</td></tr>
 <tr><td style="text-align: left"><code>embeddings-openai</code></td><td style="text-align: left">OpenAI API embeddings (text-embedding-3-small, etc.)</td><td style="text-align: left">Cloud-based vector search</td></tr>
 <tr><td style="text-align: left"><code>embeddings-multimodal</code></td><td style="text-align: left">CLIP embeddings for text + image via Candle</td><td style="text-align: left">Multimodal (text-to-image) search</td></tr>
@@ -405,7 +405,7 @@ let storage: Arc&lt;dyn Storage&gt; = Arc::new(
 );
 <span class="boring">}</span></code></pre>
 <blockquote>
-<p><strong>Tip:</strong> For production, consider <code>FileStorage</code> or <code>MmapStorage</code>. See <a href="#storage-1">Storage</a> for details.</p>
+<p><strong>Tip:</strong> For production, consider <code>FileStorage</code> (with optional <code>use_mmap</code> for memory-mapped I/O). See <a href="#storage-1">Storage</a> for details.</p>
 </blockquote>
 <h2 id="step-2--define-a-schema"><a class="header" href="#step-2--define-a-schema">Step 2 — Define a Schema</a></h2>
 <p>A <code>Schema</code> declares the fields in your documents and how each field should be indexed:</p>
@@ -586,7 +586,7 @@ async fn main() -&gt; Result&lt;()&gt; {
         DL["DocumentLog\n(WAL + Document Storage)"]
     end
 
-    Storage["Storage (trait)\nMemory / File / Mmap"]
+    Storage["Storage (trait)\nMemory / File / File+Mmap"]
 
     LS --- Storage
     VS --- Storage
@@ -682,7 +682,7 @@ async fn main() -&gt; Result&lt;()&gt; {
     User-&gt;&gt;Engine: commit()
     Engine-&gt;&gt;Lexical: Flush segments to storage
     Engine-&gt;&gt;Vector: Flush segments to storage
-    Engine-&gt;&gt;WAL: Mark checkpoint
+    Engine-&gt;&gt;WAL: Truncate WAL
     Note over Engine: Documents are\nnow searchable
 </code></pre>
 <p>Key points:</p>
@@ -736,7 +736,7 @@ async fn main() -&gt; Result&lt;()&gt; {
     Engine --&gt; PS2["PrefixedStorage\nprefix: 'vector/'"]
     Engine --&gt; PS3["PrefixedStorage\nprefix: 'documents/'"]
 
-    PS1 --&gt; S["Storage Backend\n(Memory / File / Mmap)"]
+    PS1 --&gt; S["Storage Backend\n(Memory / File / File+Mmap)"]
     PS2 --&gt; S
     PS3 --&gt; S
 </code></pre>
@@ -748,7 +748,7 @@ async fn main() -&gt; Result&lt;()&gt; {
 <tbody>
 <tr><td style="text-align: left"><code>MemoryStorage</code></td><td style="text-align: left">All data in memory</td><td style="text-align: left">Testing, small datasets, ephemeral use</td></tr>
 <tr><td style="text-align: left"><code>FileStorage</code></td><td style="text-align: left">Standard file I/O</td><td style="text-align: left">General production use</td></tr>
-<tr><td style="text-align: left"><code>MmapStorage</code></td><td style="text-align: left">Memory-mapped files</td><td style="text-align: left">Large datasets, read-heavy workloads</td></tr>
+<tr><td style="text-align: left"><code>FileStorage</code> (mmap)</td><td style="text-align: left">Memory-mapped files (<code>use_mmap = true</code>)</td><td style="text-align: left">Large datasets, read-heavy workloads</td></tr>
 </tbody>
 </table>
 </div>
@@ -1020,16 +1020,18 @@ let v: DataValue = vec![0.1f32, 0.2].into(); // Vector
 <h2 id="the-analysis-pipeline"><a class="header" href="#the-analysis-pipeline">The Analysis Pipeline</a></h2>
 <pre><code class="language-mermaid">graph LR
     Input["Raw Text\n'The quick brown FOX jumps!'"]
+    CF["UnicodeNormalizationCharFilter"]
     T["Tokenizer\nSplit into words"]
     F1["LowercaseFilter"]
     F2["StopFilter"]
     F3["StemFilter"]
     Output["Terms\n'quick', 'brown', 'fox', 'jump'"]
 
-    Input --&gt; T --&gt; F1 --&gt; F2 --&gt; F3 --&gt; Output
+    Input --&gt; CF --&gt; T --&gt; F1 --&gt; F2 --&gt; F3 --&gt; Output
 </code></pre>
 <p>The analysis pipeline consists of:</p>
 <ol>
+<li><strong>Char Filters</strong> — normalize raw text at the character level before tokenization</li>
 <li><strong>Tokenizer</strong> — splits text into raw tokens (words, characters, n-grams)</li>
 <li><strong>Token Filters</strong> — transform, remove, or expand tokens (lowercase, stop words, stemming, synonyms)</li>
 </ol>
@@ -1037,8 +1039,10 @@ let v: DataValue = vec![0.1f32, 0.2].into(); // Vector
 <p>All analyzers implement the <code>Analyzer</code> trait:</p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>pub trait Analyzer: Send + Sync {
+</span>pub trait Analyzer: Send + Sync + Debug {
     fn analyze(&amp;self, text: &amp;str) -&gt; Result&lt;TokenStream&gt;;
+    fn name(&amp;self) -&gt; &amp;str;
+    fn as_any(&amp;self) -&gt; &amp;dyn Any;
 }
 <span class="boring">}</span></code></pre>
 <p><code>TokenStream</code> is a <code>Box&lt;dyn Iterator&lt;Item = Token&gt; + Send&gt;</code> — a lazy iterator over tokens.</p>
@@ -1051,16 +1055,20 @@ let v: DataValue = vec![0.1f32, 0.2].into(); // Vector
 <tbody>
 <tr><td style="text-align: left"><code>text</code></td><td style="text-align: left"><code>String</code></td><td style="text-align: left">The token text</td></tr>
 <tr><td style="text-align: left"><code>position</code></td><td style="text-align: left"><code>usize</code></td><td style="text-align: left">Position in the original text</td></tr>
+<tr><td style="text-align: left"><code>start_offset</code></td><td style="text-align: left"><code>usize</code></td><td style="text-align: left">Start byte offset in original text</td></tr>
+<tr><td style="text-align: left"><code>end_offset</code></td><td style="text-align: left"><code>usize</code></td><td style="text-align: left">End byte offset in original text</td></tr>
 <tr><td style="text-align: left"><code>position_increment</code></td><td style="text-align: left"><code>usize</code></td><td style="text-align: left">Distance from previous token</td></tr>
 <tr><td style="text-align: left"><code>position_length</code></td><td style="text-align: left"><code>usize</code></td><td style="text-align: left">Span of the token (&gt;1 for synonyms)</td></tr>
 <tr><td style="text-align: left"><code>boost</code></td><td style="text-align: left"><code>f32</code></td><td style="text-align: left">Token-level scoring weight</td></tr>
+<tr><td style="text-align: left"><code>stopped</code></td><td style="text-align: left"><code>bool</code></td><td style="text-align: left">Whether marked as a stop word</td></tr>
+<tr><td style="text-align: left"><code>metadata</code></td><td style="text-align: left"><code>Option&lt;TokenMetadata&gt;</code></td><td style="text-align: left">Additional token metadata</td></tr>
 </tbody>
 </table>
 </div>
 <h2 id="built-in-analyzers"><a class="header" href="#built-in-analyzers">Built-in Analyzers</a></h2>
 <h3 id="standardanalyzer"><a class="header" href="#standardanalyzer">StandardAnalyzer</a></h3>
 <p>The default analyzer. Suitable for most Western languages.</p>
-<p>Pipeline: <code>RegexTokenizer</code> (Unicode word boundaries) → <code>LowercaseFilter</code> → <code>StopFilter</code> (33 common English stop words)</p>
+<p>Pipeline: <code>RegexTokenizer</code> (Unicode word boundaries) → <code>LowercaseFilter</code> → <code>StopFilter</code> (128 common English stop words)</p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>use iris::analysis::analyzer::standard::StandardAnalyzer;
@@ -1071,7 +1079,7 @@ let analyzer = StandardAnalyzer::default();
 <span class="boring">}</span></code></pre>
 <h3 id="japaneseanalyzer"><a class="header" href="#japaneseanalyzer">JapaneseAnalyzer</a></h3>
 <p>Uses morphological analysis for Japanese text segmentation.</p>
-<p>Pipeline: <code>LinderaTokenizer</code> → <code>LowercaseFilter</code></p>
+<p>Pipeline: <code>UnicodeNormalizationCharFilter</code> (NFKC) → <code>JapaneseIterationMarkCharFilter</code> → <code>LinderaTokenizer</code> → <code>LowercaseFilter</code> → <code>StopFilter</code> (Japanese stop words)</p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>use iris::analysis::analyzer::japanese::JapaneseAnalyzer;
@@ -1085,24 +1093,28 @@ let analyzer = JapaneseAnalyzer::new()?;
 </span><span class="boring">fn main() {
 </span>use iris::analysis::analyzer::keyword::KeywordAnalyzer;
 
-let analyzer = KeywordAnalyzer;
+let analyzer = KeywordAnalyzer::new();
 // "Hello World" → ["Hello World"]
 <span class="boring">}</span></code></pre>
 <p>Use this for fields that should match exactly (categories, tags, status codes).</p>
 <h3 id="pipelineanalyzer"><a class="header" href="#pipelineanalyzer">PipelineAnalyzer</a></h3>
-<p>Build a custom pipeline by combining any tokenizer with any sequence of filters:</p>
+<p>Build a custom pipeline by combining any char filters, a tokenizer, and any sequence of token filters:</p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>use iris::analysis::analyzer::pipeline::PipelineAnalyzer;
+use iris::analysis::char_filter::unicode_normalize::{
+    NormalizationForm, UnicodeNormalizationCharFilter,
+};
 use iris::analysis::tokenizer::regex::RegexTokenizer;
 use iris::analysis::token_filter::lowercase::LowercaseFilter;
 use iris::analysis::token_filter::stop::StopFilter;
 use iris::analysis::token_filter::stem::StemFilter;
 
 let analyzer = PipelineAnalyzer::new(Arc::new(RegexTokenizer::new()?))
+    .add_char_filter(Arc::new(UnicodeNormalizationCharFilter::new(NormalizationForm::NFKC)))
     .add_filter(Arc::new(LowercaseFilter::new()))
     .add_filter(Arc::new(StopFilter::new()))
-    .add_filter(Arc::new(StemFilter::english()));
+    .add_filter(Arc::new(StemFilter::new()));  // Porter stemmer
 <span class="boring">}</span></code></pre>
 <h2 id="perfieldanalyzer"><a class="header" href="#perfieldanalyzer">PerFieldAnalyzer</a></h2>
 <p><code>PerFieldAnalyzer</code> lets you assign different analyzers to different fields within the same engine:</p>
@@ -1118,7 +1130,7 @@ let analyzer = PipelineAnalyzer::new(Arc::new(RegexTokenizer::new()?))
 </span>use std::sync::Arc;
 use iris::analysis::analyzer::standard::StandardAnalyzer;
 use iris::analysis::analyzer::keyword::KeywordAnalyzer;
-use iris::analysis::per_field::PerFieldAnalyzer;
+use iris::analysis::analyzer::per_field::PerFieldAnalyzer;
 
 // Default analyzer for fields not explicitly configured
 let mut per_field = PerFieldAnalyzer::new(
@@ -1126,8 +1138,8 @@ let mut per_field = PerFieldAnalyzer::new(
 );
 
 // Use KeywordAnalyzer for exact-match fields
-per_field.add_analyzer("category", Arc::new(KeywordAnalyzer));
-per_field.add_analyzer("status", Arc::new(KeywordAnalyzer));
+per_field.add_analyzer("category", Arc::new(KeywordAnalyzer::new()));
+per_field.add_analyzer("status", Arc::new(KeywordAnalyzer::new()));
 
 let engine = Engine::builder(storage, schema)
     .analyzer(Arc::new(per_field))
@@ -1137,6 +1149,119 @@ let engine = Engine::builder(storage, schema)
 <blockquote>
 <p><strong>Note:</strong> The <code>_id</code> field is always analyzed with <code>KeywordAnalyzer</code> regardless of configuration.</p>
 </blockquote>
+<h2 id="char-filters"><a class="header" href="#char-filters">Char Filters</a></h2>
+<p>Char filters operate on the raw input text <strong>before</strong> it reaches the tokenizer. They perform character-level normalization such as Unicode normalization, character mapping, and pattern-based replacement. This ensures that the tokenizer receives clean, normalized text.</p>
+<p>All char filters implement the <code>CharFilter</code> trait:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub trait CharFilter: Send + Sync {
+    fn filter(&amp;self, input: &amp;str) -&gt; (String, Vec&lt;Transformation&gt;);
+    fn name(&amp;self) -&gt; &amp;'static str;
+}
+<span class="boring">}</span></code></pre>
+<p>The <code>Transformation</code> records describe how character positions shifted, allowing the engine to map token positions back to the original text.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Char Filter</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>UnicodeNormalizationCharFilter</code></td><td style="text-align: left">Unicode normalization (NFC, NFD, NFKC, NFKD)</td></tr>
+<tr><td style="text-align: left"><code>MappingCharFilter</code></td><td style="text-align: left">Replaces character sequences based on a mapping dictionary</td></tr>
+<tr><td style="text-align: left"><code>PatternReplaceCharFilter</code></td><td style="text-align: left">Replaces characters matching a regex pattern</td></tr>
+<tr><td style="text-align: left"><code>JapaneseIterationMarkCharFilter</code></td><td style="text-align: left">Expands Japanese iteration marks (踊り字) to their base characters</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="unicodenormalizationcharfilter"><a class="header" href="#unicodenormalizationcharfilter">UnicodeNormalizationCharFilter</a></h3>
+<p>Applies Unicode normalization to the input text. NFKC is recommended for search use cases because it normalizes both compatibility characters and composed forms.</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use iris::analysis::char_filter::unicode_normalize::{
+    NormalizationForm, UnicodeNormalizationCharFilter,
+};
+
+let filter = UnicodeNormalizationCharFilter::new(NormalizationForm::NFKC);
+// "Ｓｏｎｙ" (fullwidth) → "Sony" (halfwidth)
+// "㌂" → "アンペア"
+<span class="boring">}</span></code></pre>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Form</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left">NFC</td><td style="text-align: left">Canonical decomposition followed by canonical composition</td></tr>
+<tr><td style="text-align: left">NFD</td><td style="text-align: left">Canonical decomposition</td></tr>
+<tr><td style="text-align: left">NFKC</td><td style="text-align: left">Compatibility decomposition followed by canonical composition</td></tr>
+<tr><td style="text-align: left">NFKD</td><td style="text-align: left">Compatibility decomposition</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="mappingcharfilter"><a class="header" href="#mappingcharfilter">MappingCharFilter</a></h3>
+<p>Replaces character sequences using a dictionary. Matches are found using the Aho-Corasick algorithm (leftmost-longest match).</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use std::collections::HashMap;
+use iris::analysis::char_filter::mapping::MappingCharFilter;
+
+let mut mapping = HashMap::new();
+mapping.insert("ph".to_string(), "f".to_string());
+mapping.insert("qu".to_string(), "k".to_string());
+
+let filter = MappingCharFilter::new(mapping)?;
+// "phone queue" → "fone keue"
+<span class="boring">}</span></code></pre>
+<h3 id="patternreplacecharfilter"><a class="header" href="#patternreplacecharfilter">PatternReplaceCharFilter</a></h3>
+<p>Replaces all occurrences of a regex pattern with a fixed string.</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use iris::analysis::char_filter::pattern_replace::PatternReplaceCharFilter;
+
+// Remove hyphens
+let filter = PatternReplaceCharFilter::new(r"-", "")?;
+// "123-456-789" → "123456789"
+
+// Normalize numbers
+let filter = PatternReplaceCharFilter::new(r"\d+", "NUM")?;
+// "Year 2024" → "Year NUM"
+<span class="boring">}</span></code></pre>
+<h3 id="japaneseiterationmarkcharfilter"><a class="header" href="#japaneseiterationmarkcharfilter">JapaneseIterationMarkCharFilter</a></h3>
+<p>Expands Japanese iteration marks (踊り字) to their base characters. Supports kanji (<code>々</code>), hiragana (<code>ゝ</code>, <code>ゞ</code>), and katakana (<code>ヽ</code>, <code>ヾ</code>) iteration marks.</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use iris::analysis::char_filter::japanese_iteration_mark::JapaneseIterationMarkCharFilter;
+
+let filter = JapaneseIterationMarkCharFilter::new(
+    true,  // normalize kanji iteration marks
+    true,  // normalize kana iteration marks
+);
+// "佐々木" → "佐佐木"
+// "いすゞ" → "いすず"
+<span class="boring">}</span></code></pre>
+<h3 id="using-char-filters-in-a-pipeline"><a class="header" href="#using-char-filters-in-a-pipeline">Using Char Filters in a Pipeline</a></h3>
+<p>Add char filters to a <code>PipelineAnalyzer</code> with <code>add_char_filter()</code>. Multiple char filters are applied in the order they are added, all before the tokenizer runs.</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use std::sync::Arc;
+use iris::analysis::analyzer::pipeline::PipelineAnalyzer;
+use iris::analysis::char_filter::unicode_normalize::{
+    NormalizationForm, UnicodeNormalizationCharFilter,
+};
+use iris::analysis::char_filter::pattern_replace::PatternReplaceCharFilter;
+use iris::analysis::tokenizer::regex::RegexTokenizer;
+use iris::analysis::token_filter::lowercase::LowercaseFilter;
+
+let analyzer = PipelineAnalyzer::new(Arc::new(RegexTokenizer::new()?))
+    .add_char_filter(Arc::new(
+        UnicodeNormalizationCharFilter::new(NormalizationForm::NFKC),
+    ))
+    .add_char_filter(Arc::new(
+        PatternReplaceCharFilter::new(r"-", "")?,
+    ))
+    .add_filter(Arc::new(LowercaseFilter::new()));
+// "Ｔｏｋｙｏ-2024" → NFKC → "Tokyo-2024" → remove hyphens → "Tokyo2024" → tokenize → lowercase → ["tokyo2024"]
+<span class="boring">}</span></code></pre>
 <h2 id="tokenizers"><a class="header" href="#tokenizers">Tokenizers</a></h2>
 <div class="table-wrapper">
 <table>
@@ -1145,7 +1270,9 @@ let engine = Engine::builder(storage, schema)
 </thead>
 <tbody>
 <tr><td style="text-align: left"><code>RegexTokenizer</code></td><td style="text-align: left">Unicode word boundaries; splits on whitespace and punctuation</td></tr>
+<tr><td style="text-align: left"><code>UnicodeWordTokenizer</code></td><td style="text-align: left">Splits on Unicode word boundaries</td></tr>
 <tr><td style="text-align: left"><code>WhitespaceTokenizer</code></td><td style="text-align: left">Splits on whitespace only</td></tr>
+<tr><td style="text-align: left"><code>WholeTokenizer</code></td><td style="text-align: left">Returns the entire input as a single token</td></tr>
 <tr><td style="text-align: left"><code>LinderaTokenizer</code></td><td style="text-align: left">Japanese morphological analysis (Lindera/MeCab)</td></tr>
 <tr><td style="text-align: left"><code>NgramTokenizer</code></td><td style="text-align: left">Generates n-gram tokens of configurable size</td></tr>
 </tbody>
@@ -1162,6 +1289,11 @@ let engine = Engine::builder(storage, schema)
 <tr><td style="text-align: left"><code>StopFilter</code></td><td style="text-align: left">Removes common words (“the”, “is”, “a”)</td></tr>
 <tr><td style="text-align: left"><code>StemFilter</code></td><td style="text-align: left">Reduces words to their root form (“running” → “run”)</td></tr>
 <tr><td style="text-align: left"><code>SynonymGraphFilter</code></td><td style="text-align: left">Expands tokens with synonyms from a dictionary</td></tr>
+<tr><td style="text-align: left"><code>BoostFilter</code></td><td style="text-align: left">Adjusts token boost values</td></tr>
+<tr><td style="text-align: left"><code>LimitFilter</code></td><td style="text-align: left">Limits the number of tokens</td></tr>
+<tr><td style="text-align: left"><code>StripFilter</code></td><td style="text-align: left">Strips leading/trailing whitespace from tokens</td></tr>
+<tr><td style="text-align: left"><code>FlattenGraphFilter</code></td><td style="text-align: left">Flattens token graphs (for synonym expansion)</td></tr>
+<tr><td style="text-align: left"><code>RemoveEmptyFilter</code></td><td style="text-align: left">Removes empty tokens</td></tr>
 </tbody>
 </table>
 </div>
@@ -1189,12 +1321,15 @@ let filter = SynonymGraphFilter::new(dict, true)
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>#[async_trait]
-pub trait Embedder: Send + Sync {
+pub trait Embedder: Send + Sync + Debug {
     async fn embed(&amp;self, input: &amp;EmbedInput&lt;'_&gt;) -&gt; Result&lt;Vector&gt;;
+    async fn embed_batch(&amp;self, inputs: &amp;[EmbedInput&lt;'_&gt;]) -&gt; Result&lt;Vec&lt;Vector&gt;&gt;;
+    fn supported_input_types(&amp;self) -&gt; Vec&lt;EmbedInputType&gt;;
+    fn name(&amp;self) -&gt; &amp;str;
     fn as_any(&amp;self) -&gt; &amp;dyn Any;
 }
 <span class="boring">}</span></code></pre>
-<p>The <code>embed()</code> method returns a <code>Vector</code> (<code>Vec&lt;f32&gt;</code>) directly.</p>
+<p>The <code>embed()</code> method returns a <code>Vector</code> (a struct wrapping <code>Vec&lt;f32&gt;</code>).</p>
 <p><code>EmbedInput</code> supports two modalities:</p>
 <div class="table-wrapper">
 <table>
@@ -1218,7 +1353,7 @@ pub trait Embedder: Send + Sync {
 // Downloads model on first run (~80MB)
 let embedder = CandleBertEmbedder::new(
     "sentence-transformers/all-MiniLM-L6-v2"  // model name
-).await?;
+)?;
 // Output: 384-dimensional vector
 <span class="boring">}</span></code></pre>
 <div class="table-wrapper">
@@ -1269,7 +1404,7 @@ let embedder = OpenAIEmbedder::new(
 
 let embedder = CandleClipEmbedder::new(
     "openai/clip-vit-base-patch32"
-).await?;
+)?;
 // Text or images → 512-dimensional vector
 <span class="boring">}</span></code></pre>
 <div class="table-wrapper">
@@ -1313,8 +1448,9 @@ let embedder = PrecomputedEmbedder::new();  // no parameters needed
 </span>use std::sync::Arc;
 use iris::PerFieldEmbedder;
 
-let bert = Arc::new(CandleBertEmbedder::new("...").await?);
-let clip = Arc::new(CandleClipEmbedder::new("...").await?);
+let bert = Arc::new(CandleBertEmbedder::new("...")?);
+let clip = Arc::new(CandleClipEmbedder::new("...")?);
+
 
 let mut per_field = PerFieldEmbedder::new(bert.clone());
 per_field.add_embedder("text_vec", bert.clone());
@@ -1422,10 +1558,8 @@ let storage: Arc&lt;dyn Storage&gt; = Arc::new(
 use iris::Storage;
 use iris::storage::file::{FileStorage, FileStorageConfig};
 
-let config = FileStorageConfig {
-    base_path: "/tmp/iris-data".into(),
-};
-let storage: Arc&lt;dyn Storage&gt; = Arc::new(FileStorage::new(config)?);
+let config = FileStorageConfig::new("/tmp/iris-data");
+let storage: Arc&lt;dyn Storage&gt; = Arc::new(FileStorage::new("/tmp/iris-data", config)?);
 <span class="boring">}</span></code></pre>
 <div class="table-wrapper">
 <table>
@@ -1449,7 +1583,7 @@ use iris::storage::file::{FileStorage, FileStorageConfig};
 
 let mut config = FileStorageConfig::new("/tmp/iris-data");
 config.use_mmap = true;  // enable memory-mapped I/O
-let storage: Arc&lt;dyn Storage&gt; = Arc::new(FileStorage::new(config)?);
+let storage: Arc&lt;dyn Storage&gt; = Arc::new(FileStorage::new("/tmp/iris-data", config)?);
 <span class="boring">}</span></code></pre>
 <div class="table-wrapper">
 <table>
@@ -1601,7 +1735,7 @@ let storage = StorageFactory::create(
 <tr><td style="text-align: left">Document ID</td><td style="text-align: left">Internal <code>u64</code> identifier</td></tr>
 <tr><td style="text-align: left">Term Frequency</td><td style="text-align: left">How many times the term appears in this document</td></tr>
 <tr><td style="text-align: left">Positions (optional)</td><td style="text-align: left">Where in the document the term appears (needed for phrase queries)</td></tr>
-<tr><td style="text-align: left">Field Length</td><td style="text-align: left">Total number of terms in the field (used for BM25 normalization)</td></tr>
+<tr><td style="text-align: left">Weight</td><td style="text-align: left">Score weight for this posting</td></tr>
 </tbody>
 </table>
 </div>
@@ -1674,7 +1808,7 @@ let storage = StorageFactory::create(
 </code></pre>
 <p>Where <code>k1 = 1.2</code> and <code>b = 0.75</code> are the default tuning parameters.</p>
 <h2 id="simd-optimization"><a class="header" href="#simd-optimization">SIMD Optimization</a></h2>
-<p>Posting list intersection and scoring operations leverage SIMD (Single Instruction, Multiple Data) instructions when available, providing significant speedups for large indexes.</p>
+<p>Vector distance calculations leverage SIMD (Single Instruction, Multiple Data) instructions when available, providing significant speedups for similarity computations in vector search.</p>
 <h2 id="code-example"><a class="header" href="#code-example">Code Example</a></h2>
 <pre class="playground"><code class="language-rust">use std::sync::Arc;
 use iris::{Document, Engine, Schema};
@@ -1923,7 +2057,7 @@ let metric = DistanceMetric::Angular;      // Angular distance
 </thead>
 <tbody>
 <tr><td style="text-align: left"><strong>Scalar 8-bit</strong></td><td style="text-align: left"><code>Scalar8Bit</code></td><td style="text-align: left">Scalar quantization to 8-bit integers</td><td style="text-align: left">~4x</td></tr>
-<tr><td style="text-align: left"><strong>Product Quantization</strong></td><td style="text-align: left"><code>ProductQuantization</code></td><td style="text-align: left">Splits vectors into sub-vectors and quantizes each</td><td style="text-align: left">~16-64x</td></tr>
+<tr><td style="text-align: left"><strong>Product Quantization</strong></td><td style="text-align: left"><code>ProductQuantization { subvector_count }</code></td><td style="text-align: left">Splits vectors into sub-vectors and quantizes each</td><td style="text-align: left">~16-64x</td></tr>
 </tbody>
 </table>
 </div>
@@ -2101,7 +2235,7 @@ let query = BooleanQueryBuilder::new()
 
 // Find documents matching "programing" within edit distance 2
 // This will match "programming", "programing", etc.
-let query = FuzzyQuery::new("body", "programing", 2);
+let query = FuzzyQuery::new("body", "programing");  // default max_edits = 2
 <span class="boring">}</span></code></pre>
 <h3 id="wildcardquery"><a class="header" href="#wildcardquery">WildcardQuery</a></h3>
 <p>Matches terms using wildcard patterns.</p>
@@ -2110,9 +2244,9 @@ let query = FuzzyQuery::new("body", "programing", 2);
 </span>use iris::lexical::query::wildcard::WildcardQuery;
 
 // '?' matches exactly one character, '*' matches zero or more
-let query = WildcardQuery::new("filename", "*.pdf");
-let query = WildcardQuery::new("body", "pro*");
-let query = WildcardQuery::new("body", "col?r");  // matches "color" and "colour"
+let query = WildcardQuery::new("filename", "*.pdf")?;
+let query = WildcardQuery::new("body", "pro*")?;
+let query = WildcardQuery::new("body", "col?r")?;  // matches "color" and "colour"
 <span class="boring">}</span></code></pre>
 <h3 id="numericrangequery"><a class="header" href="#numericrangequery">NumericRangeQuery</a></h3>
 <p>Matches documents with numeric field values within a range.</p>
@@ -2285,11 +2419,7 @@ let request = VectorSearchRequestBuilder::new()
     .add_text("text_vec", "machine learning")
 
     // Or use a pre-computed vector directly
-    .add_vector(QueryVector {
-        vector: vec![0.1, 0.2, 0.3, ...],
-        weight: 1.0,
-        fields: Some(vec!["embedding".to_string()]),
-    })
+    .add_vector("embedding", vec![0.1, 0.2, 0.3, /* ... */])
 
     // Search parameters
     .limit(20)
@@ -2304,7 +2434,7 @@ let request = VectorSearchRequestBuilder::new()
 </thead>
 <tbody>
 <tr><td style="text-align: left"><code>add_text(field, text)</code></td><td style="text-align: left">Add a text query for a specific field (embedded at search time)</td></tr>
-<tr><td style="text-align: left"><code>add_vector(QueryVector)</code></td><td style="text-align: left">Add a pre-computed query vector</td></tr>
+<tr><td style="text-align: left"><code>add_vector(field, vector)</code></td><td style="text-align: left">Add a pre-computed query vector for a specific field</td></tr>
 <tr><td style="text-align: left"><code>limit(n)</code></td><td style="text-align: left">Maximum number of results</td></tr>
 </tbody>
 </table>
@@ -2328,6 +2458,7 @@ let request = VectorSearchRequestBuilder::new()
 <tbody>
 <tr><td style="text-align: left"><code>WeightedSum</code> (default)</td><td style="text-align: left">Sum of (similarity * weight) across all clauses</td></tr>
 <tr><td style="text-align: left"><code>MaxSim</code></td><td style="text-align: left">Maximum similarity score across clauses</td></tr>
+<tr><td style="text-align: left"><code>LateInteraction</code></td><td style="text-align: left">ColBERT-style late interaction scoring</td></tr>
 </tbody>
 </table>
 </div>
@@ -2678,9 +2809,12 @@ async fn main() -&gt; iris::Result&lt;()&gt; {
         })
         .build();
 
+    // Configure analyzer and embedder (see Text Analysis and Embeddings docs)
+    // let analyzer = Arc::new(StandardAnalyzer::new()?);
+    // let embedder = Arc::new(CandleBertEmbedder::new("sentence-transformers/all-MiniLM-L6-v2")?);
     let engine = Engine::builder(storage, schema)
-        .analyzer(analyzer)
-        .embedder(Arc::new(per_field_embedder))
+        // .analyzer(analyzer)
+        // .embedder(embedder)
         .build()
         .await?;
 
@@ -2795,7 +2929,7 @@ price:[* TO 100]
 <pre><code class="language-text">(title:hello OR title:hi) AND body:world
 </code></pre>
 <h3 id="peg-grammar"><a class="header" href="#peg-grammar">PEG Grammar</a></h3>
-<p>The full lexical grammar (<a href="https://github.com/mosuka/iris/blob/main/src/lexical/query/parser.pest">parser.pest</a>):</p>
+<p>The full lexical grammar (<a href="https://github.com/mosuka/iris/blob/main/iris/src/lexical/query/parser.pest">parser.pest</a>):</p>
 <pre><code class="language-pest">query          = { SOI ~ boolean_query ~ EOI }
 boolean_query  = { clause ~ (boolean_op ~ clause | clause)* }
 clause         = { required_clause | prohibited_clause | sub_clause }
@@ -2878,7 +3012,7 @@ metadata.embedding:~"text"
 request.score_mode = VectorScoreMode::MaxSim;
 <span class="boring">}</span></code></pre>
 <h3 id="peg-grammar-1"><a class="header" href="#peg-grammar-1">PEG Grammar</a></h3>
-<p>The full vector grammar (<a href="https://github.com/mosuka/iris/blob/main/src/vector/query/parser.pest">parser.pest</a>):</p>
+<p>The full vector grammar (<a href="https://github.com/mosuka/iris/blob/main/iris/src/vector/query/parser.pest">parser.pest</a>):</p>
 <pre><code class="language-pest">query          = { SOI ~ vector_clause+ ~ EOI }
 vector_clause  = { field_prefix? ~ "~" ~ quoted_text ~ boost? }
 field_prefix   = { field_name ~ ":" }
@@ -2970,9 +3104,9 @@ let unified = UnifiedQueryParser::new(lexical_parser, vector_parser);
 let request = unified.parse(
     r#"title:hello content:~"cute kitten"^0.8"#
 ).await?;
-// request.lexical  -&gt; Some(...)  — lexical query
-// request.vector   -&gt; Some(...)  — vector query
-// request.fusion   -&gt; Some(RRF)  — fusion algorithm
+// request.lexical_search_request  -&gt; Some(...)  — lexical query
+// request.vector_search_request   -&gt; Some(...)  — vector query
+// request.fusion_algorithm        -&gt; Some(RRF)  — fusion algorithm
 <span class="boring">}</span></code></pre>
 <h3 id="custom-fusion"><a class="header" href="#custom-fusion">Custom Fusion</a></h3>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
@@ -3025,10 +3159,10 @@ let unified = UnifiedQueryParser::new(lexical_parser, vector_parser)
 </ol>
 <h2 id="id-lifecycle"><a class="header" href="#id-lifecycle">ID Lifecycle</a></h2>
 <ol>
-<li><strong>Registration (<code>engine.index()</code>)</strong>: User provides a document with an External ID.</li>
+<li><strong>Registration (<code>engine.put_document()</code> / <code>engine.add_document()</code>)</strong>: User provides a document with an External ID.</li>
 <li><strong>ID Assignment</strong>: The <code>Engine</code> combines the current <code>shard_id</code> with a new Local ID to issue a Shard-Prefixed Internal ID.</li>
 <li><strong>Mapping</strong>: The engine maintains the relationship between the External ID and the new Internal ID.</li>
-<li><strong>Search</strong>: Search results return the <code>u64</code> Internal ID for efficiency.</li>
+<li><strong>Search</strong>: Search results return the External ID (<code>String</code>), resolved from the Internal ID.</li>
 <li><strong>Retrieval/Deletion</strong>: While the user-facing API accepts External IDs for convenience, the engine internally converts them to Internal IDs for near-instant processing.</li>
 </ol>
 <div style="break-before: page; page-break-before: always;"></div>
@@ -3042,7 +3176,7 @@ let unified = UnifiedQueryParser::new(lexical_parser, vector_parser)
     participant Mem as In-Memory Buffers
     participant Disk as Storage (segments)
 
-    App-&gt;&gt;Engine: add_document() / delete_document()
+    App-&gt;&gt;Engine: add_document() / delete_documents()
     Engine-&gt;&gt;WAL: 1. Append operation to WAL
     Engine-&gt;&gt;Mem: 2. Update in-memory buffers
 
@@ -3050,18 +3184,18 @@ let unified = UnifiedQueryParser::new(lexical_parser, vector_parser)
 
     App-&gt;&gt;Engine: commit()
     Engine-&gt;&gt;Disk: 3. Flush segments to storage
-    Engine-&gt;&gt;WAL: 4. Record checkpoint
+    Engine-&gt;&gt;WAL: 4. Truncate WAL
     Note over Disk: Documents are now\nsearchable and durable
 </code></pre>
 <h3 id="key-principles"><a class="header" href="#key-principles">Key Principles</a></h3>
 <ol>
 <li><strong>WAL-first</strong>: Every write (add or delete) is appended to the WAL before updating in-memory structures</li>
 <li><strong>Buffered writes</strong>: In-memory buffers accumulate changes until <code>commit()</code> is called</li>
-<li><strong>Atomic commit</strong>: <code>commit()</code> flushes all buffered changes to segment files and records a checkpoint in the WAL</li>
+<li><strong>Atomic commit</strong>: <code>commit()</code> flushes all buffered changes to segment files and truncates the WAL</li>
 <li><strong>Crash safety</strong>: If the process crashes between writes and commit, the WAL is replayed on the next startup</li>
 </ol>
 <h2 id="write-ahead-log-wal"><a class="header" href="#write-ahead-log-wal">Write-Ahead Log (WAL)</a></h2>
-<p>The WAL is managed by the <code>DocumentLog</code> component and stored under the <code>documents/</code> prefix in the storage backend.</p>
+<p>The WAL is managed by the <code>DocumentLog</code> component and stored at the root level of the storage backend (<code>engine.wal</code>).</p>
 <h3 id="wal-entry-types"><a class="header" href="#wal-entry-types">WAL Entry Types</a></h3>
 <div class="table-wrapper">
 <table>
@@ -3069,9 +3203,8 @@ let unified = UnifiedQueryParser::new(lexical_parser, vector_parser)
 <tr><th style="text-align: left">Entry Type</th><th style="text-align: left">Description</th></tr>
 </thead>
 <tbody>
-<tr><td style="text-align: left"><strong>Add</strong></td><td style="text-align: left">Document content + external ID + assigned internal ID</td></tr>
+<tr><td style="text-align: left"><strong>Upsert</strong></td><td style="text-align: left">Document content + external ID + assigned internal ID</td></tr>
 <tr><td style="text-align: left"><strong>Delete</strong></td><td style="text-align: left">External ID of the document to remove</td></tr>
-<tr><td style="text-align: left"><strong>Checkpoint</strong></td><td style="text-align: left">Marks a successful commit; entries before this are safely in segments</td></tr>
 </tbody>
 </table>
 </div>
@@ -3083,7 +3216,7 @@ let unified = UnifiedQueryParser::new(lexical_parser, vector_parser)
 <li>Payload (document data or ID)</li>
 </ul>
 <h2 id="recovery"><a class="header" href="#recovery">Recovery</a></h2>
-<p>When an engine is built (<code>Engine::builder(...).build().await</code>), it automatically checks for uncommitted WAL entries and replays them:</p>
+<p>When an engine is built (<code>Engine::builder(...).build().await</code>), it automatically checks for remaining WAL entries and replays them (the WAL is truncated on commit, so any remaining entries are from a crashed session):</p>
 <pre><code class="language-mermaid">graph TD
     Start["Engine::build()"] --&gt; Check["Check WAL for\nuncommitted entries"]
     Check --&gt;|"Entries found"| Replay["Replay operations\ninto in-memory buffers"]
@@ -3155,13 +3288,13 @@ engine.add_document("doc-3", doc3).await?;
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// Delete a document by its external ID
-engine.delete_document("doc-1").await?;
+engine.delete_documents("doc-1").await?;
 engine.commit().await?;
 <span class="boring">}</span></code></pre>
 <h2 id="logical-deletion"><a class="header" href="#logical-deletion">Logical Deletion</a></h2>
 <p>When a document is deleted, it is <strong>not</strong> immediately removed from the index files. Instead:</p>
 <pre><code class="language-mermaid">graph LR
-    Del["delete_document('doc-1')"] --&gt; Bitmap["Add internal ID\nto Deletion Bitmap"]
+    Del["delete_documents('doc-1')"] --&gt; Bitmap["Add internal ID\nto Deletion Bitmap"]
     Bitmap --&gt; Search["Search skips\ndeleted IDs"]
 </code></pre>
 <ol>
@@ -3192,11 +3325,11 @@ engine.commit().await?;
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// First insert
-engine.add_document("doc-1", doc_v1).await?;
+engine.put_document("doc-1", doc_v1).await?;
 engine.commit().await?;
 
 // Update: old version is logically deleted, new version is inserted
-engine.add_document("doc-1", doc_v2).await?;
+engine.put_document("doc-1", doc_v2).await?;
 engine.commit().await?;
 <span class="boring">}</span></code></pre>
 <h2 id="physical-compaction"><a class="header" href="#physical-compaction">Physical Compaction</a></h2>
@@ -3246,11 +3379,10 @@ engine.commit().await?;
 <li><strong>After bulk updates</strong>: Compact after a large batch of upserts</li>
 </ul>
 <h2 id="deletion-bitmap"><a class="header" href="#deletion-bitmap">Deletion Bitmap</a></h2>
-<p>The deletion bitmap is a compact, memory-efficient data structure that tracks which internal IDs have been deleted:</p>
+<p>The deletion bitmap tracks which internal IDs have been deleted:</p>
 <ul>
-<li><strong>Storage</strong>: One bit per document ID</li>
-<li><strong>Lookup</strong>: O(1) — simple bit test</li>
-<li><strong>Memory</strong>: Minimal — a bitmap for 1 million documents uses ~125 KB</li>
+<li><strong>Storage</strong>: HashSet of deleted document IDs (<code>AHashSet&lt;u64&gt;</code>)</li>
+<li><strong>Lookup</strong>: O(1) — hash set lookup</li>
 </ul>
 <p>The bitmap is persisted alongside the index segments and is rebuilt from the WAL during recovery.</p>
 <h2 id="next-steps-9"><a class="header" href="#next-steps-9">Next Steps</a></h2>
@@ -3457,7 +3589,7 @@ engine.commit().await?;
 <tr><td style="text-align: left"><code>TermQuery::new(field, term)</code></td><td style="text-align: left">Exact term match</td><td style="text-align: left"><code>TermQuery::new("body", "rust")</code></td></tr>
 <tr><td style="text-align: left"><code>PhraseQuery::new(field, terms)</code></td><td style="text-align: left">Exact phrase</td><td style="text-align: left"><code>PhraseQuery::new("body", vec!["machine".into(), "learning".into()])</code></td></tr>
 <tr><td style="text-align: left"><code>BooleanQueryBuilder::new()</code></td><td style="text-align: left">Boolean combination</td><td style="text-align: left"><code>.must(q1).should(q2).must_not(q3).build()</code></td></tr>
-<tr><td style="text-align: left"><code>FuzzyQuery::new(field, term, dist)</code></td><td style="text-align: left">Fuzzy match</td><td style="text-align: left"><code>FuzzyQuery::new("body", "programing", 2)</code></td></tr>
+<tr><td style="text-align: left"><code>FuzzyQuery::new(field, term)</code></td><td style="text-align: left">Fuzzy match (default max_edits=2)</td><td style="text-align: left"><code>FuzzyQuery::new("body", "programing").max_edits(1)</code></td></tr>
 <tr><td style="text-align: left"><code>WildcardQuery::new(field, pattern)</code></td><td style="text-align: left">Wildcard</td><td style="text-align: left"><code>WildcardQuery::new("file", "*.pdf")</code></td></tr>
 <tr><td style="text-align: left"><code>NumericRangeQuery::new(...)</code></td><td style="text-align: left">Numeric range</td><td style="text-align: left">See <a href="#lexical-search-1">Lexical Search</a></td></tr>
 <tr><td style="text-align: left"><code>GeoQuery::within_radius(...)</code></td><td style="text-align: left">Geo radius</td><td style="text-align: left">See <a href="#lexical-search-1">Lexical Search</a></td></tr>

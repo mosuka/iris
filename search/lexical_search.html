@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-bde4d09e.js";
+            window.path_to_searchindex_js = "../searchindex-e37c9676.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-2eec5043.js"></script>
@@ -255,7 +255,7 @@ let query = BooleanQueryBuilder::new()
 
 // Find documents matching "programing" within edit distance 2
 // This will match "programming", "programing", etc.
-let query = FuzzyQuery::new("body", "programing", 2);
+let query = FuzzyQuery::new("body", "programing");  // default max_edits = 2
 <span class="boring">}</span></code></pre>
 <h3 id="wildcardquery"><a class="header" href="#wildcardquery">WildcardQuery</a></h3>
 <p>Matches terms using wildcard patterns.</p>
@@ -264,9 +264,9 @@ let query = FuzzyQuery::new("body", "programing", 2);
 </span>use iris::lexical::query::wildcard::WildcardQuery;
 
 // '?' matches exactly one character, '*' matches zero or more
-let query = WildcardQuery::new("filename", "*.pdf");
-let query = WildcardQuery::new("body", "pro*");
-let query = WildcardQuery::new("body", "col?r");  // matches "color" and "colour"
+let query = WildcardQuery::new("filename", "*.pdf")?;
+let query = WildcardQuery::new("body", "pro*")?;
+let query = WildcardQuery::new("body", "col?r")?;  // matches "color" and "colour"
 <span class="boring">}</span></code></pre>
 <h3 id="numericrangequery"><a class="header" href="#numericrangequery">NumericRangeQuery</a></h3>
 <p>Matches documents with numeric field values within a range.</p>

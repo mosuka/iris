@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-bde4d09e.js";
+            window.path_to_searchindex_js = "../searchindex-e37c9676.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-2eec5043.js"></script>
@@ -228,10 +228,8 @@ let storage: Arc&lt;dyn Storage&gt; = Arc::new(
 use iris::Storage;
 use iris::storage::file::{FileStorage, FileStorageConfig};
 
-let config = FileStorageConfig {
-    base_path: "/tmp/iris-data".into(),
-};
-let storage: Arc&lt;dyn Storage&gt; = Arc::new(FileStorage::new(config)?);
+let config = FileStorageConfig::new("/tmp/iris-data");
+let storage: Arc&lt;dyn Storage&gt; = Arc::new(FileStorage::new("/tmp/iris-data", config)?);
 <span class="boring">}</span></code></pre>
 <div class="table-wrapper">
 <table>
@@ -255,7 +253,7 @@ use iris::storage::file::{FileStorage, FileStorageConfig};
 
 let mut config = FileStorageConfig::new("/tmp/iris-data");
 config.use_mmap = true;  // enable memory-mapped I/O
-let storage: Arc&lt;dyn Storage&gt; = Arc::new(FileStorage::new(config)?);
+let storage: Arc&lt;dyn Storage&gt; = Arc::new(FileStorage::new("/tmp/iris-data", config)?);
 <span class="boring">}</span></code></pre>
 <div class="table-wrapper">
 <table>

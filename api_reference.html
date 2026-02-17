@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-bde4d09e.js";
+            window.path_to_searchindex_js = "searchindex-e37c9676.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-2eec5043.js"></script>
@@ -375,7 +375,7 @@
 <tr><td style="text-align: left"><code>TermQuery::new(field, term)</code></td><td style="text-align: left">Exact term match</td><td style="text-align: left"><code>TermQuery::new("body", "rust")</code></td></tr>
 <tr><td style="text-align: left"><code>PhraseQuery::new(field, terms)</code></td><td style="text-align: left">Exact phrase</td><td style="text-align: left"><code>PhraseQuery::new("body", vec!["machine".into(), "learning".into()])</code></td></tr>
 <tr><td style="text-align: left"><code>BooleanQueryBuilder::new()</code></td><td style="text-align: left">Boolean combination</td><td style="text-align: left"><code>.must(q1).should(q2).must_not(q3).build()</code></td></tr>
-<tr><td style="text-align: left"><code>FuzzyQuery::new(field, term, dist)</code></td><td style="text-align: left">Fuzzy match</td><td style="text-align: left"><code>FuzzyQuery::new("body", "programing", 2)</code></td></tr>
+<tr><td style="text-align: left"><code>FuzzyQuery::new(field, term)</code></td><td style="text-align: left">Fuzzy match (default max_edits=2)</td><td style="text-align: left"><code>FuzzyQuery::new("body", "programing").max_edits(1)</code></td></tr>
 <tr><td style="text-align: left"><code>WildcardQuery::new(field, pattern)</code></td><td style="text-align: left">Wildcard</td><td style="text-align: left"><code>WildcardQuery::new("file", "*.pdf")</code></td></tr>
 <tr><td style="text-align: left"><code>NumericRangeQuery::new(...)</code></td><td style="text-align: left">Numeric range</td><td style="text-align: left">See <a href="search/lexical_search.html">Lexical Search</a></td></tr>
 <tr><td style="text-align: left"><code>GeoQuery::within_radius(...)</code></td><td style="text-align: left">Geo radius</td><td style="text-align: left">See <a href="search/lexical_search.html">Lexical Search</a></td></tr>

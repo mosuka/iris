@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-bde4d09e.js";
+            window.path_to_searchindex_js = "../searchindex-e37c9676.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-2eec5043.js"></script>
@@ -183,13 +183,13 @@
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// Delete a document by its external ID
-engine.delete_document("doc-1").await?;
+engine.delete_documents("doc-1").await?;
 engine.commit().await?;
 <span class="boring">}</span></code></pre>
 <h2 id="logical-deletion"><a class="header" href="#logical-deletion">Logical Deletion</a></h2>
 <p>When a document is deleted, it is <strong>not</strong> immediately removed from the index files. Instead:</p>
 <pre><code class="language-mermaid">graph LR
-    Del["delete_document('doc-1')"] --&gt; Bitmap["Add internal ID\nto Deletion Bitmap"]
+    Del["delete_documents('doc-1')"] --&gt; Bitmap["Add internal ID\nto Deletion Bitmap"]
     Bitmap --&gt; Search["Search skips\ndeleted IDs"]
 </code></pre>
 <ol>
@@ -220,11 +220,11 @@ engine.commit().await?;
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// First insert
-engine.add_document("doc-1", doc_v1).await?;
+engine.put_document("doc-1", doc_v1).await?;
 engine.commit().await?;
 
 // Update: old version is logically deleted, new version is inserted
-engine.add_document("doc-1", doc_v2).await?;
+engine.put_document("doc-1", doc_v2).await?;
 engine.commit().await?;
 <span class="boring">}</span></code></pre>
 <h2 id="physical-compaction"><a class="header" href="#physical-compaction">Physical Compaction</a></h2>
@@ -274,11 +274,10 @@ engine.commit().await?;
 <li><strong>After bulk updates</strong>: Compact after a large batch of upserts</li>
 </ul>
 <h2 id="deletion-bitmap"><a class="header" href="#deletion-bitmap">Deletion Bitmap</a></h2>
-<p>The deletion bitmap is a compact, memory-efficient data structure that tracks which internal IDs have been deleted:</p>
+<p>The deletion bitmap tracks which internal IDs have been deleted:</p>
 <ul>
-<li><strong>Storage</strong>: One bit per document ID</li>
-<li><strong>Lookup</strong>: O(1) — simple bit test</li>
-<li><strong>Memory</strong>: Minimal — a bitmap for 1 million documents uses ~125 KB</li>
+<li><strong>Storage</strong>: HashSet of deleted document IDs (<code>AHashSet&lt;u64&gt;</code>)</li>
+<li><strong>Lookup</strong>: O(1) — hash set lookup</li>
 </ul>
 <p>The bitmap is persisted alongside the index segments and is rebuilt from the WAL during recovery.</p>
 <h2 id="next-steps"><a class="header" href="#next-steps">Next Steps</a></h2>

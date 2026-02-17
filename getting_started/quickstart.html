@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-bde4d09e.js";
+            window.path_to_searchindex_js = "../searchindex-e37c9676.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-2eec5043.js"></script>
@@ -192,7 +192,7 @@ let storage: Arc&lt;dyn Storage&gt; = Arc::new(
 );
 <span class="boring">}</span></code></pre>
 <blockquote>
-<p><strong>Tip:</strong> For production, consider <code>FileStorage</code> or <code>MmapStorage</code>. See <a href="../concepts/storage.html">Storage</a> for details.</p>
+<p><strong>Tip:</strong> For production, consider <code>FileStorage</code> (with optional <code>use_mmap</code> for memory-mapped I/O). See <a href="../concepts/storage.html">Storage</a> for details.</p>
 </blockquote>
 <h2 id="step-2--define-a-schema"><a class="header" href="#step-2--define-a-schema">Step 2 — Define a Schema</a></h2>
 <p>A <code>Schema</code> declares the fields in your documents and how each field should be indexed:</p>
