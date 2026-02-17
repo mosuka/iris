@@ -81,7 +81,7 @@ use iris::lexical::query::fuzzy::FuzzyQuery;
 
 // Find documents matching "programing" within edit distance 2
 // This will match "programming", "programing", etc.
-let query = FuzzyQuery::new("body", "programing", 2);
+let query = FuzzyQuery::new("body", "programing");  // default max_edits = 2
 ```
 
 ### WildcardQuery
@@ -92,9 +92,9 @@ Matches terms using wildcard patterns.
 use iris::lexical::query::wildcard::WildcardQuery;
 
 // '?' matches exactly one character, '*' matches zero or more
-let query = WildcardQuery::new("filename", "*.pdf");
-let query = WildcardQuery::new("body", "pro*");
-let query = WildcardQuery::new("body", "col?r");  // matches "color" and "colour"
+let query = WildcardQuery::new("filename", "*.pdf")?;
+let query = WildcardQuery::new("body", "pro*")?;
+let query = WildcardQuery::new("body", "col?r")?;  // matches "color" and "colour"
 ```
 
 ### NumericRangeQuery

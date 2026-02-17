@@ -8,13 +8,16 @@ All embedders implement the `Embedder` trait:
 
 ```rust
 #[async_trait]
-pub trait Embedder: Send + Sync {
+pub trait Embedder: Send + Sync + Debug {
     async fn embed(&self, input: &EmbedInput<'_>) -> Result<Vector>;
+    async fn embed_batch(&self, inputs: &[EmbedInput<'_>]) -> Result<Vec<Vector>>;
+    fn supported_input_types(&self) -> Vec<EmbedInputType>;
+    fn name(&self) -> &str;
     fn as_any(&self) -> &dyn Any;
 }
 ```
 
-The `embed()` method returns a `Vector` (`Vec<f32>`) directly.
+The `embed()` method returns a `Vector` (a struct wrapping `Vec<f32>`).
 
 `EmbedInput` supports two modalities:
 
@@ -37,7 +40,7 @@ use iris::CandleBertEmbedder;
 // Downloads model on first run (~80MB)
 let embedder = CandleBertEmbedder::new(
     "sentence-transformers/all-MiniLM-L6-v2"  // model name
-).await?;
+)?;
 // Output: 384-dimensional vector
 ```
 
@@ -82,7 +85,7 @@ use iris::CandleClipEmbedder;
 
 let embedder = CandleClipEmbedder::new(
     "openai/clip-vit-base-patch32"
-).await?;
+)?;
 // Text or images → 512-dimensional vector
 ```
 
@@ -127,8 +130,9 @@ graph LR
 use std::sync::Arc;
 use iris::PerFieldEmbedder;
 
-let bert = Arc::new(CandleBertEmbedder::new("...").await?);
-let clip = Arc::new(CandleClipEmbedder::new("...").await?);
+let bert = Arc::new(CandleBertEmbedder::new("...")?);
+let clip = Arc::new(CandleClipEmbedder::new("...")?);
+
 
 let mut per_field = PerFieldEmbedder::new(bert.clone());
 per_field.add_embedder("text_vec", bert.clone());

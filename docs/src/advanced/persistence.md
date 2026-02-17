@@ -12,7 +12,7 @@ sequenceDiagram
     participant Mem as In-Memory Buffers
     participant Disk as Storage (segments)
 
-    App->>Engine: add_document() / delete_document()
+    App->>Engine: add_document() / delete_documents()
     Engine->>WAL: 1. Append operation to WAL
     Engine->>Mem: 2. Update in-memory buffers
 
@@ -20,7 +20,7 @@ sequenceDiagram
 
     App->>Engine: commit()
     Engine->>Disk: 3. Flush segments to storage
-    Engine->>WAL: 4. Record checkpoint
+    Engine->>WAL: 4. Truncate WAL
     Note over Disk: Documents are now\nsearchable and durable
 ```
 
@@ -28,20 +28,19 @@ sequenceDiagram
 
 1. **WAL-first**: Every write (add or delete) is appended to the WAL before updating in-memory structures
 2. **Buffered writes**: In-memory buffers accumulate changes until `commit()` is called
-3. **Atomic commit**: `commit()` flushes all buffered changes to segment files and records a checkpoint in the WAL
+3. **Atomic commit**: `commit()` flushes all buffered changes to segment files and truncates the WAL
 4. **Crash safety**: If the process crashes between writes and commit, the WAL is replayed on the next startup
 
 ## Write-Ahead Log (WAL)
 
-The WAL is managed by the `DocumentLog` component and stored under the `documents/` prefix in the storage backend.
+The WAL is managed by the `DocumentLog` component and stored at the root level of the storage backend (`engine.wal`).
 
 ### WAL Entry Types
 
 | Entry Type | Description |
 | :--- | :--- |
-| **Add** | Document content + external ID + assigned internal ID |
+| **Upsert** | Document content + external ID + assigned internal ID |
 | **Delete** | External ID of the document to remove |
-| **Checkpoint** | Marks a successful commit; entries before this are safely in segments |
 
 ### WAL File
 
@@ -53,7 +52,7 @@ The WAL file (`engine.wal`) is an append-only binary log. Each entry is self-con
 
 ## Recovery
 
-When an engine is built (`Engine::builder(...).build().await`), it automatically checks for uncommitted WAL entries and replays them:
+When an engine is built (`Engine::builder(...).build().await`), it automatically checks for remaining WAL entries and replays them (the WAL is truncated on commit, so any remaining entries are from a crashed session):
 
 ```mermaid
 graph TD

@@ -48,11 +48,7 @@ let request = VectorSearchRequestBuilder::new()
     .add_text("text_vec", "machine learning")
 
     // Or use a pre-computed vector directly
-    .add_vector(QueryVector {
-        vector: vec![0.1, 0.2, 0.3, ...],
-        weight: 1.0,
-        fields: Some(vec!["embedding".to_string()]),
-    })
+    .add_vector("embedding", vec![0.1, 0.2, 0.3, /* ... */])
 
     // Search parameters
     .limit(20)
@@ -65,7 +61,7 @@ let request = VectorSearchRequestBuilder::new()
 | Method | Description |
 | :--- | :--- |
 | `add_text(field, text)` | Add a text query for a specific field (embedded at search time) |
-| `add_vector(QueryVector)` | Add a pre-computed query vector |
+| `add_vector(field, vector)` | Add a pre-computed query vector for a specific field |
 | `limit(n)` | Maximum number of results |
 
 ## Multi-Field Vector Search
@@ -87,6 +83,7 @@ Each clause produces a vector that is searched against its respective field. Res
 | :--- | :--- |
 | `WeightedSum` (default) | Sum of (similarity * weight) across all clauses |
 | `MaxSim` | Maximum similarity score across clauses |
+| `LateInteraction` | ColBERT-style late interaction scoring |
 
 ### Weights
 

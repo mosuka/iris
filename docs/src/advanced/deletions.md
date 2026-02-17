@@ -6,7 +6,7 @@ Iris uses a two-phase deletion strategy: fast **logical deletion** followed by p
 
 ```rust
 // Delete a document by its external ID
-engine.delete_document("doc-1").await?;
+engine.delete_documents("doc-1").await?;
 engine.commit().await?;
 ```
 
@@ -16,7 +16,7 @@ When a document is deleted, it is **not** immediately removed from the index fil
 
 ```mermaid
 graph LR
-    Del["delete_document('doc-1')"] --> Bitmap["Add internal ID\nto Deletion Bitmap"]
+    Del["delete_documents('doc-1')"] --> Bitmap["Add internal ID\nto Deletion Bitmap"]
     Bitmap --> Search["Search skips\ndeleted IDs"]
 ```
 
@@ -42,11 +42,11 @@ When you index a document with an existing external ID, Iris performs an automat
 
 ```rust
 // First insert
-engine.add_document("doc-1", doc_v1).await?;
+engine.put_document("doc-1", doc_v1).await?;
 engine.commit().await?;
 
 // Update: old version is logically deleted, new version is inserted
-engine.add_document("doc-1", doc_v2).await?;
+engine.put_document("doc-1", doc_v2).await?;
 engine.commit().await?;
 ```
 
@@ -97,11 +97,10 @@ graph LR
 
 ## Deletion Bitmap
 
-The deletion bitmap is a compact, memory-efficient data structure that tracks which internal IDs have been deleted:
+The deletion bitmap tracks which internal IDs have been deleted:
 
-- **Storage**: One bit per document ID
-- **Lookup**: O(1) — simple bit test
-- **Memory**: Minimal — a bitmap for 1 million documents uses ~125 KB
+- **Storage**: HashSet of deleted document IDs (`AHashSet<u64>`)
+- **Lookup**: O(1) — hash set lookup
 
 The bitmap is persisted alongside the index segments and is rebuilt from the WAL during recovery.
 

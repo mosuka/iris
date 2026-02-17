@@ -15,7 +15,7 @@ graph TB
         DL["DocumentLog\n(WAL + Document Storage)"]
     end
 
-    Storage["Storage (trait)\nMemory / File / Mmap"]
+    Storage["Storage (trait)\nMemory / File / File+Mmap"]
 
     LS --- Storage
     VS --- Storage
@@ -119,7 +119,7 @@ sequenceDiagram
     User->>Engine: commit()
     Engine->>Lexical: Flush segments to storage
     Engine->>Vector: Flush segments to storage
-    Engine->>WAL: Mark checkpoint
+    Engine->>WAL: Truncate WAL
     Note over Engine: Documents are\nnow searchable
 ```
 
@@ -181,7 +181,7 @@ graph TB
     Engine --> PS2["PrefixedStorage\nprefix: 'vector/'"]
     Engine --> PS3["PrefixedStorage\nprefix: 'documents/'"]
 
-    PS1 --> S["Storage Backend\n(Memory / File / Mmap)"]
+    PS1 --> S["Storage Backend\n(Memory / File / File+Mmap)"]
     PS2 --> S
     PS3 --> S
 ```
@@ -190,7 +190,7 @@ graph TB
 | :--- | :--- | :--- |
 | `MemoryStorage` | All data in memory | Testing, small datasets, ephemeral use |
 | `FileStorage` | Standard file I/O | General production use |
-| `MmapStorage` | Memory-mapped files | Large datasets, read-heavy workloads |
+| `FileStorage` (mmap) | Memory-mapped files (`use_mmap = true`) | Large datasets, read-heavy workloads |
 
 ## Per-Field Dispatch
 

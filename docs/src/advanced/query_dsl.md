@@ -99,7 +99,7 @@ Use parentheses for sub-expressions:
 
 ### PEG Grammar
 
-The full lexical grammar ([parser.pest](https://github.com/mosuka/iris/blob/main/src/lexical/query/parser.pest)):
+The full lexical grammar ([parser.pest](https://github.com/mosuka/iris/blob/main/iris/src/lexical/query/parser.pest)):
 
 ```pest
 query          = { SOI ~ boolean_query ~ EOI }
@@ -192,7 +192,7 @@ request.score_mode = VectorScoreMode::MaxSim;
 
 ### PEG Grammar
 
-The full vector grammar ([parser.pest](https://github.com/mosuka/iris/blob/main/src/vector/query/parser.pest)):
+The full vector grammar ([parser.pest](https://github.com/mosuka/iris/blob/main/iris/src/vector/query/parser.pest)):
 
 ```pest
 query          = { SOI ~ vector_clause+ ~ EOI }
@@ -294,9 +294,9 @@ let unified = UnifiedQueryParser::new(lexical_parser, vector_parser);
 let request = unified.parse(
     r#"title:hello content:~"cute kitten"^0.8"#
 ).await?;
-// request.lexical  -> Some(...)  — lexical query
-// request.vector   -> Some(...)  — vector query
-// request.fusion   -> Some(RRF)  — fusion algorithm
+// request.lexical_search_request  -> Some(...)  — lexical query
+// request.vector_search_request   -> Some(...)  — vector query
+// request.fusion_algorithm        -> Some(RRF)  — fusion algorithm
 ```
 
 ### Custom Fusion

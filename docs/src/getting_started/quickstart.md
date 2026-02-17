@@ -16,7 +16,7 @@ let storage: Arc<dyn Storage> = Arc::new(
 );
 ```
 
-> **Tip:** For production, consider `FileStorage` or `MmapStorage`. See [Storage](../concepts/storage.md) for details.
+> **Tip:** For production, consider `FileStorage` (with optional `use_mmap` for memory-mapped I/O). See [Storage](../concepts/storage.md) for details.
 
 ## Step 2 — Define a Schema
 
