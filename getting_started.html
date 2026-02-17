@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-771af21f.js";
+            window.path_to_searchindex_js = "searchindex-bde4d09e.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-2eec5043.js"></script>
@@ -200,14 +200,12 @@
 </ol>
 <h2 id="workflow-overview"><a class="header" href="#workflow-overview">Workflow Overview</a></h2>
 <p>Building a search application with Iris follows a consistent pattern:</p>
-<div class="mermaid">
-graph LR
-    A["1. Create<br />Storage"] --&gt; B["2. Define<br />Schema"]
-    B --&gt; C["3. Build<br />Engine"]
-    C --&gt; D["4. Index<br />Documents"]
+<pre><code class="language-mermaid">graph LR
+    A["1. Create\nStorage"] --&gt; B["2. Define\nSchema"]
+    B --&gt; C["3. Build\nEngine"]
+    C --&gt; D["4. Index\nDocuments"]
     D --&gt; E["5. Search"]
-</div>
-
+</code></pre>
 <div class="table-wrapper">
 <table>
 <thead>

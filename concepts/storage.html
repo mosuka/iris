@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-771af21f.js";
+            window.path_to_searchindex_js = "../searchindex-bde4d09e.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-2eec5043.js"></script>
@@ -282,17 +282,15 @@ let storage = StorageFactory::create(
 <span class="boring">}</span></code></pre>
 <h2 id="prefixedstorage"><a class="header" href="#prefixedstorage">PrefixedStorage</a></h2>
 <p>The engine uses <code>PrefixedStorage</code> to isolate components within a single storage backend:</p>
-<div class="mermaid">
-graph TB
+<pre><code class="language-mermaid">graph TB
     E["Engine"]
-    E --&gt; P1["PrefixedStorage<br />prefix = 'lexical/'"]
-    E --&gt; P2["PrefixedStorage<br />prefix = 'vector/'"]
-    E --&gt; P3["PrefixedStorage<br />prefix = 'documents/'"]
+    E --&gt; P1["PrefixedStorage\nprefix = 'lexical/'"]
+    E --&gt; P2["PrefixedStorage\nprefix = 'vector/'"]
+    E --&gt; P3["PrefixedStorage\nprefix = 'documents/'"]
     P1 --&gt; S["Storage Backend"]
     P2 --&gt; S
     P3 --&gt; S
-</div>
-
+</code></pre>
 <p>When the lexical store writes a key <code>segments/seg-001.dict</code>, it is actually stored as <code>lexical/segments/seg-001.dict</code> in the underlying backend. This ensures no key collisions between components.</p>
 <p>You do not need to create <code>PrefixedStorage</code> yourself — the <code>EngineBuilder</code> handles this automatically.</p>
 <h2 id="choosing-a-backend"><a class="header" href="#choosing-a-backend">Choosing a Backend</a></h2>

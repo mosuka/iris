@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-771af21f.js";
+            window.path_to_searchindex_js = "../searchindex-bde4d09e.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-2eec5043.js"></script>
@@ -297,14 +297,12 @@ let embedder = PrecomputedEmbedder::new();  // no parameters needed
 <span class="boring">}</span></code></pre>
 <h2 id="perfieldembedder"><a class="header" href="#perfieldembedder">PerFieldEmbedder</a></h2>
 <p><code>PerFieldEmbedder</code> routes embedding requests to field-specific embedders:</p>
-<div class="mermaid">
-graph LR
+<pre><code class="language-mermaid">graph LR
     PFE["PerFieldEmbedder"]
-    PFE --&gt;|"text_vec"| BERT["CandleBertEmbedder<br />(384 dim)"]
-    PFE --&gt;|"image_vec"| CLIP["CandleClipEmbedder<br />(512 dim)"]
+    PFE --&gt;|"text_vec"| BERT["CandleBertEmbedder\n(384 dim)"]
+    PFE --&gt;|"image_vec"| CLIP["CandleClipEmbedder\n(512 dim)"]
     PFE --&gt;|other fields| DEF["Default Embedder"]
-</div>
-
+</code></pre>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>use std::sync::Arc;

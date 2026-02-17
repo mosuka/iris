@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-771af21f.js";
+            window.path_to_searchindex_js = "../searchindex-bde4d09e.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-2eec5043.js"></script>
@@ -180,20 +180,18 @@
                         <h1 id="vector-indexing"><a class="header" href="#vector-indexing">Vector Indexing</a></h1>
 <p>Vector indexing powers similarity-based search. When a document’s vector field is indexed, Iris stores the embedding vector in a specialized index structure that enables fast approximate nearest neighbor (ANN) retrieval.</p>
 <h2 id="how-vector-indexing-works"><a class="header" href="#how-vector-indexing-works">How Vector Indexing Works</a></h2>
-<div class="mermaid">
-sequenceDiagram
+<pre><code class="language-mermaid">sequenceDiagram
     participant Doc as Document
     participant Embedder
     participant Normalize as Normalizer
     participant Index as Vector Index
-<pre><code>Doc-&gt;&gt;Embedder: "Rust is a systems language"
-Embedder--&gt;&gt;Normalize: [0.12, -0.45, 0.78, ...]
-Normalize-&gt;&gt;Normalize: L2 normalize
-Normalize--&gt;&gt;Index: [0.14, -0.52, 0.90, ...]
-Index-&gt;&gt;Index: Insert into index structure
-</code></pre>
-</div>
 
+    Doc-&gt;&gt;Embedder: "Rust is a systems language"
+    Embedder--&gt;&gt;Normalize: [0.12, -0.45, 0.78, ...]
+    Normalize-&gt;&gt;Normalize: L2 normalize
+    Normalize--&gt;&gt;Index: [0.14, -0.52, 0.90, ...]
+    Index-&gt;&gt;Index: Insert into index structure
+</code></pre>
 <h3 id="step-by-step"><a class="header" href="#step-by-step">Step by Step</a></h3>
 <ol>
 <li><strong>Embed</strong>: The text (or image) is converted to a vector by the configured embedder</li>
@@ -238,38 +236,36 @@ let opt = FlatOption {
 </ul>
 <h3 id="hnsw-index"><a class="header" href="#hnsw-index">HNSW Index</a></h3>
 <p><strong>Hierarchical Navigable Small World</strong> graph. The default and most commonly used index type.</p>
-<div class="mermaid">
-graph TB
+<pre><code class="language-mermaid">graph TB
     subgraph "Layer 2 (sparse)"
         A2["A"] --- C2["C"]
     end
-<pre><code>subgraph "Layer 1 (medium)"
-    A1["A"] --- B1["B"]
-    A1 --- C1["C"]
-    B1 --- D1["D"]
-    C1 --- D1
-end
 
-subgraph "Layer 0 (dense - all vectors)"
-    A0["A"] --- B0["B"]
-    A0 --- C0["C"]
-    B0 --- D0["D"]
-    B0 --- E0["E"]
-    C0 --- D0
-    C0 --- F0["F"]
-    D0 --- E0
-    E0 --- F0
-end
+    subgraph "Layer 1 (medium)"
+        A1["A"] --- B1["B"]
+        A1 --- C1["C"]
+        B1 --- D1["D"]
+        C1 --- D1
+    end
 
-A2 -.-&gt;|"entry point"| A1
-A1 -.-&gt; A0
-C2 -.-&gt; C1
-C1 -.-&gt; C0
-B1 -.-&gt; B0
-D1 -.-&gt; D0
+    subgraph "Layer 0 (dense - all vectors)"
+        A0["A"] --- B0["B"]
+        A0 --- C0["C"]
+        B0 --- D0["D"]
+        B0 --- E0["E"]
+        C0 --- D0
+        C0 --- F0["F"]
+        D0 --- E0
+        E0 --- F0
+    end
+
+    A2 -.-&gt;|"entry point"| A1
+    A1 -.-&gt; A0
+    C2 -.-&gt; C1
+    C1 -.-&gt; C0
+    B1 -.-&gt; B0
+    D1 -.-&gt; D0
 </code></pre>
-</div>
-
 <p>The HNSW algorithm searches from the top (sparse) layer down to the bottom (dense) layer, narrowing the search space at each level.</p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
@@ -306,24 +302,22 @@ let opt = HnswOption {
 </ul>
 <h3 id="ivf-index"><a class="header" href="#ivf-index">IVF Index</a></h3>
 <p><strong>Inverted File Index</strong>. Partitions vectors into clusters, then only searches relevant clusters.</p>
-<div class="mermaid">
-graph TB
+<pre><code class="language-mermaid">graph TB
     Q["Query Vector"]
-    Q --&gt; C1["Cluster 1<br />(centroid)"]
-    Q --&gt; C2["Cluster 2<br />(centroid)"]
-<pre><code>C1 --&gt; V1["vec_3"]
-C1 --&gt; V2["vec_7"]
-C1 --&gt; V3["vec_12"]
+    Q --&gt; C1["Cluster 1\n(centroid)"]
+    Q --&gt; C2["Cluster 2\n(centroid)"]
 
-C2 --&gt; V4["vec_1"]
-C2 --&gt; V5["vec_9"]
-C2 --&gt; V6["vec_15"]
+    C1 --&gt; V1["vec_3"]
+    C1 --&gt; V2["vec_7"]
+    C1 --&gt; V3["vec_12"]
 
-style C1 fill:#f9f,stroke:#333
-style C2 fill:#f9f,stroke:#333
+    C2 --&gt; V4["vec_1"]
+    C2 --&gt; V5["vec_9"]
+    C2 --&gt; V6["vec_15"]
+
+    style C1 fill:#f9f,stroke:#333
+    style C2 fill:#f9f,stroke:#333
 </code></pre>
-</div>
-
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>use iris::vector::IvfOption;

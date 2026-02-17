@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-771af21f.js";
+            window.path_to_searchindex_js = "../searchindex-bde4d09e.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-2eec5043.js"></script>
@@ -180,18 +180,16 @@
                         <h1 id="text-analysis"><a class="header" href="#text-analysis">Text Analysis</a></h1>
 <p>Text analysis is the process of converting raw text into searchable tokens. When a document is indexed, the analyzer breaks text fields into individual terms; when a query is executed, the same analyzer processes the query text to ensure consistency.</p>
 <h2 id="the-analysis-pipeline"><a class="header" href="#the-analysis-pipeline">The Analysis Pipeline</a></h2>
-<div class="mermaid">
-graph LR
-    Input["Raw Text<br />'The quick brown FOX jumps!'"]
-    T["Tokenizer<br />Split into words"]
+<pre><code class="language-mermaid">graph LR
+    Input["Raw Text\n'The quick brown FOX jumps!'"]
+    T["Tokenizer\nSplit into words"]
     F1["LowercaseFilter"]
     F2["StopFilter"]
     F3["StemFilter"]
-    Output["Terms<br />'quick', 'brown', 'fox', 'jump'"]
-<pre><code>Input --&gt; T --&gt; F1 --&gt; F2 --&gt; F3 --&gt; Output
-</code></pre>
-</div>
+    Output["Terms\n'quick', 'brown', 'fox', 'jump'"]
 
+    Input --&gt; T --&gt; F1 --&gt; F2 --&gt; F3 --&gt; Output
+</code></pre>
 <p>The analysis pipeline consists of:</p>
 <ol>
 <li><strong>Tokenizer</strong> — splits text into raw tokens (words, characters, n-grams)</li>
@@ -270,15 +268,13 @@ let analyzer = PipelineAnalyzer::new(Arc::new(RegexTokenizer::new()?))
 <span class="boring">}</span></code></pre>
 <h2 id="perfieldanalyzer"><a class="header" href="#perfieldanalyzer">PerFieldAnalyzer</a></h2>
 <p><code>PerFieldAnalyzer</code> lets you assign different analyzers to different fields within the same engine:</p>
-<div class="mermaid">
-graph LR
+<pre><code class="language-mermaid">graph LR
     PFA["PerFieldAnalyzer"]
     PFA --&gt;|"title"| KW["KeywordAnalyzer"]
     PFA --&gt;|"body"| STD["StandardAnalyzer"]
     PFA --&gt;|"description_ja"| JP["JapaneseAnalyzer"]
-    PFA --&gt;|other fields| DEF["Default<br />(StandardAnalyzer)"]
-</div>
-
+    PFA --&gt;|other fields| DEF["Default\n(StandardAnalyzer)"]
+</code></pre>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>use std::sync::Arc;

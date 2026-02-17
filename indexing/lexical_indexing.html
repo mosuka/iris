@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-771af21f.js";
+            window.path_to_searchindex_js = "../searchindex-bde4d09e.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-2eec5043.js"></script>
@@ -180,20 +180,18 @@
                         <h1 id="lexical-indexing"><a class="header" href="#lexical-indexing">Lexical Indexing</a></h1>
 <p>Lexical indexing powers keyword-based search. When a document’s text field is indexed, Iris builds an <strong>inverted index</strong> — a data structure that maps terms to the documents containing them.</p>
 <h2 id="how-lexical-indexing-works"><a class="header" href="#how-lexical-indexing-works">How Lexical Indexing Works</a></h2>
-<div class="mermaid">
-sequenceDiagram
+<pre><code class="language-mermaid">sequenceDiagram
     participant Doc as Document
     participant Analyzer
     participant Writer as IndexWriter
     participant Seg as Segment
-<pre><code>Doc-&gt;&gt;Analyzer: "The quick brown fox"
-Analyzer-&gt;&gt;Analyzer: Tokenize + Filter
-Analyzer--&gt;&gt;Writer: ["quick", "brown", "fox"]
-Writer-&gt;&gt;Writer: Buffer in memory
-Writer-&gt;&gt;Seg: Flush to segment on commit()
-</code></pre>
-</div>
 
+    Doc-&gt;&gt;Analyzer: "The quick brown fox"
+    Analyzer-&gt;&gt;Analyzer: Tokenize + Filter
+    Analyzer--&gt;&gt;Writer: ["quick", "brown", "fox"]
+    Writer-&gt;&gt;Writer: Buffer in memory
+    Writer-&gt;&gt;Seg: Flush to segment on commit()
+</code></pre>
 <h3 id="step-by-step"><a class="header" href="#step-by-step">Step by Step</a></h3>
 <ol>
 <li><strong>Analyze</strong>: The text passes through the configured analyzer (tokenizer + filters), producing a stream of normalized terms</li>
@@ -202,28 +200,26 @@ Writer-&gt;&gt;Seg: Flush to segment on commit()
 </ol>
 <h2 id="the-inverted-index"><a class="header" href="#the-inverted-index">The Inverted Index</a></h2>
 <p>An inverted index is essentially a map from terms to document lists:</p>
-<div class="mermaid">
-graph LR
+<pre><code class="language-mermaid">graph LR
     subgraph "Term Dictionary"
         T1["'brown'"]
         T2["'fox'"]
         T3["'quick'"]
         T4["'rust'"]
     end
-<pre><code>subgraph "Posting Lists"
-    P1["doc_1, doc_3"]
-    P2["doc_1"]
-    P3["doc_1, doc_2"]
-    P4["doc_2, doc_3"]
-end
 
-T1 --&gt; P1
-T2 --&gt; P2
-T3 --&gt; P3
-T4 --&gt; P4
+    subgraph "Posting Lists"
+        P1["doc_1, doc_3"]
+        P2["doc_1"]
+        P3["doc_1, doc_2"]
+        P4["doc_2, doc_3"]
+    end
+
+    T1 --&gt; P1
+    T2 --&gt; P2
+    T3 --&gt; P3
+    T4 --&gt; P4
 </code></pre>
-</div>
-
 <div class="table-wrapper">
 <table>
 <thead>
@@ -253,8 +249,7 @@ T4 --&gt; P4
 </div>
 <h2 id="numeric-and-date-fields"><a class="header" href="#numeric-and-date-fields">Numeric and Date Fields</a></h2>
 <p>Integer, float, and datetime fields are indexed using a <strong>BKD tree</strong> — a space-partitioning data structure optimized for range queries:</p>
-<div class="mermaid">
-graph TB
+<pre><code class="language-mermaid">graph TB
     Root["BKD Root"]
     Root --&gt; L["values &lt; 50"]
     Root --&gt; R["values &gt;= 50"]
@@ -262,8 +257,7 @@ graph TB
     L --&gt; LR["25 &lt;= values &lt; 50"]
     R --&gt; RL["50 &lt;= values &lt; 75"]
     R --&gt; RR["values &gt;= 75"]
-</div>
-
+</code></pre>
 <p>BKD trees allow efficient evaluation of range queries like <code>price:[10 TO 100]</code> or <code>date:[2024-01-01 TO 2024-12-31]</code>.</p>
 <h2 id="geo-fields"><a class="header" href="#geo-fields">Geo Fields</a></h2>
 <p>Geographic fields store latitude/longitude pairs. They are indexed using a spatial data structure that supports:</p>
@@ -273,22 +267,20 @@ graph TB
 </ul>
 <h2 id="segments"><a class="header" href="#segments">Segments</a></h2>
 <p>The lexical index is organized into <strong>segments</strong>. Each segment is an immutable, self-contained mini-index:</p>
-<div class="mermaid">
-graph TB
+<pre><code class="language-mermaid">graph TB
     LI["Lexical Index"]
     LI --&gt; S1["Segment 0"]
     LI --&gt; S2["Segment 1"]
     LI --&gt; S3["Segment 2"]
-<pre><code>S1 --- F1[".dict (terms)"]
-S1 --- F2[".post (postings)"]
-S1 --- F3[".bkd (numerics)"]
-S1 --- F4[".docs (doc store)"]
-S1 --- F5[".dv (doc values)"]
-S1 --- F6[".meta (metadata)"]
-S1 --- F7[".lens (field lengths)"]
-</code></pre>
-</div>
 
+    S1 --- F1[".dict (terms)"]
+    S1 --- F2[".post (postings)"]
+    S1 --- F3[".bkd (numerics)"]
+    S1 --- F4[".docs (doc store)"]
+    S1 --- F5[".dv (doc values)"]
+    S1 --- F6[".meta (metadata)"]
+    S1 --- F7[".lens (field lengths)"]
+</code></pre>
 <div class="table-wrapper">
 <table>
 <thead>

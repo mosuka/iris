@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-771af21f.js";
+            window.path_to_searchindex_js = "../searchindex-bde4d09e.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-2eec5043.js"></script>
@@ -180,26 +180,24 @@
                         <h1 id="persistence--wal"><a class="header" href="#persistence--wal">Persistence &amp; WAL</a></h1>
 <p>Iris uses a <strong>Write-Ahead Log (WAL)</strong> to ensure data durability. Every write operation is persisted to the WAL before modifying in-memory structures, guaranteeing that no data is lost even if the process crashes.</p>
 <h2 id="write-path"><a class="header" href="#write-path">Write Path</a></h2>
-<div class="mermaid">
-sequenceDiagram
+<pre><code class="language-mermaid">sequenceDiagram
     participant App as Application
     participant Engine
     participant WAL as DocumentLog (WAL)
     participant Mem as In-Memory Buffers
     participant Disk as Storage (segments)
-<pre><code>App-&gt;&gt;Engine: add_document() / delete_document()
-Engine-&gt;&gt;WAL: 1. Append operation to WAL
-Engine-&gt;&gt;Mem: 2. Update in-memory buffers
 
-Note over Mem: Document is buffered but&lt;br/&gt;NOT yet searchable
+    App-&gt;&gt;Engine: add_document() / delete_document()
+    Engine-&gt;&gt;WAL: 1. Append operation to WAL
+    Engine-&gt;&gt;Mem: 2. Update in-memory buffers
 
-App-&gt;&gt;Engine: commit()
-Engine-&gt;&gt;Disk: 3. Flush segments to storage
-Engine-&gt;&gt;WAL: 4. Record checkpoint
-Note over Disk: Documents are now&lt;br/&gt;searchable and durable
+    Note over Mem: Document is buffered but\nNOT yet searchable
+
+    App-&gt;&gt;Engine: commit()
+    Engine-&gt;&gt;Disk: 3. Flush segments to storage
+    Engine-&gt;&gt;WAL: 4. Record checkpoint
+    Note over Disk: Documents are now\nsearchable and durable
 </code></pre>
-</div>
-
 <h3 id="key-principles"><a class="header" href="#key-principles">Key Principles</a></h3>
 <ol>
 <li><strong>WAL-first</strong>: Every write (add or delete) is appended to the WAL before updating in-memory structures</li>
@@ -231,14 +229,12 @@ Note over Disk: Documents are now&lt;br/&gt;searchable and durable
 </ul>
 <h2 id="recovery"><a class="header" href="#recovery">Recovery</a></h2>
 <p>When an engine is built (<code>Engine::builder(...).build().await</code>), it automatically checks for uncommitted WAL entries and replays them:</p>
-<div class="mermaid">
-graph TD
-    Start["Engine::build()"] --&gt; Check["Check WAL for<br />uncommitted entries"]
-    Check --&gt;|"Entries found"| Replay["Replay operations<br />into in-memory buffers"]
+<pre><code class="language-mermaid">graph TD
+    Start["Engine::build()"] --&gt; Check["Check WAL for\nuncommitted entries"]
+    Check --&gt;|"Entries found"| Replay["Replay operations\ninto in-memory buffers"]
     Replay --&gt; Ready["Engine ready"]
     Check --&gt;|"No entries"| Ready
-</div>
-
+</code></pre>
 <p>Recovery is transparent — you do not need to handle it manually.</p>
 <h2 id="the-commit-lifecycle"><a class="header" href="#the-commit-lifecycle">The Commit Lifecycle</a></h2>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]

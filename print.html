@@ -36,7 +36,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-771af21f.js";
+            window.path_to_searchindex_js = "searchindex-bde4d09e.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-2eec5043.js"></script>
@@ -316,14 +316,12 @@ async fn main() -&gt; Result&lt;()&gt; {
 </ol>
 <h2 id="workflow-overview"><a class="header" href="#workflow-overview">Workflow Overview</a></h2>
 <p>Building a search application with Iris follows a consistent pattern:</p>
-<div class="mermaid">
-graph LR
-    A["1. Create<br />Storage"] --&gt; B["2. Define<br />Schema"]
-    B --&gt; C["3. Build<br />Engine"]
-    C --&gt; D["4. Index<br />Documents"]
+<pre><code class="language-mermaid">graph LR
+    A["1. Create\nStorage"] --&gt; B["2. Define\nSchema"]
+    B --&gt; C["3. Build\nEngine"]
+    C --&gt; D["4. Index\nDocuments"]
     D --&gt; E["5. Search"]
-</div>
-
+</code></pre>
 <div class="table-wrapper">
 <table>
 <thead>
@@ -580,22 +578,20 @@ async fn main() -&gt; Result&lt;()&gt; {
 <p>This page explains how Iris is structured internally. Understanding the architecture will help you make better decisions about schema design, analyzer selection, and search strategies.</p>
 <h2 id="high-level-overview"><a class="header" href="#high-level-overview">High-Level Overview</a></h2>
 <p>Iris is organized around a single <code>Engine</code> that coordinates four internal components:</p>
-<div class="mermaid">
-graph TB
+<pre><code class="language-mermaid">graph TB
     subgraph Engine
         SCH["Schema"]
-        LS["LexicalStore<br />(Inverted Index)"]
-        VS["VectorStore<br />(HNSW / Flat / IVF)"]
-        DL["DocumentLog<br />(WAL + Document Storage)"]
+        LS["LexicalStore\n(Inverted Index)"]
+        VS["VectorStore\n(HNSW / Flat / IVF)"]
+        DL["DocumentLog\n(WAL + Document Storage)"]
     end
-<pre><code>Storage["Storage (trait)&lt;br/&gt;Memory / File / Mmap"]
 
-LS --- Storage
-VS --- Storage
-DL --- Storage
+    Storage["Storage (trait)\nMemory / File / Mmap"]
+
+    LS --- Storage
+    VS --- Storage
+    DL --- Storage
 </code></pre>
-</div>
-
 <div class="table-wrapper">
 <table>
 <thead>
@@ -621,25 +617,23 @@ DL --- Storage
     .build()
     .await?;
 <span class="boring">}</span></code></pre>
-<div class="mermaid">
-sequenceDiagram
+<pre><code class="language-mermaid">sequenceDiagram
     participant User
     participant EngineBuilder
     participant Engine
-<pre><code>User-&gt;&gt;EngineBuilder: new(storage, schema)
-User-&gt;&gt;EngineBuilder: .analyzer(analyzer)
-User-&gt;&gt;EngineBuilder: .embedder(embedder)
-User-&gt;&gt;EngineBuilder: .build().await
-EngineBuilder-&gt;&gt;EngineBuilder: split_schema()
-Note over EngineBuilder: Separate fields into&lt;br/&gt;LexicalIndexConfig&lt;br/&gt;+ VectorIndexConfig
-EngineBuilder-&gt;&gt;Engine: Create LexicalStore
-EngineBuilder-&gt;&gt;Engine: Create VectorStore
-EngineBuilder-&gt;&gt;Engine: Create DocumentLog
-EngineBuilder-&gt;&gt;Engine: Recover from WAL
-EngineBuilder--&gt;&gt;User: Engine ready
-</code></pre>
-</div>
 
+    User-&gt;&gt;EngineBuilder: new(storage, schema)
+    User-&gt;&gt;EngineBuilder: .analyzer(analyzer)
+    User-&gt;&gt;EngineBuilder: .embedder(embedder)
+    User-&gt;&gt;EngineBuilder: .build().await
+    EngineBuilder-&gt;&gt;EngineBuilder: split_schema()
+    Note over EngineBuilder: Separate fields into\nLexicalIndexConfig\n+ VectorIndexConfig
+    EngineBuilder-&gt;&gt;Engine: Create LexicalStore
+    EngineBuilder-&gt;&gt;Engine: Create VectorStore
+    EngineBuilder-&gt;&gt;Engine: Create DocumentLog
+    EngineBuilder-&gt;&gt;Engine: Recover from WAL
+    EngineBuilder--&gt;&gt;User: Engine ready
+</code></pre>
 <p>During <code>build()</code>, the engine:</p>
 <ol>
 <li><strong>Splits the schema</strong> — lexical fields go to <code>LexicalIndexConfig</code>, vector fields go to <code>VectorIndexConfig</code></li>
@@ -649,15 +643,13 @@ EngineBuilder--&gt;&gt;User: Engine ready
 </ol>
 <h3 id="schema-splitting"><a class="header" href="#schema-splitting">Schema Splitting</a></h3>
 <p>The <code>Schema</code> contains both lexical and vector fields. At build time, <code>split_schema()</code> separates them:</p>
-<div class="mermaid">
-graph LR
-    S["Schema<br />title: Text<br />body: Text<br />category: Text<br />page: Integer<br />content_vec: HNSW"]
-<pre><code>S --&gt; LC["LexicalIndexConfig&lt;br/&gt;title: TextOption&lt;br/&gt;body: TextOption&lt;br/&gt;category: TextOption&lt;br/&gt;page: IntegerOption&lt;br/&gt;_id: KeywordAnalyzer"]
+<pre><code class="language-mermaid">graph LR
+    S["Schema\ntitle: Text\nbody: Text\ncategory: Text\npage: Integer\ncontent_vec: HNSW"]
 
-S --&gt; VC["VectorIndexConfig&lt;br/&gt;content_vec: HnswOption&lt;br/&gt;(dim=384, m=16, ef=200)"]
+    S --&gt; LC["LexicalIndexConfig\ntitle: TextOption\nbody: TextOption\ncategory: TextOption\npage: IntegerOption\n_id: KeywordAnalyzer"]
+
+    S --&gt; VC["VectorIndexConfig\ncontent_vec: HnswOption\n(dim=384, m=16, ef=200)"]
 </code></pre>
-</div>
-
 <p>Key details:</p>
 <ul>
 <li>The reserved <code>_id</code> field is always added to the lexical config with <code>KeywordAnalyzer</code> (exact match)</li>
@@ -666,35 +658,33 @@ S --&gt; VC["VectorIndexConfig&lt;br/&gt;content_vec: HnswOption&lt;br/&gt;(dim=
 </ul>
 <h2 id="indexing-data-flow"><a class="header" href="#indexing-data-flow">Indexing Data Flow</a></h2>
 <p>When you call <code>engine.add_document(id, doc)</code>:</p>
-<div class="mermaid">
-sequenceDiagram
+<pre><code class="language-mermaid">sequenceDiagram
     participant User
     participant Engine
     participant WAL as DocumentLog (WAL)
     participant Lexical as LexicalStore
     participant Vector as VectorStore
-<pre><code>User-&gt;&gt;Engine: add_document("doc-1", doc)
-Engine-&gt;&gt;WAL: Append to WAL
-Engine-&gt;&gt;Engine: Assign internal ID (u64)
 
-loop For each field in document
-    alt Lexical field (text, integer, etc.)
-        Engine-&gt;&gt;Lexical: Analyze + index field
-    else Vector field
-        Engine-&gt;&gt;Vector: Embed + index field
+    User-&gt;&gt;Engine: add_document("doc-1", doc)
+    Engine-&gt;&gt;WAL: Append to WAL
+    Engine-&gt;&gt;Engine: Assign internal ID (u64)
+
+    loop For each field in document
+        alt Lexical field (text, integer, etc.)
+            Engine-&gt;&gt;Lexical: Analyze + index field
+        else Vector field
+            Engine-&gt;&gt;Vector: Embed + index field
+        end
     end
-end
 
-Note over Engine: Document is buffered&lt;br/&gt;but NOT yet searchable
+    Note over Engine: Document is buffered\nbut NOT yet searchable
 
-User-&gt;&gt;Engine: commit()
-Engine-&gt;&gt;Lexical: Flush segments to storage
-Engine-&gt;&gt;Vector: Flush segments to storage
-Engine-&gt;&gt;WAL: Mark checkpoint
-Note over Engine: Documents are&lt;br/&gt;now searchable
+    User-&gt;&gt;Engine: commit()
+    Engine-&gt;&gt;Lexical: Flush segments to storage
+    Engine-&gt;&gt;Vector: Flush segments to storage
+    Engine-&gt;&gt;WAL: Mark checkpoint
+    Note over Engine: Documents are\nnow searchable
 </code></pre>
-</div>
-
 <p>Key points:</p>
 <ul>
 <li><strong>WAL-first</strong>: every write is logged before modifying in-memory structures</li>
@@ -703,38 +693,36 @@ Note over Engine: Documents are&lt;br/&gt;now searchable
 </ul>
 <h2 id="search-data-flow"><a class="header" href="#search-data-flow">Search Data Flow</a></h2>
 <p>When you call <code>engine.search(request)</code>:</p>
-<div class="mermaid">
-sequenceDiagram
+<pre><code class="language-mermaid">sequenceDiagram
     participant User
     participant Engine
     participant Lexical as LexicalStore
     participant Vector as VectorStore
     participant Fusion
-<pre><code>User-&gt;&gt;Engine: search(request)
 
-opt Filter query present
-    Engine-&gt;&gt;Lexical: Execute filter query
-    Lexical--&gt;&gt;Engine: Allowed document IDs
-end
+    User-&gt;&gt;Engine: search(request)
 
-par Lexical search
-    Engine-&gt;&gt;Lexical: Execute lexical query
-    Lexical--&gt;&gt;Engine: Ranked hits (BM25)
-and Vector search
-    Engine-&gt;&gt;Vector: Execute vector query
-    Vector--&gt;&gt;Engine: Ranked hits (similarity)
-end
+    opt Filter query present
+        Engine-&gt;&gt;Lexical: Execute filter query
+        Lexical--&gt;&gt;Engine: Allowed document IDs
+    end
 
-alt Both lexical and vector results
-    Engine-&gt;&gt;Fusion: Fuse results (RRF or WeightedSum)
-    Fusion--&gt;&gt;Engine: Merged ranked list
-end
+    par Lexical search
+        Engine-&gt;&gt;Lexical: Execute lexical query
+        Lexical--&gt;&gt;Engine: Ranked hits (BM25)
+    and Vector search
+        Engine-&gt;&gt;Vector: Execute vector query
+        Vector--&gt;&gt;Engine: Ranked hits (similarity)
+    end
 
-Engine-&gt;&gt;Engine: Apply offset + limit
-Engine--&gt;&gt;User: Vec of SearchResult
+    alt Both lexical and vector results
+        Engine-&gt;&gt;Fusion: Fuse results (RRF or WeightedSum)
+        Fusion--&gt;&gt;Engine: Merged ranked list
+    end
+
+    Engine-&gt;&gt;Engine: Apply offset + limit
+    Engine--&gt;&gt;User: Vec of SearchResult
 </code></pre>
-</div>
-
 <p>The search pipeline has three stages:</p>
 <ol>
 <li><strong>Filter</strong> (optional) — execute a filter query on the lexical index to get a set of allowed document IDs</li>
@@ -743,17 +731,15 @@ Engine--&gt;&gt;User: Vec of SearchResult
 </ol>
 <h2 id="storage-architecture"><a class="header" href="#storage-architecture">Storage Architecture</a></h2>
 <p>All components share a single <code>Storage</code> trait implementation, but use key prefixes to isolate their data:</p>
-<div class="mermaid">
-graph TB
-    Engine --&gt; PS1["PrefixedStorage<br />prefix: 'lexical/'"]
-    Engine --&gt; PS2["PrefixedStorage<br />prefix: 'vector/'"]
-    Engine --&gt; PS3["PrefixedStorage<br />prefix: 'documents/'"]
-<pre><code>PS1 --&gt; S["Storage Backend&lt;br/&gt;(Memory / File / Mmap)"]
-PS2 --&gt; S
-PS3 --&gt; S
-</code></pre>
-</div>
+<pre><code class="language-mermaid">graph TB
+    Engine --&gt; PS1["PrefixedStorage\nprefix: 'lexical/'"]
+    Engine --&gt; PS2["PrefixedStorage\nprefix: 'vector/'"]
+    Engine --&gt; PS3["PrefixedStorage\nprefix: 'documents/'"]
 
+    PS1 --&gt; S["Storage Backend\n(Memory / File / Mmap)"]
+    PS2 --&gt; S
+    PS3 --&gt; S
+</code></pre>
 <div class="table-wrapper">
 <table>
 <thead>
@@ -768,16 +754,14 @@ PS3 --&gt; S
 </div>
 <h2 id="per-field-dispatch"><a class="header" href="#per-field-dispatch">Per-Field Dispatch</a></h2>
 <p>When a <code>PerFieldAnalyzer</code> is provided, the engine dispatches analysis to field-specific analyzers. The same pattern applies to <code>PerFieldEmbedder</code>.</p>
-<div class="mermaid">
-graph LR
+<pre><code class="language-mermaid">graph LR
     PFA["PerFieldAnalyzer"]
     PFA --&gt;|"title"| KA["KeywordAnalyzer"]
     PFA --&gt;|"body"| SA["StandardAnalyzer"]
     PFA --&gt;|"description"| JA["JapaneseAnalyzer"]
-    PFA --&gt;|"_id"| KA2["KeywordAnalyzer<br />(always)"]
-    PFA --&gt;|other fields| DEF["Default Analyzer<br />(StandardAnalyzer)"]
-</div>
-
+    PFA --&gt;|"_id"| KA2["KeywordAnalyzer\n(always)"]
+    PFA --&gt;|other fields| DEF["Default Analyzer\n(StandardAnalyzer)"]
+</code></pre>
 <p>This allows different fields to use different analysis strategies within the same engine.</p>
 <h2 id="summary"><a class="header" href="#summary">Summary</a></h2>
 <div class="table-wrapper">
@@ -861,25 +845,23 @@ let schema = Schema::builder()
 <h3 id="default-fields"><a class="header" href="#default-fields">Default Fields</a></h3>
 <p><code>add_default_field()</code> specifies which field(s) are searched when a query does not explicitly name a field. This is used by the <a href="#query-dsl-3">Query DSL</a> parser.</p>
 <h2 id="field-types"><a class="header" href="#field-types">Field Types</a></h2>
-<div class="mermaid">
-graph TB
+<pre><code class="language-mermaid">graph TB
     FO["FieldOption"]
     FO --&gt; LEX["Lexical"]
     FO --&gt; VEC["Vector"]
-<pre><code>LEX --&gt; T["Text"]
-LEX --&gt; I["Integer"]
-LEX --&gt; FL["Float"]
-LEX --&gt; B["Boolean"]
-LEX --&gt; DT["DateTime"]
-LEX --&gt; G["Geo"]
-LEX --&gt; BY["Bytes"]
 
-VEC --&gt; FLAT["Flat"]
-VEC --&gt; HNSW["HNSW"]
-VEC --&gt; IVF["IVF"]
+    LEX --&gt; T["Text"]
+    LEX --&gt; I["Integer"]
+    LEX --&gt; FL["Float"]
+    LEX --&gt; B["Boolean"]
+    LEX --&gt; DT["DateTime"]
+    LEX --&gt; G["Geo"]
+    LEX --&gt; BY["Bytes"]
+
+    VEC --&gt; FLAT["Flat"]
+    VEC --&gt; HNSW["HNSW"]
+    VEC --&gt; IVF["IVF"]
 </code></pre>
-</div>
-
 <h3 id="lexical-fields"><a class="header" href="#lexical-fields">Lexical Fields</a></h3>
 <p>Lexical fields are indexed using an inverted index and support keyword-based queries.</p>
 <div class="table-wrapper">
@@ -1036,18 +1018,16 @@ let v: DataValue = vec![0.1f32, 0.2].into(); // Vector
 <h1 id="text-analysis-1"><a class="header" href="#text-analysis-1">Text Analysis</a></h1>
 <p>Text analysis is the process of converting raw text into searchable tokens. When a document is indexed, the analyzer breaks text fields into individual terms; when a query is executed, the same analyzer processes the query text to ensure consistency.</p>
 <h2 id="the-analysis-pipeline"><a class="header" href="#the-analysis-pipeline">The Analysis Pipeline</a></h2>
-<div class="mermaid">
-graph LR
-    Input["Raw Text<br />'The quick brown FOX jumps!'"]
-    T["Tokenizer<br />Split into words"]
+<pre><code class="language-mermaid">graph LR
+    Input["Raw Text\n'The quick brown FOX jumps!'"]
+    T["Tokenizer\nSplit into words"]
     F1["LowercaseFilter"]
     F2["StopFilter"]
     F3["StemFilter"]
-    Output["Terms<br />'quick', 'brown', 'fox', 'jump'"]
-<pre><code>Input --&gt; T --&gt; F1 --&gt; F2 --&gt; F3 --&gt; Output
-</code></pre>
-</div>
+    Output["Terms\n'quick', 'brown', 'fox', 'jump'"]
 
+    Input --&gt; T --&gt; F1 --&gt; F2 --&gt; F3 --&gt; Output
+</code></pre>
 <p>The analysis pipeline consists of:</p>
 <ol>
 <li><strong>Tokenizer</strong> — splits text into raw tokens (words, characters, n-grams)</li>
@@ -1126,15 +1106,13 @@ let analyzer = PipelineAnalyzer::new(Arc::new(RegexTokenizer::new()?))
 <span class="boring">}</span></code></pre>
 <h2 id="perfieldanalyzer"><a class="header" href="#perfieldanalyzer">PerFieldAnalyzer</a></h2>
 <p><code>PerFieldAnalyzer</code> lets you assign different analyzers to different fields within the same engine:</p>
-<div class="mermaid">
-graph LR
+<pre><code class="language-mermaid">graph LR
     PFA["PerFieldAnalyzer"]
     PFA --&gt;|"title"| KW["KeywordAnalyzer"]
     PFA --&gt;|"body"| STD["StandardAnalyzer"]
     PFA --&gt;|"description_ja"| JP["JapaneseAnalyzer"]
-    PFA --&gt;|other fields| DEF["Default<br />(StandardAnalyzer)"]
-</div>
-
+    PFA --&gt;|other fields| DEF["Default\n(StandardAnalyzer)"]
+</code></pre>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>use std::sync::Arc;
@@ -1324,14 +1302,12 @@ let embedder = PrecomputedEmbedder::new();  // no parameters needed
 <span class="boring">}</span></code></pre>
 <h2 id="perfieldembedder"><a class="header" href="#perfieldembedder">PerFieldEmbedder</a></h2>
 <p><code>PerFieldEmbedder</code> routes embedding requests to field-specific embedders:</p>
-<div class="mermaid">
-graph LR
+<pre><code class="language-mermaid">graph LR
     PFE["PerFieldEmbedder"]
-    PFE --&gt;|"text_vec"| BERT["CandleBertEmbedder<br />(384 dim)"]
-    PFE --&gt;|"image_vec"| CLIP["CandleClipEmbedder<br />(512 dim)"]
+    PFE --&gt;|"text_vec"| BERT["CandleBertEmbedder\n(384 dim)"]
+    PFE --&gt;|"image_vec"| CLIP["CandleClipEmbedder\n(512 dim)"]
     PFE --&gt;|other fields| DEF["Default Embedder"]
-</div>
-
+</code></pre>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>use std::sync::Arc;
@@ -1500,17 +1476,15 @@ let storage = StorageFactory::create(
 <span class="boring">}</span></code></pre>
 <h2 id="prefixedstorage"><a class="header" href="#prefixedstorage">PrefixedStorage</a></h2>
 <p>The engine uses <code>PrefixedStorage</code> to isolate components within a single storage backend:</p>
-<div class="mermaid">
-graph TB
+<pre><code class="language-mermaid">graph TB
     E["Engine"]
-    E --&gt; P1["PrefixedStorage<br />prefix = 'lexical/'"]
-    E --&gt; P2["PrefixedStorage<br />prefix = 'vector/'"]
-    E --&gt; P3["PrefixedStorage<br />prefix = 'documents/'"]
+    E --&gt; P1["PrefixedStorage\nprefix = 'lexical/'"]
+    E --&gt; P2["PrefixedStorage\nprefix = 'vector/'"]
+    E --&gt; P3["PrefixedStorage\nprefix = 'documents/'"]
     P1 --&gt; S["Storage Backend"]
     P2 --&gt; S
     P3 --&gt; S
-</div>
-
+</code></pre>
 <p>When the lexical store writes a key <code>segments/seg-001.dict</code>, it is actually stored as <code>lexical/segments/seg-001.dict</code> in the underlying backend. This ensures no key collisions between components.</p>
 <p>You do not need to create <code>PrefixedStorage</code> yourself — the <code>EngineBuilder</code> handles this automatically.</p>
 <h2 id="choosing-a-backend"><a class="header" href="#choosing-a-backend">Choosing a Backend</a></h2>
@@ -1564,20 +1538,18 @@ graph TB
 <h1 id="lexical-indexing-1"><a class="header" href="#lexical-indexing-1">Lexical Indexing</a></h1>
 <p>Lexical indexing powers keyword-based search. When a document’s text field is indexed, Iris builds an <strong>inverted index</strong> — a data structure that maps terms to the documents containing them.</p>
 <h2 id="how-lexical-indexing-works"><a class="header" href="#how-lexical-indexing-works">How Lexical Indexing Works</a></h2>
-<div class="mermaid">
-sequenceDiagram
+<pre><code class="language-mermaid">sequenceDiagram
     participant Doc as Document
     participant Analyzer
     participant Writer as IndexWriter
     participant Seg as Segment
-<pre><code>Doc-&gt;&gt;Analyzer: "The quick brown fox"
-Analyzer-&gt;&gt;Analyzer: Tokenize + Filter
-Analyzer--&gt;&gt;Writer: ["quick", "brown", "fox"]
-Writer-&gt;&gt;Writer: Buffer in memory
-Writer-&gt;&gt;Seg: Flush to segment on commit()
-</code></pre>
-</div>
 
+    Doc-&gt;&gt;Analyzer: "The quick brown fox"
+    Analyzer-&gt;&gt;Analyzer: Tokenize + Filter
+    Analyzer--&gt;&gt;Writer: ["quick", "brown", "fox"]
+    Writer-&gt;&gt;Writer: Buffer in memory
+    Writer-&gt;&gt;Seg: Flush to segment on commit()
+</code></pre>
 <h3 id="step-by-step"><a class="header" href="#step-by-step">Step by Step</a></h3>
 <ol>
 <li><strong>Analyze</strong>: The text passes through the configured analyzer (tokenizer + filters), producing a stream of normalized terms</li>
@@ -1586,28 +1558,26 @@ Writer-&gt;&gt;Seg: Flush to segment on commit()
 </ol>
 <h2 id="the-inverted-index"><a class="header" href="#the-inverted-index">The Inverted Index</a></h2>
 <p>An inverted index is essentially a map from terms to document lists:</p>
-<div class="mermaid">
-graph LR
+<pre><code class="language-mermaid">graph LR
     subgraph "Term Dictionary"
         T1["'brown'"]
         T2["'fox'"]
         T3["'quick'"]
         T4["'rust'"]
     end
-<pre><code>subgraph "Posting Lists"
-    P1["doc_1, doc_3"]
-    P2["doc_1"]
-    P3["doc_1, doc_2"]
-    P4["doc_2, doc_3"]
-end
 
-T1 --&gt; P1
-T2 --&gt; P2
-T3 --&gt; P3
-T4 --&gt; P4
+    subgraph "Posting Lists"
+        P1["doc_1, doc_3"]
+        P2["doc_1"]
+        P3["doc_1, doc_2"]
+        P4["doc_2, doc_3"]
+    end
+
+    T1 --&gt; P1
+    T2 --&gt; P2
+    T3 --&gt; P3
+    T4 --&gt; P4
 </code></pre>
-</div>
-
 <div class="table-wrapper">
 <table>
 <thead>
@@ -1637,8 +1607,7 @@ T4 --&gt; P4
 </div>
 <h2 id="numeric-and-date-fields"><a class="header" href="#numeric-and-date-fields">Numeric and Date Fields</a></h2>
 <p>Integer, float, and datetime fields are indexed using a <strong>BKD tree</strong> — a space-partitioning data structure optimized for range queries:</p>
-<div class="mermaid">
-graph TB
+<pre><code class="language-mermaid">graph TB
     Root["BKD Root"]
     Root --&gt; L["values &lt; 50"]
     Root --&gt; R["values &gt;= 50"]
@@ -1646,8 +1615,7 @@ graph TB
     L --&gt; LR["25 &lt;= values &lt; 50"]
     R --&gt; RL["50 &lt;= values &lt; 75"]
     R --&gt; RR["values &gt;= 75"]
-</div>
-
+</code></pre>
 <p>BKD trees allow efficient evaluation of range queries like <code>price:[10 TO 100]</code> or <code>date:[2024-01-01 TO 2024-12-31]</code>.</p>
 <h2 id="geo-fields"><a class="header" href="#geo-fields">Geo Fields</a></h2>
 <p>Geographic fields store latitude/longitude pairs. They are indexed using a spatial data structure that supports:</p>
@@ -1657,22 +1625,20 @@ graph TB
 </ul>
 <h2 id="segments"><a class="header" href="#segments">Segments</a></h2>
 <p>The lexical index is organized into <strong>segments</strong>. Each segment is an immutable, self-contained mini-index:</p>
-<div class="mermaid">
-graph TB
+<pre><code class="language-mermaid">graph TB
     LI["Lexical Index"]
     LI --&gt; S1["Segment 0"]
     LI --&gt; S2["Segment 1"]
     LI --&gt; S3["Segment 2"]
-<pre><code>S1 --- F1[".dict (terms)"]
-S1 --- F2[".post (postings)"]
-S1 --- F3[".bkd (numerics)"]
-S1 --- F4[".docs (doc store)"]
-S1 --- F5[".dv (doc values)"]
-S1 --- F6[".meta (metadata)"]
-S1 --- F7[".lens (field lengths)"]
-</code></pre>
-</div>
 
+    S1 --- F1[".dict (terms)"]
+    S1 --- F2[".post (postings)"]
+    S1 --- F3[".bkd (numerics)"]
+    S1 --- F4[".docs (doc store)"]
+    S1 --- F5[".dv (doc values)"]
+    S1 --- F6[".meta (metadata)"]
+    S1 --- F7[".lens (field lengths)"]
+</code></pre>
 <div class="table-wrapper">
 <table>
 <thead>
@@ -1749,20 +1715,18 @@ async fn main() -&gt; iris::Result&lt;()&gt; {
 <h1 id="vector-indexing-1"><a class="header" href="#vector-indexing-1">Vector Indexing</a></h1>
 <p>Vector indexing powers similarity-based search. When a document’s vector field is indexed, Iris stores the embedding vector in a specialized index structure that enables fast approximate nearest neighbor (ANN) retrieval.</p>
 <h2 id="how-vector-indexing-works"><a class="header" href="#how-vector-indexing-works">How Vector Indexing Works</a></h2>
-<div class="mermaid">
-sequenceDiagram
+<pre><code class="language-mermaid">sequenceDiagram
     participant Doc as Document
     participant Embedder
     participant Normalize as Normalizer
     participant Index as Vector Index
-<pre><code>Doc-&gt;&gt;Embedder: "Rust is a systems language"
-Embedder--&gt;&gt;Normalize: [0.12, -0.45, 0.78, ...]
-Normalize-&gt;&gt;Normalize: L2 normalize
-Normalize--&gt;&gt;Index: [0.14, -0.52, 0.90, ...]
-Index-&gt;&gt;Index: Insert into index structure
-</code></pre>
-</div>
 
+    Doc-&gt;&gt;Embedder: "Rust is a systems language"
+    Embedder--&gt;&gt;Normalize: [0.12, -0.45, 0.78, ...]
+    Normalize-&gt;&gt;Normalize: L2 normalize
+    Normalize--&gt;&gt;Index: [0.14, -0.52, 0.90, ...]
+    Index-&gt;&gt;Index: Insert into index structure
+</code></pre>
 <h3 id="step-by-step-1"><a class="header" href="#step-by-step-1">Step by Step</a></h3>
 <ol>
 <li><strong>Embed</strong>: The text (or image) is converted to a vector by the configured embedder</li>
@@ -1807,38 +1771,36 @@ let opt = FlatOption {
 </ul>
 <h3 id="hnsw-index"><a class="header" href="#hnsw-index">HNSW Index</a></h3>
 <p><strong>Hierarchical Navigable Small World</strong> graph. The default and most commonly used index type.</p>
-<div class="mermaid">
-graph TB
+<pre><code class="language-mermaid">graph TB
     subgraph "Layer 2 (sparse)"
         A2["A"] --- C2["C"]
     end
-<pre><code>subgraph "Layer 1 (medium)"
-    A1["A"] --- B1["B"]
-    A1 --- C1["C"]
-    B1 --- D1["D"]
-    C1 --- D1
-end
 
-subgraph "Layer 0 (dense - all vectors)"
-    A0["A"] --- B0["B"]
-    A0 --- C0["C"]
-    B0 --- D0["D"]
-    B0 --- E0["E"]
-    C0 --- D0
-    C0 --- F0["F"]
-    D0 --- E0
-    E0 --- F0
-end
+    subgraph "Layer 1 (medium)"
+        A1["A"] --- B1["B"]
+        A1 --- C1["C"]
+        B1 --- D1["D"]
+        C1 --- D1
+    end
 
-A2 -.-&gt;|"entry point"| A1
-A1 -.-&gt; A0
-C2 -.-&gt; C1
-C1 -.-&gt; C0
-B1 -.-&gt; B0
-D1 -.-&gt; D0
+    subgraph "Layer 0 (dense - all vectors)"
+        A0["A"] --- B0["B"]
+        A0 --- C0["C"]
+        B0 --- D0["D"]
+        B0 --- E0["E"]
+        C0 --- D0
+        C0 --- F0["F"]
+        D0 --- E0
+        E0 --- F0
+    end
+
+    A2 -.-&gt;|"entry point"| A1
+    A1 -.-&gt; A0
+    C2 -.-&gt; C1
+    C1 -.-&gt; C0
+    B1 -.-&gt; B0
+    D1 -.-&gt; D0
 </code></pre>
-</div>
-
 <p>The HNSW algorithm searches from the top (sparse) layer down to the bottom (dense) layer, narrowing the search space at each level.</p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
@@ -1875,24 +1837,22 @@ let opt = HnswOption {
 </ul>
 <h3 id="ivf-index"><a class="header" href="#ivf-index">IVF Index</a></h3>
 <p><strong>Inverted File Index</strong>. Partitions vectors into clusters, then only searches relevant clusters.</p>
-<div class="mermaid">
-graph TB
+<pre><code class="language-mermaid">graph TB
     Q["Query Vector"]
-    Q --&gt; C1["Cluster 1<br />(centroid)"]
-    Q --&gt; C2["Cluster 2<br />(centroid)"]
-<pre><code>C1 --&gt; V1["vec_3"]
-C1 --&gt; V2["vec_7"]
-C1 --&gt; V3["vec_12"]
+    Q --&gt; C1["Cluster 1\n(centroid)"]
+    Q --&gt; C2["Cluster 2\n(centroid)"]
 
-C2 --&gt; V4["vec_1"]
-C2 --&gt; V5["vec_9"]
-C2 --&gt; V6["vec_15"]
+    C1 --&gt; V1["vec_3"]
+    C1 --&gt; V2["vec_7"]
+    C1 --&gt; V3["vec_12"]
 
-style C1 fill:#f9f,stroke:#333
-style C2 fill:#f9f,stroke:#333
+    C2 --&gt; V4["vec_1"]
+    C2 --&gt; V5["vec_9"]
+    C2 --&gt; V6["vec_15"]
+
+    style C1 fill:#f9f,stroke:#333
+    style C2 fill:#f9f,stroke:#333
 </code></pre>
-</div>
-
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>use iris::vector::IvfOption;
@@ -2511,30 +2471,28 @@ async fn main() -&gt; iris::Result&lt;()&gt; {
 </table>
 </div>
 <h2 id="how-it-works-1"><a class="header" href="#how-it-works-1">How It Works</a></h2>
-<div class="mermaid">
-sequenceDiagram
+<pre><code class="language-mermaid">sequenceDiagram
     participant User
     participant Engine
     participant Lexical as LexicalStore
     participant Vector as VectorStore
     participant Fusion
-<pre><code>User-&gt;&gt;Engine: SearchRequest&lt;br/&gt;(lexical + vector)
 
-par Execute in parallel
-    Engine-&gt;&gt;Lexical: BM25 keyword search
-    Lexical--&gt;&gt;Engine: Ranked hits (by relevance)
-and
-    Engine-&gt;&gt;Vector: ANN similarity search
-    Vector--&gt;&gt;Engine: Ranked hits (by distance)
-end
+    User-&gt;&gt;Engine: SearchRequest\n(lexical + vector)
 
-Engine-&gt;&gt;Fusion: Merge two result sets
-Note over Fusion: RRF or WeightedSum
-Fusion--&gt;&gt;Engine: Unified ranked list
-Engine--&gt;&gt;User: Vec of SearchResult
+    par Execute in parallel
+        Engine-&gt;&gt;Lexical: BM25 keyword search
+        Lexical--&gt;&gt;Engine: Ranked hits (by relevance)
+    and
+        Engine-&gt;&gt;Vector: ANN similarity search
+        Vector--&gt;&gt;Engine: Ranked hits (by distance)
+    end
+
+    Engine-&gt;&gt;Fusion: Merge two result sets
+    Note over Fusion: RRF or WeightedSum
+    Fusion--&gt;&gt;Engine: Unified ranked list
+    Engine--&gt;&gt;User: Vec of SearchResult
 </code></pre>
-</div>
-
 <h2 id="basic-usage-2"><a class="header" href="#basic-usage-2">Basic Usage</a></h2>
 <h3 id="builder-api-1"><a class="header" href="#builder-api-1">Builder API</a></h3>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
@@ -3077,26 +3035,24 @@ let unified = UnifiedQueryParser::new(lexical_parser, vector_parser)
 <h1 id="persistence--wal-1"><a class="header" href="#persistence--wal-1">Persistence &amp; WAL</a></h1>
 <p>Iris uses a <strong>Write-Ahead Log (WAL)</strong> to ensure data durability. Every write operation is persisted to the WAL before modifying in-memory structures, guaranteeing that no data is lost even if the process crashes.</p>
 <h2 id="write-path"><a class="header" href="#write-path">Write Path</a></h2>
-<div class="mermaid">
-sequenceDiagram
+<pre><code class="language-mermaid">sequenceDiagram
     participant App as Application
     participant Engine
     participant WAL as DocumentLog (WAL)
     participant Mem as In-Memory Buffers
     participant Disk as Storage (segments)
-<pre><code>App-&gt;&gt;Engine: add_document() / delete_document()
-Engine-&gt;&gt;WAL: 1. Append operation to WAL
-Engine-&gt;&gt;Mem: 2. Update in-memory buffers
 
-Note over Mem: Document is buffered but&lt;br/&gt;NOT yet searchable
+    App-&gt;&gt;Engine: add_document() / delete_document()
+    Engine-&gt;&gt;WAL: 1. Append operation to WAL
+    Engine-&gt;&gt;Mem: 2. Update in-memory buffers
 
-App-&gt;&gt;Engine: commit()
-Engine-&gt;&gt;Disk: 3. Flush segments to storage
-Engine-&gt;&gt;WAL: 4. Record checkpoint
-Note over Disk: Documents are now&lt;br/&gt;searchable and durable
+    Note over Mem: Document is buffered but\nNOT yet searchable
+
+    App-&gt;&gt;Engine: commit()
+    Engine-&gt;&gt;Disk: 3. Flush segments to storage
+    Engine-&gt;&gt;WAL: 4. Record checkpoint
+    Note over Disk: Documents are now\nsearchable and durable
 </code></pre>
-</div>
-
 <h3 id="key-principles"><a class="header" href="#key-principles">Key Principles</a></h3>
 <ol>
 <li><strong>WAL-first</strong>: Every write (add or delete) is appended to the WAL before updating in-memory structures</li>
@@ -3128,14 +3084,12 @@ Note over Disk: Documents are now&lt;br/&gt;searchable and durable
 </ul>
 <h2 id="recovery"><a class="header" href="#recovery">Recovery</a></h2>
 <p>When an engine is built (<code>Engine::builder(...).build().await</code>), it automatically checks for uncommitted WAL entries and replays them:</p>
-<div class="mermaid">
-graph TD
-    Start["Engine::build()"] --&gt; Check["Check WAL for<br />uncommitted entries"]
-    Check --&gt;|"Entries found"| Replay["Replay operations<br />into in-memory buffers"]
+<pre><code class="language-mermaid">graph TD
+    Start["Engine::build()"] --&gt; Check["Check WAL for\nuncommitted entries"]
+    Check --&gt;|"Entries found"| Replay["Replay operations\ninto in-memory buffers"]
     Replay --&gt; Ready["Engine ready"]
     Check --&gt;|"No entries"| Ready
-</div>
-
+</code></pre>
 <p>Recovery is transparent — you do not need to handle it manually.</p>
 <h2 id="the-commit-lifecycle"><a class="header" href="#the-commit-lifecycle">The Commit Lifecycle</a></h2>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
@@ -3206,12 +3160,10 @@ engine.commit().await?;
 <span class="boring">}</span></code></pre>
 <h2 id="logical-deletion"><a class="header" href="#logical-deletion">Logical Deletion</a></h2>
 <p>When a document is deleted, it is <strong>not</strong> immediately removed from the index files. Instead:</p>
-<div class="mermaid">
-graph LR
-    Del["delete_document('doc-1')"] --&gt; Bitmap["Add internal ID<br />to Deletion Bitmap"]
-    Bitmap --&gt; Search["Search skips<br />deleted IDs"]
-</div>
-
+<pre><code class="language-mermaid">graph LR
+    Del["delete_document('doc-1')"] --&gt; Bitmap["Add internal ID\nto Deletion Bitmap"]
+    Bitmap --&gt; Search["Search skips\ndeleted IDs"]
+</code></pre>
 <ol>
 <li>The document’s internal ID is added to a <strong>deletion bitmap</strong></li>
 <li>The bitmap is checked during every search, filtering out deleted documents from results</li>
@@ -3249,24 +3201,22 @@ engine.commit().await?;
 <span class="boring">}</span></code></pre>
 <h2 id="physical-compaction"><a class="header" href="#physical-compaction">Physical Compaction</a></h2>
 <p>Over time, logically deleted documents accumulate and waste space. Compaction reclaims this space by rewriting segment files without the deleted entries.</p>
-<div class="mermaid">
-graph LR
+<pre><code class="language-mermaid">graph LR
     subgraph "Before Compaction"
-        S1["Segment 0<br />doc-1 (deleted)<br />doc-2<br />doc-3 (deleted)"]
-        S2["Segment 1<br />doc-4<br />doc-5"]
+        S1["Segment 0\ndoc-1 (deleted)\ndoc-2\ndoc-3 (deleted)"]
+        S2["Segment 1\ndoc-4\ndoc-5"]
     end
-<pre><code>Compact["Compaction"]
 
-subgraph "After Compaction"
-    S3["Segment 0&lt;br/&gt;doc-2&lt;br/&gt;doc-4&lt;br/&gt;doc-5"]
-end
+    Compact["Compaction"]
 
-S1 --&gt; Compact
-S2 --&gt; Compact
-Compact --&gt; S3
+    subgraph "After Compaction"
+        S3["Segment 0\ndoc-2\ndoc-4\ndoc-5"]
+    end
+
+    S1 --&gt; Compact
+    S2 --&gt; Compact
+    Compact --&gt; S3
 </code></pre>
-</div>
-
 <h3 id="what-compaction-does"><a class="header" href="#what-compaction-does">What Compaction Does</a></h3>
 <ol>
 <li>Reads all live (non-deleted) documents from existing segments</li>
