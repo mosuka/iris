@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-e37c9676.js";
+            window.path_to_searchindex_js = "../searchindex-a599fd41.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-2eec5043.js"></script>
@@ -236,7 +236,16 @@ let request = VectorSearchRequestBuilder::new()
 <tbody>
 <tr><td style="text-align: left"><code>add_text(field, text)</code></td><td style="text-align: left">Add a text query for a specific field (embedded at search time)</td></tr>
 <tr><td style="text-align: left"><code>add_vector(field, vector)</code></td><td style="text-align: left">Add a pre-computed query vector for a specific field</td></tr>
-<tr><td style="text-align: left"><code>limit(n)</code></td><td style="text-align: left">Maximum number of results</td></tr>
+<tr><td style="text-align: left"><code>add_vector_with_weight(field, vector, weight)</code></td><td style="text-align: left">Add a pre-computed vector with an explicit weight</td></tr>
+<tr><td style="text-align: left"><code>add_payload(field, payload)</code></td><td style="text-align: left">Add a generic <code>DataValue</code> payload to be embedded</td></tr>
+<tr><td style="text-align: left"><code>add_bytes(field, bytes, mime)</code></td><td style="text-align: left">Add a binary payload (e.g., image bytes for multimodal)</td></tr>
+<tr><td style="text-align: left"><code>field(name)</code></td><td style="text-align: left">Restrict search to a specific field</td></tr>
+<tr><td style="text-align: left"><code>fields(names)</code></td><td style="text-align: left">Restrict search to multiple fields</td></tr>
+<tr><td style="text-align: left"><code>limit(n)</code></td><td style="text-align: left">Maximum number of results (default: 10)</td></tr>
+<tr><td style="text-align: left"><code>score_mode(VectorScoreMode)</code></td><td style="text-align: left">Score combination mode (<code>WeightedSum</code>, <code>MaxSim</code>, <code>LateInteraction</code>)</td></tr>
+<tr><td style="text-align: left"><code>min_score(f32)</code></td><td style="text-align: left">Minimum score threshold (default: 0.0)</td></tr>
+<tr><td style="text-align: left"><code>overfetch(f32)</code></td><td style="text-align: left">Overfetch factor for better result quality (default: 1.0)</td></tr>
+<tr><td style="text-align: left"><code>build()</code></td><td style="text-align: left">Build the <code>VectorSearchRequest</code></td></tr>
 </tbody>
 </table>
 </div>

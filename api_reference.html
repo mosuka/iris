@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-e37c9676.js";
+            window.path_to_searchindex_js = "searchindex-a599fd41.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-2eec5043.js"></script>
@@ -380,6 +380,8 @@
 <tr><td style="text-align: left"><code>NumericRangeQuery::new(...)</code></td><td style="text-align: left">Numeric range</td><td style="text-align: left">See <a href="search/lexical_search.html">Lexical Search</a></td></tr>
 <tr><td style="text-align: left"><code>GeoQuery::within_radius(...)</code></td><td style="text-align: left">Geo radius</td><td style="text-align: left">See <a href="search/lexical_search.html">Lexical Search</a></td></tr>
 <tr><td style="text-align: left"><code>SpanNearQuery::new(...)</code></td><td style="text-align: left">Proximity</td><td style="text-align: left">See <a href="search/lexical_search.html">Lexical Search</a></td></tr>
+<tr><td style="text-align: left"><code>PrefixQuery::new(field, prefix)</code></td><td style="text-align: left">Prefix match</td><td style="text-align: left"><code>PrefixQuery::new("body", "pro")</code></td></tr>
+<tr><td style="text-align: left"><code>RegexpQuery::new(field, pattern)?</code></td><td style="text-align: left">Regex match</td><td style="text-align: left"><code>RegexpQuery::new("body", "^pro.*ing$")?</code></td></tr>
 </tbody>
 </table>
 </div>
@@ -404,8 +406,8 @@
 </thead>
 <tbody>
 <tr><td style="text-align: left"><code>StandardAnalyzer</code></td><td style="text-align: left">RegexTokenizer + lowercase + stop words</td></tr>
-<tr><td style="text-align: left"><code>SimpleAnalyzer</code></td><td style="text-align: left">Letter tokenizer + lowercase</td></tr>
-<tr><td style="text-align: left"><code>EnglishAnalyzer</code></td><td style="text-align: left">English-specific lemmatization</td></tr>
+<tr><td style="text-align: left"><code>SimpleAnalyzer</code></td><td style="text-align: left">Tokenization only (no filtering)</td></tr>
+<tr><td style="text-align: left"><code>EnglishAnalyzer</code></td><td style="text-align: left">RegexTokenizer + lowercase + English stop words</td></tr>
 <tr><td style="text-align: left"><code>JapaneseAnalyzer</code></td><td style="text-align: left">Japanese morphological analysis</td></tr>
 <tr><td style="text-align: left"><code>KeywordAnalyzer</code></td><td style="text-align: left">No tokenization (exact match)</td></tr>
 <tr><td style="text-align: left"><code>PipelineAnalyzer</code></td><td style="text-align: left">Custom tokenizer + filter chain</td></tr>

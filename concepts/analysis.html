@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-e37c9676.js";
+            window.path_to_searchindex_js = "../searchindex-a599fd41.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-2eec5043.js"></script>
@@ -259,6 +259,32 @@ let analyzer = KeywordAnalyzer::new();
 // "Hello World" → ["Hello World"]
 <span class="boring">}</span></code></pre>
 <p>Use this for fields that should match exactly (categories, tags, status codes).</p>
+<h3 id="simpleanalyzer"><a class="header" href="#simpleanalyzer">SimpleAnalyzer</a></h3>
+<p>Tokenizes text without any filtering. The original case and all tokens are preserved. Useful when you need complete control over the analysis pipeline or want to test a tokenizer in isolation.</p>
+<p>Pipeline: User-specified <code>Tokenizer</code> only (no char filters, no token filters)</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use iris::analysis::analyzer::simple::SimpleAnalyzer;
+use iris::analysis::tokenizer::regex::RegexTokenizer;
+use std::sync::Arc;
+
+let tokenizer = Arc::new(RegexTokenizer::new()?);
+let analyzer = SimpleAnalyzer::new(tokenizer);
+// "Hello World" → ["Hello", "World"]
+// (no lowercasing, no stop word removal)
+<span class="boring">}</span></code></pre>
+<p>Use this for testing tokenizers, or when you want to apply token filters manually in a separate step.</p>
+<h3 id="englishanalyzer"><a class="header" href="#englishanalyzer">EnglishAnalyzer</a></h3>
+<p>An English-specific analyzer. Tokenizes, lowercases, and removes common English stop words.</p>
+<p>Pipeline: <code>RegexTokenizer</code> (Unicode word boundaries) → <code>LowercaseFilter</code> → <code>StopFilter</code> (128 common English stop words)</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use iris::analysis::analyzer::language::english::EnglishAnalyzer;
+
+let analyzer = EnglishAnalyzer::new()?;
+// "The Quick Brown Fox" → ["quick", "brown", "fox"]
+// ("The" is removed by stop word filtering, remaining tokens are lowercased)
+<span class="boring">}</span></code></pre>
 <h3 id="pipelineanalyzer"><a class="header" href="#pipelineanalyzer">PipelineAnalyzer</a></h3>
 <p>Build a custom pipeline by combining any char filters, a tokenizer, and any sequence of token filters:</p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
