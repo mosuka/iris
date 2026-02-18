@@ -305,11 +305,13 @@
 <tr><td style="text-align: left"><code>TermQuery::new(field, term)</code></td><td style="text-align: left">Exact term match</td><td style="text-align: left"><code>TermQuery::new("body", "rust")</code></td></tr>
 <tr><td style="text-align: left"><code>PhraseQuery::new(field, terms)</code></td><td style="text-align: left">Exact phrase</td><td style="text-align: left"><code>PhraseQuery::new("body", vec!["machine".into(), "learning".into()])</code></td></tr>
 <tr><td style="text-align: left"><code>BooleanQueryBuilder::new()</code></td><td style="text-align: left">Boolean combination</td><td style="text-align: left"><code>.must(q1).should(q2).must_not(q3).build()</code></td></tr>
-<tr><td style="text-align: left"><code>FuzzyQuery::new(field, term, dist)</code></td><td style="text-align: left">Fuzzy match</td><td style="text-align: left"><code>FuzzyQuery::new("body", "programing", 2)</code></td></tr>
+<tr><td style="text-align: left"><code>FuzzyQuery::new(field, term)</code></td><td style="text-align: left">Fuzzy match (default max_edits=2)</td><td style="text-align: left"><code>FuzzyQuery::new("body", "programing").max_edits(1)</code></td></tr>
 <tr><td style="text-align: left"><code>WildcardQuery::new(field, pattern)</code></td><td style="text-align: left">Wildcard</td><td style="text-align: left"><code>WildcardQuery::new("file", "*.pdf")</code></td></tr>
 <tr><td style="text-align: left"><code>NumericRangeQuery::new(...)</code></td><td style="text-align: left">Numeric range</td><td style="text-align: left">See <a href="search/lexical_search.html">Lexical Search</a></td></tr>
 <tr><td style="text-align: left"><code>GeoQuery::within_radius(...)</code></td><td style="text-align: left">Geo radius</td><td style="text-align: left">See <a href="search/lexical_search.html">Lexical Search</a></td></tr>
 <tr><td style="text-align: left"><code>SpanNearQuery::new(...)</code></td><td style="text-align: left">Proximity</td><td style="text-align: left">See <a href="search/lexical_search.html">Lexical Search</a></td></tr>
+<tr><td style="text-align: left"><code>PrefixQuery::new(field, prefix)</code></td><td style="text-align: left">Prefix match</td><td style="text-align: left"><code>PrefixQuery::new("body", "pro")</code></td></tr>
+<tr><td style="text-align: left"><code>RegexpQuery::new(field, pattern)?</code></td><td style="text-align: left">Regex match</td><td style="text-align: left"><code>RegexpQuery::new("body", "^pro.*ing$")?</code></td></tr>
 </tbody></table>
 </div>
 <h2 id="query-parsers"><a class="header" href="#query-parsers">Query Parsers</a></h2>
@@ -322,8 +324,8 @@
 <h2 id="analyzers"><a class="header" href="#analyzers">Analyzers</a></h2>
 <div class="table-wrapper"><table><thead><tr><th style="text-align: left">Type</th><th style="text-align: left">Description</th></tr></thead><tbody>
 <tr><td style="text-align: left"><code>StandardAnalyzer</code></td><td style="text-align: left">RegexTokenizer + lowercase + stop words</td></tr>
-<tr><td style="text-align: left"><code>SimpleAnalyzer</code></td><td style="text-align: left">Letter tokenizer + lowercase</td></tr>
-<tr><td style="text-align: left"><code>EnglishAnalyzer</code></td><td style="text-align: left">English-specific lemmatization</td></tr>
+<tr><td style="text-align: left"><code>SimpleAnalyzer</code></td><td style="text-align: left">Tokenization only (no filtering)</td></tr>
+<tr><td style="text-align: left"><code>EnglishAnalyzer</code></td><td style="text-align: left">RegexTokenizer + lowercase + English stop words</td></tr>
 <tr><td style="text-align: left"><code>JapaneseAnalyzer</code></td><td style="text-align: left">Japanese morphological analysis</td></tr>
 <tr><td style="text-align: left"><code>KeywordAnalyzer</code></td><td style="text-align: left">No tokenization (exact match)</td></tr>
 <tr><td style="text-align: left"><code>PipelineAnalyzer</code></td><td style="text-align: left">Custom tokenizer + filter chain</td></tr>

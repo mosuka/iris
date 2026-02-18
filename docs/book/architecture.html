@@ -182,21 +182,20 @@
 <p>This page explains how Iris is structured internally. Understanding the architecture will help you make better decisions about schema design, analyzer selection, and search strategies.</p>
 <h2 id="high-level-overview"><a class="header" href="#high-level-overview">High-Level Overview</a></h2>
 <p>Iris is organized around a single <code>Engine</code> that coordinates four internal components:</p>
-<div class="mermaid">
-graph TB
+<pre><code class="language-mermaid">graph TB
     subgraph Engine
         SCH["Schema"]
-        LS["LexicalStore<br/>(Inverted Index)"]
-        VS["VectorStore<br/>(HNSW / Flat / IVF)"]
-        DL["DocumentLog<br/>(WAL + Document Storage)"]
+        LS["LexicalStore\n(Inverted Index)"]
+        VS["VectorStore\n(HNSW / Flat / IVF)"]
+        DL["DocumentLog\n(WAL + Document Storage)"]
     end
-<pre><code>Storage["Storage (trait)&lt;br/&gt;Memory / File / Mmap"]
 
-LS --- Storage
-VS --- Storage
-DL --- Storage
+    Storage["Storage (trait)\nMemory / File / File+Mmap"]
+
+    LS --- Storage
+    VS --- Storage
+    DL --- Storage
 </code></pre>
-</div>
 <div class="table-wrapper"><table><thead><tr><th style="text-align: left">Component</th><th style="text-align: left">Responsibility</th></tr></thead><tbody>
 <tr><td style="text-align: left"><strong>Schema</strong></td><td style="text-align: left">Declares fields and their types; determines how each field is routed</td></tr>
 <tr><td style="text-align: left"><strong>LexicalStore</strong></td><td style="text-align: left">Inverted index for keyword search (BM25 scoring)</td></tr>
@@ -216,24 +215,23 @@ DL --- Storage
     .build()
     .await?;
 <span class="boring">}</span></code></pre></pre>
-<div class="mermaid">
-sequenceDiagram
+<pre><code class="language-mermaid">sequenceDiagram
     participant User
     participant EngineBuilder
     participant Engine
-<pre><code>User-&gt;&gt;EngineBuilder: new(storage, schema)
-User-&gt;&gt;EngineBuilder: .analyzer(analyzer)
-User-&gt;&gt;EngineBuilder: .embedder(embedder)
-User-&gt;&gt;EngineBuilder: .build().await
-EngineBuilder-&gt;&gt;EngineBuilder: split_schema()
-Note over EngineBuilder: Separate fields into&lt;br/&gt;LexicalIndexConfig&lt;br/&gt;+ VectorIndexConfig
-EngineBuilder-&gt;&gt;Engine: Create LexicalStore
-EngineBuilder-&gt;&gt;Engine: Create VectorStore
-EngineBuilder-&gt;&gt;Engine: Create DocumentLog
-EngineBuilder-&gt;&gt;Engine: Recover from WAL
-EngineBuilder--&gt;&gt;User: Engine ready
+
+    User-&gt;&gt;EngineBuilder: new(storage, schema)
+    User-&gt;&gt;EngineBuilder: .analyzer(analyzer)
+    User-&gt;&gt;EngineBuilder: .embedder(embedder)
+    User-&gt;&gt;EngineBuilder: .build().await
+    EngineBuilder-&gt;&gt;EngineBuilder: split_schema()
+    Note over EngineBuilder: Separate fields into\nLexicalIndexConfig\n+ VectorIndexConfig
+    EngineBuilder-&gt;&gt;Engine: Create LexicalStore
+    EngineBuilder-&gt;&gt;Engine: Create VectorStore
+    EngineBuilder-&gt;&gt;Engine: Create DocumentLog
+    EngineBuilder-&gt;&gt;Engine: Recover from WAL
+    EngineBuilder--&gt;&gt;User: Engine ready
 </code></pre>
-</div>
 <p>During <code>build()</code>, the engine:</p>
 <ol>
 <li><strong>Splits the schema</strong> — lexical fields go to <code>LexicalIndexConfig</code>, vector fields go to <code>VectorIndexConfig</code></li>
@@ -243,14 +241,13 @@ EngineBuilder--&gt;&gt;User: Engine ready
 </ol>
 <h3 id="schema-splitting"><a class="header" href="#schema-splitting">Schema Splitting</a></h3>
 <p>The <code>Schema</code> contains both lexical and vector fields. At build time, <code>split_schema()</code> separates them:</p>
-<div class="mermaid">
-graph LR
-    S["Schema<br/>title: Text<br/>body: Text<br/>category: Text<br/>page: Integer<br/>content_vec: HNSW"]
-<pre><code>S --&gt; LC["LexicalIndexConfig&lt;br/&gt;title: TextOption&lt;br/&gt;body: TextOption&lt;br/&gt;category: TextOption&lt;br/&gt;page: IntegerOption&lt;br/&gt;_id: KeywordAnalyzer"]
+<pre><code class="language-mermaid">graph LR
+    S["Schema\ntitle: Text\nbody: Text\ncategory: Text\npage: Integer\ncontent_vec: HNSW"]
 
-S --&gt; VC["VectorIndexConfig&lt;br/&gt;content_vec: HnswOption&lt;br/&gt;(dim=384, m=16, ef=200)"]
+    S --&gt; LC["LexicalIndexConfig\ntitle: TextOption\nbody: TextOption\ncategory: TextOption\npage: IntegerOption\n_id: KeywordAnalyzer"]
+
+    S --&gt; VC["VectorIndexConfig\ncontent_vec: HnswOption\n(dim=384, m=16, ef=200)"]
 </code></pre>
-</div>
 <p>Key details:</p>
 <ul>
 <li>The reserved <code>_id</code> field is always added to the lexical config with <code>KeywordAnalyzer</code> (exact match)</li>
@@ -259,34 +256,33 @@ S --&gt; VC["VectorIndexConfig&lt;br/&gt;content_vec: HnswOption&lt;br/&gt;(dim=
 </ul>
 <h2 id="indexing-data-flow"><a class="header" href="#indexing-data-flow">Indexing Data Flow</a></h2>
 <p>When you call <code>engine.add_document(id, doc)</code>:</p>
-<div class="mermaid">
-sequenceDiagram
+<pre><code class="language-mermaid">sequenceDiagram
     participant User
     participant Engine
     participant WAL as DocumentLog (WAL)
     participant Lexical as LexicalStore
     participant Vector as VectorStore
-<pre><code>User-&gt;&gt;Engine: add_document("doc-1", doc)
-Engine-&gt;&gt;WAL: Append to WAL
-Engine-&gt;&gt;Engine: Assign internal ID (u64)
 
-loop For each field in document
-    alt Lexical field (text, integer, etc.)
-        Engine-&gt;&gt;Lexical: Analyze + index field
-    else Vector field
-        Engine-&gt;&gt;Vector: Embed + index field
+    User-&gt;&gt;Engine: add_document("doc-1", doc)
+    Engine-&gt;&gt;WAL: Append to WAL
+    Engine-&gt;&gt;Engine: Assign internal ID (u64)
+
+    loop For each field in document
+        alt Lexical field (text, integer, etc.)
+            Engine-&gt;&gt;Lexical: Analyze + index field
+        else Vector field
+            Engine-&gt;&gt;Vector: Embed + index field
+        end
     end
-end
 
-Note over Engine: Document is buffered&lt;br/&gt;but NOT yet searchable
+    Note over Engine: Document is buffered\nbut NOT yet searchable
 
-User-&gt;&gt;Engine: commit()
-Engine-&gt;&gt;Lexical: Flush segments to storage
-Engine-&gt;&gt;Vector: Flush segments to storage
-Engine-&gt;&gt;WAL: Mark checkpoint
-Note over Engine: Documents are&lt;br/&gt;now searchable
+    User-&gt;&gt;Engine: commit()
+    Engine-&gt;&gt;Lexical: Flush segments to storage
+    Engine-&gt;&gt;Vector: Flush segments to storage
+    Engine-&gt;&gt;WAL: Truncate WAL
+    Note over Engine: Documents are\nnow searchable
 </code></pre>
-</div>
 <p>Key points:</p>
 <ul>
 <li><strong>WAL-first</strong>: every write is logged before modifying in-memory structures</li>
@@ -295,37 +291,36 @@ Note over Engine: Documents are&lt;br/&gt;now searchable
 </ul>
 <h2 id="search-data-flow"><a class="header" href="#search-data-flow">Search Data Flow</a></h2>
 <p>When you call <code>engine.search(request)</code>:</p>
-<div class="mermaid">
-sequenceDiagram
+<pre><code class="language-mermaid">sequenceDiagram
     participant User
     participant Engine
     participant Lexical as LexicalStore
     participant Vector as VectorStore
     participant Fusion
-<pre><code>User-&gt;&gt;Engine: search(request)
 
-opt Filter query present
-    Engine-&gt;&gt;Lexical: Execute filter query
-    Lexical--&gt;&gt;Engine: Allowed document IDs
-end
+    User-&gt;&gt;Engine: search(request)
 
-par Lexical search
-    Engine-&gt;&gt;Lexical: Execute lexical query
-    Lexical--&gt;&gt;Engine: Ranked hits (BM25)
-and Vector search
-    Engine-&gt;&gt;Vector: Execute vector query
-    Vector--&gt;&gt;Engine: Ranked hits (similarity)
-end
+    opt Filter query present
+        Engine-&gt;&gt;Lexical: Execute filter query
+        Lexical--&gt;&gt;Engine: Allowed document IDs
+    end
 
-alt Both lexical and vector results
-    Engine-&gt;&gt;Fusion: Fuse results (RRF or WeightedSum)
-    Fusion--&gt;&gt;Engine: Merged ranked list
-end
+    par Lexical search
+        Engine-&gt;&gt;Lexical: Execute lexical query
+        Lexical--&gt;&gt;Engine: Ranked hits (BM25)
+    and Vector search
+        Engine-&gt;&gt;Vector: Execute vector query
+        Vector--&gt;&gt;Engine: Ranked hits (similarity)
+    end
 
-Engine-&gt;&gt;Engine: Apply offset + limit
-Engine--&gt;&gt;User: Vec of SearchResult
+    alt Both lexical and vector results
+        Engine-&gt;&gt;Fusion: Fuse results (RRF or WeightedSum)
+        Fusion--&gt;&gt;Engine: Merged ranked list
+    end
+
+    Engine-&gt;&gt;Engine: Apply offset + limit
+    Engine--&gt;&gt;User: Vec of SearchResult
 </code></pre>
-</div>
 <p>The search pipeline has three stages:</p>
 <ol>
 <li><strong>Filter</strong> (optional) — execute a filter query on the lexical index to get a set of allowed document IDs</li>
@@ -334,33 +329,31 @@ Engine--&gt;&gt;User: Vec of SearchResult
 </ol>
 <h2 id="storage-architecture"><a class="header" href="#storage-architecture">Storage Architecture</a></h2>
 <p>All components share a single <code>Storage</code> trait implementation, but use key prefixes to isolate their data:</p>
-<div class="mermaid">
-graph TB
-    Engine --> PS1["PrefixedStorage<br/>prefix: 'lexical/'"]
-    Engine --> PS2["PrefixedStorage<br/>prefix: 'vector/'"]
-    Engine --> PS3["PrefixedStorage<br/>prefix: 'documents/'"]
-<pre><code>PS1 --&gt; S["Storage Backend&lt;br/&gt;(Memory / File / Mmap)"]
-PS2 --&gt; S
-PS3 --&gt; S
+<pre><code class="language-mermaid">graph TB
+    Engine --&gt; PS1["PrefixedStorage\nprefix: 'lexical/'"]
+    Engine --&gt; PS2["PrefixedStorage\nprefix: 'vector/'"]
+    Engine --&gt; PS3["PrefixedStorage\nprefix: 'documents/'"]
+
+    PS1 --&gt; S["Storage Backend\n(Memory / File / File+Mmap)"]
+    PS2 --&gt; S
+    PS3 --&gt; S
 </code></pre>
-</div>
 <div class="table-wrapper"><table><thead><tr><th style="text-align: left">Backend</th><th style="text-align: left">Description</th><th style="text-align: left">Best For</th></tr></thead><tbody>
 <tr><td style="text-align: left"><code>MemoryStorage</code></td><td style="text-align: left">All data in memory</td><td style="text-align: left">Testing, small datasets, ephemeral use</td></tr>
 <tr><td style="text-align: left"><code>FileStorage</code></td><td style="text-align: left">Standard file I/O</td><td style="text-align: left">General production use</td></tr>
-<tr><td style="text-align: left"><code>MmapStorage</code></td><td style="text-align: left">Memory-mapped files</td><td style="text-align: left">Large datasets, read-heavy workloads</td></tr>
+<tr><td style="text-align: left"><code>FileStorage</code> (mmap)</td><td style="text-align: left">Memory-mapped files (<code>use_mmap = true</code>)</td><td style="text-align: left">Large datasets, read-heavy workloads</td></tr>
 </tbody></table>
 </div>
 <h2 id="per-field-dispatch"><a class="header" href="#per-field-dispatch">Per-Field Dispatch</a></h2>
 <p>When a <code>PerFieldAnalyzer</code> is provided, the engine dispatches analysis to field-specific analyzers. The same pattern applies to <code>PerFieldEmbedder</code>.</p>
-<div class="mermaid">
-graph LR
+<pre><code class="language-mermaid">graph LR
     PFA["PerFieldAnalyzer"]
-    PFA -->|"title"| KA["KeywordAnalyzer"]
-    PFA -->|"body"| SA["StandardAnalyzer"]
-    PFA -->|"description"| JA["JapaneseAnalyzer"]
-    PFA -->|"_id"| KA2["KeywordAnalyzer<br/>(always)"]
-    PFA -->|other fields| DEF["Default Analyzer<br/>(StandardAnalyzer)"]
-</div>
+    PFA --&gt;|"title"| KA["KeywordAnalyzer"]
+    PFA --&gt;|"body"| SA["StandardAnalyzer"]
+    PFA --&gt;|"description"| JA["JapaneseAnalyzer"]
+    PFA --&gt;|"_id"| KA2["KeywordAnalyzer\n(always)"]
+    PFA --&gt;|other fields| DEF["Default Analyzer\n(StandardAnalyzer)"]
+</code></pre>
 <p>This allows different fields to use different analysis strategies within the same engine.</p>
 <h2 id="summary"><a class="header" href="#summary">Summary</a></h2>
 <div class="table-wrapper"><table><thead><tr><th style="text-align: left">Aspect</th><th style="text-align: left">Detail</th></tr></thead><tbody>

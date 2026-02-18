@@ -62,7 +62,16 @@ let request = VectorSearchRequestBuilder::new()
 | :--- | :--- |
 | `add_text(field, text)` | Add a text query for a specific field (embedded at search time) |
 | `add_vector(field, vector)` | Add a pre-computed query vector for a specific field |
-| `limit(n)` | Maximum number of results |
+| `add_vector_with_weight(field, vector, weight)` | Add a pre-computed vector with an explicit weight |
+| `add_payload(field, payload)` | Add a generic `DataValue` payload to be embedded |
+| `add_bytes(field, bytes, mime)` | Add a binary payload (e.g., image bytes for multimodal) |
+| `field(name)` | Restrict search to a specific field |
+| `fields(names)` | Restrict search to multiple fields |
+| `limit(n)` | Maximum number of results (default: 10) |
+| `score_mode(VectorScoreMode)` | Score combination mode (`WeightedSum`, `MaxSim`, `LateInteraction`) |
+| `min_score(f32)` | Minimum score threshold (default: 0.0) |
+| `overfetch(f32)` | Overfetch factor for better result quality (default: 1.0) |
+| `build()` | Build the `VectorSearchRequest` |
 
 ## Multi-Field Vector Search
 

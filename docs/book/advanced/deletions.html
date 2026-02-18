@@ -184,16 +184,15 @@
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// Delete a document by its external ID
-engine.delete_document("doc-1").await?;
+engine.delete_documents("doc-1").await?;
 engine.commit().await?;
 <span class="boring">}</span></code></pre></pre>
 <h2 id="logical-deletion"><a class="header" href="#logical-deletion">Logical Deletion</a></h2>
 <p>When a document is deleted, it is <strong>not</strong> immediately removed from the index files. Instead:</p>
-<div class="mermaid">
-graph LR
-    Del["delete_document('doc-1')"] --> Bitmap["Add internal ID<br/>to Deletion Bitmap"]
-    Bitmap --> Search["Search skips<br/>deleted IDs"]
-</div>
+<pre><code class="language-mermaid">graph LR
+    Del["delete_documents('doc-1')"] --&gt; Bitmap["Add internal ID\nto Deletion Bitmap"]
+    Bitmap --&gt; Search["Search skips\ndeleted IDs"]
+</code></pre>
 <ol>
 <li>The document's internal ID is added to a <strong>deletion bitmap</strong></li>
 <li>The bitmap is checked during every search, filtering out deleted documents from results</li>
@@ -216,32 +215,31 @@ graph LR
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// First insert
-engine.add_document("doc-1", doc_v1).await?;
+engine.put_document("doc-1", doc_v1).await?;
 engine.commit().await?;
 
 // Update: old version is logically deleted, new version is inserted
-engine.add_document("doc-1", doc_v2).await?;
+engine.put_document("doc-1", doc_v2).await?;
 engine.commit().await?;
 <span class="boring">}</span></code></pre></pre>
 <h2 id="physical-compaction"><a class="header" href="#physical-compaction">Physical Compaction</a></h2>
 <p>Over time, logically deleted documents accumulate and waste space. Compaction reclaims this space by rewriting segment files without the deleted entries.</p>
-<div class="mermaid">
-graph LR
+<pre><code class="language-mermaid">graph LR
     subgraph "Before Compaction"
-        S1["Segment 0<br/>doc-1 (deleted)<br/>doc-2<br/>doc-3 (deleted)"]
-        S2["Segment 1<br/>doc-4<br/>doc-5"]
+        S1["Segment 0\ndoc-1 (deleted)\ndoc-2\ndoc-3 (deleted)"]
+        S2["Segment 1\ndoc-4\ndoc-5"]
     end
-<pre><code>Compact["Compaction"]
 
-subgraph "After Compaction"
-    S3["Segment 0&lt;br/&gt;doc-2&lt;br/&gt;doc-4&lt;br/&gt;doc-5"]
-end
+    Compact["Compaction"]
 
-S1 --&gt; Compact
-S2 --&gt; Compact
-Compact --&gt; S3
+    subgraph "After Compaction"
+        S3["Segment 0\ndoc-2\ndoc-4\ndoc-5"]
+    end
+
+    S1 --&gt; Compact
+    S2 --&gt; Compact
+    Compact --&gt; S3
 </code></pre>
-</div>
 <h3 id="what-compaction-does"><a class="header" href="#what-compaction-does">What Compaction Does</a></h3>
 <ol>
 <li>Reads all live (non-deleted) documents from existing segments</li>
@@ -265,11 +263,10 @@ Compact --&gt; S3
 <li><strong>After bulk updates</strong>: Compact after a large batch of upserts</li>
 </ul>
 <h2 id="deletion-bitmap"><a class="header" href="#deletion-bitmap">Deletion Bitmap</a></h2>
-<p>The deletion bitmap is a compact, memory-efficient data structure that tracks which internal IDs have been deleted:</p>
+<p>The deletion bitmap tracks which internal IDs have been deleted:</p>
 <ul>
-<li><strong>Storage</strong>: One bit per document ID</li>
-<li><strong>Lookup</strong>: O(1) — simple bit test</li>
-<li><strong>Memory</strong>: Minimal — a bitmap for 1 million documents uses ~125 KB</li>
+<li><strong>Storage</strong>: HashSet of deleted document IDs (<code>AHashSet&lt;u64&gt;</code>)</li>
+<li><strong>Lookup</strong>: O(1) — hash set lookup</li>
 </ul>
 <p>The bitmap is persisted alongside the index segments and is rebuilt from the WAL during recovery.</p>
 <h2 id="next-steps"><a class="header" href="#next-steps">Next Steps</a></h2>

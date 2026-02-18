@@ -233,7 +233,7 @@ price:[* TO 100]
 <pre><code class="language-text">(title:hello OR title:hi) AND body:world
 </code></pre>
 <h3 id="peg-grammar"><a class="header" href="#peg-grammar">PEG Grammar</a></h3>
-<p>The full lexical grammar (<a href="https://github.com/mosuka/iris/blob/main/src/lexical/query/parser.pest">parser.pest</a>):</p>
+<p>The full lexical grammar (<a href="https://github.com/mosuka/iris/blob/main/iris/src/lexical/query/parser.pest">parser.pest</a>):</p>
 <pre><code class="language-pest">query          = { SOI ~ boolean_query ~ EOI }
 boolean_query  = { clause ~ (boolean_op ~ clause | clause)* }
 clause         = { required_clause | prohibited_clause | sub_clause }
@@ -304,7 +304,7 @@ metadata.embedding:~"text"
 request.score_mode = VectorScoreMode::MaxSim;
 <span class="boring">}</span></code></pre></pre>
 <h3 id="peg-grammar-1"><a class="header" href="#peg-grammar-1">PEG Grammar</a></h3>
-<p>The full vector grammar (<a href="https://github.com/mosuka/iris/blob/main/src/vector/query/parser.pest">parser.pest</a>):</p>
+<p>The full vector grammar (<a href="https://github.com/mosuka/iris/blob/main/iris/src/vector/query/parser.pest">parser.pest</a>):</p>
 <pre><code class="language-pest">query          = { SOI ~ vector_clause+ ~ EOI }
 vector_clause  = { field_prefix? ~ "~" ~ quoted_text ~ boost? }
 field_prefix   = { field_name ~ ":" }
@@ -390,9 +390,9 @@ let unified = UnifiedQueryParser::new(lexical_parser, vector_parser);
 let request = unified.parse(
     r#"title:hello content:~"cute kitten"^0.8"#
 ).await?;
-// request.lexical  -&gt; Some(...)  — lexical query
-// request.vector   -&gt; Some(...)  — vector query
-// request.fusion   -&gt; Some(RRF)  — fusion algorithm
+// request.lexical_search_request  -&gt; Some(...)  — lexical query
+// request.vector_search_request   -&gt; Some(...)  — vector query
+// request.fusion_algorithm        -&gt; Some(RRF)  — fusion algorithm
 <span class="boring">}</span></code></pre></pre>
 <h3 id="custom-fusion"><a class="header" href="#custom-fusion">Custom Fusion</a></h3>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]

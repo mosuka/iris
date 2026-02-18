@@ -223,10 +223,8 @@ let storage: Arc&lt;dyn Storage&gt; = Arc::new(
 use iris::Storage;
 use iris::storage::file::{FileStorage, FileStorageConfig};
 
-let config = FileStorageConfig {
-    base_path: "/tmp/iris-data".into(),
-};
-let storage: Arc&lt;dyn Storage&gt; = Arc::new(FileStorage::new(config)?);
+let config = FileStorageConfig::new("/tmp/iris-data");
+let storage: Arc&lt;dyn Storage&gt; = Arc::new(FileStorage::new("/tmp/iris-data", config)?);
 <span class="boring">}</span></code></pre></pre>
 <div class="table-wrapper"><table><thead><tr><th style="text-align: left">Property</th><th style="text-align: left">Value</th></tr></thead><tbody>
 <tr><td style="text-align: left">Durability</td><td style="text-align: left">Full (persisted to disk)</td></tr>
@@ -244,7 +242,7 @@ use iris::storage::file::{FileStorage, FileStorageConfig};
 
 let mut config = FileStorageConfig::new("/tmp/iris-data");
 config.use_mmap = true;  // enable memory-mapped I/O
-let storage: Arc&lt;dyn Storage&gt; = Arc::new(FileStorage::new(config)?);
+let storage: Arc&lt;dyn Storage&gt; = Arc::new(FileStorage::new("/tmp/iris-data", config)?);
 <span class="boring">}</span></code></pre></pre>
 <div class="table-wrapper"><table><thead><tr><th style="text-align: left">Property</th><th style="text-align: left">Value</th></tr></thead><tbody>
 <tr><td style="text-align: left">Durability</td><td style="text-align: left">Full (persisted to disk)</td></tr>
@@ -265,16 +263,15 @@ let storage = StorageFactory::create(
 <span class="boring">}</span></code></pre></pre>
 <h2 id="prefixedstorage"><a class="header" href="#prefixedstorage">PrefixedStorage</a></h2>
 <p>The engine uses <code>PrefixedStorage</code> to isolate components within a single storage backend:</p>
-<div class="mermaid">
-graph TB
+<pre><code class="language-mermaid">graph TB
     E["Engine"]
-    E --> P1["PrefixedStorage<br/>prefix = 'lexical/'"]
-    E --> P2["PrefixedStorage<br/>prefix = 'vector/'"]
-    E --> P3["PrefixedStorage<br/>prefix = 'documents/'"]
-    P1 --> S["Storage Backend"]
-    P2 --> S
-    P3 --> S
-</div>
+    E --&gt; P1["PrefixedStorage\nprefix = 'lexical/'"]
+    E --&gt; P2["PrefixedStorage\nprefix = 'vector/'"]
+    E --&gt; P3["PrefixedStorage\nprefix = 'documents/'"]
+    P1 --&gt; S["Storage Backend"]
+    P2 --&gt; S
+    P3 --&gt; S
+</code></pre>
 <p>When the lexical store writes a key <code>segments/seg-001.dict</code>, it is actually stored as <code>lexical/segments/seg-001.dict</code> in the underlying backend. This ensures no key collisions between components.</p>
 <p>You do not need to create <code>PrefixedStorage</code> yourself — the <code>EngineBuilder</code> handles this automatically.</p>
 <h2 id="choosing-a-backend"><a class="header" href="#choosing-a-backend">Choosing a Backend</a></h2>

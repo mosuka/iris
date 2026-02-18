@@ -250,7 +250,7 @@ let query = BooleanQueryBuilder::new()
 
 // Find documents matching "programing" within edit distance 2
 // This will match "programming", "programing", etc.
-let query = FuzzyQuery::new("body", "programing", 2);
+let query = FuzzyQuery::new("body", "programing");  // default max_edits = 2
 <span class="boring">}</span></code></pre></pre>
 <h3 id="wildcardquery"><a class="header" href="#wildcardquery">WildcardQuery</a></h3>
 <p>Matches terms using wildcard patterns.</p>
@@ -259,10 +259,35 @@ let query = FuzzyQuery::new("body", "programing", 2);
 </span>use iris::lexical::query::wildcard::WildcardQuery;
 
 // '?' matches exactly one character, '*' matches zero or more
-let query = WildcardQuery::new("filename", "*.pdf");
-let query = WildcardQuery::new("body", "pro*");
-let query = WildcardQuery::new("body", "col?r");  // matches "color" and "colour"
+let query = WildcardQuery::new("filename", "*.pdf")?;
+let query = WildcardQuery::new("body", "pro*")?;
+let query = WildcardQuery::new("body", "col?r")?;  // matches "color" and "colour"
 <span class="boring">}</span></code></pre></pre>
+<h3 id="prefixquery"><a class="header" href="#prefixquery">PrefixQuery</a></h3>
+<p>Matches documents containing terms that start with a specific prefix.</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use iris::lexical::query::prefix::PrefixQuery;
+
+// Find documents where "body" contains terms starting with "pro"
+// This matches "programming", "program", "production", etc.
+let query = PrefixQuery::new("body", "pro");
+<span class="boring">}</span></code></pre></pre>
+<h3 id="regexpquery"><a class="header" href="#regexpquery">RegexpQuery</a></h3>
+<p>Matches documents containing terms that match a regular expression pattern.</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use iris::lexical::query::regexp::RegexpQuery;
+
+// Find documents where "body" contains terms matching the regex
+let query = RegexpQuery::new("body", "^pro.*ing$")?;
+
+// Match version-like patterns
+let query = RegexpQuery::new("version", r"^v\d+\.\d+")?;
+<span class="boring">}</span></code></pre></pre>
+<blockquote>
+<p><strong>Note:</strong> <code>RegexpQuery::new()</code> returns <code>Result</code> because the regex pattern is validated at construction time. Invalid patterns will produce an error.</p>
+</blockquote>
 <h3 id="numericrangequery"><a class="header" href="#numericrangequery">NumericRangeQuery</a></h3>
 <p>Matches documents with numeric field values within a range.</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
@@ -345,9 +370,29 @@ request.field_boosts.insert("body".to_string(), 1.0);
 <tr><td style="text-align: left"><code>query</code></td><td style="text-align: left">(required)</td><td style="text-align: left">The query to execute</td></tr>
 <tr><td style="text-align: left"><code>limit</code></td><td style="text-align: left">10</td><td style="text-align: left">Maximum number of results</td></tr>
 <tr><td style="text-align: left"><code>load_documents</code></td><td style="text-align: left">true</td><td style="text-align: left">Whether to load full document content</td></tr>
+<tr><td style="text-align: left"><code>min_score</code></td><td style="text-align: left">0.0</td><td style="text-align: left">Minimum score threshold</td></tr>
+<tr><td style="text-align: left"><code>timeout_ms</code></td><td style="text-align: left">None</td><td style="text-align: left">Search timeout in milliseconds</td></tr>
+<tr><td style="text-align: left"><code>parallel</code></td><td style="text-align: left">false</td><td style="text-align: left">Enable parallel search across segments</td></tr>
+<tr><td style="text-align: left"><code>sort_by</code></td><td style="text-align: left"><code>Score</code></td><td style="text-align: left">Sort by relevance score, or by a field (<code>asc</code> / <code>desc</code>)</td></tr>
 <tr><td style="text-align: left"><code>field_boosts</code></td><td style="text-align: left">empty</td><td style="text-align: left">Per-field score multipliers</td></tr>
 </tbody></table>
 </div>
+<h3 id="builder-methods"><a class="header" href="#builder-methods">Builder Methods</a></h3>
+<p><code>LexicalSearchRequest</code> supports a builder-style API for setting options:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use iris::LexicalSearchRequest;
+use iris::lexical::TermQuery;
+
+let request = LexicalSearchRequest::new(Box::new(TermQuery::new("body", "rust")))
+    .limit(20)
+    .min_score(0.5)
+    .timeout_ms(5000)
+    .parallel(true)
+    .sort_by_field_desc("date")
+    .with_field_boost("title", 2.0)
+    .with_field_boost("body", 1.0);
+<span class="boring">}</span></code></pre></pre>
 <h2 id="using-the-query-dsl"><a class="header" href="#using-the-query-dsl">Using the Query DSL</a></h2>
 <p>Instead of building queries programmatically, you can use the text-based Query DSL:</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]

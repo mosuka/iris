@@ -193,7 +193,7 @@ let storage: Arc&lt;dyn Storage&gt; = Arc::new(
 );
 <span class="boring">}</span></code></pre></pre>
 <blockquote>
-<p><strong>Tip:</strong> For production, consider <code>FileStorage</code> or <code>MmapStorage</code>. See <a href="../concepts/storage.html">Storage</a> for details.</p>
+<p><strong>Tip:</strong> For production, consider <code>FileStorage</code> (with optional <code>use_mmap</code> for memory-mapped I/O). See <a href="../concepts/storage.html">Storage</a> for details.</p>
 </blockquote>
 <h2 id="step-2--define-a-schema"><a class="header" href="#step-2--define-a-schema">Step 2 — Define a Schema</a></h2>
 <p>A <code>Schema</code> declares the fields in your documents and how each field should be indexed:</p>

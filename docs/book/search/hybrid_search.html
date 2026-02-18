@@ -188,29 +188,28 @@
 </tbody></table>
 </div>
 <h2 id="how-it-works"><a class="header" href="#how-it-works">How It Works</a></h2>
-<div class="mermaid">
-sequenceDiagram
+<pre><code class="language-mermaid">sequenceDiagram
     participant User
     participant Engine
     participant Lexical as LexicalStore
     participant Vector as VectorStore
     participant Fusion
-<pre><code>User-&gt;&gt;Engine: SearchRequest&lt;br/&gt;(lexical + vector)
 
-par Execute in parallel
-    Engine-&gt;&gt;Lexical: BM25 keyword search
-    Lexical--&gt;&gt;Engine: Ranked hits (by relevance)
-and
-    Engine-&gt;&gt;Vector: ANN similarity search
-    Vector--&gt;&gt;Engine: Ranked hits (by distance)
-end
+    User-&gt;&gt;Engine: SearchRequest\n(lexical + vector)
 
-Engine-&gt;&gt;Fusion: Merge two result sets
-Note over Fusion: RRF or WeightedSum
-Fusion--&gt;&gt;Engine: Unified ranked list
-Engine--&gt;&gt;User: Vec of SearchResult
+    par Execute in parallel
+        Engine-&gt;&gt;Lexical: BM25 keyword search
+        Lexical--&gt;&gt;Engine: Ranked hits (by relevance)
+    and
+        Engine-&gt;&gt;Vector: ANN similarity search
+        Vector--&gt;&gt;Engine: Ranked hits (by distance)
+    end
+
+    Engine-&gt;&gt;Fusion: Merge two result sets
+    Note over Fusion: RRF or WeightedSum
+    Fusion--&gt;&gt;Engine: Unified ranked list
+    Engine--&gt;&gt;User: Vec of SearchResult
 </code></pre>
-</div>
 <h2 id="basic-usage"><a class="header" href="#basic-usage">Basic Usage</a></h2>
 <h3 id="builder-api"><a class="header" href="#builder-api">Builder API</a></h3>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
@@ -384,9 +383,12 @@ async fn main() -&gt; iris::Result&lt;()&gt; {
         })
         .build();
 
+    // Configure analyzer and embedder (see Text Analysis and Embeddings docs)
+    // let analyzer = Arc::new(StandardAnalyzer::new()?);
+    // let embedder = Arc::new(CandleBertEmbedder::new("sentence-transformers/all-MiniLM-L6-v2")?);
     let engine = Engine::builder(storage, schema)
-        .analyzer(analyzer)
-        .embedder(Arc::new(per_field_embedder))
+        // .analyzer(analyzer)
+        // .embedder(embedder)
         .build()
         .await?;
 

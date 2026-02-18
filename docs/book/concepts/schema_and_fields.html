@@ -200,24 +200,23 @@ let schema = Schema::builder()
 <h3 id="default-fields"><a class="header" href="#default-fields">Default Fields</a></h3>
 <p><code>add_default_field()</code> specifies which field(s) are searched when a query does not explicitly name a field. This is used by the <a href="../advanced/query_dsl.html">Query DSL</a> parser.</p>
 <h2 id="field-types"><a class="header" href="#field-types">Field Types</a></h2>
-<div class="mermaid">
-graph TB
+<pre><code class="language-mermaid">graph TB
     FO["FieldOption"]
-    FO --> LEX["Lexical"]
-    FO --> VEC["Vector"]
-<pre><code>LEX --&gt; T["Text"]
-LEX --&gt; I["Integer"]
-LEX --&gt; FL["Float"]
-LEX --&gt; B["Boolean"]
-LEX --&gt; DT["DateTime"]
-LEX --&gt; G["Geo"]
-LEX --&gt; BY["Bytes"]
+    FO --&gt; LEX["Lexical"]
+    FO --&gt; VEC["Vector"]
 
-VEC --&gt; FLAT["Flat"]
-VEC --&gt; HNSW["HNSW"]
-VEC --&gt; IVF["IVF"]
+    LEX --&gt; T["Text"]
+    LEX --&gt; I["Integer"]
+    LEX --&gt; FL["Float"]
+    LEX --&gt; B["Boolean"]
+    LEX --&gt; DT["DateTime"]
+    LEX --&gt; G["Geo"]
+    LEX --&gt; BY["Bytes"]
+
+    VEC --&gt; FLAT["Flat"]
+    VEC --&gt; HNSW["HNSW"]
+    VEC --&gt; IVF["IVF"]
 </code></pre>
-</div>
 <h3 id="lexical-fields"><a class="header" href="#lexical-fields">Lexical Fields</a></h3>
 <p>Lexical fields are indexed using an inverted index and support keyword-based queries.</p>
 <div class="table-wrapper"><table><thead><tr><th style="text-align: left">Type</th><th style="text-align: left">Rust Type</th><th style="text-align: left">SchemaBuilder Method</th><th style="text-align: left">Description</th></tr></thead><tbody>

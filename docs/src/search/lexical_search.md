@@ -97,6 +97,34 @@ let query = WildcardQuery::new("body", "pro*")?;
 let query = WildcardQuery::new("body", "col?r")?;  // matches "color" and "colour"
 ```
 
+### PrefixQuery
+
+Matches documents containing terms that start with a specific prefix.
+
+```rust
+use iris::lexical::query::prefix::PrefixQuery;
+
+// Find documents where "body" contains terms starting with "pro"
+// This matches "programming", "program", "production", etc.
+let query = PrefixQuery::new("body", "pro");
+```
+
+### RegexpQuery
+
+Matches documents containing terms that match a regular expression pattern.
+
+```rust
+use iris::lexical::query::regexp::RegexpQuery;
+
+// Find documents where "body" contains terms matching the regex
+let query = RegexpQuery::new("body", "^pro.*ing$")?;
+
+// Match version-like patterns
+let query = RegexpQuery::new("version", r"^v\d+\.\d+")?;
+```
+
+> **Note:** `RegexpQuery::new()` returns `Result` because the regex pattern is validated at construction time. Invalid patterns will produce an error.
+
 ### NumericRangeQuery
 
 Matches documents with numeric field values within a range.
@@ -190,7 +218,29 @@ request.field_boosts.insert("body".to_string(), 1.0);
 | `query` | (required) | The query to execute |
 | `limit` | 10 | Maximum number of results |
 | `load_documents` | true | Whether to load full document content |
+| `min_score` | 0.0 | Minimum score threshold |
+| `timeout_ms` | None | Search timeout in milliseconds |
+| `parallel` | false | Enable parallel search across segments |
+| `sort_by` | `Score` | Sort by relevance score, or by a field (`asc` / `desc`) |
 | `field_boosts` | empty | Per-field score multipliers |
+
+### Builder Methods
+
+`LexicalSearchRequest` supports a builder-style API for setting options:
+
+```rust
+use iris::LexicalSearchRequest;
+use iris::lexical::TermQuery;
+
+let request = LexicalSearchRequest::new(Box::new(TermQuery::new("body", "rust")))
+    .limit(20)
+    .min_score(0.5)
+    .timeout_ms(5000)
+    .parallel(true)
+    .sort_by_field_desc("date")
+    .with_field_boost("title", 2.0)
+    .with_field_boost("body", 1.0);
+```
 
 ## Using the Query DSL
 

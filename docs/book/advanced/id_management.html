@@ -211,10 +211,10 @@
 </ol>
 <h2 id="id-lifecycle"><a class="header" href="#id-lifecycle">ID Lifecycle</a></h2>
 <ol>
-<li><strong>Registration (<code>engine.index()</code>)</strong>: User provides a document with an External ID.</li>
+<li><strong>Registration (<code>engine.put_document()</code> / <code>engine.add_document()</code>)</strong>: User provides a document with an External ID.</li>
 <li><strong>ID Assignment</strong>: The <code>Engine</code> combines the current <code>shard_id</code> with a new Local ID to issue a Shard-Prefixed Internal ID.</li>
 <li><strong>Mapping</strong>: The engine maintains the relationship between the External ID and the new Internal ID.</li>
-<li><strong>Search</strong>: Search results return the <code>u64</code> Internal ID for efficiency.</li>
+<li><strong>Search</strong>: Search results return the External ID (<code>String</code>), resolved from the Internal ID.</li>
 <li><strong>Retrieval/Deletion</strong>: While the user-facing API accepts External IDs for convenience, the engine internally converts them to Internal IDs for near-instant processing.</li>
 </ol>
 

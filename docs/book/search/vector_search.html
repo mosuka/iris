@@ -221,11 +221,7 @@ let request = VectorSearchRequestBuilder::new()
     .add_text("text_vec", "machine learning")
 
     // Or use a pre-computed vector directly
-    .add_vector(QueryVector {
-        vector: vec![0.1, 0.2, 0.3, ...],
-        weight: 1.0,
-        fields: Some(vec!["embedding".to_string()]),
-    })
+    .add_vector("embedding", vec![0.1, 0.2, 0.3, /* ... */])
 
     // Search parameters
     .limit(20)
@@ -235,8 +231,17 @@ let request = VectorSearchRequestBuilder::new()
 <h3 id="methods"><a class="header" href="#methods">Methods</a></h3>
 <div class="table-wrapper"><table><thead><tr><th style="text-align: left">Method</th><th style="text-align: left">Description</th></tr></thead><tbody>
 <tr><td style="text-align: left"><code>add_text(field, text)</code></td><td style="text-align: left">Add a text query for a specific field (embedded at search time)</td></tr>
-<tr><td style="text-align: left"><code>add_vector(QueryVector)</code></td><td style="text-align: left">Add a pre-computed query vector</td></tr>
-<tr><td style="text-align: left"><code>limit(n)</code></td><td style="text-align: left">Maximum number of results</td></tr>
+<tr><td style="text-align: left"><code>add_vector(field, vector)</code></td><td style="text-align: left">Add a pre-computed query vector for a specific field</td></tr>
+<tr><td style="text-align: left"><code>add_vector_with_weight(field, vector, weight)</code></td><td style="text-align: left">Add a pre-computed vector with an explicit weight</td></tr>
+<tr><td style="text-align: left"><code>add_payload(field, payload)</code></td><td style="text-align: left">Add a generic <code>DataValue</code> payload to be embedded</td></tr>
+<tr><td style="text-align: left"><code>add_bytes(field, bytes, mime)</code></td><td style="text-align: left">Add a binary payload (e.g., image bytes for multimodal)</td></tr>
+<tr><td style="text-align: left"><code>field(name)</code></td><td style="text-align: left">Restrict search to a specific field</td></tr>
+<tr><td style="text-align: left"><code>fields(names)</code></td><td style="text-align: left">Restrict search to multiple fields</td></tr>
+<tr><td style="text-align: left"><code>limit(n)</code></td><td style="text-align: left">Maximum number of results (default: 10)</td></tr>
+<tr><td style="text-align: left"><code>score_mode(VectorScoreMode)</code></td><td style="text-align: left">Score combination mode (<code>WeightedSum</code>, <code>MaxSim</code>, <code>LateInteraction</code>)</td></tr>
+<tr><td style="text-align: left"><code>min_score(f32)</code></td><td style="text-align: left">Minimum score threshold (default: 0.0)</td></tr>
+<tr><td style="text-align: left"><code>overfetch(f32)</code></td><td style="text-align: left">Overfetch factor for better result quality (default: 1.0)</td></tr>
+<tr><td style="text-align: left"><code>build()</code></td><td style="text-align: left">Build the <code>VectorSearchRequest</code></td></tr>
 </tbody></table>
 </div>
 <h2 id="multi-field-vector-search"><a class="header" href="#multi-field-vector-search">Multi-Field Vector Search</a></h2>
@@ -253,6 +258,7 @@ let request = VectorSearchRequestBuilder::new()
 <div class="table-wrapper"><table><thead><tr><th style="text-align: left">Mode</th><th style="text-align: left">Description</th></tr></thead><tbody>
 <tr><td style="text-align: left"><code>WeightedSum</code> (default)</td><td style="text-align: left">Sum of (similarity * weight) across all clauses</td></tr>
 <tr><td style="text-align: left"><code>MaxSim</code></td><td style="text-align: left">Maximum similarity score across clauses</td></tr>
+<tr><td style="text-align: left"><code>LateInteraction</code></td><td style="text-align: left">ColBERT-style late interaction scoring</td></tr>
 </tbody></table>
 </div>
 <h3 id="weights"><a class="header" href="#weights">Weights</a></h3>

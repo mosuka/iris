@@ -151,6 +151,8 @@ A collection of named field values.
 | `NumericRangeQuery::new(...)` | Numeric range | See [Lexical Search](search/lexical_search.md) |
 | `GeoQuery::within_radius(...)` | Geo radius | See [Lexical Search](search/lexical_search.md) |
 | `SpanNearQuery::new(...)` | Proximity | See [Lexical Search](search/lexical_search.md) |
+| `PrefixQuery::new(field, prefix)` | Prefix match | `PrefixQuery::new("body", "pro")` |
+| `RegexpQuery::new(field, pattern)?` | Regex match | `RegexpQuery::new("body", "^pro.*ing$")?` |
 
 ## Query Parsers
 
@@ -165,8 +167,8 @@ A collection of named field values.
 | Type | Description |
 | :--- | :--- |
 | `StandardAnalyzer` | RegexTokenizer + lowercase + stop words |
-| `SimpleAnalyzer` | Letter tokenizer + lowercase |
-| `EnglishAnalyzer` | English-specific lemmatization |
+| `SimpleAnalyzer` | Tokenization only (no filtering) |
+| `EnglishAnalyzer` | RegexTokenizer + lowercase + English stop words |
 | `JapaneseAnalyzer` | Japanese morphological analysis |
 | `KeywordAnalyzer` | No tokenization (exact match) |
 | `PipelineAnalyzer` | Custom tokenizer + filter chain |

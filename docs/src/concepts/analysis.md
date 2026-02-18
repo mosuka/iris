@@ -93,6 +93,39 @@ let analyzer = KeywordAnalyzer::new();
 
 Use this for fields that should match exactly (categories, tags, status codes).
 
+### SimpleAnalyzer
+
+Tokenizes text without any filtering. The original case and all tokens are preserved. Useful when you need complete control over the analysis pipeline or want to test a tokenizer in isolation.
+
+Pipeline: User-specified `Tokenizer` only (no char filters, no token filters)
+
+```rust
+use iris::analysis::analyzer::simple::SimpleAnalyzer;
+use iris::analysis::tokenizer::regex::RegexTokenizer;
+use std::sync::Arc;
+
+let tokenizer = Arc::new(RegexTokenizer::new()?);
+let analyzer = SimpleAnalyzer::new(tokenizer);
+// "Hello World" → ["Hello", "World"]
+// (no lowercasing, no stop word removal)
+```
+
+Use this for testing tokenizers, or when you want to apply token filters manually in a separate step.
+
+### EnglishAnalyzer
+
+An English-specific analyzer. Tokenizes, lowercases, and removes common English stop words.
+
+Pipeline: `RegexTokenizer` (Unicode word boundaries) → `LowercaseFilter` → `StopFilter` (128 common English stop words)
+
+```rust
+use iris::analysis::analyzer::language::english::EnglishAnalyzer;
+
+let analyzer = EnglishAnalyzer::new()?;
+// "The Quick Brown Fox" → ["quick", "brown", "fox"]
+// ("The" is removed by stop word filtering, remaining tokens are lowercased)
+```
+
 ### PipelineAnalyzer
 
 Build a custom pipeline by combining any char filters, a tokenizer, and any sequence of token filters:

@@ -201,13 +201,12 @@
 </ol>
 <h2 id="workflow-overview"><a class="header" href="#workflow-overview">Workflow Overview</a></h2>
 <p>Building a search application with Iris follows a consistent pattern:</p>
-<div class="mermaid">
-graph LR
-    A["1. Create<br/>Storage"] --> B["2. Define<br/>Schema"]
-    B --> C["3. Build<br/>Engine"]
-    C --> D["4. Index<br/>Documents"]
-    D --> E["5. Search"]
-</div>
+<pre><code class="language-mermaid">graph LR
+    A["1. Create\nStorage"] --&gt; B["2. Define\nSchema"]
+    B --&gt; C["3. Build\nEngine"]
+    C --&gt; D["4. Index\nDocuments"]
+    D --&gt; E["5. Search"]
+</code></pre>
 <div class="table-wrapper"><table><thead><tr><th style="text-align: left">Step</th><th style="text-align: left">What Happens</th></tr></thead><tbody>
 <tr><td style="text-align: left"><strong>Create Storage</strong></td><td style="text-align: left">Choose where data lives — in memory, on disk, or memory-mapped</td></tr>
 <tr><td style="text-align: left"><strong>Define Schema</strong></td><td style="text-align: left">Declare fields and their types (text, integer, vector, etc.)</td></tr>

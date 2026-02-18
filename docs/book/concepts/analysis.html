@@ -181,19 +181,20 @@
                         <h1 id="text-analysis"><a class="header" href="#text-analysis">Text Analysis</a></h1>
 <p>Text analysis is the process of converting raw text into searchable tokens. When a document is indexed, the analyzer breaks text fields into individual terms; when a query is executed, the same analyzer processes the query text to ensure consistency.</p>
 <h2 id="the-analysis-pipeline"><a class="header" href="#the-analysis-pipeline">The Analysis Pipeline</a></h2>
-<div class="mermaid">
-graph LR
-    Input["Raw Text<br/>'The quick brown FOX jumps!'"]
-    T["Tokenizer<br/>Split into words"]
+<pre><code class="language-mermaid">graph LR
+    Input["Raw Text\n'The quick brown FOX jumps!'"]
+    CF["UnicodeNormalizationCharFilter"]
+    T["Tokenizer\nSplit into words"]
     F1["LowercaseFilter"]
     F2["StopFilter"]
     F3["StemFilter"]
-    Output["Terms<br/>'quick', 'brown', 'fox', 'jump'"]
-<pre><code>Input --&gt; T --&gt; F1 --&gt; F2 --&gt; F3 --&gt; Output
+    Output["Terms\n'quick', 'brown', 'fox', 'jump'"]
+
+    Input --&gt; CF --&gt; T --&gt; F1 --&gt; F2 --&gt; F3 --&gt; Output
 </code></pre>
-</div>
 <p>The analysis pipeline consists of:</p>
 <ol>
+<li><strong>Char Filters</strong> — normalize raw text at the character level before tokenization</li>
 <li><strong>Tokenizer</strong> — splits text into raw tokens (words, characters, n-grams)</li>
 <li><strong>Token Filters</strong> — transform, remove, or expand tokens (lowercase, stop words, stemming, synonyms)</li>
 </ol>
@@ -201,8 +202,10 @@ graph LR
 <p>All analyzers implement the <code>Analyzer</code> trait:</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>pub trait Analyzer: Send + Sync {
+</span>pub trait Analyzer: Send + Sync + Debug {
     fn analyze(&amp;self, text: &amp;str) -&gt; Result&lt;TokenStream&gt;;
+    fn name(&amp;self) -&gt; &amp;str;
+    fn as_any(&amp;self) -&gt; &amp;dyn Any;
 }
 <span class="boring">}</span></code></pre></pre>
 <p><code>TokenStream</code> is a <code>Box&lt;dyn Iterator&lt;Item = Token&gt; + Send&gt;</code> — a lazy iterator over tokens.</p>
@@ -210,15 +213,19 @@ graph LR
 <div class="table-wrapper"><table><thead><tr><th style="text-align: left">Field</th><th style="text-align: left">Type</th><th style="text-align: left">Description</th></tr></thead><tbody>
 <tr><td style="text-align: left"><code>text</code></td><td style="text-align: left"><code>String</code></td><td style="text-align: left">The token text</td></tr>
 <tr><td style="text-align: left"><code>position</code></td><td style="text-align: left"><code>usize</code></td><td style="text-align: left">Position in the original text</td></tr>
+<tr><td style="text-align: left"><code>start_offset</code></td><td style="text-align: left"><code>usize</code></td><td style="text-align: left">Start byte offset in original text</td></tr>
+<tr><td style="text-align: left"><code>end_offset</code></td><td style="text-align: left"><code>usize</code></td><td style="text-align: left">End byte offset in original text</td></tr>
 <tr><td style="text-align: left"><code>position_increment</code></td><td style="text-align: left"><code>usize</code></td><td style="text-align: left">Distance from previous token</td></tr>
 <tr><td style="text-align: left"><code>position_length</code></td><td style="text-align: left"><code>usize</code></td><td style="text-align: left">Span of the token (&gt;1 for synonyms)</td></tr>
 <tr><td style="text-align: left"><code>boost</code></td><td style="text-align: left"><code>f32</code></td><td style="text-align: left">Token-level scoring weight</td></tr>
+<tr><td style="text-align: left"><code>stopped</code></td><td style="text-align: left"><code>bool</code></td><td style="text-align: left">Whether marked as a stop word</td></tr>
+<tr><td style="text-align: left"><code>metadata</code></td><td style="text-align: left"><code>Option&lt;TokenMetadata&gt;</code></td><td style="text-align: left">Additional token metadata</td></tr>
 </tbody></table>
 </div>
 <h2 id="built-in-analyzers"><a class="header" href="#built-in-analyzers">Built-in Analyzers</a></h2>
 <h3 id="standardanalyzer"><a class="header" href="#standardanalyzer">StandardAnalyzer</a></h3>
 <p>The default analyzer. Suitable for most Western languages.</p>
-<p>Pipeline: <code>RegexTokenizer</code> (Unicode word boundaries) → <code>LowercaseFilter</code> → <code>StopFilter</code> (33 common English stop words)</p>
+<p>Pipeline: <code>RegexTokenizer</code> (Unicode word boundaries) → <code>LowercaseFilter</code> → <code>StopFilter</code> (128 common English stop words)</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>use iris::analysis::analyzer::standard::StandardAnalyzer;
@@ -229,7 +236,7 @@ let analyzer = StandardAnalyzer::default();
 <span class="boring">}</span></code></pre></pre>
 <h3 id="japaneseanalyzer"><a class="header" href="#japaneseanalyzer">JapaneseAnalyzer</a></h3>
 <p>Uses morphological analysis for Japanese text segmentation.</p>
-<p>Pipeline: <code>LinderaTokenizer</code> → <code>LowercaseFilter</code></p>
+<p>Pipeline: <code>UnicodeNormalizationCharFilter</code> (NFKC) → <code>JapaneseIterationMarkCharFilter</code> → <code>LinderaTokenizer</code> → <code>LowercaseFilter</code> → <code>StopFilter</code> (Japanese stop words)</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>use iris::analysis::analyzer::japanese::JapaneseAnalyzer;
@@ -243,41 +250,70 @@ let analyzer = JapaneseAnalyzer::new()?;
 </span><span class="boring">fn main() {
 </span>use iris::analysis::analyzer::keyword::KeywordAnalyzer;
 
-let analyzer = KeywordAnalyzer;
+let analyzer = KeywordAnalyzer::new();
 // "Hello World" → ["Hello World"]
 <span class="boring">}</span></code></pre></pre>
 <p>Use this for fields that should match exactly (categories, tags, status codes).</p>
+<h3 id="simpleanalyzer"><a class="header" href="#simpleanalyzer">SimpleAnalyzer</a></h3>
+<p>Tokenizes text without any filtering. The original case and all tokens are preserved. Useful when you need complete control over the analysis pipeline or want to test a tokenizer in isolation.</p>
+<p>Pipeline: User-specified <code>Tokenizer</code> only (no char filters, no token filters)</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use iris::analysis::analyzer::simple::SimpleAnalyzer;
+use iris::analysis::tokenizer::regex::RegexTokenizer;
+use std::sync::Arc;
+
+let tokenizer = Arc::new(RegexTokenizer::new()?);
+let analyzer = SimpleAnalyzer::new(tokenizer);
+// "Hello World" → ["Hello", "World"]
+// (no lowercasing, no stop word removal)
+<span class="boring">}</span></code></pre></pre>
+<p>Use this for testing tokenizers, or when you want to apply token filters manually in a separate step.</p>
+<h3 id="englishanalyzer"><a class="header" href="#englishanalyzer">EnglishAnalyzer</a></h3>
+<p>An English-specific analyzer. Tokenizes, lowercases, and removes common English stop words.</p>
+<p>Pipeline: <code>RegexTokenizer</code> (Unicode word boundaries) → <code>LowercaseFilter</code> → <code>StopFilter</code> (128 common English stop words)</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use iris::analysis::analyzer::language::english::EnglishAnalyzer;
+
+let analyzer = EnglishAnalyzer::new()?;
+// "The Quick Brown Fox" → ["quick", "brown", "fox"]
+// ("The" is removed by stop word filtering, remaining tokens are lowercased)
+<span class="boring">}</span></code></pre></pre>
 <h3 id="pipelineanalyzer"><a class="header" href="#pipelineanalyzer">PipelineAnalyzer</a></h3>
-<p>Build a custom pipeline by combining any tokenizer with any sequence of filters:</p>
+<p>Build a custom pipeline by combining any char filters, a tokenizer, and any sequence of token filters:</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>use iris::analysis::analyzer::pipeline::PipelineAnalyzer;
+use iris::analysis::char_filter::unicode_normalize::{
+    NormalizationForm, UnicodeNormalizationCharFilter,
+};
 use iris::analysis::tokenizer::regex::RegexTokenizer;
 use iris::analysis::token_filter::lowercase::LowercaseFilter;
 use iris::analysis::token_filter::stop::StopFilter;
 use iris::analysis::token_filter::stem::StemFilter;
 
 let analyzer = PipelineAnalyzer::new(Arc::new(RegexTokenizer::new()?))
+    .add_char_filter(Arc::new(UnicodeNormalizationCharFilter::new(NormalizationForm::NFKC)))
     .add_filter(Arc::new(LowercaseFilter::new()))
     .add_filter(Arc::new(StopFilter::new()))
-    .add_filter(Arc::new(StemFilter::english()));
+    .add_filter(Arc::new(StemFilter::new()));  // Porter stemmer
 <span class="boring">}</span></code></pre></pre>
 <h2 id="perfieldanalyzer"><a class="header" href="#perfieldanalyzer">PerFieldAnalyzer</a></h2>
 <p><code>PerFieldAnalyzer</code> lets you assign different analyzers to different fields within the same engine:</p>
-<div class="mermaid">
-graph LR
+<pre><code class="language-mermaid">graph LR
     PFA["PerFieldAnalyzer"]
-    PFA -->|"title"| KW["KeywordAnalyzer"]
-    PFA -->|"body"| STD["StandardAnalyzer"]
-    PFA -->|"description_ja"| JP["JapaneseAnalyzer"]
-    PFA -->|other fields| DEF["Default<br/>(StandardAnalyzer)"]
-</div>
+    PFA --&gt;|"title"| KW["KeywordAnalyzer"]
+    PFA --&gt;|"body"| STD["StandardAnalyzer"]
+    PFA --&gt;|"description_ja"| JP["JapaneseAnalyzer"]
+    PFA --&gt;|other fields| DEF["Default\n(StandardAnalyzer)"]
+</code></pre>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>use std::sync::Arc;
 use iris::analysis::analyzer::standard::StandardAnalyzer;
 use iris::analysis::analyzer::keyword::KeywordAnalyzer;
-use iris::analysis::per_field::PerFieldAnalyzer;
+use iris::analysis::analyzer::per_field::PerFieldAnalyzer;
 
 // Default analyzer for fields not explicitly configured
 let mut per_field = PerFieldAnalyzer::new(
@@ -285,8 +321,8 @@ let mut per_field = PerFieldAnalyzer::new(
 );
 
 // Use KeywordAnalyzer for exact-match fields
-per_field.add_analyzer("category", Arc::new(KeywordAnalyzer));
-per_field.add_analyzer("status", Arc::new(KeywordAnalyzer));
+per_field.add_analyzer("category", Arc::new(KeywordAnalyzer::new()));
+per_field.add_analyzer("status", Arc::new(KeywordAnalyzer::new()));
 
 let engine = Engine::builder(storage, schema)
     .analyzer(Arc::new(per_field))
@@ -296,10 +332,113 @@ let engine = Engine::builder(storage, schema)
 <blockquote>
 <p><strong>Note:</strong> The <code>_id</code> field is always analyzed with <code>KeywordAnalyzer</code> regardless of configuration.</p>
 </blockquote>
+<h2 id="char-filters"><a class="header" href="#char-filters">Char Filters</a></h2>
+<p>Char filters operate on the raw input text <strong>before</strong> it reaches the tokenizer. They perform character-level normalization such as Unicode normalization, character mapping, and pattern-based replacement. This ensures that the tokenizer receives clean, normalized text.</p>
+<p>All char filters implement the <code>CharFilter</code> trait:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub trait CharFilter: Send + Sync {
+    fn filter(&amp;self, input: &amp;str) -&gt; (String, Vec&lt;Transformation&gt;);
+    fn name(&amp;self) -&gt; &amp;'static str;
+}
+<span class="boring">}</span></code></pre></pre>
+<p>The <code>Transformation</code> records describe how character positions shifted, allowing the engine to map token positions back to the original text.</p>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Char Filter</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>UnicodeNormalizationCharFilter</code></td><td style="text-align: left">Unicode normalization (NFC, NFD, NFKC, NFKD)</td></tr>
+<tr><td style="text-align: left"><code>MappingCharFilter</code></td><td style="text-align: left">Replaces character sequences based on a mapping dictionary</td></tr>
+<tr><td style="text-align: left"><code>PatternReplaceCharFilter</code></td><td style="text-align: left">Replaces characters matching a regex pattern</td></tr>
+<tr><td style="text-align: left"><code>JapaneseIterationMarkCharFilter</code></td><td style="text-align: left">Expands Japanese iteration marks (踊り字) to their base characters</td></tr>
+</tbody></table>
+</div>
+<h3 id="unicodenormalizationcharfilter"><a class="header" href="#unicodenormalizationcharfilter">UnicodeNormalizationCharFilter</a></h3>
+<p>Applies Unicode normalization to the input text. NFKC is recommended for search use cases because it normalizes both compatibility characters and composed forms.</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use iris::analysis::char_filter::unicode_normalize::{
+    NormalizationForm, UnicodeNormalizationCharFilter,
+};
+
+let filter = UnicodeNormalizationCharFilter::new(NormalizationForm::NFKC);
+// "Ｓｏｎｙ" (fullwidth) → "Sony" (halfwidth)
+// "㌂" → "アンペア"
+<span class="boring">}</span></code></pre></pre>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Form</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: left">NFC</td><td style="text-align: left">Canonical decomposition followed by canonical composition</td></tr>
+<tr><td style="text-align: left">NFD</td><td style="text-align: left">Canonical decomposition</td></tr>
+<tr><td style="text-align: left">NFKC</td><td style="text-align: left">Compatibility decomposition followed by canonical composition</td></tr>
+<tr><td style="text-align: left">NFKD</td><td style="text-align: left">Compatibility decomposition</td></tr>
+</tbody></table>
+</div>
+<h3 id="mappingcharfilter"><a class="header" href="#mappingcharfilter">MappingCharFilter</a></h3>
+<p>Replaces character sequences using a dictionary. Matches are found using the Aho-Corasick algorithm (leftmost-longest match).</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use std::collections::HashMap;
+use iris::analysis::char_filter::mapping::MappingCharFilter;
+
+let mut mapping = HashMap::new();
+mapping.insert("ph".to_string(), "f".to_string());
+mapping.insert("qu".to_string(), "k".to_string());
+
+let filter = MappingCharFilter::new(mapping)?;
+// "phone queue" → "fone keue"
+<span class="boring">}</span></code></pre></pre>
+<h3 id="patternreplacecharfilter"><a class="header" href="#patternreplacecharfilter">PatternReplaceCharFilter</a></h3>
+<p>Replaces all occurrences of a regex pattern with a fixed string.</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use iris::analysis::char_filter::pattern_replace::PatternReplaceCharFilter;
+
+// Remove hyphens
+let filter = PatternReplaceCharFilter::new(r"-", "")?;
+// "123-456-789" → "123456789"
+
+// Normalize numbers
+let filter = PatternReplaceCharFilter::new(r"\d+", "NUM")?;
+// "Year 2024" → "Year NUM"
+<span class="boring">}</span></code></pre></pre>
+<h3 id="japaneseiterationmarkcharfilter"><a class="header" href="#japaneseiterationmarkcharfilter">JapaneseIterationMarkCharFilter</a></h3>
+<p>Expands Japanese iteration marks (踊り字) to their base characters. Supports kanji (<code>々</code>), hiragana (<code>ゝ</code>, <code>ゞ</code>), and katakana (<code>ヽ</code>, <code>ヾ</code>) iteration marks.</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use iris::analysis::char_filter::japanese_iteration_mark::JapaneseIterationMarkCharFilter;
+
+let filter = JapaneseIterationMarkCharFilter::new(
+    true,  // normalize kanji iteration marks
+    true,  // normalize kana iteration marks
+);
+// "佐々木" → "佐佐木"
+// "いすゞ" → "いすず"
+<span class="boring">}</span></code></pre></pre>
+<h3 id="using-char-filters-in-a-pipeline"><a class="header" href="#using-char-filters-in-a-pipeline">Using Char Filters in a Pipeline</a></h3>
+<p>Add char filters to a <code>PipelineAnalyzer</code> with <code>add_char_filter()</code>. Multiple char filters are applied in the order they are added, all before the tokenizer runs.</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use std::sync::Arc;
+use iris::analysis::analyzer::pipeline::PipelineAnalyzer;
+use iris::analysis::char_filter::unicode_normalize::{
+    NormalizationForm, UnicodeNormalizationCharFilter,
+};
+use iris::analysis::char_filter::pattern_replace::PatternReplaceCharFilter;
+use iris::analysis::tokenizer::regex::RegexTokenizer;
+use iris::analysis::token_filter::lowercase::LowercaseFilter;
+
+let analyzer = PipelineAnalyzer::new(Arc::new(RegexTokenizer::new()?))
+    .add_char_filter(Arc::new(
+        UnicodeNormalizationCharFilter::new(NormalizationForm::NFKC),
+    ))
+    .add_char_filter(Arc::new(
+        PatternReplaceCharFilter::new(r"-", "")?,
+    ))
+    .add_filter(Arc::new(LowercaseFilter::new()));
+// "Ｔｏｋｙｏ-2024" → NFKC → "Tokyo-2024" → remove hyphens → "Tokyo2024" → tokenize → lowercase → ["tokyo2024"]
+<span class="boring">}</span></code></pre></pre>
 <h2 id="tokenizers"><a class="header" href="#tokenizers">Tokenizers</a></h2>
 <div class="table-wrapper"><table><thead><tr><th style="text-align: left">Tokenizer</th><th style="text-align: left">Description</th></tr></thead><tbody>
 <tr><td style="text-align: left"><code>RegexTokenizer</code></td><td style="text-align: left">Unicode word boundaries; splits on whitespace and punctuation</td></tr>
+<tr><td style="text-align: left"><code>UnicodeWordTokenizer</code></td><td style="text-align: left">Splits on Unicode word boundaries</td></tr>
 <tr><td style="text-align: left"><code>WhitespaceTokenizer</code></td><td style="text-align: left">Splits on whitespace only</td></tr>
+<tr><td style="text-align: left"><code>WholeTokenizer</code></td><td style="text-align: left">Returns the entire input as a single token</td></tr>
 <tr><td style="text-align: left"><code>LinderaTokenizer</code></td><td style="text-align: left">Japanese morphological analysis (Lindera/MeCab)</td></tr>
 <tr><td style="text-align: left"><code>NgramTokenizer</code></td><td style="text-align: left">Generates n-gram tokens of configurable size</td></tr>
 </tbody></table>
@@ -310,6 +449,11 @@ let engine = Engine::builder(storage, schema)
 <tr><td style="text-align: left"><code>StopFilter</code></td><td style="text-align: left">Removes common words ("the", "is", "a")</td></tr>
 <tr><td style="text-align: left"><code>StemFilter</code></td><td style="text-align: left">Reduces words to their root form ("running" → "run")</td></tr>
 <tr><td style="text-align: left"><code>SynonymGraphFilter</code></td><td style="text-align: left">Expands tokens with synonyms from a dictionary</td></tr>
+<tr><td style="text-align: left"><code>BoostFilter</code></td><td style="text-align: left">Adjusts token boost values</td></tr>
+<tr><td style="text-align: left"><code>LimitFilter</code></td><td style="text-align: left">Limits the number of tokens</td></tr>
+<tr><td style="text-align: left"><code>StripFilter</code></td><td style="text-align: left">Strips leading/trailing whitespace from tokens</td></tr>
+<tr><td style="text-align: left"><code>FlattenGraphFilter</code></td><td style="text-align: left">Flattens token graphs (for synonym expansion)</td></tr>
+<tr><td style="text-align: left"><code>RemoveEmptyFilter</code></td><td style="text-align: left">Removes empty tokens</td></tr>
 </tbody></table>
 </div>
 <h3 id="synonym-expansion"><a class="header" href="#synonym-expansion">Synonym Expansion</a></h3>
