@@ -196,8 +196,8 @@ impl CandleClipEmbedder {
         let repo = api.model(model_name.to_string());
 
         // Load config
-        // Note: Using default vit_base_patch32 config
-        // TODO: Parse config.json for model-specific settings
+        // Currently defaults to ViT-B/32 configuration. To support other CLIP variants
+        // (e.g. ViT-L/14), this should parse config.json from the model repository.
         let config = clip::ClipConfig::vit_base_patch32();
 
         // Load weights - try safetensors first, fall back to pytorch

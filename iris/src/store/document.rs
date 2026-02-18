@@ -259,7 +259,8 @@ impl UnifiedDocumentStore {
         let doc_id = self.next_doc_id;
         self.next_doc_id += 1;
         self.pending_docs.insert(doc_id, doc);
-        // TODO: Auto-flush if pending_docs too large?
+        // Flushing is intentionally left to the caller via `commit()` to give full
+        // control over transaction boundaries and batch sizes.
         Ok(doc_id)
     }
 

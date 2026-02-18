@@ -3,12 +3,13 @@
 .mcp.json
 AGENTS.md
 CLAUDE.md
+.github/copilot-instructions.md
 
 .vscode
 .idea
 .DS_Store
+
 .env
-.github/copilot-instructions.md
 
 target/
 perf.data*
@@ -17,4 +18,4 @@ Cargo.lock
 
 flamegraph.svg
 
-.tmp/
+.tmp

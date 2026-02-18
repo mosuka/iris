@@ -45,7 +45,6 @@ pub use engine::search::{FusionAlgorithm, SearchRequest, SearchRequestBuilder, S
 pub use error::{IrisError, Result};
 pub use lexical::search::searcher::LexicalSearchRequest;
 pub use maintenance::deletion::DeletionConfig;
-pub use parking_lot;
 pub use storage::{Storage, StorageConfig, StorageFactory};
 
 // Version information
