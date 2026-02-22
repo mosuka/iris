@@ -4,9 +4,8 @@
 [![Documentation](https://docs.rs/laurus/badge.svg)](https://docs.rs/laurus)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Laurus is a search core library written in Rust, designed for **Information Retrieval with Semantics**.
-
-Laurus provides the foundational mechanisms **essential for** advanced search capabilities:
+Laurus is a composable search core library written in Rust — built for Lexical Augmented Unified Retrieval Using Semantics.
+Rather than a monolithic engine, Laurus provides modular building blocks for embedding powerful search into any application:
 
 - **Lexical search primitives** for precise, exact-match retrieval
 - **Vector-based similarity search** for deep semantic understanding
