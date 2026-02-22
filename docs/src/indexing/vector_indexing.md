@@ -1,6 +1,6 @@
 # Vector Indexing
 
-Vector indexing powers similarity-based search. When a document's vector field is indexed, Iris stores the embedding vector in a specialized index structure that enables fast approximate nearest neighbor (ANN) retrieval.
+Vector indexing powers similarity-based search. When a document's vector field is indexed, Laurus stores the embedding vector in a specialized index structure that enables fast approximate nearest neighbor (ANN) retrieval.
 
 ## How Vector Indexing Works
 
@@ -27,7 +27,7 @@ sequenceDiagram
 
 ## Index Types
 
-Iris supports three vector index types, each with different performance characteristics:
+Laurus supports three vector index types, each with different performance characteristics:
 
 ### Comparison
 
@@ -44,8 +44,8 @@ Iris supports three vector index types, each with different performance characte
 The simplest index. Compares the query vector against every stored vector (brute-force).
 
 ```rust
-use iris::vector::FlatOption;
-use iris::vector::core::distance::DistanceMetric;
+use laurus::vector::FlatOption;
+use laurus::vector::core::distance::DistanceMetric;
 
 let opt = FlatOption {
     dimension: 384,
@@ -97,8 +97,8 @@ graph TB
 The HNSW algorithm searches from the top (sparse) layer down to the bottom (dense) layer, narrowing the search space at each level.
 
 ```rust
-use iris::vector::HnswOption;
-use iris::vector::core::distance::DistanceMetric;
+use laurus::vector::HnswOption;
+use laurus::vector::core::distance::DistanceMetric;
 
 let opt = HnswOption {
     dimension: 384,
@@ -147,8 +147,8 @@ graph TB
 ```
 
 ```rust
-use iris::vector::IvfOption;
-use iris::vector::core::distance::DistanceMetric;
+use laurus::vector::IvfOption;
+use laurus::vector::core::distance::DistanceMetric;
 
 let opt = IvfOption {
     dimension: 384,
@@ -185,7 +185,7 @@ let opt = IvfOption {
 | `Angular` | Angular distance | [0, pi] | Directional similarity |
 
 ```rust
-use iris::vector::core::distance::DistanceMetric;
+use laurus::vector::core::distance::DistanceMetric;
 
 let metric = DistanceMetric::Cosine;      // Default for text
 let metric = DistanceMetric::Euclidean;    // For spatial data
@@ -206,8 +206,8 @@ Quantization reduces memory usage by compressing vectors at the cost of some acc
 | **Product Quantization** | `ProductQuantization { subvector_count }` | Splits vectors into sub-vectors and quantizes each | ~16-64x |
 
 ```rust
-use iris::vector::HnswOption;
-use iris::vector::core::quantization::QuantizationMethod;
+use laurus::vector::HnswOption;
+use laurus::vector::core::quantization::QuantizationMethod;
 
 let opt = HnswOption {
     dimension: 384,
@@ -230,14 +230,14 @@ Each vector index type stores its data in a single segment file:
 
 ```rust
 use std::sync::Arc;
-use iris::{Document, Engine, Schema};
-use iris::lexical::TextOption;
-use iris::vector::HnswOption;
-use iris::vector::core::distance::DistanceMetric;
-use iris::storage::memory::MemoryStorage;
+use laurus::{Document, Engine, Schema};
+use laurus::lexical::TextOption;
+use laurus::vector::HnswOption;
+use laurus::vector::core::distance::DistanceMetric;
+use laurus::storage::memory::MemoryStorage;
 
 #[tokio::main]
-async fn main() -> iris::Result<()> {
+async fn main() -> laurus::Result<()> {
     let storage = Arc::new(MemoryStorage::new(Default::default()));
     let schema = Schema::builder()
         .add_text_field("title", TextOption::default())

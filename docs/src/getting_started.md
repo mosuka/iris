@@ -1,6 +1,6 @@
 # Getting Started
 
-Welcome to Iris! This section will help you install the library and run your first search.
+Welcome to Laurus! This section will help you install the library and run your first search.
 
 ## What You Will Build
 
@@ -15,16 +15,16 @@ By the end of this guide, you will have a working search engine that can:
 
 - **Rust** 1.85 or later (edition 2024)
 - **Cargo** (included with Rust)
-- **Tokio** runtime (Iris uses async APIs)
+- **Tokio** runtime (Laurus uses async APIs)
 
 ## Steps
 
-1. **[Installation](getting_started/installation.md)** — Add Iris to your project and choose feature flags
+1. **[Installation](getting_started/installation.md)** — Add Laurus to your project and choose feature flags
 2. **[Quick Start](getting_started/quickstart.md)** — Build a complete search engine in 5 steps
 
 ## Workflow Overview
 
-Building a search application with Iris follows a consistent pattern:
+Building a search application with Laurus follows a consistent pattern:
 
 ```mermaid
 graph LR

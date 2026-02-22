@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Introduction - Iris Documentation</title>
+        <title>Introduction - Laurus Documentation</title>
 
 
         <!-- Custom HTML head -->
@@ -138,13 +138,13 @@
                         </button>
                     </div>
 
-                    <h1 class="menu-title">Iris Documentation</h1>
+                    <h1 class="menu-title">Laurus Documentation</h1>
 
                     <div class="right-buttons">
                         <a href="print.html" title="Print this book" aria-label="Print this book">
                             <i id="print-button" class="fa fa-print"></i>
                         </a>
-                        <a href="https://github.com/mosuka/iris" title="Git repository" aria-label="Git repository">
+                        <a href="https://github.com/mosuka/laurus" title="Git repository" aria-label="Git repository">
                             <i id="git-repository-button" class="fa fa-github"></i>
                         </a>
 
@@ -178,9 +178,9 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="iris"><a class="header" href="#iris">Iris</a></h1>
+                        <h1 id="laurus"><a class="header" href="#laurus">Laurus</a></h1>
 <p><strong>A fast, featureful hybrid search library for Rust.</strong></p>
-<p>Iris is a pure-Rust library that combines <strong>lexical search</strong> (keyword matching via inverted index) and <strong>vector search</strong> (semantic similarity via embeddings) into a single, unified engine. It is designed to be embedded directly into your Rust application — no external server required.</p>
+<p>Laurus is a pure-Rust library that combines <strong>lexical search</strong> (keyword matching via inverted index) and <strong>vector search</strong> (semantic similarity via embeddings) into a single, unified engine. It is designed to be embedded directly into your Rust application — no external server required.</p>
 <h2 id="key-features"><a class="header" href="#key-features">Key Features</a></h2>
 <div class="table-wrapper"><table><thead><tr><th style="text-align: left">Feature</th><th style="text-align: left">Description</th></tr></thead><tbody>
 <tr><td style="text-align: left"><strong>Lexical Search</strong></td><td style="text-align: left">Full-text search powered by an inverted index with BM25 scoring</td></tr>
@@ -200,7 +200,7 @@
         Q["Query"]
     end
 
-    subgraph Iris Engine
+    subgraph Laurus Engine
         SCH["Schema"]
         AN["Analyzer"]
         EM["Embedder"]
@@ -224,7 +224,7 @@
 </ol>
 <h2 id="document-map"><a class="header" href="#document-map">Document Map</a></h2>
 <div class="table-wrapper"><table><thead><tr><th style="text-align: left">Section</th><th style="text-align: left">What You Will Learn</th></tr></thead><tbody>
-<tr><td style="text-align: left"><a href="getting_started.html">Getting Started</a></td><td style="text-align: left">Install Iris and run your first search in minutes</td></tr>
+<tr><td style="text-align: left"><a href="getting_started.html">Getting Started</a></td><td style="text-align: left">Install Laurus and run your first search in minutes</td></tr>
 <tr><td style="text-align: left"><a href="architecture.html">Architecture</a></td><td style="text-align: left">Understand the Engine, its components, and data flow</td></tr>
 <tr><td style="text-align: left"><a href="concepts.html">Core Concepts</a></td><td style="text-align: left">Schema, text analysis, embeddings, and storage</td></tr>
 <tr><td style="text-align: left"><a href="indexing/lexical_indexing.html">Indexing</a></td><td style="text-align: left">How inverted indexes and vector indexes work internally</td></tr>
@@ -235,9 +235,9 @@
 </div>
 <h2 id="quick-example"><a class="header" href="#quick-example">Quick Example</a></h2>
 <pre><pre class="playground"><code class="language-rust">use std::sync::Arc;
-use iris::{Document, Engine, Schema, SearchRequestBuilder, Result};
-use iris::lexical::{TextOption, TermQuery};
-use iris::storage::memory::MemoryStorage;
+use laurus::{Document, Engine, Schema, SearchRequestBuilder, Result};
+use laurus::lexical::{TextOption, TermQuery};
+use laurus::storage::memory::MemoryStorage;
 
 #[tokio::main]
 async fn main() -&gt; Result&lt;()&gt; {
@@ -256,7 +256,7 @@ async fn main() -&gt; Result&lt;()&gt; {
 
     // 4. Index a document
     let doc = Document::builder()
-        .add_text("title", "Hello Iris")
+        .add_text("title", "Hello Laurus")
         .add_text("body", "A fast search library for Rust")
         .build();
     engine.add_document("doc-1", doc).await?;
@@ -265,7 +265,7 @@ async fn main() -&gt; Result&lt;()&gt; {
     // 5. Search
     let request = SearchRequestBuilder::new()
         .lexical_search_request(
-            iris::LexicalSearchRequest::new(
+            laurus::LexicalSearchRequest::new(
                 Box::new(TermQuery::new("body", "rust"))
             )
         )
@@ -279,7 +279,7 @@ async fn main() -&gt; Result&lt;()&gt; {
     Ok(())
 }</code></pre></pre>
 <h2 id="license"><a class="header" href="#license">License</a></h2>
-<p>Iris is dual-licensed under <a href="https://opensource.org/licenses/MIT">MIT</a> and <a href="https://www.apache.org/licenses/LICENSE-2.0">Apache 2.0</a>.</p>
+<p>Laurus is dual-licensed under <a href="https://opensource.org/licenses/MIT">MIT</a> and <a href="https://www.apache.org/licenses/LICENSE-2.0">Apache 2.0</a>.</p>
 
                     </main>
 

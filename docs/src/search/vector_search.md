@@ -7,8 +7,8 @@ Vector search finds documents by semantic similarity. Instead of matching keywor
 ### Builder API
 
 ```rust
-use iris::SearchRequestBuilder;
-use iris::vector::VectorSearchRequestBuilder;
+use laurus::SearchRequestBuilder;
+use laurus::vector::VectorSearchRequestBuilder;
 
 let request = SearchRequestBuilder::new()
     .vector_search_request(
@@ -27,7 +27,7 @@ The `add_text()` method stores the text as a query payload. At search time, the 
 ### Query DSL
 
 ```rust
-use iris::vector::VectorQueryParser;
+use laurus::vector::VectorQueryParser;
 
 let parser = VectorQueryParser::new(embedder.clone())
     .with_default_field("embedding");
@@ -40,8 +40,8 @@ let request = parser.parse(r#"embedding:~"systems programming""#).await?;
 The builder API provides fine-grained control:
 
 ```rust
-use iris::vector::VectorSearchRequestBuilder;
-use iris::vector::store::request::QueryVector;
+use laurus::vector::VectorSearchRequestBuilder;
+use laurus::vector::store::request::QueryVector;
 
 let request = VectorSearchRequestBuilder::new()
     // Text query (will be embedded at search time)
@@ -109,9 +109,9 @@ This means text similarity counts twice as much as image similarity.
 You can apply lexical filters to narrow the vector search results:
 
 ```rust
-use iris::{SearchRequestBuilder, LexicalSearchRequest};
-use iris::lexical::TermQuery;
-use iris::vector::VectorSearchRequestBuilder;
+use laurus::{SearchRequestBuilder, LexicalSearchRequest};
+use laurus::lexical::TermQuery;
+use laurus::vector::VectorSearchRequestBuilder;
 
 // Vector search with a category filter
 let request = SearchRequestBuilder::new()
@@ -132,8 +132,8 @@ The filter query runs first on the lexical index to identify allowed document ID
 ### Filter with Numeric Range
 
 ```rust
-use iris::lexical::NumericRangeQuery;
-use iris::lexical::core::field::NumericType;
+use laurus::lexical::NumericRangeQuery;
+use laurus::lexical::core::field::NumericType;
 
 let request = SearchRequestBuilder::new()
     .vector_search_request(
@@ -165,14 +165,14 @@ The distance metric is configured per field in the schema (see [Vector Indexing]
 
 ```rust
 use std::sync::Arc;
-use iris::{Document, Engine, Schema, SearchRequestBuilder, PerFieldEmbedder};
-use iris::lexical::TextOption;
-use iris::vector::HnswOption;
-use iris::vector::VectorSearchRequestBuilder;
-use iris::storage::memory::MemoryStorage;
+use laurus::{Document, Engine, Schema, SearchRequestBuilder, PerFieldEmbedder};
+use laurus::lexical::TextOption;
+use laurus::vector::HnswOption;
+use laurus::vector::VectorSearchRequestBuilder;
+use laurus::storage::memory::MemoryStorage;
 
 #[tokio::main]
-async fn main() -> iris::Result<()> {
+async fn main() -> laurus::Result<()> {
     let storage = Arc::new(MemoryStorage::new(Default::default()));
 
     let schema = Schema::builder()

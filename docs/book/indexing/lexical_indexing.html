@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Lexical Indexing - Iris Documentation</title>
+        <title>Lexical Indexing - Laurus Documentation</title>
 
 
         <!-- Custom HTML head -->
@@ -138,13 +138,13 @@
                         </button>
                     </div>
 
-                    <h1 class="menu-title">Iris Documentation</h1>
+                    <h1 class="menu-title">Laurus Documentation</h1>
 
                     <div class="right-buttons">
                         <a href="../print.html" title="Print this book" aria-label="Print this book">
                             <i id="print-button" class="fa fa-print"></i>
                         </a>
-                        <a href="https://github.com/mosuka/iris" title="Git repository" aria-label="Git repository">
+                        <a href="https://github.com/mosuka/laurus" title="Git repository" aria-label="Git repository">
                             <i id="git-repository-button" class="fa fa-github"></i>
                         </a>
 
@@ -179,7 +179,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="lexical-indexing"><a class="header" href="#lexical-indexing">Lexical Indexing</a></h1>
-<p>Lexical indexing powers keyword-based search. When a document's text field is indexed, Iris builds an <strong>inverted index</strong> — a data structure that maps terms to the documents containing them.</p>
+<p>Lexical indexing powers keyword-based search. When a document's text field is indexed, Laurus builds an <strong>inverted index</strong> — a data structure that maps terms to the documents containing them.</p>
 <h2 id="how-lexical-indexing-works"><a class="header" href="#how-lexical-indexing-works">How Lexical Indexing Works</a></h2>
 <pre><code class="language-mermaid">sequenceDiagram
     participant Doc as Document
@@ -288,7 +288,7 @@
 <li><strong>Delete</strong>: When a document is deleted, its ID is added to a deletion bitmap rather than physically removed (see <a href="../advanced/deletions.html">Deletions &amp; Compaction</a>)</li>
 </ol>
 <h2 id="bm25-scoring"><a class="header" href="#bm25-scoring">BM25 Scoring</a></h2>
-<p>Iris uses the BM25 algorithm to score lexical search results. BM25 considers:</p>
+<p>Laurus uses the BM25 algorithm to score lexical search results. BM25 considers:</p>
 <ul>
 <li><strong>Term Frequency (TF)</strong>: how often the term appears in the document (more = better, with diminishing returns)</li>
 <li><strong>Inverse Document Frequency (IDF)</strong>: how rare the term is across all documents (rarer = more important)</li>
@@ -302,13 +302,13 @@
 <p>Vector distance calculations leverage SIMD (Single Instruction, Multiple Data) instructions when available, providing significant speedups for similarity computations in vector search.</p>
 <h2 id="code-example"><a class="header" href="#code-example">Code Example</a></h2>
 <pre><pre class="playground"><code class="language-rust">use std::sync::Arc;
-use iris::{Document, Engine, Schema};
-use iris::lexical::TextOption;
-use iris::lexical::core::field::IntegerOption;
-use iris::storage::memory::MemoryStorage;
+use laurus::{Document, Engine, Schema};
+use laurus::lexical::TextOption;
+use laurus::lexical::core::field::IntegerOption;
+use laurus::storage::memory::MemoryStorage;
 
 #[tokio::main]
-async fn main() -&gt; iris::Result&lt;()&gt; {
+async fn main() -&gt; laurus::Result&lt;()&gt; {
     let storage = Arc::new(MemoryStorage::new(Default::default()));
     let schema = Schema::builder()
         .add_text_field("title", TextOption::default())

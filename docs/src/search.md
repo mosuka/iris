@@ -1,6 +1,6 @@
 # Search
 
-This section covers how to query your indexed data. Iris supports three search modes that can be used independently or combined.
+This section covers how to query your indexed data. Laurus supports three search modes that can be used independently or combined.
 
 ## Topics
 

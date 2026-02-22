@@ -2,10 +2,10 @@
 authors = ["Minoru Osuka"]
 language = "en"
 src = "src"
-title = "Iris Documentation"
+title = "Laurus Documentation"
 
 [output.html]
-git-repository-url = "https://github.com/mosuka/iris"
-site-url = "/iris/"
+git-repository-url = "https://github.com/mosuka/laurus"
+site-url = "/laurus/"
 
 additional-js = ["mermaid.min.js", "mermaid-init.js"]

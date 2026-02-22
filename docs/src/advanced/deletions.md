@@ -1,6 +1,6 @@
 # Deletions & Compaction
 
-Iris uses a two-phase deletion strategy: fast **logical deletion** followed by periodic **physical compaction**.
+Laurus uses a two-phase deletion strategy: fast **logical deletion** followed by periodic **physical compaction**.
 
 ## Deleting Documents
 
@@ -34,7 +34,7 @@ graph LR
 
 ## Upserts (Update = Delete + Insert)
 
-When you index a document with an existing external ID, Iris performs an automatic upsert:
+When you index a document with an existing external ID, Laurus performs an automatic upsert:
 
 1. The old document is logically deleted (its ID is added to the deletion bitmap)
 2. A new document is inserted with a new internal ID

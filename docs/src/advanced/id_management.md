@@ -1,6 +1,6 @@
 # ID Management
 
-Iris uses a dual-tiered ID management strategy to ensure efficient document retrieval, updates, and aggregation in distributed environments.
+Laurus uses a dual-tiered ID management strategy to ensure efficient document retrieval, updates, and aggregation in distributed environments.
 
 ## 1. External ID (String)
 
@@ -14,7 +14,7 @@ The External ID is a **logical identifier** used by users and applications to un
 
 ## 2. Internal ID (u64 / Stable ID)
 
-The Internal ID is a **physical handle** used internally by Iris's engines (Lexical and Vector) for high-performance operations.
+The Internal ID is a **physical handle** used internally by Laurus's engines (Lexical and Vector) for high-performance operations.
 
 - **Type**: Unsigned 64-bit Integer (`u64`)
 - **Role**: Used for bitmap operations, point references, and routing between distributed nodes.
@@ -22,7 +22,7 @@ The Internal ID is a **physical handle** used internally by Iris's engines (Lexi
 
 ### ID Structure (Shard-Prefixed)
 
-Iris employs a **Shard-Prefixed Stable ID** scheme designed for multi-node distributed environments.
+Laurus employs a **Shard-Prefixed Stable ID** scheme designed for multi-node distributed environments.
 
 | Bit Range | Name | Description |
 | :--- | :--- | :--- |
@@ -33,7 +33,7 @@ Iris employs a **Shard-Prefixed Stable ID** scheme designed for multi-node distr
 
 1. **Zero-Cost Aggregation**: Since `u64` IDs are globally unique, the aggregator can perform fast sorting and deduplication without worrying about ID collisions between nodes.
 2. **Fast Routing**: The aggregator can immediately identify the physical node responsible for a document just by looking at the upper bits, avoiding expensive hash lookups.
-3. **High-Performance Fetching**: Internal IDs map directly to physical data structures. This allows Iris to skip the "External-to-Internal ID" conversion step during retrieval, achieving **O(1)** access speed.
+3. **High-Performance Fetching**: Internal IDs map directly to physical data structures. This allows Laurus to skip the "External-to-Internal ID" conversion step during retrieval, achieving **O(1)** access speed.
 
 ## ID Lifecycle
 

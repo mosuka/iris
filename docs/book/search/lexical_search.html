@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Lexical Search - Iris Documentation</title>
+        <title>Lexical Search - Laurus Documentation</title>
 
 
         <!-- Custom HTML head -->
@@ -138,13 +138,13 @@
                         </button>
                     </div>
 
-                    <h1 class="menu-title">Iris Documentation</h1>
+                    <h1 class="menu-title">Laurus Documentation</h1>
 
                     <div class="right-buttons">
                         <a href="../print.html" title="Print this book" aria-label="Print this book">
                             <i id="print-button" class="fa fa-print"></i>
                         </a>
-                        <a href="https://github.com/mosuka/iris" title="Git repository" aria-label="Git repository">
+                        <a href="https://github.com/mosuka/laurus" title="Git repository" aria-label="Git repository">
                             <i id="git-repository-button" class="fa fa-github"></i>
                         </a>
 
@@ -179,12 +179,12 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="lexical-search"><a class="header" href="#lexical-search">Lexical Search</a></h1>
-<p>Lexical search finds documents by matching keywords against an inverted index. Iris provides a rich set of query types that cover exact matching, phrase matching, fuzzy matching, and more.</p>
+<p>Lexical search finds documents by matching keywords against an inverted index. Laurus provides a rich set of query types that cover exact matching, phrase matching, fuzzy matching, and more.</p>
 <h2 id="basic-usage"><a class="header" href="#basic-usage">Basic Usage</a></h2>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use iris::{SearchRequestBuilder, LexicalSearchRequest};
-use iris::lexical::TermQuery;
+</span>use laurus::{SearchRequestBuilder, LexicalSearchRequest};
+use laurus::lexical::TermQuery;
 
 let request = SearchRequestBuilder::new()
     .lexical_search_request(
@@ -202,7 +202,7 @@ let results = engine.search(request).await?;
 <p>Matches documents containing an exact term in a specific field.</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use iris::lexical::TermQuery;
+</span>use laurus::lexical::TermQuery;
 
 // Find documents where "body" contains the term "rust"
 let query = TermQuery::new("body", "rust");
@@ -214,7 +214,7 @@ let query = TermQuery::new("body", "rust");
 <p>Matches documents containing an exact sequence of terms.</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use iris::lexical::query::phrase::PhraseQuery;
+</span>use laurus::lexical::query::phrase::PhraseQuery;
 
 // Find documents containing the exact phrase "machine learning"
 let query = PhraseQuery::new("body", vec!["machine".to_string(), "learning".to_string()]);
@@ -227,7 +227,7 @@ let query = PhraseQuery::from_phrase("body", "machine learning");
 <p>Combines multiple queries with boolean logic.</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use iris::lexical::query::boolean::{BooleanQuery, BooleanQueryBuilder, Occur};
+</span>use laurus::lexical::query::boolean::{BooleanQuery, BooleanQueryBuilder, Occur};
 
 let query = BooleanQueryBuilder::new()
     .must(Box::new(TermQuery::new("body", "rust")))       // AND
@@ -246,7 +246,7 @@ let query = BooleanQueryBuilder::new()
 <p>Matches terms within a specified edit distance (Levenshtein distance).</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use iris::lexical::query::fuzzy::FuzzyQuery;
+</span>use laurus::lexical::query::fuzzy::FuzzyQuery;
 
 // Find documents matching "programing" within edit distance 2
 // This will match "programming", "programing", etc.
@@ -256,7 +256,7 @@ let query = FuzzyQuery::new("body", "programing");  // default max_edits = 2
 <p>Matches terms using wildcard patterns.</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use iris::lexical::query::wildcard::WildcardQuery;
+</span>use laurus::lexical::query::wildcard::WildcardQuery;
 
 // '?' matches exactly one character, '*' matches zero or more
 let query = WildcardQuery::new("filename", "*.pdf")?;
@@ -267,7 +267,7 @@ let query = WildcardQuery::new("body", "col?r")?;  // matches "color" and "colou
 <p>Matches documents containing terms that start with a specific prefix.</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use iris::lexical::query::prefix::PrefixQuery;
+</span>use laurus::lexical::query::prefix::PrefixQuery;
 
 // Find documents where "body" contains terms starting with "pro"
 // This matches "programming", "program", "production", etc.
@@ -277,7 +277,7 @@ let query = PrefixQuery::new("body", "pro");
 <p>Matches documents containing terms that match a regular expression pattern.</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use iris::lexical::query::regexp::RegexpQuery;
+</span>use laurus::lexical::query::regexp::RegexpQuery;
 
 // Find documents where "body" contains terms matching the regex
 let query = RegexpQuery::new("body", "^pro.*ing$")?;
@@ -292,8 +292,8 @@ let query = RegexpQuery::new("version", r"^v\d+\.\d+")?;
 <p>Matches documents with numeric field values within a range.</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use iris::lexical::NumericRangeQuery;
-use iris::lexical::core::field::NumericType;
+</span>use laurus::lexical::NumericRangeQuery;
+use laurus::lexical::core::field::NumericType;
 
 // Find documents where "price" is between 10.0 and 100.0 (inclusive)
 let query = NumericRangeQuery::new(
@@ -319,7 +319,7 @@ let query = NumericRangeQuery::new(
 <p>Matches documents by geographic location.</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use iris::lexical::query::geo::GeoQuery;
+</span>use laurus::lexical::query::geo::GeoQuery;
 
 // Find documents within 10km of Tokyo Station (35.6812, 139.7671)
 let query = GeoQuery::within_radius("location", 35.6812, 139.7671, 10.0)?; // radius in kilometers
@@ -335,7 +335,7 @@ let query = GeoQuery::within_bounding_box(
 <p>Matches terms based on their proximity within a document. Use <code>SpanTermQuery</code> and <code>SpanNearQuery</code> to build proximity queries:</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use iris::lexical::query::span::{SpanQuery, SpanTermQuery, SpanNearQuery};
+</span>use laurus::lexical::query::span::{SpanQuery, SpanTermQuery, SpanNearQuery};
 
 // Find documents where "quick" appears near "fox" (within 3 positions)
 let query = SpanNearQuery::new(
@@ -359,7 +359,7 @@ let query = SpanNearQuery::new(
 <p>You can boost specific fields to influence relevance:</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use iris::LexicalSearchRequest;
+</span>use laurus::LexicalSearchRequest;
 
 let mut request = LexicalSearchRequest::new(Box::new(query));
 request.field_boosts.insert("title".to_string(), 2.0);  // title matches count double
@@ -381,8 +381,8 @@ request.field_boosts.insert("body".to_string(), 1.0);
 <p><code>LexicalSearchRequest</code> supports a builder-style API for setting options:</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use iris::LexicalSearchRequest;
-use iris::lexical::TermQuery;
+</span>use laurus::LexicalSearchRequest;
+use laurus::lexical::TermQuery;
 
 let request = LexicalSearchRequest::new(Box::new(TermQuery::new("body", "rust")))
     .limit(20)
@@ -397,8 +397,8 @@ let request = LexicalSearchRequest::new(Box::new(TermQuery::new("body", "rust"))
 <p>Instead of building queries programmatically, you can use the text-based Query DSL:</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use iris::lexical::QueryParser;
-use iris::analysis::analyzer::standard::StandardAnalyzer;
+</span>use laurus::lexical::QueryParser;
+use laurus::analysis::analyzer::standard::StandardAnalyzer;
 use std::sync::Arc;
 
 let analyzer = Arc::new(StandardAnalyzer::default());

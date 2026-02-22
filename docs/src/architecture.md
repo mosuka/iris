@@ -1,10 +1,10 @@
 # Architecture
 
-This page explains how Iris is structured internally. Understanding the architecture will help you make better decisions about schema design, analyzer selection, and search strategies.
+This page explains how Laurus is structured internally. Understanding the architecture will help you make better decisions about schema design, analyzer selection, and search strategies.
 
 ## High-Level Overview
 
-Iris is organized around a single `Engine` that coordinates four internal components:
+Laurus is organized around a single `Engine` that coordinates four internal components:
 
 ```mermaid
 graph TB

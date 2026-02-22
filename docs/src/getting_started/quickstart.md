@@ -4,12 +4,12 @@ This tutorial walks you through building a complete search engine in 5 steps. By
 
 ## Step 1 — Create Storage
 
-Storage determines where Iris persists index data. For development and testing, use `MemoryStorage`:
+Storage determines where Laurus persists index data. For development and testing, use `MemoryStorage`:
 
 ```rust
 use std::sync::Arc;
-use iris::storage::memory::MemoryStorage;
-use iris::Storage;
+use laurus::storage::memory::MemoryStorage;
+use laurus::Storage;
 
 let storage: Arc<dyn Storage> = Arc::new(
     MemoryStorage::new(Default::default())
@@ -23,8 +23,8 @@ let storage: Arc<dyn Storage> = Arc::new(
 A `Schema` declares the fields in your documents and how each field should be indexed:
 
 ```rust
-use iris::Schema;
-use iris::lexical::TextOption;
+use laurus::Schema;
+use laurus::lexical::TextOption;
 
 let schema = Schema::builder()
     .add_text_field("title", TextOption::default())
@@ -52,7 +52,7 @@ Each field has a type. Common types include:
 The `Engine` ties storage, schema, and runtime components together:
 
 ```rust
-use iris::Engine;
+use laurus::Engine;
 
 let engine = Engine::builder(storage, schema)
     .build()
@@ -66,7 +66,7 @@ When you only use text fields, the default `StandardAnalyzer` is used automatica
 Create documents with the `DocumentBuilder` and add them to the engine:
 
 ```rust
-use iris::Document;
+use laurus::Document;
 
 // Each document needs a unique external ID (string)
 let doc = Document::builder()
@@ -98,8 +98,8 @@ engine.commit().await?;
 Use `SearchRequestBuilder` with a query to search the index:
 
 ```rust
-use iris::{SearchRequestBuilder, LexicalSearchRequest};
-use iris::lexical::TermQuery;
+use laurus::{SearchRequestBuilder, LexicalSearchRequest};
+use laurus::lexical::TermQuery;
 
 // Search for "rust" in the "body" field
 let request = SearchRequestBuilder::new()
@@ -129,12 +129,12 @@ Here is the full program that you can copy, paste, and run:
 
 ```rust
 use std::sync::Arc;
-use iris::{
+use laurus::{
     Document, Engine, LexicalSearchRequest,
     Result, Schema, SearchRequestBuilder,
 };
-use iris::lexical::{TextOption, TermQuery};
-use iris::storage::memory::MemoryStorage;
+use laurus::lexical::{TextOption, TermQuery};
+use laurus::storage::memory::MemoryStorage;
 
 #[tokio::main]
 async fn main() -> Result<()> {

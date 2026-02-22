@@ -1,18 +1,18 @@
 # Installation
 
-## Add Iris to Your Project
+## Add Laurus to Your Project
 
-Add `iris` and `tokio` (async runtime) to your `Cargo.toml`:
+Add `laurus` and `tokio` (async runtime) to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-iris = "0.1.0"
+laurus = "0.1.0"
 tokio = { version = "1", features = ["full"] }
 ```
 
 ## Feature Flags
 
-Iris ships with a minimal default feature set. Enable additional features as needed:
+Laurus ships with a minimal default feature set. Enable additional features as needed:
 
 | Feature | Description | Use Case |
 | :--- | :--- | :--- |
@@ -28,40 +28,40 @@ Iris ships with a minimal default feature set. Enable additional features as nee
 
 ```toml
 [dependencies]
-iris = "0.1.0"
+laurus = "0.1.0"
 ```
 
 **Vector search with local model** (no API key required):
 
 ```toml
 [dependencies]
-iris = { version = "0.1.0", features = ["embeddings-candle"] }
+laurus = { version = "0.1.0", features = ["embeddings-candle"] }
 ```
 
 **Vector search with OpenAI**:
 
 ```toml
 [dependencies]
-iris = { version = "0.1.0", features = ["embeddings-openai"] }
+laurus = { version = "0.1.0", features = ["embeddings-openai"] }
 ```
 
 **Everything**:
 
 ```toml
 [dependencies]
-iris = { version = "0.1.0", features = ["embeddings-all"] }
+laurus = { version = "0.1.0", features = ["embeddings-all"] }
 ```
 
 ## Verify Installation
 
-Create a minimal program to verify that Iris compiles:
+Create a minimal program to verify that Laurus compiles:
 
 ```rust
-use iris::Result;
+use laurus::Result;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    println!("Iris version: {}", iris::VERSION);
+    println!("Laurus version: {}", laurus::VERSION);
     Ok(())
 }
 ```

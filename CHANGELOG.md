@@ -32,4 +32,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Document management** with auto-generated or user-specified document IDs
 - **Segment-based architecture** with merge policies for index maintenance
 
-[0.1.0]: https://github.com/mosuka/iris/releases/tag/v0.1.0
+[0.1.0]: https://github.com/mosuka/laurus/releases/tag/v0.1.0

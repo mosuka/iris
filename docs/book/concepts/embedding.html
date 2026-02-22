@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Embeddings - Iris Documentation</title>
+        <title>Embeddings - Laurus Documentation</title>
 
 
         <!-- Custom HTML head -->
@@ -138,13 +138,13 @@
                         </button>
                     </div>
 
-                    <h1 class="menu-title">Iris Documentation</h1>
+                    <h1 class="menu-title">Laurus Documentation</h1>
 
                     <div class="right-buttons">
                         <a href="../print.html" title="Print this book" aria-label="Print this book">
                             <i id="print-button" class="fa fa-print"></i>
                         </a>
-                        <a href="https://github.com/mosuka/iris" title="Git repository" aria-label="Git repository">
+                        <a href="https://github.com/mosuka/laurus" title="Git repository" aria-label="Git repository">
                             <i id="git-repository-button" class="fa fa-github"></i>
                         </a>
 
@@ -206,7 +206,7 @@ pub trait Embedder: Send + Sync + Debug {
 <p><strong>Feature flag:</strong> <code>embeddings-candle</code></p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use iris::CandleBertEmbedder;
+</span>use laurus::CandleBertEmbedder;
 
 // Downloads model on first run (~80MB)
 let embedder = CandleBertEmbedder::new(
@@ -226,7 +226,7 @@ let embedder = CandleBertEmbedder::new(
 <p><strong>Feature flag:</strong> <code>embeddings-openai</code></p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use iris::OpenAIEmbedder;
+</span>use laurus::OpenAIEmbedder;
 
 let embedder = OpenAIEmbedder::new(
     api_key,
@@ -246,7 +246,7 @@ let embedder = OpenAIEmbedder::new(
 <p><strong>Feature flag:</strong> <code>embeddings-multimodal</code></p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use iris::CandleClipEmbedder;
+</span>use laurus::CandleClipEmbedder;
 
 let embedder = CandleClipEmbedder::new(
     "openai/clip-vit-base-patch32"
@@ -264,7 +264,7 @@ let embedder = CandleClipEmbedder::new(
 <p>Use pre-computed vectors directly without any embedding computation. Useful when vectors are generated externally.</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use iris::PrecomputedEmbedder;
+</span>use laurus::PrecomputedEmbedder;
 
 let embedder = PrecomputedEmbedder::new();  // no parameters needed
 <span class="boring">}</span></code></pre></pre>
@@ -286,7 +286,7 @@ let embedder = PrecomputedEmbedder::new();  // no parameters needed
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>use std::sync::Arc;
-use iris::PerFieldEmbedder;
+use laurus::PerFieldEmbedder;
 
 let bert = Arc::new(CandleBertEmbedder::new("...")?);
 let clip = Arc::new(CandleClipEmbedder::new("...")?);
