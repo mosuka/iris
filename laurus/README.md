@@ -1,4 +1,4 @@
-# Laurus : Information Retrieval with Semantics
+# Laurus : Lexical Augmented Unified Retrieval Using Semantics
 
 [![Crates.io](https://img.shields.io/crates/v/laurus.svg)](https://crates.io/crates/laurus)
 [![Documentation](https://docs.rs/laurus/badge.svg)](https://docs.rs/laurus)
@@ -18,9 +18,12 @@ Rather than functioning as a monolithic search engine, Laurus is architected as 
 
 Comprehensive documentation is available in the [`docs/`](docs/) directory and online at [https://mosuka.github.io/laurus/](https://mosuka.github.io/laurus/):
 
-- [**Getting Started**](https://mosuka.github.io/laurus/getting_started/index.html): Installation and basic usage.
-- [**Core Concepts**](https://mosuka.github.io/laurus/concepts/index.html): Architecture, Lexical Search, and Vector Search.
-- [**Advanced Features**](https://mosuka.github.io/laurus/advanced/index.html): ID Management, Persistence, and Deletions.
+- [**Getting Started**](https://mosuka.github.io/laurus/getting_started.html): Installation and basic usage.
+- [**Architecture**](https://mosuka.github.io/laurus/architecture.html): System architecture overview.
+- [**Core Concepts**](https://mosuka.github.io/laurus/concepts.html): Schema, Analysis, Embeddings, and Storage.
+- [**Indexing**](https://mosuka.github.io/laurus/indexing.html): Lexical and Vector indexing.
+- [**Search**](https://mosuka.github.io/laurus/search.html): Lexical, Vector, and Hybrid search.
+- [**Advanced Features**](https://mosuka.github.io/laurus/advanced.html): Query DSL, ID Management, Persistence, and Deletions.
 - [**API Reference**](https://docs.rs/laurus)
 
 ## Features
@@ -35,58 +38,59 @@ Comprehensive documentation is available in the [`docs/`](docs/) directory and o
 ## Quick Start
 
 ```rust
-use laurus::{Document, Engine, FieldOption, FusionAlgorithm, Schema, SearchRequestBuilder};
-use laurus::analysis::analyzer::standard::StandardAnalyzer;
-use laurus::lexical::{FieldOption as LexicalFieldOption, TextOption, TermQuery};
-use laurus::vector::{FlatOption, VectorOption, VectorSearchRequestBuilder};
+use laurus::lexical::{TermQuery, TextOption};
+use laurus::{Document, Engine, LexicalSearchRequest, Schema, SearchRequestBuilder};
 use laurus::storage::{StorageConfig, StorageFactory};
 use laurus::storage::memory::MemoryStorageConfig;
-use std::sync::Arc;
 
-fn main() -> laurus::Result<()> {
+#[tokio::main]
+async fn main() -> laurus::Result<()> {
     // 1. Create storage
     let storage = StorageFactory::create(StorageConfig::Memory(MemoryStorageConfig::default()))?;
 
-    // 2. Define schema with separate lexical and vector fields
+    // 2. Define schema
     let schema = Schema::builder()
-        .add_field("content", FieldOption::Lexical(LexicalFieldOption::Text(TextOption::default())))
-        .add_field("content_vec", FieldOption::Vector(VectorOption::Flat(FlatOption { dimension: 384, ..Default::default() })))
+        .add_text_field("title", TextOption::default())
+        .add_text_field("body", TextOption::default())
         .build();
 
-    // 3. Create engine with analyzer and embedder
-    let engine = Engine::builder(storage, schema)
-        .analyzer(Arc::new(StandardAnalyzer::default()))
-        .embedder(Arc::new(MyEmbedder))  // Your embedder implementation
-        .build()?;
+    // 3. Create engine
+    let engine = Engine::new(storage, schema).await?;
 
-    engine.put_document("doc1",
-        Document::new()
-            .add_text("content", "Rust is a systems programming language")
-            .add_text("content_vec", "Rust is a systems programming language")
-    )?;
-    engine.put_document("doc2",
-        Document::new()
-            .add_text("content", "Python is great for machine learning")
-            .add_text("content_vec", "Python is great for machine learning")
-    )?;
-    engine.commit()?;
+    // 4. Index documents
+    engine
+        .add_document(
+            "doc1",
+            Document::builder()
+                .add_text("title", "Introduction to Rust")
+                .add_text("body", "Rust is a systems programming language focused on safety.")
+                .build(),
+        )
+        .await?;
+    engine
+        .add_document(
+            "doc2",
+            Document::builder()
+                .add_text("title", "Python for Data Science")
+                .add_text("body", "Python is widely used in data science and machine learning.")
+                .build(),
+        )
+        .await?;
+    engine.commit().await?;
 
-    // 4. Hybrid search (combines lexical keyword match + semantic similarity)
-    let results = engine.search(
-        SearchRequestBuilder::new()
-            .lexical_search_request(Box::new(TermQuery::new("content", "programming")))
-            .vector_search_request(VectorSearchRequestBuilder::new().add_text("content_vec", "systems language").build())
-            .fusion(FusionAlgorithm::RRF { k: 60.0 })
-            .build()
-    )?;
+    // 5. Search
+    let results = engine
+        .search(
+            SearchRequestBuilder::new()
+                .lexical_search_request(LexicalSearchRequest::new(Box::new(TermQuery::new(
+                    "body", "rust",
+                ))))
+                .build(),
+        )
+        .await?;
 
-    // 5. Display results with document content
-    for hit in results {
-        let content = hit.document.as_ref()
-            .and_then(|doc| doc.fields.get("content"))
-            .and_then(|v| v.as_text())
-            .unwrap_or("");
-        println!("[{}] {} (score={:.4})", hit.id, content, hit.score);
+    for hit in &results {
+        println!("[{}] score={:.4}", hit.id, hit.score);
     }
 
     Ok(())
@@ -95,32 +99,20 @@ fn main() -> laurus::Result<()> {
 
 ## Examples
 
-You can find usage examples in the [`examples/`](examples/) directory:
+You can find usage examples in the [`laurus/examples/`](laurus/examples/) directory:
 
-### Search
-
-- [Unified Search](examples/search.rs) - Lexical, Vector, and Hybrid search in one cohesive example
-- [Multimodal Search](examples/multimodal_search.rs) - Text-to-image and image-to-image search
-
-### Query Types
-
-- [Term Query](examples/term_query.rs) - Basic keyword search
-- [Boolean Query](examples/boolean_query.rs) - Complex boolean expressions (AND, OR, NOT)
-- [Phrase Query](examples/phrase_query.rs) - Exact phrase matching
-- [Fuzzy Query](examples/fuzzy_query.rs) - Approximate string matching
-- [Wildcard Query](examples/wildcard_query.rs) - Pattern-based search
-- [Range Query](examples/range_query.rs) - Numeric and date range queries
-- [Geo Query](examples/geo_query.rs) - Geographic search
-- [Span Query](examples/span_query.rs) - Positional queries
-
-### Embeddings
-
-- [Candle Embedder](examples/embedding_with_candle.rs) - Local BERT embeddings
-- [OpenAI Embedder](examples/embedding_with_openai.rs) - Cloud-based embeddings
+- [Quickstart](laurus/examples/quickstart.rs) - Basic full-text search
+- [Lexical Search](laurus/examples/lexical_search.rs) - All query types (Term, Phrase, Boolean, Fuzzy, Wildcard, Range, Geo, Span)
+- [Vector Search](laurus/examples/vector_search.rs) - Semantic similarity search with embeddings
+- [Hybrid Search](laurus/examples/hybrid_search.rs) - Combining lexical and vector search with fusion
+- [Multimodal Search](laurus/examples/multimodal_search.rs) - Text-to-image and image-to-image search
+- [Synonym Graph Filter](laurus/examples/synonym_graph_filter.rs) - Synonym expansion in analysis pipeline
+- [Candle Embedder](laurus/examples/search_with_candle.rs) - Local BERT embeddings
+- [OpenAI Embedder](laurus/examples/search_with_openai.rs) - Cloud-based embeddings
 
 ## Contributing
 
-We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details.
+We welcome contributions!
 
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
@@ -130,8 +122,4 @@ We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.
 
 ## License
 
-This project is licensed under either of
-
-- MIT License ([LICENSE-MIT](LICENSE-MIT) or <http://opensource.org/licenses/MIT>)
-
-at your option.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

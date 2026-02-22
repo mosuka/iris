@@ -5,7 +5,7 @@ resolver = "2"
 [workspace.package]
 version = "0.1.0"
 edition = "2024"
-description = "Laurus is a Rust library for building search engines with support for lexical, vector, and hybrid search. It provides a flexible and efficient way to create powerful search applications."
+description = "Unified search library for lexical, vector, and semantic retrieval"
 documentation = "https://docs.rs/laurus"
 homepage = "https://github.com/mosuka/laurus"
 repository = "https://github.com/mosuka/laurus"
