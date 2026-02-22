@@ -1,6 +1,6 @@
 # Indexing
 
-This section explains how Iris stores and organizes data internally. Understanding the indexing layer will help you choose the right field types and tune performance.
+This section explains how Laurus stores and organizes data internally. Understanding the indexing layer will help you choose the right field types and tune performance.
 
 ## Topics
 

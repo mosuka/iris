@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Query DSL - Iris Documentation</title>
+        <title>Query DSL - Laurus Documentation</title>
 
 
         <!-- Custom HTML head -->
@@ -138,13 +138,13 @@
                         </button>
                     </div>
 
-                    <h1 class="menu-title">Iris Documentation</h1>
+                    <h1 class="menu-title">Laurus Documentation</h1>
 
                     <div class="right-buttons">
                         <a href="../print.html" title="Print this book" aria-label="Print this book">
                             <i id="print-button" class="fa fa-print"></i>
                         </a>
-                        <a href="https://github.com/mosuka/iris" title="Git repository" aria-label="Git repository">
+                        <a href="https://github.com/mosuka/laurus" title="Git repository" aria-label="Git repository">
                             <i id="git-repository-button" class="fa fa-github"></i>
                         </a>
 
@@ -179,7 +179,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="query-dsl"><a class="header" href="#query-dsl">Query DSL</a></h1>
-<p>Iris provides a unified query DSL (Domain Specific Language) that allows lexical (keyword) and vector (semantic) search in a single query string. The <code>UnifiedQueryParser</code> splits the input into lexical and vector portions and delegates to the appropriate sub-parser.</p>
+<p>Laurus provides a unified query DSL (Domain Specific Language) that allows lexical (keyword) and vector (semantic) search in a single query string. The <code>UnifiedQueryParser</code> splits the input into lexical and vector portions and delegates to the appropriate sub-parser.</p>
 <h2 id="overview"><a class="header" href="#overview">Overview</a></h2>
 <pre><code class="language-text">title:hello AND content:~"cute kitten"^0.8
 |--- lexical --|    |--- vector --------|
@@ -233,7 +233,7 @@ price:[* TO 100]
 <pre><code class="language-text">(title:hello OR title:hi) AND body:world
 </code></pre>
 <h3 id="peg-grammar"><a class="header" href="#peg-grammar">PEG Grammar</a></h3>
-<p>The full lexical grammar (<a href="https://github.com/mosuka/iris/blob/main/iris/src/lexical/query/parser.pest">parser.pest</a>):</p>
+<p>The full lexical grammar (<a href="https://github.com/mosuka/laurus/blob/main/laurus/src/lexical/query/parser.pest">parser.pest</a>):</p>
 <pre><code class="language-pest">query          = { SOI ~ boolean_query ~ EOI }
 boolean_query  = { clause ~ (boolean_op ~ clause | clause)* }
 clause         = { required_clause | prohibited_clause | sub_clause }
@@ -304,7 +304,7 @@ metadata.embedding:~"text"
 request.score_mode = VectorScoreMode::MaxSim;
 <span class="boring">}</span></code></pre></pre>
 <h3 id="peg-grammar-1"><a class="header" href="#peg-grammar-1">PEG Grammar</a></h3>
-<p>The full vector grammar (<a href="https://github.com/mosuka/iris/blob/main/iris/src/vector/query/parser.pest">parser.pest</a>):</p>
+<p>The full vector grammar (<a href="https://github.com/mosuka/laurus/blob/main/laurus/src/vector/query/parser.pest">parser.pest</a>):</p>
 <pre><code class="language-pest">query          = { SOI ~ vector_clause+ ~ EOI }
 vector_clause  = { field_prefix? ~ "~" ~ quoted_text ~ boost? }
 field_prefix   = { field_name ~ ":" }
@@ -360,8 +360,8 @@ hello ~"cats"
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>use std::sync::Arc;
-use iris::analysis::analyzer::standard::StandardAnalyzer;
-use iris::lexical::query::QueryParser;
+use laurus::analysis::analyzer::standard::StandardAnalyzer;
+use laurus::lexical::query::QueryParser;
 
 let analyzer = Arc::new(StandardAnalyzer::new()?);
 let parser = QueryParser::new(analyzer)
@@ -373,7 +373,7 @@ let query = parser.parse("title:hello AND body:world")?;
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>use std::sync::Arc;
-use iris::vector::query::VectorQueryParser;
+use laurus::vector::query::VectorQueryParser;
 
 let parser = VectorQueryParser::new(embedder)
     .with_default_field("content");
@@ -383,7 +383,7 @@ let request = parser.parse(r#"content:~"cute kitten"^0.8"#).await?;
 <h3 id="hybrid-search-with-unified-dsl"><a class="header" href="#hybrid-search-with-unified-dsl">Hybrid Search with Unified DSL</a></h3>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use iris::engine::query::UnifiedQueryParser;
+</span>use laurus::engine::query::UnifiedQueryParser;
 
 let unified = UnifiedQueryParser::new(lexical_parser, vector_parser);
 
@@ -397,7 +397,7 @@ let request = unified.parse(
 <h3 id="custom-fusion"><a class="header" href="#custom-fusion">Custom Fusion</a></h3>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use iris::engine::search::FusionAlgorithm;
+</span>use laurus::engine::search::FusionAlgorithm;
 
 let unified = UnifiedQueryParser::new(lexical_parser, vector_parser)
     .with_fusion(FusionAlgorithm::WeightedSum {

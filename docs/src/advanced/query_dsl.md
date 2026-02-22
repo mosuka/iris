@@ -1,6 +1,6 @@
 # Query DSL
 
-Iris provides a unified query DSL (Domain Specific Language) that allows lexical (keyword) and vector (semantic) search in a single query string. The `UnifiedQueryParser` splits the input into lexical and vector portions and delegates to the appropriate sub-parser.
+Laurus provides a unified query DSL (Domain Specific Language) that allows lexical (keyword) and vector (semantic) search in a single query string. The `UnifiedQueryParser` splits the input into lexical and vector portions and delegates to the appropriate sub-parser.
 
 ## Overview
 
@@ -99,7 +99,7 @@ Use parentheses for sub-expressions:
 
 ### PEG Grammar
 
-The full lexical grammar ([parser.pest](https://github.com/mosuka/iris/blob/main/iris/src/lexical/query/parser.pest)):
+The full lexical grammar ([parser.pest](https://github.com/mosuka/laurus/blob/main/laurus/src/lexical/query/parser.pest)):
 
 ```pest
 query          = { SOI ~ boolean_query ~ EOI }
@@ -192,7 +192,7 @@ request.score_mode = VectorScoreMode::MaxSim;
 
 ### PEG Grammar
 
-The full vector grammar ([parser.pest](https://github.com/mosuka/iris/blob/main/iris/src/vector/query/parser.pest)):
+The full vector grammar ([parser.pest](https://github.com/mosuka/laurus/blob/main/laurus/src/vector/query/parser.pest)):
 
 ```pest
 query          = { SOI ~ vector_clause+ ~ EOI }
@@ -262,8 +262,8 @@ hello ~"cats"
 
 ```rust
 use std::sync::Arc;
-use iris::analysis::analyzer::standard::StandardAnalyzer;
-use iris::lexical::query::QueryParser;
+use laurus::analysis::analyzer::standard::StandardAnalyzer;
+use laurus::lexical::query::QueryParser;
 
 let analyzer = Arc::new(StandardAnalyzer::new()?);
 let parser = QueryParser::new(analyzer)
@@ -276,7 +276,7 @@ let query = parser.parse("title:hello AND body:world")?;
 
 ```rust
 use std::sync::Arc;
-use iris::vector::query::VectorQueryParser;
+use laurus::vector::query::VectorQueryParser;
 
 let parser = VectorQueryParser::new(embedder)
     .with_default_field("content");
@@ -287,7 +287,7 @@ let request = parser.parse(r#"content:~"cute kitten"^0.8"#).await?;
 ### Hybrid Search with Unified DSL
 
 ```rust
-use iris::engine::query::UnifiedQueryParser;
+use laurus::engine::query::UnifiedQueryParser;
 
 let unified = UnifiedQueryParser::new(lexical_parser, vector_parser);
 
@@ -302,7 +302,7 @@ let request = unified.parse(
 ### Custom Fusion
 
 ```rust
-use iris::engine::search::FusionAlgorithm;
+use laurus::engine::search::FusionAlgorithm;
 
 let unified = UnifiedQueryParser::new(lexical_parser, vector_parser)
     .with_fusion(FusionAlgorithm::WeightedSum {

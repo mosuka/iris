@@ -60,7 +60,7 @@ The default analyzer. Suitable for most Western languages.
 Pipeline: `RegexTokenizer` (Unicode word boundaries) → `LowercaseFilter` → `StopFilter` (128 common English stop words)
 
 ```rust
-use iris::analysis::analyzer::standard::StandardAnalyzer;
+use laurus::analysis::analyzer::standard::StandardAnalyzer;
 
 let analyzer = StandardAnalyzer::default();
 // "The Quick Brown Fox" → ["quick", "brown", "fox"]
@@ -74,7 +74,7 @@ Uses morphological analysis for Japanese text segmentation.
 Pipeline: `UnicodeNormalizationCharFilter` (NFKC) → `JapaneseIterationMarkCharFilter` → `LinderaTokenizer` → `LowercaseFilter` → `StopFilter` (Japanese stop words)
 
 ```rust
-use iris::analysis::analyzer::japanese::JapaneseAnalyzer;
+use laurus::analysis::analyzer::japanese::JapaneseAnalyzer;
 
 let analyzer = JapaneseAnalyzer::new()?;
 // "東京都に住んでいる" → ["東京", "都", "に", "住ん", "で", "いる"]
@@ -85,7 +85,7 @@ let analyzer = JapaneseAnalyzer::new()?;
 Treats the entire input as a single token. No tokenization or normalization.
 
 ```rust
-use iris::analysis::analyzer::keyword::KeywordAnalyzer;
+use laurus::analysis::analyzer::keyword::KeywordAnalyzer;
 
 let analyzer = KeywordAnalyzer::new();
 // "Hello World" → ["Hello World"]
@@ -100,8 +100,8 @@ Tokenizes text without any filtering. The original case and all tokens are prese
 Pipeline: User-specified `Tokenizer` only (no char filters, no token filters)
 
 ```rust
-use iris::analysis::analyzer::simple::SimpleAnalyzer;
-use iris::analysis::tokenizer::regex::RegexTokenizer;
+use laurus::analysis::analyzer::simple::SimpleAnalyzer;
+use laurus::analysis::tokenizer::regex::RegexTokenizer;
 use std::sync::Arc;
 
 let tokenizer = Arc::new(RegexTokenizer::new()?);
@@ -119,7 +119,7 @@ An English-specific analyzer. Tokenizes, lowercases, and removes common English 
 Pipeline: `RegexTokenizer` (Unicode word boundaries) → `LowercaseFilter` → `StopFilter` (128 common English stop words)
 
 ```rust
-use iris::analysis::analyzer::language::english::EnglishAnalyzer;
+use laurus::analysis::analyzer::language::english::EnglishAnalyzer;
 
 let analyzer = EnglishAnalyzer::new()?;
 // "The Quick Brown Fox" → ["quick", "brown", "fox"]
@@ -131,14 +131,14 @@ let analyzer = EnglishAnalyzer::new()?;
 Build a custom pipeline by combining any char filters, a tokenizer, and any sequence of token filters:
 
 ```rust
-use iris::analysis::analyzer::pipeline::PipelineAnalyzer;
-use iris::analysis::char_filter::unicode_normalize::{
+use laurus::analysis::analyzer::pipeline::PipelineAnalyzer;
+use laurus::analysis::char_filter::unicode_normalize::{
     NormalizationForm, UnicodeNormalizationCharFilter,
 };
-use iris::analysis::tokenizer::regex::RegexTokenizer;
-use iris::analysis::token_filter::lowercase::LowercaseFilter;
-use iris::analysis::token_filter::stop::StopFilter;
-use iris::analysis::token_filter::stem::StemFilter;
+use laurus::analysis::tokenizer::regex::RegexTokenizer;
+use laurus::analysis::token_filter::lowercase::LowercaseFilter;
+use laurus::analysis::token_filter::stop::StopFilter;
+use laurus::analysis::token_filter::stem::StemFilter;
 
 let analyzer = PipelineAnalyzer::new(Arc::new(RegexTokenizer::new()?))
     .add_char_filter(Arc::new(UnicodeNormalizationCharFilter::new(NormalizationForm::NFKC)))
@@ -162,9 +162,9 @@ graph LR
 
 ```rust
 use std::sync::Arc;
-use iris::analysis::analyzer::standard::StandardAnalyzer;
-use iris::analysis::analyzer::keyword::KeywordAnalyzer;
-use iris::analysis::analyzer::per_field::PerFieldAnalyzer;
+use laurus::analysis::analyzer::standard::StandardAnalyzer;
+use laurus::analysis::analyzer::keyword::KeywordAnalyzer;
+use laurus::analysis::analyzer::per_field::PerFieldAnalyzer;
 
 // Default analyzer for fields not explicitly configured
 let mut per_field = PerFieldAnalyzer::new(
@@ -210,7 +210,7 @@ The `Transformation` records describe how character positions shifted, allowing 
 Applies Unicode normalization to the input text. NFKC is recommended for search use cases because it normalizes both compatibility characters and composed forms.
 
 ```rust
-use iris::analysis::char_filter::unicode_normalize::{
+use laurus::analysis::char_filter::unicode_normalize::{
     NormalizationForm, UnicodeNormalizationCharFilter,
 };
 
@@ -232,7 +232,7 @@ Replaces character sequences using a dictionary. Matches are found using the Aho
 
 ```rust
 use std::collections::HashMap;
-use iris::analysis::char_filter::mapping::MappingCharFilter;
+use laurus::analysis::char_filter::mapping::MappingCharFilter;
 
 let mut mapping = HashMap::new();
 mapping.insert("ph".to_string(), "f".to_string());
@@ -247,7 +247,7 @@ let filter = MappingCharFilter::new(mapping)?;
 Replaces all occurrences of a regex pattern with a fixed string.
 
 ```rust
-use iris::analysis::char_filter::pattern_replace::PatternReplaceCharFilter;
+use laurus::analysis::char_filter::pattern_replace::PatternReplaceCharFilter;
 
 // Remove hyphens
 let filter = PatternReplaceCharFilter::new(r"-", "")?;
@@ -263,7 +263,7 @@ let filter = PatternReplaceCharFilter::new(r"\d+", "NUM")?;
 Expands Japanese iteration marks (踊り字) to their base characters. Supports kanji (`々`), hiragana (`ゝ`, `ゞ`), and katakana (`ヽ`, `ヾ`) iteration marks.
 
 ```rust
-use iris::analysis::char_filter::japanese_iteration_mark::JapaneseIterationMarkCharFilter;
+use laurus::analysis::char_filter::japanese_iteration_mark::JapaneseIterationMarkCharFilter;
 
 let filter = JapaneseIterationMarkCharFilter::new(
     true,  // normalize kanji iteration marks
@@ -279,13 +279,13 @@ Add char filters to a `PipelineAnalyzer` with `add_char_filter()`. Multiple char
 
 ```rust
 use std::sync::Arc;
-use iris::analysis::analyzer::pipeline::PipelineAnalyzer;
-use iris::analysis::char_filter::unicode_normalize::{
+use laurus::analysis::analyzer::pipeline::PipelineAnalyzer;
+use laurus::analysis::char_filter::unicode_normalize::{
     NormalizationForm, UnicodeNormalizationCharFilter,
 };
-use iris::analysis::char_filter::pattern_replace::PatternReplaceCharFilter;
-use iris::analysis::tokenizer::regex::RegexTokenizer;
-use iris::analysis::token_filter::lowercase::LowercaseFilter;
+use laurus::analysis::char_filter::pattern_replace::PatternReplaceCharFilter;
+use laurus::analysis::tokenizer::regex::RegexTokenizer;
+use laurus::analysis::token_filter::lowercase::LowercaseFilter;
 
 let analyzer = PipelineAnalyzer::new(Arc::new(RegexTokenizer::new()?))
     .add_char_filter(Arc::new(
@@ -328,8 +328,8 @@ let analyzer = PipelineAnalyzer::new(Arc::new(RegexTokenizer::new()?))
 The `SynonymGraphFilter` expands terms using a synonym dictionary:
 
 ```rust
-use iris::analysis::synonym::dictionary::SynonymDictionary;
-use iris::analysis::token_filter::synonym_graph::SynonymGraphFilter;
+use laurus::analysis::synonym::dictionary::SynonymDictionary;
+use laurus::analysis::token_filter::synonym_graph::SynonymGraphFilter;
 
 let mut dict = SynonymDictionary::new(None)?;
 dict.add_synonym_group(vec!["ml".into(), "machine learning".into()]);

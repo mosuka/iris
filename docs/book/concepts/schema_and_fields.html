@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Schema &amp; Fields - Iris Documentation</title>
+        <title>Schema &amp; Fields - Laurus Documentation</title>
 
 
         <!-- Custom HTML head -->
@@ -138,13 +138,13 @@
                         </button>
                     </div>
 
-                    <h1 class="menu-title">Iris Documentation</h1>
+                    <h1 class="menu-title">Laurus Documentation</h1>
 
                     <div class="right-buttons">
                         <a href="../print.html" title="Print this book" aria-label="Print this book">
                             <i id="print-button" class="fa fa-print"></i>
                         </a>
-                        <a href="https://github.com/mosuka/iris" title="Git repository" aria-label="Git repository">
+                        <a href="https://github.com/mosuka/laurus" title="Git repository" aria-label="Git repository">
                             <i id="git-repository-button" class="fa fa-github"></i>
                         </a>
 
@@ -184,10 +184,10 @@
 <p>A <code>Schema</code> is a collection of named fields. Each field is either a <strong>lexical field</strong> (for keyword search) or a <strong>vector field</strong> (for similarity search).</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use iris::Schema;
-use iris::lexical::TextOption;
-use iris::lexical::core::field::IntegerOption;
-use iris::vector::HnswOption;
+</span>use laurus::Schema;
+use laurus::lexical::TextOption;
+use laurus::lexical::core::field::IntegerOption;
+use laurus::vector::HnswOption;
 
 let schema = Schema::builder()
     .add_text_field("title", TextOption::default())
@@ -233,7 +233,7 @@ let schema = Schema::builder()
 <p><code>TextOption</code> controls how text is indexed:</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use iris::lexical::TextOption;
+</span>use laurus::lexical::TextOption;
 
 // Default: indexed + stored
 let opt = TextOption::default();
@@ -261,8 +261,8 @@ let opt = TextOption::default()
 <h4 id="hnsw-field-options-most-common"><a class="header" href="#hnsw-field-options-most-common">HNSW Field Options (most common)</a></h4>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use iris::vector::HnswOption;
-use iris::vector::core::distance::DistanceMetric;
+</span>use laurus::vector::HnswOption;
+use laurus::vector::core::distance::DistanceMetric;
 
 let opt = HnswOption {
     dimension: 384,                          // vector dimensions
@@ -278,7 +278,7 @@ let opt = HnswOption {
 <p>A <code>Document</code> is a collection of named field values. Use <code>DocumentBuilder</code> to construct documents:</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use iris::Document;
+</span>use laurus::Document;
 
 let doc = Document::builder()
     .add_text("title", "Introduction to Rust")
@@ -302,7 +302,7 @@ let doc = Document::builder()
 </tbody></table>
 </div>
 <h2 id="datavalue"><a class="header" href="#datavalue">DataValue</a></h2>
-<p><code>DataValue</code> is the unified value enum that represents any field value in Iris:</p>
+<p><code>DataValue</code> is the unified value enum that represents any field value in Laurus:</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>pub enum DataValue {
@@ -320,7 +320,7 @@ let doc = Document::builder()
 <p><code>DataValue</code> implements <code>From&lt;T&gt;</code> for common types, so you can use <code>.into()</code> conversions:</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use iris::DataValue;
+</span>use laurus::DataValue;
 
 let v: DataValue = "hello".into();       // Text
 let v: DataValue = 42i64.into();         // Int64
@@ -329,7 +329,7 @@ let v: DataValue = true.into();          // Bool
 let v: DataValue = vec![0.1f32, 0.2].into(); // Vector
 <span class="boring">}</span></code></pre></pre>
 <h2 id="reserved-fields"><a class="header" href="#reserved-fields">Reserved Fields</a></h2>
-<p>The <code>_id</code> field is reserved by Iris for internal use. It stores the external document ID and is always indexed with <code>KeywordAnalyzer</code> (exact match). You do not need to add it to your schema — it is managed automatically.</p>
+<p>The <code>_id</code> field is reserved by Laurus for internal use. It stores the external document ID and is always indexed with <code>KeywordAnalyzer</code> (exact match). You do not need to add it to your schema — it is managed automatically.</p>
 <h2 id="schema-design-tips"><a class="header" href="#schema-design-tips">Schema Design Tips</a></h2>
 <ol>
 <li>

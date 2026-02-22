@@ -1,21 +1,21 @@
 [workspace]
-members = ["iris"]
+members = ["laurus"]
 resolver = "2"
 
 [workspace.package]
 version = "0.1.0"
 edition = "2024"
-description = "Iris is a Rust library for building search engines with support for lexical, vector, and hybrid search. It provides a flexible and efficient way to create powerful search applications."
-documentation = "https://docs.rs/iris"
-homepage = "https://github.com/mosuka/iris"
-repository = "https://github.com/mosuka/iris"
+description = "Laurus is a Rust library for building search engines with support for lexical, vector, and hybrid search. It provides a flexible and efficient way to create powerful search applications."
+documentation = "https://docs.rs/laurus"
+homepage = "https://github.com/mosuka/laurus"
+repository = "https://github.com/mosuka/laurus"
 readme = "README.md"
 keywords = ["search", "vector", "lexical", "hybrid", "library"]
 categories = ["text-processing"]
 license = "MIT"
 
 [workspace.dependencies]
-iris = { version = "0.1.0", path = "iris" }
+laurus = { version = "0.1.0", path = "laurus" }
 
 [profile.release]
 lto = true

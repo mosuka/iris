@@ -35,7 +35,7 @@ Runs a BERT model locally using Hugging Face Candle. No API key required.
 **Feature flag:** `embeddings-candle`
 
 ```rust
-use iris::CandleBertEmbedder;
+use laurus::CandleBertEmbedder;
 
 // Downloads model on first run (~80MB)
 let embedder = CandleBertEmbedder::new(
@@ -58,7 +58,7 @@ Calls the OpenAI Embeddings API. Requires an API key.
 **Feature flag:** `embeddings-openai`
 
 ```rust
-use iris::OpenAIEmbedder;
+use laurus::OpenAIEmbedder;
 
 let embedder = OpenAIEmbedder::new(
     api_key,
@@ -81,7 +81,7 @@ Runs a CLIP model locally for multimodal (text + image) embeddings.
 **Feature flag:** `embeddings-multimodal`
 
 ```rust
-use iris::CandleClipEmbedder;
+use laurus::CandleClipEmbedder;
 
 let embedder = CandleClipEmbedder::new(
     "openai/clip-vit-base-patch32"
@@ -101,7 +101,7 @@ let embedder = CandleClipEmbedder::new(
 Use pre-computed vectors directly without any embedding computation. Useful when vectors are generated externally.
 
 ```rust
-use iris::PrecomputedEmbedder;
+use laurus::PrecomputedEmbedder;
 
 let embedder = PrecomputedEmbedder::new();  // no parameters needed
 ```
@@ -128,7 +128,7 @@ graph LR
 
 ```rust
 use std::sync::Arc;
-use iris::PerFieldEmbedder;
+use laurus::PerFieldEmbedder;
 
 let bert = Arc::new(CandleBertEmbedder::new("...")?);
 let clip = Arc::new(CandleClipEmbedder::new("...")?);

@@ -132,9 +132,9 @@ jobs:
 
       - name: Publish crates
         run: |
-          for crate in iris; do
+          for crate in laurus; do
             VERSION=$(cargo metadata --no-deps --format-version=1 | jq -r ".packages[] | select(.name==\"$crate\") | .version")
-            PUBLISHED_VERSIONS=$(curl -s -A "iris-release-workflow (https://github.com/mosuka/iris)" "https://crates.io/api/v1/crates/$crate" | jq -r 'select(.versions != null) | .versions[].num')
+            PUBLISHED_VERSIONS=$(curl -s -A "laurus-release-workflow (https://github.com/mosuka/laurus)" "https://crates.io/api/v1/crates/$crate" | jq -r 'select(.versions != null) | .versions[].num')
             if echo "${PUBLISHED_VERSIONS}" | grep -Fx "${VERSION}" >/dev/null; then
               echo "$crate $VERSION has already published"
             else

@@ -1,6 +1,6 @@
 # API Reference
 
-This page provides a quick reference of the most important types and methods in Iris. For full details, generate the Rustdoc:
+This page provides a quick reference of the most important types and methods in Laurus. For full details, generate the Rustdoc:
 
 ```bash
 cargo doc --open

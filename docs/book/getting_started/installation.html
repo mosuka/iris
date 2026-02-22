@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Installation - Iris Documentation</title>
+        <title>Installation - Laurus Documentation</title>
 
 
         <!-- Custom HTML head -->
@@ -138,13 +138,13 @@
                         </button>
                     </div>
 
-                    <h1 class="menu-title">Iris Documentation</h1>
+                    <h1 class="menu-title">Laurus Documentation</h1>
 
                     <div class="right-buttons">
                         <a href="../print.html" title="Print this book" aria-label="Print this book">
                             <i id="print-button" class="fa fa-print"></i>
                         </a>
-                        <a href="https://github.com/mosuka/iris" title="Git repository" aria-label="Git repository">
+                        <a href="https://github.com/mosuka/laurus" title="Git repository" aria-label="Git repository">
                             <i id="git-repository-button" class="fa fa-github"></i>
                         </a>
 
@@ -179,14 +179,14 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="installation"><a class="header" href="#installation">Installation</a></h1>
-<h2 id="add-iris-to-your-project"><a class="header" href="#add-iris-to-your-project">Add Iris to Your Project</a></h2>
-<p>Add <code>iris</code> and <code>tokio</code> (async runtime) to your <code>Cargo.toml</code>:</p>
+<h2 id="add-laurus-to-your-project"><a class="header" href="#add-laurus-to-your-project">Add Laurus to Your Project</a></h2>
+<p>Add <code>laurus</code> and <code>tokio</code> (async runtime) to your <code>Cargo.toml</code>:</p>
 <pre><code class="language-toml">[dependencies]
-iris = "0.1.0"
+laurus = "0.1.0"
 tokio = { version = "1", features = ["full"] }
 </code></pre>
 <h2 id="feature-flags"><a class="header" href="#feature-flags">Feature Flags</a></h2>
-<p>Iris ships with a minimal default feature set. Enable additional features as needed:</p>
+<p>Laurus ships with a minimal default feature set. Enable additional features as needed:</p>
 <div class="table-wrapper"><table><thead><tr><th style="text-align: left">Feature</th><th style="text-align: left">Description</th><th style="text-align: left">Use Case</th></tr></thead><tbody>
 <tr><td style="text-align: left"><em>(default)</em></td><td style="text-align: left">Core library (lexical search, storage, analyzers — no embedding)</td><td style="text-align: left">Keyword search only</td></tr>
 <tr><td style="text-align: left"><code>embeddings-candle</code></td><td style="text-align: left">Local BERT embeddings via Hugging Face Candle</td><td style="text-align: left">Vector search without external API</td></tr>
@@ -198,27 +198,27 @@ tokio = { version = "1", features = ["full"] }
 <h3 id="examples"><a class="header" href="#examples">Examples</a></h3>
 <p><strong>Lexical search only</strong> (no embeddings needed):</p>
 <pre><code class="language-toml">[dependencies]
-iris = "0.1.0"
+laurus = "0.1.0"
 </code></pre>
 <p><strong>Vector search with local model</strong> (no API key required):</p>
 <pre><code class="language-toml">[dependencies]
-iris = { version = "0.1.0", features = ["embeddings-candle"] }
+laurus = { version = "0.1.0", features = ["embeddings-candle"] }
 </code></pre>
 <p><strong>Vector search with OpenAI</strong>:</p>
 <pre><code class="language-toml">[dependencies]
-iris = { version = "0.1.0", features = ["embeddings-openai"] }
+laurus = { version = "0.1.0", features = ["embeddings-openai"] }
 </code></pre>
 <p><strong>Everything</strong>:</p>
 <pre><code class="language-toml">[dependencies]
-iris = { version = "0.1.0", features = ["embeddings-all"] }
+laurus = { version = "0.1.0", features = ["embeddings-all"] }
 </code></pre>
 <h2 id="verify-installation"><a class="header" href="#verify-installation">Verify Installation</a></h2>
-<p>Create a minimal program to verify that Iris compiles:</p>
-<pre><pre class="playground"><code class="language-rust">use iris::Result;
+<p>Create a minimal program to verify that Laurus compiles:</p>
+<pre><pre class="playground"><code class="language-rust">use laurus::Result;
 
 #[tokio::main]
 async fn main() -&gt; Result&lt;()&gt; {
-    println!("Iris version: {}", iris::VERSION);
+    println!("Laurus version: {}", laurus::VERSION);
     Ok(())
 }</code></pre></pre>
 <pre><code class="language-bash">cargo run

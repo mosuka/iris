@@ -1,8 +1,8 @@
-# Iris
+# Laurus
 
 **A fast, featureful hybrid search library for Rust.**
 
-Iris is a pure-Rust library that combines **lexical search** (keyword matching via inverted index) and **vector search** (semantic similarity via embeddings) into a single, unified engine. It is designed to be embedded directly into your Rust application — no external server required.
+Laurus is a pure-Rust library that combines **lexical search** (keyword matching via inverted index) and **vector search** (semantic similarity via embeddings) into a single, unified engine. It is designed to be embedded directly into your Rust application — no external server required.
 
 ## Key Features
 
@@ -26,7 +26,7 @@ graph LR
         Q["Query"]
     end
 
-    subgraph Iris Engine
+    subgraph Laurus Engine
         SCH["Schema"]
         AN["Analyzer"]
         EM["Embedder"]
@@ -52,7 +52,7 @@ graph LR
 
 | Section | What You Will Learn |
 | :--- | :--- |
-| [Getting Started](getting_started.md) | Install Iris and run your first search in minutes |
+| [Getting Started](getting_started.md) | Install Laurus and run your first search in minutes |
 | [Architecture](architecture.md) | Understand the Engine, its components, and data flow |
 | [Core Concepts](concepts.md) | Schema, text analysis, embeddings, and storage |
 | [Indexing](indexing/lexical_indexing.md) | How inverted indexes and vector indexes work internally |
@@ -64,9 +64,9 @@ graph LR
 
 ```rust
 use std::sync::Arc;
-use iris::{Document, Engine, Schema, SearchRequestBuilder, Result};
-use iris::lexical::{TextOption, TermQuery};
-use iris::storage::memory::MemoryStorage;
+use laurus::{Document, Engine, Schema, SearchRequestBuilder, Result};
+use laurus::lexical::{TextOption, TermQuery};
+use laurus::storage::memory::MemoryStorage;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -85,7 +85,7 @@ async fn main() -> Result<()> {
 
     // 4. Index a document
     let doc = Document::builder()
-        .add_text("title", "Hello Iris")
+        .add_text("title", "Hello Laurus")
         .add_text("body", "A fast search library for Rust")
         .build();
     engine.add_document("doc-1", doc).await?;
@@ -94,7 +94,7 @@ async fn main() -> Result<()> {
     // 5. Search
     let request = SearchRequestBuilder::new()
         .lexical_search_request(
-            iris::LexicalSearchRequest::new(
+            laurus::LexicalSearchRequest::new(
                 Box::new(TermQuery::new("body", "rust"))
             )
         )
@@ -111,4 +111,4 @@ async fn main() -> Result<()> {
 
 ## License
 
-Iris is dual-licensed under [MIT](https://opensource.org/licenses/MIT) and [Apache 2.0](https://www.apache.org/licenses/LICENSE-2.0).
+Laurus is dual-licensed under [MIT](https://opensource.org/licenses/MIT) and [Apache 2.0](https://www.apache.org/licenses/LICENSE-2.0).

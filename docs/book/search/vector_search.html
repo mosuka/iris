@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Vector Search - Iris Documentation</title>
+        <title>Vector Search - Laurus Documentation</title>
 
 
         <!-- Custom HTML head -->
@@ -138,13 +138,13 @@
                         </button>
                     </div>
 
-                    <h1 class="menu-title">Iris Documentation</h1>
+                    <h1 class="menu-title">Laurus Documentation</h1>
 
                     <div class="right-buttons">
                         <a href="../print.html" title="Print this book" aria-label="Print this book">
                             <i id="print-button" class="fa fa-print"></i>
                         </a>
-                        <a href="https://github.com/mosuka/iris" title="Git repository" aria-label="Git repository">
+                        <a href="https://github.com/mosuka/laurus" title="Git repository" aria-label="Git repository">
                             <i id="git-repository-button" class="fa fa-github"></i>
                         </a>
 
@@ -184,8 +184,8 @@
 <h3 id="builder-api"><a class="header" href="#builder-api">Builder API</a></h3>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use iris::SearchRequestBuilder;
-use iris::vector::VectorSearchRequestBuilder;
+</span>use laurus::SearchRequestBuilder;
+use laurus::vector::VectorSearchRequestBuilder;
 
 let request = SearchRequestBuilder::new()
     .vector_search_request(
@@ -202,7 +202,7 @@ let results = engine.search(request).await?;
 <h3 id="query-dsl"><a class="header" href="#query-dsl">Query DSL</a></h3>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use iris::vector::VectorQueryParser;
+</span>use laurus::vector::VectorQueryParser;
 
 let parser = VectorQueryParser::new(embedder.clone())
     .with_default_field("embedding");
@@ -213,8 +213,8 @@ let request = parser.parse(r#"embedding:~"systems programming""#).await?;
 <p>The builder API provides fine-grained control:</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use iris::vector::VectorSearchRequestBuilder;
-use iris::vector::store::request::QueryVector;
+</span>use laurus::vector::VectorSearchRequestBuilder;
+use laurus::vector::store::request::QueryVector;
 
 let request = VectorSearchRequestBuilder::new()
     // Text query (will be embedded at search time)
@@ -270,9 +270,9 @@ let request = VectorSearchRequestBuilder::new()
 <p>You can apply lexical filters to narrow the vector search results:</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use iris::{SearchRequestBuilder, LexicalSearchRequest};
-use iris::lexical::TermQuery;
-use iris::vector::VectorSearchRequestBuilder;
+</span>use laurus::{SearchRequestBuilder, LexicalSearchRequest};
+use laurus::lexical::TermQuery;
+use laurus::vector::VectorSearchRequestBuilder;
 
 // Vector search with a category filter
 let request = SearchRequestBuilder::new()
@@ -291,8 +291,8 @@ let results = engine.search(request).await?;
 <h3 id="filter-with-numeric-range"><a class="header" href="#filter-with-numeric-range">Filter with Numeric Range</a></h3>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use iris::lexical::NumericRangeQuery;
-use iris::lexical::core::field::NumericType;
+</span>use laurus::lexical::NumericRangeQuery;
+use laurus::lexical::core::field::NumericType;
 
 let request = SearchRequestBuilder::new()
     .vector_search_request(
@@ -319,14 +319,14 @@ let request = SearchRequestBuilder::new()
 </div>
 <h2 id="code-example-complete-vector-search"><a class="header" href="#code-example-complete-vector-search">Code Example: Complete Vector Search</a></h2>
 <pre><pre class="playground"><code class="language-rust">use std::sync::Arc;
-use iris::{Document, Engine, Schema, SearchRequestBuilder, PerFieldEmbedder};
-use iris::lexical::TextOption;
-use iris::vector::HnswOption;
-use iris::vector::VectorSearchRequestBuilder;
-use iris::storage::memory::MemoryStorage;
+use laurus::{Document, Engine, Schema, SearchRequestBuilder, PerFieldEmbedder};
+use laurus::lexical::TextOption;
+use laurus::vector::HnswOption;
+use laurus::vector::VectorSearchRequestBuilder;
+use laurus::storage::memory::MemoryStorage;
 
 #[tokio::main]
-async fn main() -&gt; iris::Result&lt;()&gt; {
+async fn main() -&gt; laurus::Result&lt;()&gt; {
     let storage = Arc::new(MemoryStorage::new(Default::default()));
 
     let schema = Schema::builder()

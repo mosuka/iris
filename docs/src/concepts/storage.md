@@ -1,6 +1,6 @@
 # Storage
 
-Iris uses a pluggable storage layer that abstracts how and where index data is persisted. All components — lexical index, vector index, and document log — share a single storage backend.
+Laurus uses a pluggable storage layer that abstracts how and where index data is persisted. All components — lexical index, vector index, and document log — share a single storage backend.
 
 ## The Storage Trait
 
@@ -29,8 +29,8 @@ All data lives in memory. Fast and simple, but not durable.
 
 ```rust
 use std::sync::Arc;
-use iris::Storage;
-use iris::storage::memory::MemoryStorage;
+use laurus::Storage;
+use laurus::storage::memory::MemoryStorage;
 
 let storage: Arc<dyn Storage> = Arc::new(
     MemoryStorage::new(Default::default())
@@ -49,11 +49,11 @@ Standard file-system based persistence. Each key maps to a file on disk.
 
 ```rust
 use std::sync::Arc;
-use iris::Storage;
-use iris::storage::file::{FileStorage, FileStorageConfig};
+use laurus::Storage;
+use laurus::storage::file::{FileStorage, FileStorageConfig};
 
-let config = FileStorageConfig::new("/tmp/iris-data");
-let storage: Arc<dyn Storage> = Arc::new(FileStorage::new("/tmp/iris-data", config)?);
+let config = FileStorageConfig::new("/tmp/laurus-data");
+let storage: Arc<dyn Storage> = Arc::new(FileStorage::new("/tmp/laurus-data", config)?);
 ```
 
 | Property | Value |
@@ -68,12 +68,12 @@ let storage: Arc<dyn Storage> = Arc::new(FileStorage::new("/tmp/iris-data", conf
 
 ```rust
 use std::sync::Arc;
-use iris::Storage;
-use iris::storage::file::{FileStorage, FileStorageConfig};
+use laurus::Storage;
+use laurus::storage::file::{FileStorage, FileStorageConfig};
 
-let mut config = FileStorageConfig::new("/tmp/iris-data");
+let mut config = FileStorageConfig::new("/tmp/laurus-data");
 config.use_mmap = true;  // enable memory-mapped I/O
-let storage: Arc<dyn Storage> = Arc::new(FileStorage::new("/tmp/iris-data", config)?);
+let storage: Arc<dyn Storage> = Arc::new(FileStorage::new("/tmp/laurus-data", config)?);
 ```
 
 | Property | Value |
@@ -87,8 +87,8 @@ let storage: Arc<dyn Storage> = Arc::new(FileStorage::new("/tmp/iris-data", conf
 You can also create storage via configuration:
 
 ```rust
-use iris::storage::{StorageConfig, StorageFactory};
-use iris::storage::memory::MemoryStorageConfig;
+use laurus::storage::{StorageConfig, StorageFactory};
+use laurus::storage::memory::MemoryStorageConfig;
 
 let storage = StorageFactory::create(
     StorageConfig::Memory(MemoryStorageConfig::default())

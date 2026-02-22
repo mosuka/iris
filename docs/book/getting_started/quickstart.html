@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Quick Start - Iris Documentation</title>
+        <title>Quick Start - Laurus Documentation</title>
 
 
         <!-- Custom HTML head -->
@@ -138,13 +138,13 @@
                         </button>
                     </div>
 
-                    <h1 class="menu-title">Iris Documentation</h1>
+                    <h1 class="menu-title">Laurus Documentation</h1>
 
                     <div class="right-buttons">
                         <a href="../print.html" title="Print this book" aria-label="Print this book">
                             <i id="print-button" class="fa fa-print"></i>
                         </a>
-                        <a href="https://github.com/mosuka/iris" title="Git repository" aria-label="Git repository">
+                        <a href="https://github.com/mosuka/laurus" title="Git repository" aria-label="Git repository">
                             <i id="git-repository-button" class="fa fa-github"></i>
                         </a>
 
@@ -181,12 +181,12 @@
                         <h1 id="quick-start"><a class="header" href="#quick-start">Quick Start</a></h1>
 <p>This tutorial walks you through building a complete search engine in 5 steps. By the end, you will be able to index documents and search them by keyword.</p>
 <h2 id="step-1--create-storage"><a class="header" href="#step-1--create-storage">Step 1 — Create Storage</a></h2>
-<p>Storage determines where Iris persists index data. For development and testing, use <code>MemoryStorage</code>:</p>
+<p>Storage determines where Laurus persists index data. For development and testing, use <code>MemoryStorage</code>:</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>use std::sync::Arc;
-use iris::storage::memory::MemoryStorage;
-use iris::Storage;
+use laurus::storage::memory::MemoryStorage;
+use laurus::Storage;
 
 let storage: Arc&lt;dyn Storage&gt; = Arc::new(
     MemoryStorage::new(Default::default())
@@ -199,8 +199,8 @@ let storage: Arc&lt;dyn Storage&gt; = Arc::new(
 <p>A <code>Schema</code> declares the fields in your documents and how each field should be indexed:</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use iris::Schema;
-use iris::lexical::TextOption;
+</span>use laurus::Schema;
+use laurus::lexical::TextOption;
 
 let schema = Schema::builder()
     .add_text_field("title", TextOption::default())
@@ -226,7 +226,7 @@ let schema = Schema::builder()
 <p>The <code>Engine</code> ties storage, schema, and runtime components together:</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use iris::Engine;
+</span>use laurus::Engine;
 
 let engine = Engine::builder(storage, schema)
     .build()
@@ -237,7 +237,7 @@ let engine = Engine::builder(storage, schema)
 <p>Create documents with the <code>DocumentBuilder</code> and add them to the engine:</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use iris::Document;
+</span>use laurus::Document;
 
 // Each document needs a unique external ID (string)
 let doc = Document::builder()
@@ -268,8 +268,8 @@ engine.commit().await?;
 <p>Use <code>SearchRequestBuilder</code> with a query to search the index:</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use iris::{SearchRequestBuilder, LexicalSearchRequest};
-use iris::lexical::TermQuery;
+</span>use laurus::{SearchRequestBuilder, LexicalSearchRequest};
+use laurus::lexical::TermQuery;
 
 // Search for "rust" in the "body" field
 let request = SearchRequestBuilder::new()
@@ -295,12 +295,12 @@ for result in &amp;results {
 <h2 id="complete-example"><a class="header" href="#complete-example">Complete Example</a></h2>
 <p>Here is the full program that you can copy, paste, and run:</p>
 <pre><pre class="playground"><code class="language-rust">use std::sync::Arc;
-use iris::{
+use laurus::{
     Document, Engine, LexicalSearchRequest,
     Result, Schema, SearchRequestBuilder,
 };
-use iris::lexical::{TextOption, TermQuery};
-use iris::storage::memory::MemoryStorage;
+use laurus::lexical::{TextOption, TermQuery};
+use laurus::storage::memory::MemoryStorage;
 
 #[tokio::main]
 async fn main() -&gt; Result&lt;()&gt; {

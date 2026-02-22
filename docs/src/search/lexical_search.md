@@ -1,12 +1,12 @@
 # Lexical Search
 
-Lexical search finds documents by matching keywords against an inverted index. Iris provides a rich set of query types that cover exact matching, phrase matching, fuzzy matching, and more.
+Lexical search finds documents by matching keywords against an inverted index. Laurus provides a rich set of query types that cover exact matching, phrase matching, fuzzy matching, and more.
 
 ## Basic Usage
 
 ```rust
-use iris::{SearchRequestBuilder, LexicalSearchRequest};
-use iris::lexical::TermQuery;
+use laurus::{SearchRequestBuilder, LexicalSearchRequest};
+use laurus::lexical::TermQuery;
 
 let request = SearchRequestBuilder::new()
     .lexical_search_request(
@@ -27,7 +27,7 @@ let results = engine.search(request).await?;
 Matches documents containing an exact term in a specific field.
 
 ```rust
-use iris::lexical::TermQuery;
+use laurus::lexical::TermQuery;
 
 // Find documents where "body" contains the term "rust"
 let query = TermQuery::new("body", "rust");
@@ -40,7 +40,7 @@ let query = TermQuery::new("body", "rust");
 Matches documents containing an exact sequence of terms.
 
 ```rust
-use iris::lexical::query::phrase::PhraseQuery;
+use laurus::lexical::query::phrase::PhraseQuery;
 
 // Find documents containing the exact phrase "machine learning"
 let query = PhraseQuery::new("body", vec!["machine".to_string(), "learning".to_string()]);
@@ -56,7 +56,7 @@ Phrase queries require term positions to be stored (the default for `TextOption`
 Combines multiple queries with boolean logic.
 
 ```rust
-use iris::lexical::query::boolean::{BooleanQuery, BooleanQueryBuilder, Occur};
+use laurus::lexical::query::boolean::{BooleanQuery, BooleanQueryBuilder, Occur};
 
 let query = BooleanQueryBuilder::new()
     .must(Box::new(TermQuery::new("body", "rust")))       // AND
@@ -77,7 +77,7 @@ let query = BooleanQueryBuilder::new()
 Matches terms within a specified edit distance (Levenshtein distance).
 
 ```rust
-use iris::lexical::query::fuzzy::FuzzyQuery;
+use laurus::lexical::query::fuzzy::FuzzyQuery;
 
 // Find documents matching "programing" within edit distance 2
 // This will match "programming", "programing", etc.
@@ -89,7 +89,7 @@ let query = FuzzyQuery::new("body", "programing");  // default max_edits = 2
 Matches terms using wildcard patterns.
 
 ```rust
-use iris::lexical::query::wildcard::WildcardQuery;
+use laurus::lexical::query::wildcard::WildcardQuery;
 
 // '?' matches exactly one character, '*' matches zero or more
 let query = WildcardQuery::new("filename", "*.pdf")?;
@@ -102,7 +102,7 @@ let query = WildcardQuery::new("body", "col?r")?;  // matches "color" and "colou
 Matches documents containing terms that start with a specific prefix.
 
 ```rust
-use iris::lexical::query::prefix::PrefixQuery;
+use laurus::lexical::query::prefix::PrefixQuery;
 
 // Find documents where "body" contains terms starting with "pro"
 // This matches "programming", "program", "production", etc.
@@ -114,7 +114,7 @@ let query = PrefixQuery::new("body", "pro");
 Matches documents containing terms that match a regular expression pattern.
 
 ```rust
-use iris::lexical::query::regexp::RegexpQuery;
+use laurus::lexical::query::regexp::RegexpQuery;
 
 // Find documents where "body" contains terms matching the regex
 let query = RegexpQuery::new("body", "^pro.*ing$")?;
@@ -130,8 +130,8 @@ let query = RegexpQuery::new("version", r"^v\d+\.\d+")?;
 Matches documents with numeric field values within a range.
 
 ```rust
-use iris::lexical::NumericRangeQuery;
-use iris::lexical::core::field::NumericType;
+use laurus::lexical::NumericRangeQuery;
+use laurus::lexical::core::field::NumericType;
 
 // Find documents where "price" is between 10.0 and 100.0 (inclusive)
 let query = NumericRangeQuery::new(
@@ -159,7 +159,7 @@ let query = NumericRangeQuery::new(
 Matches documents by geographic location.
 
 ```rust
-use iris::lexical::query::geo::GeoQuery;
+use laurus::lexical::query::geo::GeoQuery;
 
 // Find documents within 10km of Tokyo Station (35.6812, 139.7671)
 let query = GeoQuery::within_radius("location", 35.6812, 139.7671, 10.0)?; // radius in kilometers
@@ -177,7 +177,7 @@ let query = GeoQuery::within_bounding_box(
 Matches terms based on their proximity within a document. Use `SpanTermQuery` and `SpanNearQuery` to build proximity queries:
 
 ```rust
-use iris::lexical::query::span::{SpanQuery, SpanTermQuery, SpanNearQuery};
+use laurus::lexical::query::span::{SpanQuery, SpanTermQuery, SpanNearQuery};
 
 // Find documents where "quick" appears near "fox" (within 3 positions)
 let query = SpanNearQuery::new(
@@ -204,7 +204,7 @@ Lexical search results are scored using **BM25**. The score reflects how relevan
 You can boost specific fields to influence relevance:
 
 ```rust
-use iris::LexicalSearchRequest;
+use laurus::LexicalSearchRequest;
 
 let mut request = LexicalSearchRequest::new(Box::new(query));
 request.field_boosts.insert("title".to_string(), 2.0);  // title matches count double
@@ -229,8 +229,8 @@ request.field_boosts.insert("body".to_string(), 1.0);
 `LexicalSearchRequest` supports a builder-style API for setting options:
 
 ```rust
-use iris::LexicalSearchRequest;
-use iris::lexical::TermQuery;
+use laurus::LexicalSearchRequest;
+use laurus::lexical::TermQuery;
 
 let request = LexicalSearchRequest::new(Box::new(TermQuery::new("body", "rust")))
     .limit(20)
@@ -247,8 +247,8 @@ let request = LexicalSearchRequest::new(Box::new(TermQuery::new("body", "rust"))
 Instead of building queries programmatically, you can use the text-based Query DSL:
 
 ```rust
-use iris::lexical::QueryParser;
-use iris::analysis::analyzer::standard::StandardAnalyzer;
+use laurus::lexical::QueryParser;
+use laurus::analysis::analyzer::standard::StandardAnalyzer;
 use std::sync::Arc;
 
 let analyzer = Arc::new(StandardAnalyzer::default());

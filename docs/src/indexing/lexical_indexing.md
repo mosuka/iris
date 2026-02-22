@@ -1,6 +1,6 @@
 # Lexical Indexing
 
-Lexical indexing powers keyword-based search. When a document's text field is indexed, Iris builds an **inverted index** — a data structure that maps terms to the documents containing them.
+Lexical indexing powers keyword-based search. When a document's text field is indexed, Laurus builds an **inverted index** — a data structure that maps terms to the documents containing them.
 
 ## How Lexical Indexing Works
 
@@ -130,7 +130,7 @@ graph TB
 
 ## BM25 Scoring
 
-Iris uses the BM25 algorithm to score lexical search results. BM25 considers:
+Laurus uses the BM25 algorithm to score lexical search results. BM25 considers:
 
 - **Term Frequency (TF)**: how often the term appears in the document (more = better, with diminishing returns)
 - **Inverse Document Frequency (IDF)**: how rare the term is across all documents (rarer = more important)
@@ -152,13 +152,13 @@ Vector distance calculations leverage SIMD (Single Instruction, Multiple Data) i
 
 ```rust
 use std::sync::Arc;
-use iris::{Document, Engine, Schema};
-use iris::lexical::TextOption;
-use iris::lexical::core::field::IntegerOption;
-use iris::storage::memory::MemoryStorage;
+use laurus::{Document, Engine, Schema};
+use laurus::lexical::TextOption;
+use laurus::lexical::core::field::IntegerOption;
+use laurus::storage::memory::MemoryStorage;
 
 #[tokio::main]
-async fn main() -> iris::Result<()> {
+async fn main() -> laurus::Result<()> {
     let storage = Arc::new(MemoryStorage::new(Default::default()));
     let schema = Schema::builder()
         .add_text_field("title", TextOption::default())

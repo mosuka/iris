@@ -1,6 +1,6 @@
 # Hybrid Search
 
-Hybrid search combines **lexical search** (keyword matching) with **vector search** (semantic similarity) to deliver results that are both precise and semantically relevant. This is Iris's most powerful search mode.
+Hybrid search combines **lexical search** (keyword matching) with **vector search** (semantic similarity) to deliver results that are both precise and semantically relevant. This is Laurus's most powerful search mode.
 
 ## Why Hybrid Search?
 
@@ -41,9 +41,9 @@ sequenceDiagram
 ### Builder API
 
 ```rust
-use iris::{SearchRequestBuilder, LexicalSearchRequest, FusionAlgorithm};
-use iris::lexical::TermQuery;
-use iris::vector::VectorSearchRequestBuilder;
+use laurus::{SearchRequestBuilder, LexicalSearchRequest, FusionAlgorithm};
+use laurus::lexical::TermQuery;
+use laurus::vector::VectorSearchRequestBuilder;
 
 let request = SearchRequestBuilder::new()
     // Lexical component
@@ -71,9 +71,9 @@ let results = engine.search(request).await?;
 Mix lexical and vector clauses in a single query string:
 
 ```rust
-use iris::UnifiedQueryParser;
-use iris::lexical::QueryParser;
-use iris::vector::VectorQueryParser;
+use laurus::UnifiedQueryParser;
+use laurus::lexical::QueryParser;
+use laurus::vector::VectorQueryParser;
 
 let unified = UnifiedQueryParser::new(
     QueryParser::new(analyzer).with_default_field("body"),
@@ -89,7 +89,7 @@ The `~"..."` syntax identifies vector clauses. Everything else is parsed as lexi
 
 ## Fusion Algorithms
 
-When both lexical and vector results exist, they must be merged into a single ranked list. Iris supports two fusion algorithms:
+When both lexical and vector results exist, they must be merged into a single ranked list. Laurus supports two fusion algorithms:
 
 ### RRF (Reciprocal Rank Fusion)
 
@@ -102,7 +102,7 @@ score(doc) = sum( 1 / (k + rank_i) )
 Where `rank_i` is the position of the document in each result list, and `k` is a smoothing parameter (default 60).
 
 ```rust
-use iris::FusionAlgorithm;
+use laurus::FusionAlgorithm;
 
 let fusion = FusionAlgorithm::RRF { k: 60.0 };
 ```
@@ -121,7 +121,7 @@ score(doc) = lexical_weight * lexical_score + vector_weight * vector_score
 ```
 
 ```rust
-use iris::FusionAlgorithm;
+use laurus::FusionAlgorithm;
 
 let fusion = FusionAlgorithm::WeightedSum {
     lexical_weight: 0.3,
@@ -207,17 +207,17 @@ let page2 = SearchRequestBuilder::new()
 
 ```rust
 use std::sync::Arc;
-use iris::{
+use laurus::{
     Document, Engine, Schema, SearchRequestBuilder,
     LexicalSearchRequest, FusionAlgorithm, PerFieldEmbedder,
 };
-use iris::lexical::{TextOption, TermQuery};
-use iris::lexical::core::field::IntegerOption;
-use iris::vector::{HnswOption, VectorSearchRequestBuilder};
-use iris::storage::memory::MemoryStorage;
+use laurus::lexical::{TextOption, TermQuery};
+use laurus::lexical::core::field::IntegerOption;
+use laurus::vector::{HnswOption, VectorSearchRequestBuilder};
+use laurus::storage::memory::MemoryStorage;
 
 #[tokio::main]
-async fn main() -> iris::Result<()> {
+async fn main() -> laurus::Result<()> {
     let storage = Arc::new(MemoryStorage::new(Default::default()));
 
     // Schema with both lexical and vector fields

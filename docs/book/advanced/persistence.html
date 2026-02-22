@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Persistence &amp; WAL - Iris Documentation</title>
+        <title>Persistence &amp; WAL - Laurus Documentation</title>
 
 
         <!-- Custom HTML head -->
@@ -138,13 +138,13 @@
                         </button>
                     </div>
 
-                    <h1 class="menu-title">Iris Documentation</h1>
+                    <h1 class="menu-title">Laurus Documentation</h1>
 
                     <div class="right-buttons">
                         <a href="../print.html" title="Print this book" aria-label="Print this book">
                             <i id="print-button" class="fa fa-print"></i>
                         </a>
-                        <a href="https://github.com/mosuka/iris" title="Git repository" aria-label="Git repository">
+                        <a href="https://github.com/mosuka/laurus" title="Git repository" aria-label="Git repository">
                             <i id="git-repository-button" class="fa fa-github"></i>
                         </a>
 
@@ -179,7 +179,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="persistence--wal"><a class="header" href="#persistence--wal">Persistence &amp; WAL</a></h1>
-<p>Iris uses a <strong>Write-Ahead Log (WAL)</strong> to ensure data durability. Every write operation is persisted to the WAL before modifying in-memory structures, guaranteeing that no data is lost even if the process crashes.</p>
+<p>Laurus uses a <strong>Write-Ahead Log (WAL)</strong> to ensure data durability. Every write operation is persisted to the WAL before modifying in-memory structures, guaranteeing that no data is lost even if the process crashes.</p>
 <h2 id="write-path"><a class="header" href="#write-path">Write Path</a></h2>
 <pre><code class="language-mermaid">sequenceDiagram
     participant App as Application

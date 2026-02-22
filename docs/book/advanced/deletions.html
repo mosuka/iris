@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Deletions &amp; Compaction - Iris Documentation</title>
+        <title>Deletions &amp; Compaction - Laurus Documentation</title>
 
 
         <!-- Custom HTML head -->
@@ -138,13 +138,13 @@
                         </button>
                     </div>
 
-                    <h1 class="menu-title">Iris Documentation</h1>
+                    <h1 class="menu-title">Laurus Documentation</h1>
 
                     <div class="right-buttons">
                         <a href="../print.html" title="Print this book" aria-label="Print this book">
                             <i id="print-button" class="fa fa-print"></i>
                         </a>
-                        <a href="https://github.com/mosuka/iris" title="Git repository" aria-label="Git repository">
+                        <a href="https://github.com/mosuka/laurus" title="Git repository" aria-label="Git repository">
                             <i id="git-repository-button" class="fa fa-github"></i>
                         </a>
 
@@ -179,7 +179,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="deletions--compaction"><a class="header" href="#deletions--compaction">Deletions &amp; Compaction</a></h1>
-<p>Iris uses a two-phase deletion strategy: fast <strong>logical deletion</strong> followed by periodic <strong>physical compaction</strong>.</p>
+<p>Laurus uses a two-phase deletion strategy: fast <strong>logical deletion</strong> followed by periodic <strong>physical compaction</strong>.</p>
 <h2 id="deleting-documents"><a class="header" href="#deleting-documents">Deleting Documents</a></h2>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
@@ -206,7 +206,7 @@ engine.commit().await?;
 </tbody></table>
 </div>
 <h2 id="upserts-update--delete--insert"><a class="header" href="#upserts-update--delete--insert">Upserts (Update = Delete + Insert)</a></h2>
-<p>When you index a document with an existing external ID, Iris performs an automatic upsert:</p>
+<p>When you index a document with an existing external ID, Laurus performs an automatic upsert:</p>
 <ol>
 <li>The old document is logically deleted (its ID is added to the deletion bitmap)</li>
 <li>A new document is inserted with a new internal ID</li>

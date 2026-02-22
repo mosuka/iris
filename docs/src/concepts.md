@@ -1,6 +1,6 @@
 # Core Concepts
 
-This section covers the foundational building blocks of Iris. Understanding these concepts will help you design effective schemas and configure your search engine.
+This section covers the foundational building blocks of Laurus. Understanding these concepts will help you design effective schemas and configure your search engine.
 
 ## Topics
 

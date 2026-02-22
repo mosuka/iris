@@ -7,10 +7,10 @@ The `Schema` defines the structure of your documents — what fields exist and h
 A `Schema` is a collection of named fields. Each field is either a **lexical field** (for keyword search) or a **vector field** (for similarity search).
 
 ```rust
-use iris::Schema;
-use iris::lexical::TextOption;
-use iris::lexical::core::field::IntegerOption;
-use iris::vector::HnswOption;
+use laurus::Schema;
+use laurus::lexical::TextOption;
+use laurus::lexical::core::field::IntegerOption;
+use laurus::vector::HnswOption;
 
 let schema = Schema::builder()
     .add_text_field("title", TextOption::default())
@@ -65,7 +65,7 @@ Lexical fields are indexed using an inverted index and support keyword-based que
 `TextOption` controls how text is indexed:
 
 ```rust
-use iris::lexical::TextOption;
+use laurus::lexical::TextOption;
 
 // Default: indexed + stored
 let opt = TextOption::default();
@@ -96,8 +96,8 @@ Vector fields are indexed using vector indexes for approximate nearest neighbor 
 #### HNSW Field Options (most common)
 
 ```rust
-use iris::vector::HnswOption;
-use iris::vector::core::distance::DistanceMetric;
+use laurus::vector::HnswOption;
+use laurus::vector::core::distance::DistanceMetric;
 
 let opt = HnswOption {
     dimension: 384,                          // vector dimensions
@@ -116,7 +116,7 @@ See [Vector Indexing](../indexing/vector_indexing.md) for detailed parameter gui
 A `Document` is a collection of named field values. Use `DocumentBuilder` to construct documents:
 
 ```rust
-use iris::Document;
+use laurus::Document;
 
 let doc = Document::builder()
     .add_text("title", "Introduction to Rust")
@@ -143,7 +143,7 @@ let doc = Document::builder()
 
 ## DataValue
 
-`DataValue` is the unified value enum that represents any field value in Iris:
+`DataValue` is the unified value enum that represents any field value in Laurus:
 
 ```rust
 pub enum DataValue {
@@ -162,7 +162,7 @@ pub enum DataValue {
 `DataValue` implements `From<T>` for common types, so you can use `.into()` conversions:
 
 ```rust
-use iris::DataValue;
+use laurus::DataValue;
 
 let v: DataValue = "hello".into();       // Text
 let v: DataValue = 42i64.into();         // Int64
@@ -173,7 +173,7 @@ let v: DataValue = vec![0.1f32, 0.2].into(); // Vector
 
 ## Reserved Fields
 
-The `_id` field is reserved by Iris for internal use. It stores the external document ID and is always indexed with `KeywordAnalyzer` (exact match). You do not need to add it to your schema — it is managed automatically.
+The `_id` field is reserved by Laurus for internal use. It stores the external document ID and is always indexed with `KeywordAnalyzer` (exact match). You do not need to add it to your schema — it is managed automatically.
 
 ## Schema Design Tips
 
