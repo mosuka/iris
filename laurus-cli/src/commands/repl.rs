@@ -15,8 +15,7 @@ pub async fn run(data_dir: &Path, format: OutputFormat) -> Result<()> {
     // Read schema for default fields.
     let schema_toml = std::fs::read_to_string(data_dir.join("schema.toml"))
         .context("Failed to read schema file")?;
-    let schema: Schema =
-        toml::from_str(&schema_toml).context("Failed to parse schema TOML")?;
+    let schema: Schema = toml::from_str(&schema_toml).context("Failed to parse schema TOML")?;
 
     let mut rl = DefaultEditor::new()?;
 
@@ -25,7 +24,9 @@ pub async fn run(data_dir: &Path, format: OutputFormat) -> Result<()> {
     loop {
         let line = match rl.readline("laurus> ") {
             Ok(line) => line,
-            Err(rustyline::error::ReadlineError::Interrupted | rustyline::error::ReadlineError::Eof) => {
+            Err(
+                rustyline::error::ReadlineError::Interrupted | rustyline::error::ReadlineError::Eof,
+            ) => {
                 break;
             }
             Err(err) => {
@@ -73,7 +74,10 @@ pub async fn run(data_dir: &Path, format: OutputFormat) -> Result<()> {
                 Ok(())
             }
             _ => {
-                eprintln!("Unknown command: '{}'. Type 'help' for available commands.", parts[0]);
+                eprintln!(
+                    "Unknown command: '{}'. Type 'help' for available commands.",
+                    parts[0]
+                );
                 Ok(())
             }
         };
@@ -134,9 +138,7 @@ async fn handle_doc(
     match action {
         "add" => {
             let rest = rest.context("Usage: doc add <id> <json>")?;
-            let (id, json_str) = rest
-                .split_once(' ')
-                .context("Usage: doc add <id> <json>")?;
+            let (id, json_str) = rest.split_once(' ').context("Usage: doc add <id> <json>")?;
             let doc: Document =
                 serde_json::from_str(json_str).context("Failed to parse document JSON")?;
             engine.add_document(id, doc).await?;

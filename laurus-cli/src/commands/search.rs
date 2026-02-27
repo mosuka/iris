@@ -15,8 +15,7 @@ pub async fn run(cmd: SearchCommand, data_dir: &Path, format: OutputFormat) -> R
     // Read schema to get default fields.
     let schema_toml = std::fs::read_to_string(data_dir.join("schema.toml"))
         .context("Failed to read schema file")?;
-    let schema: Schema =
-        toml::from_str(&schema_toml).context("Failed to parse schema TOML")?;
+    let schema: Schema = toml::from_str(&schema_toml).context("Failed to parse schema TOML")?;
 
     // Build the query parser with default fields from the schema.
     let mut parser =

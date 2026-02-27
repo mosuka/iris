@@ -19,8 +19,7 @@ pub async fn create_index(data_dir: &Path, schema_path: &Path) -> Result<()> {
     // Read and parse the schema file.
     let schema_content =
         std::fs::read_to_string(schema_path).context("Failed to read schema file")?;
-    let schema: Schema =
-        toml::from_str(&schema_content).context("Failed to parse schema TOML")?;
+    let schema: Schema = toml::from_str(&schema_content).context("Failed to parse schema TOML")?;
 
     // Create the data directory.
     std::fs::create_dir_all(data_dir).context("Failed to create data directory")?;

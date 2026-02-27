@@ -64,11 +64,7 @@ pub fn print_search_results(results: &[SearchResult], format: OutputFormat) {
 }
 
 /// Print documents.
-pub fn print_documents(
-    id: &str,
-    documents: &[Document],
-    format: OutputFormat,
-) {
+pub fn print_documents(id: &str, documents: &[Document], format: OutputFormat) {
     match format {
         OutputFormat::Json => {
             let json_docs: Vec<serde_json::Value> = documents

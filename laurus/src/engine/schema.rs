@@ -107,16 +107,12 @@ impl FieldOption {
     pub fn to_lexical(&self) -> Option<crate::lexical::core::field::FieldOption> {
         match self {
             Self::Text(o) => Some(crate::lexical::core::field::FieldOption::Text(o.clone())),
-            Self::Integer(o) => {
-                Some(crate::lexical::core::field::FieldOption::Integer(o.clone()))
-            }
+            Self::Integer(o) => Some(crate::lexical::core::field::FieldOption::Integer(o.clone())),
             Self::Float(o) => Some(crate::lexical::core::field::FieldOption::Float(o.clone())),
-            Self::Boolean(o) => {
-                Some(crate::lexical::core::field::FieldOption::Boolean(o.clone()))
-            }
-            Self::DateTime(o) => {
-                Some(crate::lexical::core::field::FieldOption::DateTime(o.clone()))
-            }
+            Self::Boolean(o) => Some(crate::lexical::core::field::FieldOption::Boolean(o.clone())),
+            Self::DateTime(o) => Some(crate::lexical::core::field::FieldOption::DateTime(
+                o.clone(),
+            )),
             Self::Geo(o) => Some(crate::lexical::core::field::FieldOption::Geo(o.clone())),
             Self::Bytes(o) => Some(crate::lexical::core::field::FieldOption::Bytes(o.clone())),
             _ => None,
