@@ -30,20 +30,18 @@ let schema = Schema::builder()
 ```mermaid
 graph TB
     FO["FieldOption"]
-    FO --> LEX["Lexical"]
-    FO --> VEC["Vector"]
 
-    LEX --> T["Text"]
-    LEX --> I["Integer"]
-    LEX --> FL["Float"]
-    LEX --> B["Boolean"]
-    LEX --> DT["DateTime"]
-    LEX --> G["Geo"]
-    LEX --> BY["Bytes"]
+    FO --> T["Text"]
+    FO --> I["Integer"]
+    FO --> FL["Float"]
+    FO --> B["Boolean"]
+    FO --> DT["DateTime"]
+    FO --> G["Geo"]
+    FO --> BY["Bytes"]
 
-    VEC --> FLAT["Flat"]
-    VEC --> HNSW["HNSW"]
-    VEC --> IVF["IVF"]
+    FO --> FLAT["Flat"]
+    FO --> HNSW["HNSW"]
+    FO --> IVF["IVF"]
 ```
 
 ### Lexical Fields

@@ -1,0 +1,20 @@
+default_fields = ["title", "body"]
+
+[fields.title.Text]
+indexed = true
+stored = true
+term_vectors = false
+
+[fields.body.Text]
+indexed = true
+stored = true
+term_vectors = false
+
+[fields.category.Text]
+indexed = true
+stored = true
+term_vectors = false
+
+[fields.body_vec.Hnsw]
+dimension = 384
+distance = "Cosine"

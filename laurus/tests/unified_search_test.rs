@@ -2,12 +2,11 @@ use tempfile::TempDir;
 
 use laurus::Engine;
 use laurus::SearchRequestBuilder;
-use laurus::lexical::FieldOption as LexicalOption;
 use laurus::lexical::Query;
 use laurus::lexical::TermQuery;
+use laurus::lexical::TextOption;
 use laurus::storage::file::FileStorageConfig;
 use laurus::storage::{StorageConfig, StorageFactory};
-use laurus::vector::FieldOption as VectorOption;
 use laurus::vector::VectorSearchRequestBuilder;
 use laurus::{DataValue, Document};
 use laurus::{FieldOption, LexicalSearchRequest, Schema};
@@ -21,12 +20,12 @@ async fn test_unified_search_hybrid() -> laurus::Result<()> {
 
     // 2. Configure Engines
     use laurus::vector::FlatOption;
-    let vector_opt: VectorOption = FlatOption::default().dimension(3).into();
-    let lexical_opt = LexicalOption::default();
+    let vector_opt = FlatOption::default().dimension(3);
+    let lexical_opt = TextOption::default();
 
     let config = Schema::builder()
-        .add_field("title", FieldOption::Lexical(lexical_opt))
-        .add_field("embedding", FieldOption::Vector(vector_opt))
+        .add_field("title", FieldOption::Text(lexical_opt))
+        .add_field("embedding", FieldOption::Flat(vector_opt))
         .build();
 
     let engine = Engine::new(storage.clone(), config).await?;
@@ -92,10 +91,10 @@ async fn test_unified_search_hybrid_fusion() -> laurus::Result<()> {
     let storage = StorageFactory::create(storage_config)?;
 
     let config = Schema::builder()
-        .add_field("title", FieldOption::Lexical(Default::default()))
+        .add_field("title", FieldOption::Text(Default::default()))
         .add_field(
             "embedding",
-            FieldOption::Vector(laurus::vector::FlatOption::default().dimension(3).into()),
+            FieldOption::Flat(laurus::vector::FlatOption::default().dimension(3)),
         )
         .build();
 

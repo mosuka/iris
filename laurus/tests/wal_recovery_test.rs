@@ -1,11 +1,11 @@
 use tempfile::TempDir;
 
 use laurus::Engine;
-use laurus::lexical::FieldOption as LexicalOption;
 use laurus::lexical::TermQuery;
+use laurus::lexical::TextOption;
 use laurus::storage::file::FileStorageConfig;
 use laurus::storage::{StorageConfig, StorageFactory};
-use laurus::vector::FieldOption as VectorOption;
+use laurus::vector::FlatOption;
 use laurus::{DataValue, Document};
 use laurus::{FieldOption, LexicalSearchRequest, Schema};
 
@@ -17,12 +17,12 @@ async fn test_wal_recovery_uncommitted() -> laurus::Result<()> {
     let storage = StorageFactory::create(storage_config)?;
 
     // 2. Configure Config
-    let vector_opt = VectorOption::default();
-    let lexical_opt = LexicalOption::default();
+    let vector_opt = FlatOption::default();
+    let lexical_opt = TextOption::default();
 
     let config = Schema::builder()
-        .add_field("title", FieldOption::Lexical(lexical_opt))
-        .add_field("embedding", FieldOption::Vector(vector_opt))
+        .add_field("title", FieldOption::Text(lexical_opt))
+        .add_field("embedding", FieldOption::Flat(vector_opt))
         .build();
 
     // 3. Round 1: Index but DO NOT commit

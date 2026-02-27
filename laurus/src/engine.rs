@@ -260,25 +260,22 @@ impl Engine {
     /// - Vector fields: always stored
     /// - Unknown fields: not stored
     fn is_field_stored(&self, name: &str) -> bool {
-        use crate::lexical::core::field::FieldOption as LexicalFieldOption;
+        use crate::engine::schema::FieldOption;
 
         if name == "_id" {
             return true;
         }
         if let Some(field_opt) = self.schema.fields.get(name) {
-            if let Some(lexical_opt) = field_opt.as_lexical() {
-                match lexical_opt {
-                    LexicalFieldOption::Text(o) => o.stored,
-                    LexicalFieldOption::Integer(o) => o.stored,
-                    LexicalFieldOption::Float(o) => o.stored,
-                    LexicalFieldOption::Boolean(o) => o.stored,
-                    LexicalFieldOption::DateTime(o) => o.stored,
-                    LexicalFieldOption::Geo(o) => o.stored,
-                    LexicalFieldOption::Bytes(o) => o.stored,
-                }
-            } else {
-                // Vector field - always stored
-                true
+            match field_opt {
+                FieldOption::Text(o) => o.stored,
+                FieldOption::Integer(o) => o.stored,
+                FieldOption::Float(o) => o.stored,
+                FieldOption::Boolean(o) => o.stored,
+                FieldOption::DateTime(o) => o.stored,
+                FieldOption::Geo(o) => o.stored,
+                FieldOption::Bytes(o) => o.stored,
+                // Vector fields are always stored
+                FieldOption::Hnsw(_) | FieldOption::Flat(_) | FieldOption::Ivf(_) => true,
             }
         } else {
             false
@@ -351,8 +348,8 @@ impl Engine {
             LexicalIndexConfig::builder().analyzer(Arc::new(per_field_analyzer));
 
         for (name, field_option) in &schema.fields {
-            if let Some(lexical_opt) = field_option.as_lexical() {
-                lexical_builder = lexical_builder.add_field(name, lexical_opt.clone());
+            if let Some(lexical_opt) = field_option.to_lexical() {
+                lexical_builder = lexical_builder.add_field(name, lexical_opt);
             }
         }
 
@@ -365,8 +362,8 @@ impl Engine {
         }
 
         for (name, field_option) in &schema.fields {
-            if let Some(vector_opt) = field_option.as_vector() {
-                vector_builder = vector_builder.add_field(name, vector_opt.clone())?;
+            if let Some(vector_opt) = field_option.to_vector() {
+                vector_builder = vector_builder.add_field(name, vector_opt)?;
             }
         }
 

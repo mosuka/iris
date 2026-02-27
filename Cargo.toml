@@ -1,5 +1,5 @@
 [workspace]
-members = ["laurus"]
+members = ["laurus", "laurus-cli"]
 resolver = "2"
 
 [workspace.package]
@@ -16,6 +16,15 @@ license = "MIT"
 
 [workspace.dependencies]
 laurus = { version = "0.1.0", path = "laurus" }
+
+anyhow = "1.0.102"
+clap = { version = "4.5.60", features = ["derive", "env"] }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.149"
+toml = "0.9.8"
+tokio = { version = "1.49.0", features = ["full"] }
+tabled = "0.20.0"
+rustyline = "17.0.2"
 
 [profile.release]
 lto = true

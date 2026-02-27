@@ -22,4 +22,8 @@
   - [ID Management](advanced/id_management.md)
   - [Persistence & WAL](advanced/persistence.md)
   - [Deletions & Compaction](advanced/deletions.md)
+- [CLI](cli.md)
+  - [Installation](cli/installation.md)
+  - [Commands](cli/commands.md)
+  - [REPL](cli/repl.md)
 - [API Reference](api_reference.md)

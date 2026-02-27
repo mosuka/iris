@@ -2,11 +2,11 @@ use tempfile::TempDir;
 
 use laurus::Document;
 use laurus::Engine;
-use laurus::lexical::FieldOption as LexicalOption;
 use laurus::lexical::TermQuery;
+use laurus::lexical::TextOption;
 use laurus::storage::file::FileStorageConfig;
 use laurus::storage::{StorageConfig, StorageFactory};
-use laurus::vector::FieldOption as VectorOption;
+use laurus::vector::HnswOption;
 use laurus::vector::VectorSearchRequestBuilder;
 use laurus::{FieldOption, Schema};
 use laurus::{FusionAlgorithm, LexicalSearchRequest, SearchRequestBuilder};
@@ -19,12 +19,9 @@ async fn test_advanced_fusion_normalization() -> laurus::Result<()> {
     let storage = StorageFactory::create(storage_config)?;
 
     // 2. Configure Engine
-    let vector_opt = VectorOption::default();
-    let lexical_opt = LexicalOption::default();
-
     let config = Schema::builder()
-        .add_field("title", FieldOption::Lexical(lexical_opt))
-        .add_field("embedding", FieldOption::Vector(vector_opt))
+        .add_field("title", FieldOption::Text(TextOption::default()))
+        .add_field("embedding", FieldOption::Hnsw(HnswOption::default()))
         .build();
 
     let engine = Engine::new(storage, config).await?;
@@ -99,8 +96,8 @@ async fn test_field_boosts() -> laurus::Result<()> {
 
     // 2. Configure Engine
     let config = Schema::builder()
-        .add_field("title", FieldOption::Lexical(LexicalOption::default()))
-        .add_field("body", FieldOption::Lexical(LexicalOption::default()))
+        .add_field("title", FieldOption::Text(TextOption::default()))
+        .add_field("body", FieldOption::Text(TextOption::default()))
         .build();
 
     let engine = Engine::new(storage, config).await?;

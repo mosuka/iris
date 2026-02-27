@@ -3,7 +3,7 @@ use laurus::Engine;
 use laurus::Result;
 use laurus::SearchRequestBuilder;
 use laurus::lexical::TermQuery;
-use laurus::lexical::{FieldOption as LexicalFieldOption, TextOption};
+use laurus::lexical::TextOption;
 use laurus::storage::memory::MemoryStorageConfig;
 use laurus::storage::{StorageConfig, StorageFactory};
 use laurus::{FieldOption, LexicalSearchRequest, Schema};
@@ -18,27 +18,27 @@ async fn test_schema_lexical_guardrails() -> Result<()> {
     let config = Schema::builder()
         .add_field(
             "indexed_and_stored",
-            FieldOption::Lexical(LexicalFieldOption::Text(TextOption {
+            FieldOption::Text(TextOption {
                 indexed: true,
                 stored: true,
                 ..Default::default()
-            })),
+            }),
         )
         .add_field(
             "indexed_only",
-            FieldOption::Lexical(LexicalFieldOption::Text(TextOption {
+            FieldOption::Text(TextOption {
                 indexed: true,
                 stored: false,
                 ..Default::default()
-            })),
+            }),
         )
         .add_field(
             "stored_only",
-            FieldOption::Lexical(LexicalFieldOption::Text(TextOption {
+            FieldOption::Text(TextOption {
                 indexed: false,
                 stored: true,
                 ..Default::default()
-            })),
+            }),
         )
         .build();
 

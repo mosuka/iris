@@ -6,9 +6,9 @@ use std::sync::{Arc, Mutex};
 use laurus::Engine;
 use laurus::LaurusError;
 use laurus::lexical::TermQuery;
-use laurus::lexical::{FieldOption as LexicalFieldOption, TextOption};
+use laurus::lexical::TextOption;
 use laurus::storage::memory::MemoryStorage;
-use laurus::vector::{FieldOption as VectorOption, FlatOption};
+use laurus::vector::FlatOption;
 use laurus::vector::{QueryVector, VectorSearchRequest};
 use laurus::{DataValue, Document};
 use laurus::{EmbedInput, EmbedInputType, Embedder};
@@ -85,16 +85,13 @@ async fn create_hybrid_engine() -> std::result::Result<Engine, Box<dyn std::erro
 
     // Schema with separate fields for lexical and vector
     let schema = Schema::builder()
-        .add_field(
-            "title",
-            FieldOption::Lexical(LexicalFieldOption::Text(TextOption::default())),
-        )
+        .add_field("title", FieldOption::Text(TextOption::default()))
         .add_field(
             "title_vec",
-            FieldOption::Vector(VectorOption::Flat(FlatOption {
+            FieldOption::Flat(FlatOption {
                 dimension: 3,
                 ..Default::default()
-            })),
+            }),
         )
         .build();
 
