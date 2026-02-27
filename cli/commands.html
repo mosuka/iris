@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Installation - Laurus Documentation</title>
+        <title>Commands - Laurus Documentation</title>
 
 
         <!-- Custom HTML head -->
@@ -177,68 +177,241 @@
 
                 <div id="mdbook-content" class="content">
                     <main>
-                        <h1 id="installation"><a class="header" href="#installation">Installation</a></h1>
-<h2 id="add-laurus-to-your-project"><a class="header" href="#add-laurus-to-your-project">Add Laurus to Your Project</a></h2>
-<p>Add <code>laurus</code> and <code>tokio</code> (async runtime) to your <code>Cargo.toml</code>:</p>
-<pre><code class="language-toml">[dependencies]
-laurus = "0.1.0"
-tokio = { version = "1", features = ["full"] }
-</code></pre>
-<h2 id="feature-flags"><a class="header" href="#feature-flags">Feature Flags</a></h2>
-<p>Laurus ships with a minimal default feature set. Enable additional features as needed:</p>
+                        <h1 id="command-reference"><a class="header" href="#command-reference">Command Reference</a></h1>
+<h2 id="global-options"><a class="header" href="#global-options">Global Options</a></h2>
+<p>Every command accepts these options:</p>
 <div class="table-wrapper">
 <table>
 <thead>
-<tr><th style="text-align: left">Feature</th><th style="text-align: left">Description</th><th style="text-align: left">Use Case</th></tr>
+<tr><th style="text-align: left">Option</th><th style="text-align: left">Environment Variable</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr>
 </thead>
 <tbody>
-<tr><td style="text-align: left"><em>(default)</em></td><td style="text-align: left">Core library (lexical search, storage, analyzers — no embedding)</td><td style="text-align: left">Keyword search only</td></tr>
-<tr><td style="text-align: left"><code>embeddings-candle</code></td><td style="text-align: left">Local BERT embeddings via Hugging Face Candle</td><td style="text-align: left">Vector search without external API</td></tr>
-<tr><td style="text-align: left"><code>embeddings-openai</code></td><td style="text-align: left">OpenAI API embeddings (text-embedding-3-small, etc.)</td><td style="text-align: left">Cloud-based vector search</td></tr>
-<tr><td style="text-align: left"><code>embeddings-multimodal</code></td><td style="text-align: left">CLIP embeddings for text + image via Candle</td><td style="text-align: left">Multimodal (text-to-image) search</td></tr>
-<tr><td style="text-align: left"><code>embeddings-all</code></td><td style="text-align: left">All embedding features above</td><td style="text-align: left">Full embedding support</td></tr>
+<tr><td style="text-align: left"><code>--data-dir &lt;PATH&gt;</code></td><td style="text-align: left"><code>LAURUS_DATA_DIR</code></td><td style="text-align: left"><code>./laurus_data</code></td><td style="text-align: left">Path to the index data directory</td></tr>
+<tr><td style="text-align: left"><code>--format &lt;FORMAT&gt;</code></td><td style="text-align: left">—</td><td style="text-align: left"><code>table</code></td><td style="text-align: left">Output format: <code>table</code> or <code>json</code></td></tr>
 </tbody>
 </table>
 </div>
-<h3 id="examples"><a class="header" href="#examples">Examples</a></h3>
-<p><strong>Lexical search only</strong> (no embeddings needed):</p>
-<pre><code class="language-toml">[dependencies]
-laurus = "0.1.0"
+<pre><code class="language-bash"># Example: use JSON output with a custom data directory
+laurus --data-dir /var/data/my_index --format json search "title:rust"
 </code></pre>
-<p><strong>Vector search with local model</strong> (no API key required):</p>
-<pre><code class="language-toml">[dependencies]
-laurus = { version = "0.1.0", features = ["embeddings-candle"] }
+<hr>
+<h2 id="create--create-a-resource"><a class="header" href="#create--create-a-resource"><code>create</code> — Create a Resource</a></h2>
+<h3 id="create-index"><a class="header" href="#create-index"><code>create index</code></a></h3>
+<p>Create a new index from a schema TOML file.</p>
+<pre><code class="language-bash">laurus create index --schema &lt;FILE&gt;
 </code></pre>
-<p><strong>Vector search with OpenAI</strong>:</p>
-<pre><code class="language-toml">[dependencies]
-laurus = { version = "0.1.0", features = ["embeddings-openai"] }
-</code></pre>
-<p><strong>Everything</strong>:</p>
-<pre><code class="language-toml">[dependencies]
-laurus = { version = "0.1.0", features = ["embeddings-all"] }
-</code></pre>
-<h2 id="verify-installation"><a class="header" href="#verify-installation">Verify Installation</a></h2>
-<p>Create a minimal program to verify that Laurus compiles:</p>
-<pre class="playground"><code class="language-rust">use laurus::Result;
+<p><strong>Arguments:</strong></p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Flag</th><th style="text-align: left">Required</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>--schema &lt;FILE&gt;</code></td><td style="text-align: left">Yes</td><td style="text-align: left">Path to a TOML file defining the index schema</td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>Schema file format:</strong></p>
+<p>The schema file follows the same structure as the <code>Schema</code> type in the Laurus library. Example:</p>
+<pre><code class="language-toml">default_fields = ["title", "body"]
 
-#[tokio::main]
-async fn main() -&gt; Result&lt;()&gt; {
-    println!("Laurus version: {}", laurus::VERSION);
-    Ok(())
-}</code></pre>
-<pre><code class="language-bash">cargo run
+[fields.title.Text]
+stored = true
+indexed = true
+
+[fields.body.Text]
+stored = true
+indexed = true
+
+[fields.category.Text]
+stored = true
+indexed = true
 </code></pre>
-<p>If you see the version printed, you are ready to proceed to the <a href="quickstart.html">Quick Start</a>.</p>
+<p><strong>Example:</strong></p>
+<pre><code class="language-bash">laurus --data-dir ./my_index create index --schema schema.toml
+# Index created at ./my_index.
+</code></pre>
+<blockquote>
+<p><strong>Note:</strong> An error is returned if the index already exists. Delete the data directory to recreate.</p>
+</blockquote>
+<hr>
+<h2 id="get--get-a-resource"><a class="header" href="#get--get-a-resource"><code>get</code> — Get a Resource</a></h2>
+<h3 id="get-index"><a class="header" href="#get-index"><code>get index</code></a></h3>
+<p>Display statistics about the index.</p>
+<pre><code class="language-bash">laurus get index
+</code></pre>
+<p><strong>Table output example:</strong></p>
+<pre><code class="language-text">Document count: 42
+
+Vector fields:
+╭──────────┬─────────┬───────────╮
+│ Field    │ Vectors │ Dimension │
+├──────────┼─────────┼───────────┤
+│ text_vec │ 42      │ 384       │
+╰──────────┴─────────┴───────────╯
+</code></pre>
+<p><strong>JSON output example:</strong></p>
+<pre><code class="language-bash">laurus --format json get index
+</code></pre>
+<pre><code class="language-json">{
+  "document_count": 42,
+  "fields": {
+    "text_vec": {
+      "vector_count": 42,
+      "dimension": 384
+    }
+  }
+}
+</code></pre>
+<h3 id="get-doc"><a class="header" href="#get-doc"><code>get doc</code></a></h3>
+<p>Retrieve a document (and all its chunks) by external ID.</p>
+<pre><code class="language-bash">laurus get doc --id &lt;ID&gt;
+</code></pre>
+<p><strong>Table output example:</strong></p>
+<pre><code class="language-text">╭──────┬─────────────────────────────────────────╮
+│ ID   │ Fields                                  │
+├──────┼─────────────────────────────────────────┤
+│ doc1 │ body: This is a test, title: Hello World │
+╰──────┴─────────────────────────────────────────╯
+</code></pre>
+<p><strong>JSON output example:</strong></p>
+<pre><code class="language-bash">laurus --format json get doc --id doc1
+</code></pre>
+<pre><code class="language-json">[
+  {
+    "id": "doc1",
+    "document": {
+      "title": "Hello World",
+      "body": "This is a test document."
+    }
+  }
+]
+</code></pre>
+<hr>
+<h2 id="add--add-a-resource"><a class="header" href="#add--add-a-resource"><code>add</code> — Add a Resource</a></h2>
+<h3 id="add-doc"><a class="header" href="#add-doc"><code>add doc</code></a></h3>
+<p>Add a document to the index. Documents are not searchable until <code>commit</code> is called.</p>
+<pre><code class="language-bash">laurus add doc --id &lt;ID&gt; --data &lt;JSON&gt;
+</code></pre>
+<p><strong>Arguments:</strong></p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Flag</th><th style="text-align: left">Required</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>--id &lt;ID&gt;</code></td><td style="text-align: left">Yes</td><td style="text-align: left">External document ID (string)</td></tr>
+<tr><td style="text-align: left"><code>--data &lt;JSON&gt;</code></td><td style="text-align: left">Yes</td><td style="text-align: left">Document fields as a JSON string</td></tr>
+</tbody>
+</table>
+</div>
+<p>The JSON format is a flat object mapping field names to values:</p>
+<pre><code class="language-json">{
+  "title": "Introduction to Rust",
+  "body": "Rust is a systems programming language.",
+  "category": "programming"
+}
+</code></pre>
+<p><strong>Example:</strong></p>
+<pre><code class="language-bash">laurus add doc --id doc1 --data '{"title":"Hello World","body":"This is a test document."}'
+# Document 'doc1' added. Run 'commit' to persist changes.
+</code></pre>
+<blockquote>
+<p><strong>Tip:</strong> Multiple documents can share the same external ID (chunking pattern). Use <code>add doc</code> for each chunk.</p>
+</blockquote>
+<hr>
+<h2 id="delete--delete-a-resource"><a class="header" href="#delete--delete-a-resource"><code>delete</code> — Delete a Resource</a></h2>
+<h3 id="delete-doc"><a class="header" href="#delete-doc"><code>delete doc</code></a></h3>
+<p>Delete a document (and all its chunks) by external ID.</p>
+<pre><code class="language-bash">laurus delete doc --id &lt;ID&gt;
+</code></pre>
+<p><strong>Example:</strong></p>
+<pre><code class="language-bash">laurus delete doc --id doc1
+# Document 'doc1' deleted. Run 'commit' to persist changes.
+</code></pre>
+<hr>
+<h2 id="commit"><a class="header" href="#commit"><code>commit</code></a></h2>
+<p>Commit pending changes (additions and deletions) to the index. Until committed, changes are not visible to search.</p>
+<pre><code class="language-bash">laurus commit
+</code></pre>
+<p><strong>Example:</strong></p>
+<pre><code class="language-bash">laurus --data-dir ./my_index commit
+# Changes committed successfully.
+</code></pre>
+<hr>
+<h2 id="search"><a class="header" href="#search"><code>search</code></a></h2>
+<p>Execute a search query using the <a href="../advanced/query_dsl.html">Query DSL</a>.</p>
+<pre><code class="language-bash">laurus search &lt;QUERY&gt; [--limit &lt;N&gt;] [--offset &lt;N&gt;]
+</code></pre>
+<p><strong>Arguments:</strong></p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Argument / Flag</th><th style="text-align: left">Required</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>&lt;QUERY&gt;</code></td><td style="text-align: left">Yes</td><td style="text-align: left">—</td><td style="text-align: left">Query string in Laurus Query DSL</td></tr>
+<tr><td style="text-align: left"><code>--limit &lt;N&gt;</code></td><td style="text-align: left">No</td><td style="text-align: left"><code>10</code></td><td style="text-align: left">Maximum number of results</td></tr>
+<tr><td style="text-align: left"><code>--offset &lt;N&gt;</code></td><td style="text-align: left">No</td><td style="text-align: left"><code>0</code></td><td style="text-align: left">Number of results to skip</td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>Query syntax examples:</strong></p>
+<pre><code class="language-bash"># Term query
+laurus search "body:rust"
+
+# Phrase query
+laurus search 'body:"machine learning"'
+
+# Boolean query
+laurus search "+body:programming -body:python"
+
+# Fuzzy query (typo tolerance)
+laurus search "body:programing~2"
+
+# Wildcard query
+laurus search "title:intro*"
+
+# Range query
+laurus search "price:[10 TO 50]"
+</code></pre>
+<p><strong>Table output example:</strong></p>
+<pre><code class="language-text">╭──────┬────────┬─────────────────────────────────────────╮
+│ ID   │ Score  │ Fields                                  │
+├──────┼────────┼─────────────────────────────────────────┤
+│ doc1 │ 0.8532 │ body: Rust is a systems..., title: Intr │
+│ doc3 │ 0.4210 │ body: JavaScript powers..., title: Web  │
+╰──────┴────────┴─────────────────────────────────────────╯
+</code></pre>
+<p><strong>JSON output example:</strong></p>
+<pre><code class="language-bash">laurus --format json search "body:rust" --limit 5
+</code></pre>
+<pre><code class="language-json">[
+  {
+    "id": "doc1",
+    "score": 0.8532,
+    "document": {
+      "title": "Introduction to Rust",
+      "body": "Rust is a systems programming language."
+    }
+  }
+]
+</code></pre>
+<hr>
+<h2 id="repl"><a class="header" href="#repl"><code>repl</code></a></h2>
+<p>Start an interactive REPL session. See <a href="repl.html">REPL</a> for details.</p>
+<pre><code class="language-bash">laurus repl
+</code></pre>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="../getting_started.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../cli/installation.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
-                            <a rel="next prefetch" href="../getting_started/quickstart.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="../cli/repl.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                             </a>
 
@@ -248,11 +421,11 @@ async fn main() -&gt; Result&lt;()&gt; {
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="../getting_started.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="../cli/installation.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 
-                    <a rel="next prefetch" href="../getting_started/quickstart.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="../cli/repl.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                     </a>
             </nav>

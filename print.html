@@ -36,10 +36,10 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-9e3f7325.js";
+            window.path_to_searchindex_js = "searchindex-4437056a.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-2eec5043.js"></script>
+        <script src="toc-cdeea0d2.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -847,20 +847,18 @@ let schema = Schema::builder()
 <h2 id="field-types"><a class="header" href="#field-types">Field Types</a></h2>
 <pre><code class="language-mermaid">graph TB
     FO["FieldOption"]
-    FO --&gt; LEX["Lexical"]
-    FO --&gt; VEC["Vector"]
 
-    LEX --&gt; T["Text"]
-    LEX --&gt; I["Integer"]
-    LEX --&gt; FL["Float"]
-    LEX --&gt; B["Boolean"]
-    LEX --&gt; DT["DateTime"]
-    LEX --&gt; G["Geo"]
-    LEX --&gt; BY["Bytes"]
+    FO --&gt; T["Text"]
+    FO --&gt; I["Integer"]
+    FO --&gt; FL["Float"]
+    FO --&gt; B["Boolean"]
+    FO --&gt; DT["DateTime"]
+    FO --&gt; G["Geo"]
+    FO --&gt; BY["Bytes"]
 
-    VEC --&gt; FLAT["Flat"]
-    VEC --&gt; HNSW["HNSW"]
-    VEC --&gt; IVF["IVF"]
+    FO --&gt; FLAT["Flat"]
+    FO --&gt; HNSW["HNSW"]
+    FO --&gt; IVF["IVF"]
 </code></pre>
 <h3 id="lexical-fields"><a class="header" href="#lexical-fields">Lexical Fields</a></h3>
 <p>Lexical fields are indexed using an inverted index and support keyword-based queries.</p>
@@ -3471,6 +3469,354 @@ engine.commit().await?;
 <li>ID management and internal/external ID mapping: <a href="#id-management-1">ID Management</a></li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div>
+<h1 id="cli-command-line-interface"><a class="header" href="#cli-command-line-interface">CLI (Command-Line Interface)</a></h1>
+<p>Laurus provides a command-line tool <code>laurus</code> that lets you create indexes, manage documents, and run search queries without writing code.</p>
+<h2 id="features"><a class="header" href="#features">Features</a></h2>
+<ul>
+<li><strong>Index management</strong> — Create and inspect indexes from TOML schema files</li>
+<li><strong>Document CRUD</strong> — Add, retrieve, and delete documents via JSON</li>
+<li><strong>Search</strong> — Execute queries using the <a href="#query-dsl-3">Query DSL</a></li>
+<li><strong>Dual output</strong> — Human-readable tables or machine-parseable JSON</li>
+<li><strong>Interactive REPL</strong> — Explore your index in a live session</li>
+</ul>
+<h2 id="getting-started-1"><a class="header" href="#getting-started-1">Getting Started</a></h2>
+<pre><code class="language-bash"># Install
+cargo install laurus-cli
+
+# Create an index
+laurus --data-dir ./my_index create index --schema schema.toml
+
+# Add a document
+laurus --data-dir ./my_index add doc --id doc1 --data '{"title":"Hello","body":"World"}'
+
+# Commit changes
+laurus --data-dir ./my_index commit
+
+# Search
+laurus --data-dir ./my_index search "body:world"
+</code></pre>
+<p>See the sub-sections for detailed documentation:</p>
+<ul>
+<li><a href="#installation-1">Installation</a> — How to install the CLI</li>
+<li><a href="#command-reference">Commands</a> — Full command reference</li>
+<li><a href="#repl-interactive-mode">REPL</a> — Interactive mode</li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="installation-1"><a class="header" href="#installation-1">Installation</a></h1>
+<h2 id="from-cratesio"><a class="header" href="#from-cratesio">From crates.io</a></h2>
+<pre><code class="language-bash">cargo install laurus-cli
+</code></pre>
+<p>This installs the <code>laurus</code> binary to <code>~/.cargo/bin/</code>.</p>
+<h2 id="from-source"><a class="header" href="#from-source">From source</a></h2>
+<pre><code class="language-bash">git clone https://github.com/mosuka/laurus.git
+cd laurus
+cargo install --path laurus-cli
+</code></pre>
+<h2 id="verify"><a class="header" href="#verify">Verify</a></h2>
+<pre><code class="language-bash">laurus --version
+</code></pre>
+<h2 id="shell-completion"><a class="header" href="#shell-completion">Shell Completion</a></h2>
+<p>Generate completion scripts for your shell:</p>
+<pre><code class="language-bash"># Bash
+laurus --help
+
+# The CLI uses clap, so shell completions can be generated
+# with clap_complete if needed in a future release.
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="command-reference"><a class="header" href="#command-reference">Command Reference</a></h1>
+<h2 id="global-options"><a class="header" href="#global-options">Global Options</a></h2>
+<p>Every command accepts these options:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Option</th><th style="text-align: left">Environment Variable</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>--data-dir &lt;PATH&gt;</code></td><td style="text-align: left"><code>LAURUS_DATA_DIR</code></td><td style="text-align: left"><code>./laurus_data</code></td><td style="text-align: left">Path to the index data directory</td></tr>
+<tr><td style="text-align: left"><code>--format &lt;FORMAT&gt;</code></td><td style="text-align: left">—</td><td style="text-align: left"><code>table</code></td><td style="text-align: left">Output format: <code>table</code> or <code>json</code></td></tr>
+</tbody>
+</table>
+</div>
+<pre><code class="language-bash"># Example: use JSON output with a custom data directory
+laurus --data-dir /var/data/my_index --format json search "title:rust"
+</code></pre>
+<hr>
+<h2 id="create--create-a-resource"><a class="header" href="#create--create-a-resource"><code>create</code> — Create a Resource</a></h2>
+<h3 id="create-index"><a class="header" href="#create-index"><code>create index</code></a></h3>
+<p>Create a new index from a schema TOML file.</p>
+<pre><code class="language-bash">laurus create index --schema &lt;FILE&gt;
+</code></pre>
+<p><strong>Arguments:</strong></p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Flag</th><th style="text-align: left">Required</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>--schema &lt;FILE&gt;</code></td><td style="text-align: left">Yes</td><td style="text-align: left">Path to a TOML file defining the index schema</td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>Schema file format:</strong></p>
+<p>The schema file follows the same structure as the <code>Schema</code> type in the Laurus library. Example:</p>
+<pre><code class="language-toml">default_fields = ["title", "body"]
+
+[fields.title.Text]
+stored = true
+indexed = true
+
+[fields.body.Text]
+stored = true
+indexed = true
+
+[fields.category.Text]
+stored = true
+indexed = true
+</code></pre>
+<p><strong>Example:</strong></p>
+<pre><code class="language-bash">laurus --data-dir ./my_index create index --schema schema.toml
+# Index created at ./my_index.
+</code></pre>
+<blockquote>
+<p><strong>Note:</strong> An error is returned if the index already exists. Delete the data directory to recreate.</p>
+</blockquote>
+<hr>
+<h2 id="get--get-a-resource"><a class="header" href="#get--get-a-resource"><code>get</code> — Get a Resource</a></h2>
+<h3 id="get-index"><a class="header" href="#get-index"><code>get index</code></a></h3>
+<p>Display statistics about the index.</p>
+<pre><code class="language-bash">laurus get index
+</code></pre>
+<p><strong>Table output example:</strong></p>
+<pre><code class="language-text">Document count: 42
+
+Vector fields:
+╭──────────┬─────────┬───────────╮
+│ Field    │ Vectors │ Dimension │
+├──────────┼─────────┼───────────┤
+│ text_vec │ 42      │ 384       │
+╰──────────┴─────────┴───────────╯
+</code></pre>
+<p><strong>JSON output example:</strong></p>
+<pre><code class="language-bash">laurus --format json get index
+</code></pre>
+<pre><code class="language-json">{
+  "document_count": 42,
+  "fields": {
+    "text_vec": {
+      "vector_count": 42,
+      "dimension": 384
+    }
+  }
+}
+</code></pre>
+<h3 id="get-doc"><a class="header" href="#get-doc"><code>get doc</code></a></h3>
+<p>Retrieve a document (and all its chunks) by external ID.</p>
+<pre><code class="language-bash">laurus get doc --id &lt;ID&gt;
+</code></pre>
+<p><strong>Table output example:</strong></p>
+<pre><code class="language-text">╭──────┬─────────────────────────────────────────╮
+│ ID   │ Fields                                  │
+├──────┼─────────────────────────────────────────┤
+│ doc1 │ body: This is a test, title: Hello World │
+╰──────┴─────────────────────────────────────────╯
+</code></pre>
+<p><strong>JSON output example:</strong></p>
+<pre><code class="language-bash">laurus --format json get doc --id doc1
+</code></pre>
+<pre><code class="language-json">[
+  {
+    "id": "doc1",
+    "document": {
+      "title": "Hello World",
+      "body": "This is a test document."
+    }
+  }
+]
+</code></pre>
+<hr>
+<h2 id="add--add-a-resource"><a class="header" href="#add--add-a-resource"><code>add</code> — Add a Resource</a></h2>
+<h3 id="add-doc"><a class="header" href="#add-doc"><code>add doc</code></a></h3>
+<p>Add a document to the index. Documents are not searchable until <code>commit</code> is called.</p>
+<pre><code class="language-bash">laurus add doc --id &lt;ID&gt; --data &lt;JSON&gt;
+</code></pre>
+<p><strong>Arguments:</strong></p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Flag</th><th style="text-align: left">Required</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>--id &lt;ID&gt;</code></td><td style="text-align: left">Yes</td><td style="text-align: left">External document ID (string)</td></tr>
+<tr><td style="text-align: left"><code>--data &lt;JSON&gt;</code></td><td style="text-align: left">Yes</td><td style="text-align: left">Document fields as a JSON string</td></tr>
+</tbody>
+</table>
+</div>
+<p>The JSON format is a flat object mapping field names to values:</p>
+<pre><code class="language-json">{
+  "title": "Introduction to Rust",
+  "body": "Rust is a systems programming language.",
+  "category": "programming"
+}
+</code></pre>
+<p><strong>Example:</strong></p>
+<pre><code class="language-bash">laurus add doc --id doc1 --data '{"title":"Hello World","body":"This is a test document."}'
+# Document 'doc1' added. Run 'commit' to persist changes.
+</code></pre>
+<blockquote>
+<p><strong>Tip:</strong> Multiple documents can share the same external ID (chunking pattern). Use <code>add doc</code> for each chunk.</p>
+</blockquote>
+<hr>
+<h2 id="delete--delete-a-resource"><a class="header" href="#delete--delete-a-resource"><code>delete</code> — Delete a Resource</a></h2>
+<h3 id="delete-doc"><a class="header" href="#delete-doc"><code>delete doc</code></a></h3>
+<p>Delete a document (and all its chunks) by external ID.</p>
+<pre><code class="language-bash">laurus delete doc --id &lt;ID&gt;
+</code></pre>
+<p><strong>Example:</strong></p>
+<pre><code class="language-bash">laurus delete doc --id doc1
+# Document 'doc1' deleted. Run 'commit' to persist changes.
+</code></pre>
+<hr>
+<h2 id="commit"><a class="header" href="#commit"><code>commit</code></a></h2>
+<p>Commit pending changes (additions and deletions) to the index. Until committed, changes are not visible to search.</p>
+<pre><code class="language-bash">laurus commit
+</code></pre>
+<p><strong>Example:</strong></p>
+<pre><code class="language-bash">laurus --data-dir ./my_index commit
+# Changes committed successfully.
+</code></pre>
+<hr>
+<h2 id="search-1"><a class="header" href="#search-1"><code>search</code></a></h2>
+<p>Execute a search query using the <a href="#query-dsl-3">Query DSL</a>.</p>
+<pre><code class="language-bash">laurus search &lt;QUERY&gt; [--limit &lt;N&gt;] [--offset &lt;N&gt;]
+</code></pre>
+<p><strong>Arguments:</strong></p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Argument / Flag</th><th style="text-align: left">Required</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>&lt;QUERY&gt;</code></td><td style="text-align: left">Yes</td><td style="text-align: left">—</td><td style="text-align: left">Query string in Laurus Query DSL</td></tr>
+<tr><td style="text-align: left"><code>--limit &lt;N&gt;</code></td><td style="text-align: left">No</td><td style="text-align: left"><code>10</code></td><td style="text-align: left">Maximum number of results</td></tr>
+<tr><td style="text-align: left"><code>--offset &lt;N&gt;</code></td><td style="text-align: left">No</td><td style="text-align: left"><code>0</code></td><td style="text-align: left">Number of results to skip</td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>Query syntax examples:</strong></p>
+<pre><code class="language-bash"># Term query
+laurus search "body:rust"
+
+# Phrase query
+laurus search 'body:"machine learning"'
+
+# Boolean query
+laurus search "+body:programming -body:python"
+
+# Fuzzy query (typo tolerance)
+laurus search "body:programing~2"
+
+# Wildcard query
+laurus search "title:intro*"
+
+# Range query
+laurus search "price:[10 TO 50]"
+</code></pre>
+<p><strong>Table output example:</strong></p>
+<pre><code class="language-text">╭──────┬────────┬─────────────────────────────────────────╮
+│ ID   │ Score  │ Fields                                  │
+├──────┼────────┼─────────────────────────────────────────┤
+│ doc1 │ 0.8532 │ body: Rust is a systems..., title: Intr │
+│ doc3 │ 0.4210 │ body: JavaScript powers..., title: Web  │
+╰──────┴────────┴─────────────────────────────────────────╯
+</code></pre>
+<p><strong>JSON output example:</strong></p>
+<pre><code class="language-bash">laurus --format json search "body:rust" --limit 5
+</code></pre>
+<pre><code class="language-json">[
+  {
+    "id": "doc1",
+    "score": 0.8532,
+    "document": {
+      "title": "Introduction to Rust",
+      "body": "Rust is a systems programming language."
+    }
+  }
+]
+</code></pre>
+<hr>
+<h2 id="repl"><a class="header" href="#repl"><code>repl</code></a></h2>
+<p>Start an interactive REPL session. See <a href="#repl-interactive-mode">REPL</a> for details.</p>
+<pre><code class="language-bash">laurus repl
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="repl-interactive-mode"><a class="header" href="#repl-interactive-mode">REPL (Interactive Mode)</a></h1>
+<p>The REPL provides an interactive session for exploring your index without typing the full <code>laurus</code> command each time.</p>
+<h2 id="starting-the-repl"><a class="header" href="#starting-the-repl">Starting the REPL</a></h2>
+<pre><code class="language-bash">laurus --data-dir ./my_index repl
+</code></pre>
+<pre><code class="language-text">Laurus REPL (type 'help' for commands, 'quit' to exit)
+laurus&gt;
+</code></pre>
+<p>The REPL opens the index at startup and keeps it loaded throughout the session.</p>
+<h2 id="available-commands"><a class="header" href="#available-commands">Available Commands</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Command</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>search &lt;query&gt; [limit]</code></td><td style="text-align: left">Search the index</td></tr>
+<tr><td style="text-align: left"><code>doc add &lt;id&gt; &lt;json&gt;</code></td><td style="text-align: left">Add a document</td></tr>
+<tr><td style="text-align: left"><code>doc get &lt;id&gt;</code></td><td style="text-align: left">Get a document by ID</td></tr>
+<tr><td style="text-align: left"><code>doc delete &lt;id&gt;</code></td><td style="text-align: left">Delete a document by ID</td></tr>
+<tr><td style="text-align: left"><code>commit</code></td><td style="text-align: left">Commit pending changes</td></tr>
+<tr><td style="text-align: left"><code>stats</code></td><td style="text-align: left">Show index statistics</td></tr>
+<tr><td style="text-align: left"><code>help</code></td><td style="text-align: left">Show available commands</td></tr>
+<tr><td style="text-align: left"><code>quit</code> / <code>exit</code></td><td style="text-align: left">Exit the REPL</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="usage-examples"><a class="header" href="#usage-examples">Usage Examples</a></h2>
+<h3 id="searching"><a class="header" href="#searching">Searching</a></h3>
+<pre><code class="language-text">laurus&gt; search body:rust
+╭──────┬────────┬────────────────────────────────────╮
+│ ID   │ Score  │ Fields                             │
+├──────┼────────┼────────────────────────────────────┤
+│ doc1 │ 0.8532 │ body: Rust is a systems..., title… │
+╰──────┴────────┴────────────────────────────────────╯
+</code></pre>
+<h3 id="adding-and-committing-documents"><a class="header" href="#adding-and-committing-documents">Adding and Committing Documents</a></h3>
+<pre><code class="language-text">laurus&gt; doc add doc4 {"title":"New Document","body":"Some content here."}
+Document 'doc4' added.
+laurus&gt; commit
+Changes committed.
+</code></pre>
+<h3 id="retrieving-documents"><a class="header" href="#retrieving-documents">Retrieving Documents</a></h3>
+<pre><code class="language-text">laurus&gt; doc get doc4
+╭──────┬───────────────────────────────────────────────╮
+│ ID   │ Fields                                        │
+├──────┼───────────────────────────────────────────────┤
+│ doc4 │ body: Some content here., title: New Document │
+╰──────┴───────────────────────────────────────────────╯
+</code></pre>
+<h3 id="deleting-documents-1"><a class="header" href="#deleting-documents-1">Deleting Documents</a></h3>
+<pre><code class="language-text">laurus&gt; doc delete doc4
+Document 'doc4' deleted.
+laurus&gt; commit
+Changes committed.
+</code></pre>
+<h3 id="viewing-statistics"><a class="header" href="#viewing-statistics">Viewing Statistics</a></h3>
+<pre><code class="language-text">laurus&gt; stats
+Document count: 3
+</code></pre>
+<h2 id="features-1"><a class="header" href="#features-1">Features</a></h2>
+<ul>
+<li><strong>Line editing</strong> — Arrow keys, Home/End, and standard readline shortcuts</li>
+<li><strong>History</strong> — Use Up/Down arrows to recall previous commands</li>
+<li><strong>Ctrl+C / Ctrl+D</strong> — Exit the REPL gracefully</li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div>
 <h1 id="api-reference"><a class="header" href="#api-reference">API Reference</a></h1>
 <p>This page provides a quick reference of the most important types and methods in Laurus. For full details, generate the Rustdoc:</p>
 <pre><code class="language-bash">cargo doc --open
@@ -3575,7 +3921,7 @@ engine.commit().await?;
 </tbody>
 </table>
 </div>
-<h2 id="search-1"><a class="header" href="#search-1">Search</a></h2>
+<h2 id="search-2"><a class="header" href="#search-2">Search</a></h2>
 <h3 id="searchrequestbuilder"><a class="header" href="#searchrequestbuilder">SearchRequestBuilder</a></h3>
 <div class="table-wrapper">
 <table>

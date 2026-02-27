@@ -35,10 +35,10 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-9e3f7325.js";
+            window.path_to_searchindex_js = "../searchindex-4437056a.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-2eec5043.js"></script>
+        <script src="../toc-cdeea0d2.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -201,20 +201,18 @@ let schema = Schema::builder()
 <h2 id="field-types"><a class="header" href="#field-types">Field Types</a></h2>
 <pre><code class="language-mermaid">graph TB
     FO["FieldOption"]
-    FO --&gt; LEX["Lexical"]
-    FO --&gt; VEC["Vector"]
 
-    LEX --&gt; T["Text"]
-    LEX --&gt; I["Integer"]
-    LEX --&gt; FL["Float"]
-    LEX --&gt; B["Boolean"]
-    LEX --&gt; DT["DateTime"]
-    LEX --&gt; G["Geo"]
-    LEX --&gt; BY["Bytes"]
+    FO --&gt; T["Text"]
+    FO --&gt; I["Integer"]
+    FO --&gt; FL["Float"]
+    FO --&gt; B["Boolean"]
+    FO --&gt; DT["DateTime"]
+    FO --&gt; G["Geo"]
+    FO --&gt; BY["Bytes"]
 
-    VEC --&gt; FLAT["Flat"]
-    VEC --&gt; HNSW["HNSW"]
-    VEC --&gt; IVF["IVF"]
+    FO --&gt; FLAT["Flat"]
+    FO --&gt; HNSW["HNSW"]
+    FO --&gt; IVF["IVF"]
 </code></pre>
 <h3 id="lexical-fields"><a class="header" href="#lexical-fields">Lexical Fields</a></h3>
 <p>Lexical fields are indexed using an inverted index and support keyword-based queries.</p>
