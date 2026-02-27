@@ -1,0 +1,36 @@
+{
+  "fields": {
+    "title": {
+      "type": "Text",
+      "option": {
+        "indexed": true,
+        "stored": true,
+        "term_vectors": false
+      }
+    },
+    "body": {
+      "type": "Text",
+      "option": {
+        "indexed": true,
+        "stored": true,
+        "term_vectors": false
+      }
+    },
+    "category": {
+      "type": "Text",
+      "option": {
+        "indexed": true,
+        "stored": true,
+        "term_vectors": false
+      }
+    },
+    "body_vec": {
+      "type": "Hnsw",
+      "option": {
+        "dimension": 384,
+        "distance": "Cosine"
+      }
+    }
+  },
+  "default_fields": ["title", "body"]
+}

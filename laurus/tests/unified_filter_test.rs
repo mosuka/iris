@@ -3,11 +3,10 @@ use tempfile::TempDir;
 use laurus::Document;
 use laurus::Engine;
 use laurus::SearchRequestBuilder;
-use laurus::lexical::FieldOption as LexicalOption;
 use laurus::lexical::TermQuery;
+use laurus::lexical::TextOption;
 use laurus::storage::file::FileStorageConfig;
 use laurus::storage::{StorageConfig, StorageFactory};
-use laurus::vector::FieldOption as VectorOption;
 use laurus::vector::VectorSearchRequestBuilder;
 use laurus::{FieldOption, Schema};
 
@@ -20,13 +19,13 @@ async fn test_unified_filtering() -> laurus::Result<()> {
 
     // 2. Configure Engines
     use laurus::vector::FlatOption;
-    let vector_opt: VectorOption = FlatOption::default().dimension(2).into();
-    let lexical_opt = LexicalOption::default();
+    let vector_opt = FlatOption::default().dimension(2);
+    let lexical_opt = TextOption::default();
 
     let config = Schema::builder()
-        .add_field("name", FieldOption::Lexical(lexical_opt.clone()))
-        .add_field("category", FieldOption::Lexical(lexical_opt))
-        .add_field("embedding", FieldOption::Vector(vector_opt))
+        .add_field("name", FieldOption::Text(lexical_opt.clone()))
+        .add_field("category", FieldOption::Text(lexical_opt))
+        .add_field("embedding", FieldOption::Flat(vector_opt))
         .build();
 
     let engine = Engine::new(storage.clone(), config).await?;
@@ -125,13 +124,13 @@ async fn test_unified_filtering_hnsw() -> laurus::Result<()> {
 
     // 2. Configure Engines with HNSW
     use laurus::vector::HnswOption;
-    let vector_opt: VectorOption = HnswOption::default().dimension(2).into();
-    let lexical_opt = LexicalOption::default();
+    let vector_opt = HnswOption::default().dimension(2);
+    let lexical_opt = TextOption::default();
 
     let config = Schema::builder()
-        .add_field("name", FieldOption::Lexical(lexical_opt.clone()))
-        .add_field("category", FieldOption::Lexical(lexical_opt))
-        .add_field("embedding", FieldOption::Vector(vector_opt))
+        .add_field("name", FieldOption::Text(lexical_opt.clone()))
+        .add_field("category", FieldOption::Text(lexical_opt))
+        .add_field("embedding", FieldOption::Hnsw(vector_opt))
         .build();
 
     let engine = Engine::new(storage.clone(), config).await?;
@@ -200,13 +199,13 @@ async fn test_unified_filtering_ivf() -> laurus::Result<()> {
     // Or we rely on `IvfFieldReader` behavior validation specifically.
     // If standard IVF needs training, this test might fail if training isn't triggered.
     // Assuming implicit training or minimal setup for test.
-    let vector_opt: VectorOption = IvfOption::default().dimension(2).n_clusters(1).into();
-    let lexical_opt = LexicalOption::default();
+    let vector_opt = IvfOption::default().dimension(2).n_clusters(1);
+    let lexical_opt = TextOption::default();
 
     let config = Schema::builder()
-        .add_field("name", FieldOption::Lexical(lexical_opt.clone()))
-        .add_field("category", FieldOption::Lexical(lexical_opt))
-        .add_field("embedding", FieldOption::Vector(vector_opt))
+        .add_field("name", FieldOption::Text(lexical_opt.clone()))
+        .add_field("category", FieldOption::Text(lexical_opt))
+        .add_field("embedding", FieldOption::Ivf(vector_opt))
         .build();
 
     let engine = Engine::new(storage.clone(), config).await?;

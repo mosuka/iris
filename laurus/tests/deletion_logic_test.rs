@@ -3,11 +3,11 @@ use tempfile::TempDir;
 use laurus::Document;
 use laurus::Engine;
 use laurus::SearchRequestBuilder;
-use laurus::lexical::FieldOption as LexicalOption;
 use laurus::lexical::TermQuery;
+use laurus::lexical::TextOption;
 use laurus::storage::file::FileStorageConfig;
 use laurus::storage::{StorageConfig, StorageFactory};
-use laurus::vector::FieldOption as VectorOption;
+use laurus::vector::HnswOption;
 use laurus::vector::VectorSearchRequestBuilder;
 use laurus::{FieldOption, LexicalSearchRequest, Schema};
 
@@ -19,12 +19,9 @@ async fn test_engine_unified_deletion() -> laurus::Result<()> {
     let storage = StorageFactory::create(storage_config)?;
 
     // 2. Configure Engine
-    let vector_opt = VectorOption::default(); // dim=128
-    let lexical_opt = LexicalOption::default();
-
     let config = Schema::builder()
-        .add_field("title", FieldOption::Lexical(lexical_opt))
-        .add_field("embedding", FieldOption::Vector(vector_opt))
+        .add_field("title", FieldOption::Text(TextOption::default()))
+        .add_field("embedding", FieldOption::Hnsw(HnswOption::default()))
         .build();
 
     let engine = Engine::new(storage.clone(), config).await?;
@@ -100,15 +97,16 @@ async fn test_engine_upsert() -> laurus::Result<()> {
 
     // 2. Configure Engine
     use laurus::vector::FlatOption;
-    let vector_opt = VectorOption::Flat(FlatOption {
-        dimension: 2,
-        ..Default::default()
-    });
-    let lexical_opt = LexicalOption::default();
 
     let config = Schema::builder()
-        .add_field("title", FieldOption::Lexical(lexical_opt))
-        .add_field("embedding", FieldOption::Vector(vector_opt))
+        .add_field("title", FieldOption::Text(TextOption::default()))
+        .add_field(
+            "embedding",
+            FieldOption::Flat(FlatOption {
+                dimension: 2,
+                ..Default::default()
+            }),
+        )
         .build();
 
     let engine = Engine::new(storage.clone(), config).await?;
@@ -193,13 +191,13 @@ async fn test_engine_delete_nonexistent() -> laurus::Result<()> {
 
     use laurus::vector::FlatOption;
     let config = Schema::builder()
-        .add_field("title", FieldOption::Lexical(LexicalOption::default()))
+        .add_field("title", FieldOption::Text(TextOption::default()))
         .add_field(
             "embedding",
-            FieldOption::Vector(VectorOption::Flat(FlatOption {
+            FieldOption::Flat(FlatOption {
                 dimension: 2,
                 ..Default::default()
-            })),
+            }),
         )
         .build();
 
@@ -223,13 +221,13 @@ async fn test_engine_double_delete() -> laurus::Result<()> {
 
     use laurus::vector::FlatOption;
     let config = Schema::builder()
-        .add_field("title", FieldOption::Lexical(LexicalOption::default()))
+        .add_field("title", FieldOption::Text(TextOption::default()))
         .add_field(
             "embedding",
-            FieldOption::Vector(VectorOption::Flat(FlatOption {
+            FieldOption::Flat(FlatOption {
                 dimension: 2,
                 ..Default::default()
-            })),
+            }),
         )
         .build();
 

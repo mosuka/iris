@@ -2,11 +2,10 @@ use tempfile::TempDir;
 
 use laurus::Engine;
 use laurus::SearchRequestBuilder;
-use laurus::lexical::FieldOption as LexicalOption;
 use laurus::lexical::TermQuery;
+use laurus::lexical::TextOption;
 use laurus::storage::file::FileStorageConfig;
 use laurus::storage::{StorageConfig, StorageFactory};
-use laurus::vector::FieldOption as VectorOption;
 use laurus::vector::FlatOption;
 use laurus::vector::VectorSearchRequestBuilder;
 use laurus::{DataValue, Document};
@@ -25,14 +24,14 @@ async fn test_unified_engine_indexing() -> laurus::Result<()> {
     // - "embedding": Vector only
     // - "description": Lexical only
 
-    // Note: VectorOption default uses Cosine, dim=128
-    let vector_opt = VectorOption::default();
-    let lexical_opt = LexicalOption::default();
+    // Note: FlatOption default uses Cosine, dim=128
+    let vector_opt = FlatOption::default();
+    let lexical_opt = TextOption::default();
 
     let config = Schema::builder()
-        .add_field("title", FieldOption::Lexical(lexical_opt.clone()))
-        .add_field("embedding", FieldOption::Vector(vector_opt.clone()))
-        .add_field("description", FieldOption::Lexical(lexical_opt))
+        .add_field("title", FieldOption::Text(lexical_opt.clone()))
+        .add_field("embedding", FieldOption::Flat(vector_opt.clone()))
+        .add_field("description", FieldOption::Text(lexical_opt))
         .build();
 
     // 3. Initialize Engine
@@ -81,9 +80,9 @@ async fn test_unified_engine_dimension_mismatch() -> laurus::Result<()> {
     let storage_config = StorageConfig::File(FileStorageConfig::new(temp_dir.path()));
     let storage = StorageFactory::create(storage_config)?;
 
-    let vector_opt: VectorOption = FlatOption::default().dimension(3).into();
+    let vector_opt = FlatOption::default().dimension(3);
     let config = Schema::builder()
-        .add_field("embedding", FieldOption::Vector(vector_opt))
+        .add_field("embedding", FieldOption::Flat(vector_opt))
         .build();
 
     let engine = Engine::new(storage, config).await?;
@@ -110,10 +109,10 @@ async fn test_unified_engine_concurrent_reads() -> laurus::Result<()> {
     let storage_config = StorageConfig::File(FileStorageConfig::new(temp_dir.path()));
     let storage = StorageFactory::create(storage_config)?;
 
-    let vector_opt: VectorOption = FlatOption::default().dimension(3).into();
+    let vector_opt = FlatOption::default().dimension(3);
     let config = Schema::builder()
-        .add_field("title", FieldOption::Lexical(LexicalOption::default()))
-        .add_field("embedding", FieldOption::Vector(vector_opt))
+        .add_field("title", FieldOption::Text(TextOption::default()))
+        .add_field("embedding", FieldOption::Flat(vector_opt))
         .build();
 
     let engine = Arc::new(Engine::new(storage, config).await?);

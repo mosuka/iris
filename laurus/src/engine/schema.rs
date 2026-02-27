@@ -1,12 +1,10 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use crate::lexical::TextOption;
 use crate::lexical::core::field::{
-    BooleanOption, DateTimeOption, FieldOption as LexicalOption, FloatOption, IntegerOption,
+    BooleanOption, BytesOption, DateTimeOption, FloatOption, GeoOption, IntegerOption, TextOption,
 };
-use crate::vector::HnswOption;
-use crate::vector::core::field::FieldOption as VectorOption;
+use crate::vector::core::field::{FlatOption, HnswOption, IvfOption};
 
 /// Schema for the unified engine.
 ///
@@ -43,40 +41,84 @@ impl Default for Schema {
 
 /// Options for a single field in the unified schema.
 ///
-/// A field is indexed either as a vector or lexically, but not both.
+/// Each variant directly represents a concrete field type.
 /// For hybrid search, define separate fields for vector and lexical indexing.
+///
+/// Serializes using serde's externally tagged representation:
+/// ```json
+/// { "Text": { "indexed": true, "stored": true, "term_vectors": false } }
+/// { "Hnsw": { "dimension": 384, "distance": "Cosine" } }
+/// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type", content = "options", rename_all = "snake_case")]
 pub enum FieldOption {
-    /// Vector index options (e.g. HNSW parameters, dimension).
-    Vector(VectorOption),
-    /// Lexical index options (e.g. text, integer, etc.).
-    Lexical(LexicalOption),
+    /// Text field options (lexical search).
+    Text(TextOption),
+    /// Integer field options.
+    Integer(IntegerOption),
+    /// Float field options.
+    Float(FloatOption),
+    /// Boolean field options.
+    Boolean(BooleanOption),
+    /// DateTime field options.
+    DateTime(DateTimeOption),
+    /// Geo field options.
+    Geo(GeoOption),
+    /// Bytes field options.
+    Bytes(BytesOption),
+    /// HNSW vector index options.
+    Hnsw(HnswOption),
+    /// Flat vector index options.
+    Flat(FlatOption),
+    /// IVF vector index options.
+    Ivf(IvfOption),
 }
 
 impl FieldOption {
     /// Returns true if this is a vector field.
     pub fn is_vector(&self) -> bool {
-        matches!(self, FieldOption::Vector(_))
+        matches!(self, Self::Hnsw(_) | Self::Flat(_) | Self::Ivf(_))
     }
 
     /// Returns true if this is a lexical field.
     pub fn is_lexical(&self) -> bool {
-        matches!(self, FieldOption::Lexical(_))
+        matches!(
+            self,
+            Self::Text(_)
+                | Self::Integer(_)
+                | Self::Float(_)
+                | Self::Boolean(_)
+                | Self::DateTime(_)
+                | Self::Geo(_)
+                | Self::Bytes(_)
+        )
     }
 
-    /// Returns the vector option if this is a vector field.
-    pub fn as_vector(&self) -> Option<&VectorOption> {
+    /// Converts to the vector-subsystem's `FieldOption` if this is a vector field.
+    pub fn to_vector(&self) -> Option<crate::vector::core::field::FieldOption> {
         match self {
-            FieldOption::Vector(opt) => Some(opt),
+            Self::Hnsw(o) => Some(crate::vector::core::field::FieldOption::Hnsw(o.clone())),
+            Self::Flat(o) => Some(crate::vector::core::field::FieldOption::Flat(o.clone())),
+            Self::Ivf(o) => Some(crate::vector::core::field::FieldOption::Ivf(o.clone())),
             _ => None,
         }
     }
 
-    /// Returns the lexical option if this is a lexical field.
-    pub fn as_lexical(&self) -> Option<&LexicalOption> {
+    /// Converts to the lexical-subsystem's `FieldOption` if this is a lexical field.
+    pub fn to_lexical(&self) -> Option<crate::lexical::core::field::FieldOption> {
         match self {
-            FieldOption::Lexical(opt) => Some(opt),
+            Self::Text(o) => Some(crate::lexical::core::field::FieldOption::Text(o.clone())),
+            Self::Integer(o) => {
+                Some(crate::lexical::core::field::FieldOption::Integer(o.clone()))
+            }
+            Self::Float(o) => Some(crate::lexical::core::field::FieldOption::Float(o.clone())),
+            Self::Boolean(o) => {
+                Some(crate::lexical::core::field::FieldOption::Boolean(o.clone()))
+            }
+            Self::DateTime(o) => {
+                Some(crate::lexical::core::field::FieldOption::DateTime(o.clone()))
+            }
+            Self::Geo(o) => Some(crate::lexical::core::field::FieldOption::Geo(o.clone())),
+            Self::Bytes(o) => Some(crate::lexical::core::field::FieldOption::Bytes(o.clone())),
             _ => None,
         }
     }
@@ -95,16 +137,8 @@ impl SchemaBuilder {
         self
     }
 
-    pub fn add_lexical_field(
-        self,
-        name: impl Into<String>,
-        option: impl Into<LexicalOption>,
-    ) -> Self {
-        self.add_field(name, FieldOption::Lexical(option.into()))
-    }
-
     pub fn add_text_field(self, name: impl Into<String>, option: impl Into<TextOption>) -> Self {
-        self.add_lexical_field(name, LexicalOption::Text(option.into()))
+        self.add_field(name, FieldOption::Text(option.into()))
     }
 
     pub fn add_integer_field(
@@ -112,11 +146,11 @@ impl SchemaBuilder {
         name: impl Into<String>,
         option: impl Into<IntegerOption>,
     ) -> Self {
-        self.add_lexical_field(name, LexicalOption::Integer(option.into()))
+        self.add_field(name, FieldOption::Integer(option.into()))
     }
 
     pub fn add_float_field(self, name: impl Into<String>, option: impl Into<FloatOption>) -> Self {
-        self.add_lexical_field(name, LexicalOption::Float(option.into()))
+        self.add_field(name, FieldOption::Float(option.into()))
     }
 
     pub fn add_boolean_field(
@@ -124,7 +158,7 @@ impl SchemaBuilder {
         name: impl Into<String>,
         option: impl Into<BooleanOption>,
     ) -> Self {
-        self.add_lexical_field(name, LexicalOption::Boolean(option.into()))
+        self.add_field(name, FieldOption::Boolean(option.into()))
     }
 
     pub fn add_datetime_field(
@@ -132,51 +166,27 @@ impl SchemaBuilder {
         name: impl Into<String>,
         option: impl Into<DateTimeOption>,
     ) -> Self {
-        self.add_lexical_field(name, LexicalOption::DateTime(option.into()))
+        self.add_field(name, FieldOption::DateTime(option.into()))
     }
 
-    pub fn add_geo_field(
-        self,
-        name: impl Into<String>,
-        option: impl Into<crate::lexical::core::field::GeoOption>,
-    ) -> Self {
-        self.add_lexical_field(name, LexicalOption::Geo(option.into()))
+    pub fn add_geo_field(self, name: impl Into<String>, option: impl Into<GeoOption>) -> Self {
+        self.add_field(name, FieldOption::Geo(option.into()))
     }
 
-    pub fn add_bytes_field(
-        self,
-        name: impl Into<String>,
-        option: impl Into<crate::lexical::core::field::BytesOption>,
-    ) -> Self {
-        self.add_lexical_field(name, LexicalOption::Bytes(option.into()))
-    }
-
-    pub fn add_vector_field(
-        self,
-        name: impl Into<String>,
-        option: impl Into<VectorOption>,
-    ) -> Self {
-        self.add_field(name, FieldOption::Vector(option.into()))
+    pub fn add_bytes_field(self, name: impl Into<String>, option: impl Into<BytesOption>) -> Self {
+        self.add_field(name, FieldOption::Bytes(option.into()))
     }
 
     pub fn add_hnsw_field(self, name: impl Into<String>, option: impl Into<HnswOption>) -> Self {
-        self.add_vector_field(name, VectorOption::Hnsw(option.into()))
+        self.add_field(name, FieldOption::Hnsw(option.into()))
     }
 
-    pub fn add_flat_field(
-        self,
-        name: impl Into<String>,
-        option: impl Into<crate::vector::FlatOption>,
-    ) -> Self {
-        self.add_vector_field(name, VectorOption::Flat(option.into()))
+    pub fn add_flat_field(self, name: impl Into<String>, option: impl Into<FlatOption>) -> Self {
+        self.add_field(name, FieldOption::Flat(option.into()))
     }
 
-    pub fn add_ivf_field(
-        self,
-        name: impl Into<String>,
-        option: impl Into<crate::vector::IvfOption>,
-    ) -> Self {
-        self.add_vector_field(name, VectorOption::Ivf(option.into()))
+    pub fn add_ivf_field(self, name: impl Into<String>, option: impl Into<IvfOption>) -> Self {
+        self.add_field(name, FieldOption::Ivf(option.into()))
     }
 
     pub fn add_default_field(mut self, name: impl Into<String>) -> Self {

@@ -3,7 +3,7 @@ use laurus::Result;
 use laurus::storage::memory::MemoryStorageConfig;
 use laurus::storage::{StorageConfig, StorageFactory};
 use laurus::vector::DistanceMetric;
-use laurus::vector::{FieldOption as VectorOption, FlatOption};
+use laurus::vector::FlatOption;
 use laurus::{DataValue, Document};
 use laurus::{FieldOption, Schema};
 
@@ -11,12 +11,12 @@ async fn build_test_engine() -> Result<Engine> {
     let storage_config = StorageConfig::Memory(MemoryStorageConfig::default());
     let storage = StorageFactory::create(storage_config)?;
 
-    let field_option = FieldOption::Vector(VectorOption::Flat(FlatOption {
+    let field_option = FieldOption::Flat(FlatOption {
         dimension: 3,
         distance: DistanceMetric::Cosine,
         base_weight: 1.0,
         quantizer: None,
-    }));
+    });
 
     let config = Schema::builder().add_field("body", field_option).build();
 
