@@ -6,8 +6,8 @@ use dialoguer::{Confirm, Input, MultiSelect, Select};
 use laurus::lexical::core::field::{
     BooleanOption, BytesOption, DateTimeOption, FloatOption, GeoOption, IntegerOption, TextOption,
 };
-use laurus::vector::core::field::{FlatOption, HnswOption, IvfOption};
 use laurus::vector::DistanceMetric;
+use laurus::vector::core::field::{FlatOption, HnswOption, IvfOption};
 use laurus::{FieldOption, Schema};
 
 /// Field type names shown in the interactive prompt.
@@ -29,7 +29,11 @@ pub fn run(output: &Path) -> Result<()> {
         let name = prompt_field_name(&fields)?;
         let field_option = prompt_field_type_and_options()?;
 
-        println!("\nField \"{}\" ({}) added.\n", name, field_type_label(&field_option));
+        println!(
+            "\nField \"{}\" ({}) added.\n",
+            name,
+            field_type_label(&field_option)
+        );
 
         field_order.push(name.clone());
         fields.insert(name, field_option);
@@ -47,12 +51,7 @@ pub fn run(output: &Path) -> Result<()> {
     // Collect lexical field names for default field selection.
     let lexical_fields: Vec<&str> = field_order
         .iter()
-        .filter(|name| {
-            fields
-                .get(*name)
-                .map(is_lexical_field)
-                .unwrap_or(false)
-        })
+        .filter(|name| fields.get(*name).map(is_lexical_field).unwrap_or(false))
         .map(|s| s.as_str())
         .collect();
 
@@ -68,8 +67,7 @@ pub fn run(output: &Path) -> Result<()> {
     };
 
     // Show preview.
-    let toml_str =
-        toml::to_string_pretty(&schema).context("Failed to serialize schema to TOML")?;
+    let toml_str = toml::to_string_pretty(&schema).context("Failed to serialize schema to TOML")?;
     println!("\n--- Preview ---");
     println!("{toml_str}");
     println!("---------------\n");
@@ -92,9 +90,7 @@ pub fn run(output: &Path) -> Result<()> {
 /// Prompt for a unique field name.
 fn prompt_field_name(existing: &HashMap<String, FieldOption>) -> Result<String> {
     loop {
-        let name: String = Input::new()
-            .with_prompt("Field name")
-            .interact_text()?;
+        let name: String = Input::new().with_prompt("Field name").interact_text()?;
 
         if name.is_empty() {
             println!("Field name cannot be empty.");
@@ -102,7 +98,10 @@ fn prompt_field_name(existing: &HashMap<String, FieldOption>) -> Result<String> 
         }
 
         if existing.contains_key(&name) {
-            println!("Field \"{}\" already exists. Please choose a different name.", name);
+            println!(
+                "Field \"{}\" already exists. Please choose a different name.",
+                name
+            );
             continue;
         }
 

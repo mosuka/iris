@@ -4,7 +4,7 @@ Laurus provides a command-line tool `laurus` that lets you create indexes, manag
 
 ## Features
 
-- **Index management** — Create and inspect indexes from TOML schema files
+- **Index management** — Create and inspect indexes from TOML schema files, with an interactive schema generator
 - **Document CRUD** — Add, retrieve, and delete documents via JSON
 - **Search** — Execute queries using the [Query DSL](advanced/query_dsl.md)
 - **Dual output** — Human-readable tables or machine-parseable JSON
@@ -16,7 +16,10 @@ Laurus provides a command-line tool `laurus` that lets you create indexes, manag
 # Install
 cargo install laurus-cli
 
-# Create an index
+# Generate a schema interactively
+laurus create schema
+
+# Create an index from the schema
 laurus --data-dir ./my_index create index --schema schema.toml
 
 # Add a document

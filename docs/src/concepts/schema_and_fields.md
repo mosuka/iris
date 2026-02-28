@@ -182,3 +182,5 @@ The `_id` field is reserved by Laurus for internal use. It stores the external d
 3. **Choose the right vector index** — use HNSW for most cases, Flat for small datasets, IVF for very large datasets. See [Vector Indexing](../indexing/vector_indexing.md).
 
 4. **Set default fields** — if you use the Query DSL, set default fields so users can write `hello` instead of `body:hello`.
+
+5. **Use the schema generator** — run `laurus create schema` to interactively build a schema TOML file instead of writing it by hand. See [CLI Commands](../cli/commands.md#create-schema).

@@ -61,6 +61,56 @@ laurus --data-dir ./my_index create index --schema schema.toml
 
 > **Note:** An error is returned if the index already exists. Delete the data directory to recreate.
 
+### `create schema`
+
+Interactively generate a schema TOML file through a guided wizard.
+
+```bash
+laurus create schema [--output <FILE>]
+```
+
+**Arguments:**
+
+| Flag | Required | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `--output <FILE>` | No | `schema.toml` | Output file path for the generated schema |
+
+The wizard guides you through:
+
+1. **Field definition** — Enter a field name, select the type, and configure type-specific options
+2. **Repeat** — Add as many fields as needed
+3. **Default fields** — Select which lexical fields to use as default search fields
+4. **Preview** — Review the generated TOML before saving
+5. **Save** — Write the schema file
+
+**Supported field types:**
+
+| Type | Category | Options |
+| :--- | :--- | :--- |
+| `Text` | Lexical | `indexed`, `stored`, `term_vectors` |
+| `Integer` | Lexical | `indexed`, `stored` |
+| `Float` | Lexical | `indexed`, `stored` |
+| `Boolean` | Lexical | `indexed`, `stored` |
+| `DateTime` | Lexical | `indexed`, `stored` |
+| `Geo` | Lexical | `indexed`, `stored` |
+| `Bytes` | Lexical | `stored` |
+| `Hnsw` | Vector | `dimension`, `distance`, `m`, `ef_construction` |
+| `Flat` | Vector | `dimension`, `distance` |
+| `Ivf` | Vector | `dimension`, `distance`, `n_clusters`, `n_probe` |
+
+**Example:**
+
+```bash
+# Generate schema.toml interactively
+laurus create schema
+
+# Specify output path
+laurus create schema --output my_schema.toml
+
+# Then create an index from the generated schema
+laurus create index --schema schema.toml
+```
+
 ---
 
 ## `get` — Get a Resource
