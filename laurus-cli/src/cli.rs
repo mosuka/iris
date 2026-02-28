@@ -54,6 +54,12 @@ pub enum CreateResource {
         #[arg(long)]
         schema: PathBuf,
     },
+    /// Interactively generate a schema TOML file.
+    Schema {
+        /// Output file path for the generated schema TOML.
+        #[arg(long, default_value = "schema.toml")]
+        output: PathBuf,
+    },
 }
 
 // --- Get ---

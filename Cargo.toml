@@ -25,6 +25,7 @@ toml = "0.9.8"
 tokio = { version = "1.49.0", features = ["full"] }
 tabled = "0.20.0"
 rustyline = "17.0.2"
+dialoguer = "0.11"
 
 [profile.release]
 lto = true
