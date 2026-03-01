@@ -343,3 +343,38 @@ Start an interactive REPL session. See [REPL](repl.md) for details.
 ```bash
 laurus repl
 ```
+
+---
+
+## `serve`
+
+Start the gRPC server. See [gRPC Server](../server.md) for full documentation.
+
+```bash
+laurus serve [OPTIONS]
+```
+
+**Options:**
+
+| Option | Short | Env Variable | Default | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `--config <PATH>` | `-c` | `LAURUS_CONFIG` | — | Path to a TOML configuration file |
+| `--host <HOST>` | `-H` | `LAURUS_HOST` | `0.0.0.0` | Listen address |
+| `--port <PORT>` | `-p` | `LAURUS_PORT` | `50051` | Listen port |
+| `--log-level <LEVEL>` | `-l` | `LAURUS_LOG_LEVEL` | `info` | Log level (`trace`, `debug`, `info`, `warn`, `error`) |
+
+**Example:**
+
+```bash
+# Start with defaults (port 50051)
+laurus --data-dir ./my_index serve
+
+# Custom port and log level
+laurus serve --port 8080 --log-level debug
+
+# Use a configuration file
+laurus serve --config config.toml
+
+# Use environment variables
+LAURUS_DATA_DIR=./my_index LAURUS_PORT=8080 laurus serve
+```

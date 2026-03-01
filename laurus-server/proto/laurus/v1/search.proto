@@ -1,0 +1,102 @@
+syntax = "proto3";
+package laurus.v1;
+
+import "laurus/v1/common.proto";
+
+// Service for hybrid search (lexical + vector).
+service SearchService {
+  // Execute a search and return all results at once.
+  rpc Search(SearchRequest) returns (SearchResponse);
+
+  // Execute a search and stream results one by one.
+  rpc SearchStream(SearchRequest) returns (stream SearchResult);
+}
+
+message SearchRequest {
+  // Lexical query in Laurus DSL syntax.
+  string query = 1;
+
+  // Vector queries (pre-embedded).
+  repeated QueryVector query_vectors = 2;
+
+  // Maximum number of results to return.
+  uint32 limit = 3;
+
+  // Number of results to skip.
+  uint32 offset = 4;
+
+  // Fusion algorithm for combining lexical and vector scores.
+  optional FusionAlgorithm fusion = 5;
+
+  // Lexical search parameters.
+  optional LexicalParams lexical_params = 6;
+
+  // Vector search parameters.
+  optional VectorParams vector_params = 7;
+
+  // Per-field boost factors for lexical scoring.
+  map<string, float> field_boosts = 8;
+}
+
+message QueryVector {
+  repeated float vector = 1;
+  float weight = 2;
+  repeated string fields = 3;
+}
+
+message FusionAlgorithm {
+  oneof algorithm {
+    RRF rrf = 1;
+    WeightedSum weighted_sum = 2;
+  }
+}
+
+message RRF {
+  double k = 1;
+}
+
+message WeightedSum {
+  float lexical_weight = 1;
+  float vector_weight = 2;
+}
+
+message LexicalParams {
+  float min_score = 1;
+  optional uint64 timeout_ms = 2;
+  bool parallel = 3;
+  optional SortSpec sort_by = 4;
+}
+
+message SortSpec {
+  // Field name to sort by. Empty string means sort by score.
+  string field = 1;
+  SortOrder order = 2;
+}
+
+enum SortOrder {
+  SORT_ORDER_ASC = 0;
+  SORT_ORDER_DESC = 1;
+}
+
+message VectorParams {
+  repeated string fields = 1;
+  VectorScoreMode score_mode = 2;
+  float overfetch = 3;
+  float min_score = 4;
+}
+
+enum VectorScoreMode {
+  VECTOR_SCORE_MODE_WEIGHTED_SUM = 0;
+  VECTOR_SCORE_MODE_MAX_SIM = 1;
+  VECTOR_SCORE_MODE_LATE_INTERACTION = 2;
+}
+
+message SearchResponse {
+  repeated SearchResult results = 1;
+}
+
+message SearchResult {
+  string id = 1;
+  float score = 2;
+  Document document = 3;
+}

@@ -36,6 +36,8 @@ pub enum Command {
     Search(SearchCommand),
     /// Start an interactive REPL session.
     Repl,
+    /// Start the gRPC server.
+    Serve(ServeCommand),
 }
 
 // --- Create ---
@@ -119,6 +121,27 @@ pub enum DeleteResource {
         #[arg(long)]
         id: String,
     },
+}
+
+// --- Serve ---
+
+#[derive(Parser)]
+pub struct ServeCommand {
+    /// Path to the configuration file (TOML).
+    #[arg(short = 'c', long = "config", env = "LAURUS_CONFIG")]
+    pub config: Option<PathBuf>,
+
+    /// Listen address.
+    #[arg(short = 'H', long = "host", env = "LAURUS_HOST")]
+    pub host: Option<String>,
+
+    /// Listen port.
+    #[arg(short = 'p', long = "port", env = "LAURUS_PORT")]
+    pub port: Option<u16>,
+
+    /// Log level (trace, debug, info, warn, error).
+    #[arg(short = 'l', long = "log-level", env = "LAURUS_LOG_LEVEL")]
+    pub log_level: Option<String>,
 }
 
 // --- Search ---

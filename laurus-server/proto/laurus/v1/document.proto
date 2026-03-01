@@ -1,0 +1,54 @@
+syntax = "proto3";
+package laurus.v1;
+
+import "laurus/v1/common.proto";
+
+// Service for document CRUD and transaction management.
+service DocumentService {
+  // Insert or replace a document (upsert by external ID).
+  rpc PutDocument(PutDocumentRequest) returns (PutDocumentResponse);
+
+  // Add a document as a new chunk (multiple chunks can share an ID).
+  rpc AddDocument(AddDocumentRequest) returns (AddDocumentResponse);
+
+  // Get all documents (including chunks) by external ID.
+  rpc GetDocuments(GetDocumentsRequest) returns (GetDocumentsResponse);
+
+  // Delete all documents (including chunks) by external ID.
+  rpc DeleteDocuments(DeleteDocumentsRequest) returns (DeleteDocumentsResponse);
+
+  // Commit pending changes to persistent storage.
+  rpc Commit(CommitRequest) returns (CommitResponse);
+}
+
+message PutDocumentRequest {
+  string id = 1;
+  Document document = 2;
+}
+
+message PutDocumentResponse {}
+
+message AddDocumentRequest {
+  string id = 1;
+  Document document = 2;
+}
+
+message AddDocumentResponse {}
+
+message GetDocumentsRequest {
+  string id = 1;
+}
+
+message GetDocumentsResponse {
+  repeated Document documents = 1;
+}
+
+message DeleteDocumentsRequest {
+  string id = 1;
+}
+
+message DeleteDocumentsResponse {}
+
+message CommitRequest {}
+
+message CommitResponse {}

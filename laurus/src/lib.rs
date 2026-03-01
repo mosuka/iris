@@ -43,9 +43,18 @@ pub use engine::query::UnifiedQueryParser;
 pub use engine::schema::{FieldOption, Schema};
 pub use engine::search::{FusionAlgorithm, SearchRequest, SearchRequestBuilder, SearchResult};
 pub use error::{LaurusError, Result};
-pub use lexical::search::searcher::LexicalSearchRequest;
+pub use lexical::core::field::{
+    BooleanOption, BytesOption, DateTimeOption, FloatOption, GeoOption, IntegerOption, TextOption,
+};
+pub use lexical::search::searcher::{
+    LexicalSearchParams, LexicalSearchQuery, LexicalSearchRequest, SortField, SortOrder,
+};
 pub use maintenance::deletion::DeletionConfig;
 pub use storage::{Storage, StorageConfig, StorageFactory};
+pub use vector::core::distance::DistanceMetric;
+pub use vector::core::field::{FlatOption, HnswOption, IvfOption};
+pub use vector::core::quantization::QuantizationMethod;
+pub use vector::store::request::{QueryVector, VectorScoreMode, VectorSearchRequest};
 
 // Version information
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
