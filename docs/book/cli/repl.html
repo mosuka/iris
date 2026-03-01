@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Search - Laurus Documentation</title>
+        <title>REPL - Laurus Documentation</title>
 
 
         <!-- Custom HTML head -->
@@ -12,34 +12,34 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="theme-color" content="#ffffff">
 
-        <link rel="icon" href="favicon.svg">
-        <link rel="shortcut icon" href="favicon.png">
-        <link rel="stylesheet" href="css/variables.css">
-        <link rel="stylesheet" href="css/general.css">
-        <link rel="stylesheet" href="css/chrome.css">
-        <link rel="stylesheet" href="css/print.css" media="print">
+        <link rel="icon" href="../favicon.svg">
+        <link rel="shortcut icon" href="../favicon.png">
+        <link rel="stylesheet" href="../css/variables.css">
+        <link rel="stylesheet" href="../css/general.css">
+        <link rel="stylesheet" href="../css/chrome.css">
+        <link rel="stylesheet" href="../css/print.css" media="print">
 
         <!-- Fonts -->
-        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
-        <link rel="stylesheet" href="fonts/fonts.css">
+        <link rel="stylesheet" href="../FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="../fonts/fonts.css">
 
         <!-- Highlight.js Stylesheets -->
-        <link rel="stylesheet" id="highlight-css" href="highlight.css">
-        <link rel="stylesheet" id="tomorrow-night-css" href="tomorrow-night.css">
-        <link rel="stylesheet" id="ayu-highlight-css" href="ayu-highlight.css">
+        <link rel="stylesheet" id="highlight-css" href="../highlight.css">
+        <link rel="stylesheet" id="tomorrow-night-css" href="../tomorrow-night.css">
+        <link rel="stylesheet" id="ayu-highlight-css" href="../ayu-highlight.css">
 
         <!-- Custom theme stylesheets -->
 
 
         <!-- Provide site root and default themes to javascript -->
         <script>
-            const path_to_root = "";
+            const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex.js";
+            window.path_to_searchindex_js = "../searchindex.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc.js"></script>
+        <script src="../toc.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -106,7 +106,7 @@
             <!-- populated by js -->
             <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
             <noscript>
-                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
+                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
             </noscript>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle">
                 <div class="sidebar-resize-indicator"></div>
@@ -141,7 +141,7 @@
                     <h1 class="menu-title">Laurus Documentation</h1>
 
                     <div class="right-buttons">
-                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
                             <i id="print-button" class="fa fa-print"></i>
                         </a>
                         <a href="https://github.com/mosuka/laurus" title="Git repository" aria-label="Git repository">
@@ -178,48 +178,76 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="search"><a class="header" href="#search">Search</a></h1>
-<p>This section covers how to query your indexed data. Laurus supports three search modes that can be used independently or combined.</p>
-<h2 id="topics"><a class="header" href="#topics">Topics</a></h2>
-<h3 id="lexical-search"><a class="header" href="#lexical-search"><a href="search/lexical_search.html">Lexical Search</a></a></h3>
-<p>Keyword-based search using an inverted index. Covers:</p>
+                        <h1 id="repl-interactive-mode"><a class="header" href="#repl-interactive-mode">REPL (Interactive Mode)</a></h1>
+<p>The REPL provides an interactive session for exploring your index without typing the full <code>laurus</code> command each time.</p>
+<h2 id="starting-the-repl"><a class="header" href="#starting-the-repl">Starting the REPL</a></h2>
+<pre><code class="language-bash">laurus --data-dir ./my_index repl
+</code></pre>
+<pre><code class="language-text">Laurus REPL (type 'help' for commands, 'quit' to exit)
+laurus&gt;
+</code></pre>
+<p>The REPL opens the index at startup and keeps it loaded throughout the session.</p>
+<h2 id="available-commands"><a class="header" href="#available-commands">Available Commands</a></h2>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Command</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>search &lt;query&gt; [limit]</code></td><td style="text-align: left">Search the index</td></tr>
+<tr><td style="text-align: left"><code>doc add &lt;id&gt; &lt;json&gt;</code></td><td style="text-align: left">Add a document</td></tr>
+<tr><td style="text-align: left"><code>doc get &lt;id&gt;</code></td><td style="text-align: left">Get a document by ID</td></tr>
+<tr><td style="text-align: left"><code>doc delete &lt;id&gt;</code></td><td style="text-align: left">Delete a document by ID</td></tr>
+<tr><td style="text-align: left"><code>commit</code></td><td style="text-align: left">Commit pending changes</td></tr>
+<tr><td style="text-align: left"><code>stats</code></td><td style="text-align: left">Show index statistics</td></tr>
+<tr><td style="text-align: left"><code>help</code></td><td style="text-align: left">Show available commands</td></tr>
+<tr><td style="text-align: left"><code>quit</code> / <code>exit</code></td><td style="text-align: left">Exit the REPL</td></tr>
+</tbody></table>
+</div>
+<h2 id="usage-examples"><a class="header" href="#usage-examples">Usage Examples</a></h2>
+<h3 id="searching"><a class="header" href="#searching">Searching</a></h3>
+<pre><code class="language-text">laurus&gt; search body:rust
+╭──────┬────────┬────────────────────────────────────╮
+│ ID   │ Score  │ Fields                             │
+├──────┼────────┼────────────────────────────────────┤
+│ doc1 │ 0.8532 │ body: Rust is a systems..., title… │
+╰──────┴────────┴────────────────────────────────────╯
+</code></pre>
+<h3 id="adding-and-committing-documents"><a class="header" href="#adding-and-committing-documents">Adding and Committing Documents</a></h3>
+<pre><code class="language-text">laurus&gt; doc add doc4 {"title":"New Document","body":"Some content here."}
+Document 'doc4' added.
+laurus&gt; commit
+Changes committed.
+</code></pre>
+<h3 id="retrieving-documents"><a class="header" href="#retrieving-documents">Retrieving Documents</a></h3>
+<pre><code class="language-text">laurus&gt; doc get doc4
+╭──────┬───────────────────────────────────────────────╮
+│ ID   │ Fields                                        │
+├──────┼───────────────────────────────────────────────┤
+│ doc4 │ body: Some content here., title: New Document │
+╰──────┴───────────────────────────────────────────────╯
+</code></pre>
+<h3 id="deleting-documents"><a class="header" href="#deleting-documents">Deleting Documents</a></h3>
+<pre><code class="language-text">laurus&gt; doc delete doc4
+Document 'doc4' deleted.
+laurus&gt; commit
+Changes committed.
+</code></pre>
+<h3 id="viewing-statistics"><a class="header" href="#viewing-statistics">Viewing Statistics</a></h3>
+<pre><code class="language-text">laurus&gt; stats
+Document count: 3
+</code></pre>
+<h2 id="features"><a class="header" href="#features">Features</a></h2>
 <ul>
-<li>All query types: Term, Phrase, Boolean, Fuzzy, Wildcard, Range, Geo, Span</li>
-<li>BM25 scoring and field boosts</li>
-<li>Using the Query DSL for text-based queries</li>
-</ul>
-<h3 id="vector-search"><a class="header" href="#vector-search"><a href="search/vector_search.html">Vector Search</a></a></h3>
-<p>Semantic similarity search using vector embeddings. Covers:</p>
-<ul>
-<li>VectorSearchRequestBuilder API</li>
-<li>Multi-field vector search and score modes</li>
-<li>Filtered vector search</li>
-</ul>
-<h3 id="hybrid-search"><a class="header" href="#hybrid-search"><a href="search/hybrid_search.html">Hybrid Search</a></a></h3>
-<p>Combining lexical and vector search for best-of-both-worlds results. Covers:</p>
-<ul>
-<li>SearchRequestBuilder API</li>
-<li>Fusion algorithms (RRF, WeightedSum)</li>
-<li>Filtered hybrid search</li>
-<li>Pagination with offset/limit</li>
-</ul>
-<h3 id="spelling-correction"><a class="header" href="#spelling-correction"><a href="search/spelling_correction.html">Spelling Correction</a></a></h3>
-<p>Suggest corrections for misspelled query terms. Covers:</p>
-<ul>
-<li>SpellingCorrector and "Did you mean?" features</li>
-<li>Custom dictionaries and configuration</li>
-<li>Learning from index terms and user queries</li>
+<li><strong>Line editing</strong> — Arrow keys, Home/End, and standard readline shortcuts</li>
+<li><strong>History</strong> — Use Up/Down arrows to recall previous commands</li>
+<li><strong>Ctrl+C / Ctrl+D</strong> — Exit the REPL gracefully</li>
 </ul>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="indexing/vector_indexing.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../cli/schema_format.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <i class="fa fa-angle-left"></i>
                             </a>
 
-                            <a rel="next prefetch" href="search/lexical_search.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="../advanced.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <i class="fa fa-angle-right"></i>
                             </a>
 
@@ -229,11 +257,11 @@
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="indexing/vector_indexing.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="../cli/schema_format.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <i class="fa fa-angle-left"></i>
                     </a>
 
-                    <a rel="next prefetch" href="search/lexical_search.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="../advanced.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <i class="fa fa-angle-right"></i>
                     </a>
             </nav>
@@ -248,17 +276,17 @@
         </script>
 
 
-        <script src="elasticlunr.min.js"></script>
-        <script src="mark.min.js"></script>
-        <script src="searcher.js"></script>
+        <script src="../elasticlunr.min.js"></script>
+        <script src="../mark.min.js"></script>
+        <script src="../searcher.js"></script>
 
-        <script src="clipboard.min.js"></script>
-        <script src="highlight.js"></script>
-        <script src="book.js"></script>
+        <script src="../clipboard.min.js"></script>
+        <script src="../highlight.js"></script>
+        <script src="../book.js"></script>
 
         <!-- Custom JS scripts -->
-        <script src="mermaid.min.js"></script>
-        <script src="mermaid-init.js"></script>
+        <script src="../mermaid.min.js"></script>
+        <script src="../mermaid-init.js"></script>
 
 
 

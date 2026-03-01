@@ -8,7 +8,7 @@ use clap::Parser;
 use laurus::Document;
 
 use crate::cli::{AddResource, Cli, Command, CreateResource, DeleteResource, GetResource};
-use crate::commands::{repl, search};
+use crate::commands::{repl, schema, search};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -23,6 +23,7 @@ async fn main() -> Result<()> {
                 println!("Index created at {}.", data_dir.display());
                 Ok(())
             }
+            CreateResource::Schema { output } => schema::run(&output),
         },
         Command::Get(cmd) => match cmd.resource {
             GetResource::Index => {

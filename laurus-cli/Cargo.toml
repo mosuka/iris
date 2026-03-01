@@ -25,3 +25,4 @@ toml = { workspace = true }
 tokio = { workspace = true }
 tabled = { workspace = true }
 rustyline = { workspace = true }
+dialoguer = { workspace = true }

@@ -180,6 +180,9 @@
                     <main>
                         <h1 id="schema--fields"><a class="header" href="#schema--fields">Schema &amp; Fields</a></h1>
 <p>The <code>Schema</code> defines the structure of your documents — what fields exist and how each field is indexed. It is the single source of truth for the Engine.</p>
+<blockquote>
+<p>For the TOML file format used by the CLI, see <a href="../cli/schema_format.html">Schema Format Reference</a>.</p>
+</blockquote>
 <h2 id="schema"><a class="header" href="#schema">Schema</a></h2>
 <p>A <code>Schema</code> is a collection of named fields. Each field is either a <strong>lexical field</strong> (for keyword search) or a <strong>vector field</strong> (for similarity search).</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
@@ -202,20 +205,18 @@ let schema = Schema::builder()
 <h2 id="field-types"><a class="header" href="#field-types">Field Types</a></h2>
 <pre><code class="language-mermaid">graph TB
     FO["FieldOption"]
-    FO --&gt; LEX["Lexical"]
-    FO --&gt; VEC["Vector"]
 
-    LEX --&gt; T["Text"]
-    LEX --&gt; I["Integer"]
-    LEX --&gt; FL["Float"]
-    LEX --&gt; B["Boolean"]
-    LEX --&gt; DT["DateTime"]
-    LEX --&gt; G["Geo"]
-    LEX --&gt; BY["Bytes"]
+    FO --&gt; T["Text"]
+    FO --&gt; I["Integer"]
+    FO --&gt; FL["Float"]
+    FO --&gt; B["Boolean"]
+    FO --&gt; DT["DateTime"]
+    FO --&gt; G["Geo"]
+    FO --&gt; BY["Bytes"]
 
-    VEC --&gt; FLAT["Flat"]
-    VEC --&gt; HNSW["HNSW"]
-    VEC --&gt; IVF["IVF"]
+    FO --&gt; FLAT["Flat"]
+    FO --&gt; HNSW["HNSW"]
+    FO --&gt; IVF["IVF"]
 </code></pre>
 <h3 id="lexical-fields"><a class="header" href="#lexical-fields">Lexical Fields</a></h3>
 <p>Lexical fields are indexed using an inverted index and support keyword-based queries.</p>
@@ -288,6 +289,54 @@ let doc = Document::builder()
     .add_boolean("published", true)
     .build();
 <span class="boring">}</span></code></pre></pre>
+<h3 id="indexing-documents"><a class="header" href="#indexing-documents">Indexing Documents</a></h3>
+<p>The <code>Engine</code> provides two methods for adding documents, each with different semantics:</p>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Method</th><th style="text-align: left">Behavior</th><th style="text-align: left">Use Case</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>put_document(id, doc)</code></td><td style="text-align: left"><strong>Upsert</strong> — if a document with the same ID exists, it is replaced</td><td style="text-align: left">Standard document indexing</td></tr>
+<tr><td style="text-align: left"><code>add_document(id, doc)</code></td><td style="text-align: left"><strong>Append</strong> — adds the document as a new chunk; multiple chunks can share the same ID</td><td style="text-align: left">Chunked/split documents (e.g., long articles split into paragraphs)</td></tr>
+</tbody></table>
+</div>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Upsert: replaces any existing document with id "doc1"
+engine.put_document("doc1", doc).await?;
+
+// Append: adds another chunk under the same id "doc1"
+engine.add_document("doc1", chunk2).await?;
+
+// Always commit after indexing
+engine.commit().await?;
+<span class="boring">}</span></code></pre></pre>
+<h3 id="retrieving-documents"><a class="header" href="#retrieving-documents">Retrieving Documents</a></h3>
+<p>Use <code>get_documents</code> to retrieve all documents (including chunks) by external ID:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let docs = engine.get_documents("doc1").await?;
+for doc in &amp;docs {
+    if let Some(title) = doc.get("title") {
+        println!("Title: {:?}", title);
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="deleting-documents"><a class="header" href="#deleting-documents">Deleting Documents</a></h3>
+<p>Delete all documents and chunks sharing an external ID:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>engine.delete_documents("doc1").await?;
+engine.commit().await?;
+<span class="boring">}</span></code></pre></pre>
+<h3 id="document-lifecycle"><a class="header" href="#document-lifecycle">Document Lifecycle</a></h3>
+<pre><code class="language-mermaid">graph LR
+    A["Build Document"] --&gt; B["put/add_document()"]
+    B --&gt; C["WAL"]
+    C --&gt; D["commit()"]
+    D --&gt; E["Searchable"]
+    E --&gt; F["get_documents()"]
+    E --&gt; G["delete_documents()"]
+</code></pre>
+<blockquote>
+<p><strong>Important:</strong> Documents are not searchable until <code>commit()</code> is called.</p>
+</blockquote>
 <h3 id="documentbuilder-methods"><a class="header" href="#documentbuilder-methods">DocumentBuilder Methods</a></h3>
 <div class="table-wrapper"><table><thead><tr><th style="text-align: left">Method</th><th style="text-align: left">Value Type</th><th style="text-align: left">Description</th></tr></thead><tbody>
 <tr><td style="text-align: left"><code>add_text(name, value)</code></td><td style="text-align: left"><code>String</code></td><td style="text-align: left">Add a text field</td></tr>
@@ -343,6 +392,9 @@ let v: DataValue = vec![0.1f32, 0.2].into(); // Vector
 </li>
 <li>
 <p><strong>Set default fields</strong> — if you use the Query DSL, set default fields so users can write <code>hello</code> instead of <code>body:hello</code>.</p>
+</li>
+<li>
+<p><strong>Use the schema generator</strong> — run <code>laurus create schema</code> to interactively build a schema TOML file instead of writing it by hand. See <a href="../cli/commands.html#create-schema">CLI Commands</a>.</p>
 </li>
 </ol>
 

@@ -2,6 +2,8 @@
 
 The `Schema` defines the structure of your documents — what fields exist and how each field is indexed. It is the single source of truth for the Engine.
 
+> For the TOML file format used by the CLI, see [Schema Format Reference](../cli/schema_format.md).
+
 ## Schema
 
 A `Schema` is a collection of named fields. Each field is either a **lexical field** (for keyword search) or a **vector field** (for similarity search).
@@ -125,6 +127,62 @@ let doc = Document::builder()
     .build();
 ```
 
+### Indexing Documents
+
+The `Engine` provides two methods for adding documents, each with different semantics:
+
+| Method | Behavior | Use Case |
+| :--- | :--- | :--- |
+| `put_document(id, doc)` | **Upsert** — if a document with the same ID exists, it is replaced | Standard document indexing |
+| `add_document(id, doc)` | **Append** — adds the document as a new chunk; multiple chunks can share the same ID | Chunked/split documents (e.g., long articles split into paragraphs) |
+
+```rust
+// Upsert: replaces any existing document with id "doc1"
+engine.put_document("doc1", doc).await?;
+
+// Append: adds another chunk under the same id "doc1"
+engine.add_document("doc1", chunk2).await?;
+
+// Always commit after indexing
+engine.commit().await?;
+```
+
+### Retrieving Documents
+
+Use `get_documents` to retrieve all documents (including chunks) by external ID:
+
+```rust
+let docs = engine.get_documents("doc1").await?;
+for doc in &docs {
+    if let Some(title) = doc.get("title") {
+        println!("Title: {:?}", title);
+    }
+}
+```
+
+### Deleting Documents
+
+Delete all documents and chunks sharing an external ID:
+
+```rust
+engine.delete_documents("doc1").await?;
+engine.commit().await?;
+```
+
+### Document Lifecycle
+
+```mermaid
+graph LR
+    A["Build Document"] --> B["put/add_document()"]
+    B --> C["WAL"]
+    C --> D["commit()"]
+    D --> E["Searchable"]
+    E --> F["get_documents()"]
+    E --> G["delete_documents()"]
+```
+
+> **Important:** Documents are not searchable until `commit()` is called.
+
 ### DocumentBuilder Methods
 
 | Method | Value Type | Description |
@@ -182,3 +240,5 @@ The `_id` field is reserved by Laurus for internal use. It stores the external d
 3. **Choose the right vector index** — use HNSW for most cases, Flat for small datasets, IVF for very large datasets. See [Vector Indexing](../indexing/vector_indexing.md).
 
 4. **Set default fields** — if you use the Query DSL, set default fields so users can write `hello` instead of `body:hello`.
+
+5. **Use the schema generator** — run `laurus create schema` to interactively build a schema TOML file instead of writing it by hand. See [CLI Commands](../cli/commands.md#create-schema).
