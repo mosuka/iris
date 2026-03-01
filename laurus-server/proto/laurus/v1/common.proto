@@ -1,0 +1,33 @@
+syntax = "proto3";
+package laurus.v1;
+
+// A polymorphic value that can represent any supported data type.
+message Value {
+  oneof kind {
+    bool null_value = 1;
+    bool bool_value = 2;
+    int64 int64_value = 3;
+    double float64_value = 4;
+    string text_value = 5;
+    bytes bytes_value = 6;
+    VectorValue vector_value = 7;
+    int64 datetime_value = 8;  // Unix microseconds (UTC)
+    GeoPoint geo_value = 9;
+  }
+}
+
+// A vector of floating-point values.
+message VectorValue {
+  repeated float values = 1;
+}
+
+// A geographic point (latitude/longitude).
+message GeoPoint {
+  double latitude = 1;
+  double longitude = 2;
+}
+
+// A document consisting of named fields.
+message Document {
+  map<string, Value> fields = 1;
+}

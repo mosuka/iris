@@ -8,7 +8,7 @@ use clap::Parser;
 use laurus::Document;
 
 use crate::cli::{AddResource, Cli, Command, CreateResource, DeleteResource, GetResource};
-use crate::commands::{repl, schema, search};
+use crate::commands::{repl, schema, search, serve};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -65,5 +65,6 @@ async fn main() -> Result<()> {
         }
         Command::Search(cmd) => search::run(cmd, &data_dir, format).await,
         Command::Repl => repl::run(&data_dir, format).await,
+        Command::Serve(cmd) => serve::run(cmd, &data_dir).await,
     }
 }

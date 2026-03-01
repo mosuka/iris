@@ -1,0 +1,148 @@
+syntax = "proto3";
+package laurus.v1;
+
+// Service for index lifecycle and schema management.
+service IndexService {
+  // Create a new index with the given schema.
+  rpc CreateIndex(CreateIndexRequest) returns (CreateIndexResponse);
+
+  // Get index statistics.
+  rpc GetIndex(GetIndexRequest) returns (GetIndexResponse);
+
+  // Get the schema of the current index.
+  rpc GetSchema(GetSchemaRequest) returns (GetSchemaResponse);
+}
+
+// ---- Schema definitions ----
+
+// The schema describing all fields in an index.
+message Schema {
+  map<string, FieldOption> fields = 1;
+  repeated string default_fields = 2;
+}
+
+// A field configuration, exactly one variant must be set.
+message FieldOption {
+  oneof option {
+    TextOption text = 1;
+    IntegerOption integer = 2;
+    FloatOption float = 3;
+    BooleanOption boolean = 4;
+    DateTimeOption date_time = 5;
+    GeoOption geo = 6;
+    BytesOption bytes = 7;
+    HnswOption hnsw = 8;
+    FlatOption flat = 9;
+    IvfOption ivf = 10;
+  }
+}
+
+// Lexical field options.
+
+message TextOption {
+  bool indexed = 1;
+  bool stored = 2;
+  bool term_vectors = 3;
+}
+
+message IntegerOption {
+  bool indexed = 1;
+  bool stored = 2;
+}
+
+message FloatOption {
+  bool indexed = 1;
+  bool stored = 2;
+}
+
+message BooleanOption {
+  bool indexed = 1;
+  bool stored = 2;
+}
+
+message DateTimeOption {
+  bool indexed = 1;
+  bool stored = 2;
+}
+
+message GeoOption {
+  bool indexed = 1;
+  bool stored = 2;
+}
+
+message BytesOption {
+  bool stored = 1;
+}
+
+// Vector field options.
+
+enum DistanceMetric {
+  DISTANCE_METRIC_COSINE = 0;
+  DISTANCE_METRIC_EUCLIDEAN = 1;
+  DISTANCE_METRIC_MANHATTAN = 2;
+  DISTANCE_METRIC_DOT_PRODUCT = 3;
+  DISTANCE_METRIC_ANGULAR = 4;
+}
+
+enum QuantizationMethod {
+  QUANTIZATION_METHOD_NONE = 0;
+  QUANTIZATION_METHOD_SCALAR_8BIT = 1;
+  QUANTIZATION_METHOD_PRODUCT_QUANTIZATION = 2;
+}
+
+message QuantizationConfig {
+  QuantizationMethod method = 1;
+  // Only used when method is PRODUCT_QUANTIZATION.
+  uint32 subvector_count = 2;
+}
+
+message HnswOption {
+  uint32 dimension = 1;
+  DistanceMetric distance = 2;
+  uint32 m = 3;
+  uint32 ef_construction = 4;
+  float base_weight = 5;
+  optional QuantizationConfig quantizer = 6;
+}
+
+message FlatOption {
+  uint32 dimension = 1;
+  DistanceMetric distance = 2;
+  float base_weight = 3;
+  optional QuantizationConfig quantizer = 4;
+}
+
+message IvfOption {
+  uint32 dimension = 1;
+  DistanceMetric distance = 2;
+  uint32 n_clusters = 3;
+  uint32 n_probe = 4;
+  float base_weight = 5;
+  optional QuantizationConfig quantizer = 6;
+}
+
+// ---- RPC messages ----
+
+message CreateIndexRequest {
+  Schema schema = 1;
+}
+
+message CreateIndexResponse {}
+
+message GetIndexRequest {}
+
+message GetIndexResponse {
+  uint64 document_count = 1;
+  map<string, VectorFieldStats> vector_fields = 2;
+}
+
+message VectorFieldStats {
+  uint64 vector_count = 1;
+  uint64 dimension = 2;
+}
+
+message GetSchemaRequest {}
+
+message GetSchemaResponse {
+  Schema schema = 1;
+}

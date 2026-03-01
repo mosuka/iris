@@ -16,6 +16,7 @@ path = "src/main.rs"
 
 [dependencies]
 laurus = { workspace = true }
+laurus-server = { workspace = true }
 
 anyhow = { workspace = true }
 clap = { workspace = true }

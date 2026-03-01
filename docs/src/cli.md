@@ -9,6 +9,7 @@ Laurus provides a command-line tool `laurus` that lets you create indexes, manag
 - **Search** — Execute queries using the [Query DSL](advanced/query_dsl.md)
 - **Dual output** — Human-readable tables or machine-parseable JSON
 - **Interactive REPL** — Explore your index in a live session
+- **gRPC server** — Start a [gRPC server](server.md) with `laurus serve`
 
 ## Getting Started
 
