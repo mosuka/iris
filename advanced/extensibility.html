@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Embeddings - Laurus Documentation</title>
+        <title>Extensibility - Laurus Documentation</title>
 
 
         <!-- Custom HTML head -->
@@ -177,208 +177,295 @@
 
                 <div id="mdbook-content" class="content">
                     <main>
-                        <h1 id="embeddings"><a class="header" href="#embeddings">Embeddings</a></h1>
-<p>Embeddings convert text (or images) into dense numeric vectors that capture semantic meaning. Two texts with similar meanings produce vectors that are close together in vector space, enabling similarity-based search.</p>
-<h2 id="the-embedder-trait"><a class="header" href="#the-embedder-trait">The Embedder Trait</a></h2>
-<p>All embedders implement the <code>Embedder</code> trait:</p>
+                        <h1 id="extensibility"><a class="header" href="#extensibility">Extensibility</a></h1>
+<p>Laurus uses trait-based abstractions for its core components. You can implement these traits to provide custom analyzers, embedders, and storage backends.</p>
+<h2 id="custom-analyzer"><a class="header" href="#custom-analyzer">Custom Analyzer</a></h2>
+<p>Implement the <code>Analyzer</code> trait to create a custom text analysis pipeline:</p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>#[async_trait]
-pub trait Embedder: Send + Sync + Debug {
-    async fn embed(&amp;self, input: &amp;EmbedInput&lt;'_&gt;) -&gt; Result&lt;Vector&gt;;
-    async fn embed_batch(&amp;self, inputs: &amp;[EmbedInput&lt;'_&gt;]) -&gt; Result&lt;Vec&lt;Vector&gt;&gt;;
-    fn supported_input_types(&amp;self) -&gt; Vec&lt;EmbedInputType&gt;;
-    fn name(&amp;self) -&gt; &amp;str;
-    fn as_any(&amp;self) -&gt; &amp;dyn Any;
+</span>use laurus::analysis::analyzer::analyzer::Analyzer;
+use laurus::analysis::token::{Token, TokenStream};
+use laurus::Result;
+
+#[derive(Debug)]
+struct ReverseAnalyzer;
+
+impl Analyzer for ReverseAnalyzer {
+    fn analyze(&amp;self, text: &amp;str) -&gt; Result&lt;TokenStream&gt; {
+        let tokens: Vec&lt;Token&gt; = text
+            .split_whitespace()
+            .enumerate()
+            .map(|(i, word)| Token {
+                text: word.chars().rev().collect(),
+                position: i,
+                ..Default::default()
+            })
+            .collect();
+        Ok(Box::new(tokens.into_iter()))
+    }
+
+    fn name(&amp;self) -&gt; &amp;str {
+        "reverse"
+    }
+
+    fn as_any(&amp;self) -&gt; &amp;dyn std::any::Any {
+        self
+    }
 }
 <span class="boring">}</span></code></pre>
-<p>The <code>embed()</code> method returns a <code>Vector</code> (a struct wrapping <code>Vec&lt;f32&gt;</code>).</p>
-<p><code>EmbedInput</code> supports two modalities:</p>
+<h3 id="required-methods"><a class="header" href="#required-methods">Required Methods</a></h3>
 <div class="table-wrapper">
 <table>
 <thead>
-<tr><th style="text-align: left">Variant</th><th style="text-align: left">Description</th></tr>
+<tr><th style="text-align: left">Method</th><th style="text-align: left">Description</th></tr>
 </thead>
 <tbody>
-<tr><td style="text-align: left"><code>EmbedInput::Text(&amp;str)</code></td><td style="text-align: left">Text input</td></tr>
-<tr><td style="text-align: left"><code>EmbedInput::Bytes(&amp;[u8], Option&lt;&amp;str&gt;)</code></td><td style="text-align: left">Binary input with optional MIME type (for images)</td></tr>
+<tr><td style="text-align: left"><code>analyze(&amp;self, text: &amp;str) -&gt; Result&lt;TokenStream&gt;</code></td><td style="text-align: left">Process text into a stream of tokens</td></tr>
+<tr><td style="text-align: left"><code>name(&amp;self) -&gt; &amp;str</code></td><td style="text-align: left">Return a unique identifier for this analyzer</td></tr>
+<tr><td style="text-align: left"><code>as_any(&amp;self) -&gt; &amp;dyn Any</code></td><td style="text-align: left">Enable downcasting to the concrete type</td></tr>
 </tbody>
 </table>
 </div>
-<h2 id="built-in-embedders"><a class="header" href="#built-in-embedders">Built-in Embedders</a></h2>
-<h3 id="candlebertembedder"><a class="header" href="#candlebertembedder">CandleBertEmbedder</a></h3>
-<p>Runs a BERT model locally using Hugging Face Candle. No API key required.</p>
-<p><strong>Feature flag:</strong> <code>embeddings-candle</code></p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use laurus::CandleBertEmbedder;
-
-// Downloads model on first run (~80MB)
-let embedder = CandleBertEmbedder::new(
-    "sentence-transformers/all-MiniLM-L6-v2"  // model name
-)?;
-// Output: 384-dimensional vector
-<span class="boring">}</span></code></pre>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th style="text-align: left">Property</th><th style="text-align: left">Value</th></tr>
-</thead>
-<tbody>
-<tr><td style="text-align: left">Model</td><td style="text-align: left"><code>sentence-transformers/all-MiniLM-L6-v2</code></td></tr>
-<tr><td style="text-align: left">Dimensions</td><td style="text-align: left">384</td></tr>
-<tr><td style="text-align: left">Runtime</td><td style="text-align: left">Local (CPU)</td></tr>
-<tr><td style="text-align: left">First-run download</td><td style="text-align: left">~80 MB</td></tr>
-</tbody>
-</table>
-</div>
-<h3 id="openaiembedder"><a class="header" href="#openaiembedder">OpenAIEmbedder</a></h3>
-<p>Calls the OpenAI Embeddings API. Requires an API key.</p>
-<p><strong>Feature flag:</strong> <code>embeddings-openai</code></p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use laurus::OpenAIEmbedder;
-
-let embedder = OpenAIEmbedder::new(
-    api_key,
-    "text-embedding-3-small".to_string()
-).await?;
-// Output: 1536-dimensional vector
-<span class="boring">}</span></code></pre>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th style="text-align: left">Property</th><th style="text-align: left">Value</th></tr>
-</thead>
-<tbody>
-<tr><td style="text-align: left">Model</td><td style="text-align: left"><code>text-embedding-3-small</code> (or any OpenAI model)</td></tr>
-<tr><td style="text-align: left">Dimensions</td><td style="text-align: left">1536 (for text-embedding-3-small)</td></tr>
-<tr><td style="text-align: left">Runtime</td><td style="text-align: left">Remote API call</td></tr>
-<tr><td style="text-align: left">Requires</td><td style="text-align: left"><code>OPENAI_API_KEY</code> environment variable</td></tr>
-</tbody>
-</table>
-</div>
-<h3 id="candleclipembedder"><a class="header" href="#candleclipembedder">CandleClipEmbedder</a></h3>
-<p>Runs a CLIP model locally for multimodal (text + image) embeddings.</p>
-<p><strong>Feature flag:</strong> <code>embeddings-multimodal</code></p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use laurus::CandleClipEmbedder;
-
-let embedder = CandleClipEmbedder::new(
-    "openai/clip-vit-base-patch32"
-)?;
-// Text or images → 512-dimensional vector
-<span class="boring">}</span></code></pre>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th style="text-align: left">Property</th><th style="text-align: left">Value</th></tr>
-</thead>
-<tbody>
-<tr><td style="text-align: left">Model</td><td style="text-align: left"><code>openai/clip-vit-base-patch32</code></td></tr>
-<tr><td style="text-align: left">Dimensions</td><td style="text-align: left">512</td></tr>
-<tr><td style="text-align: left">Input types</td><td style="text-align: left">Text AND images</td></tr>
-<tr><td style="text-align: left">Use case</td><td style="text-align: left">Text-to-image search, image-to-image search</td></tr>
-</tbody>
-</table>
-</div>
-<h3 id="precomputedembedder"><a class="header" href="#precomputedembedder">PrecomputedEmbedder</a></h3>
-<p>Use pre-computed vectors directly without any embedding computation. Useful when vectors are generated externally.</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use laurus::PrecomputedEmbedder;
-
-let embedder = PrecomputedEmbedder::new();  // no parameters needed
-<span class="boring">}</span></code></pre>
-<p>When using <code>PrecomputedEmbedder</code>, you provide vectors directly in documents instead of text for embedding:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>let doc = Document::builder()
-    .add_vector("embedding", vec![0.1, 0.2, 0.3, ...])
-    .build();
-<span class="boring">}</span></code></pre>
-<h2 id="perfieldembedder"><a class="header" href="#perfieldembedder">PerFieldEmbedder</a></h2>
-<p><code>PerFieldEmbedder</code> routes embedding requests to field-specific embedders:</p>
-<pre><code class="language-mermaid">graph LR
-    PFE["PerFieldEmbedder"]
-    PFE --&gt;|"text_vec"| BERT["CandleBertEmbedder\n(384 dim)"]
-    PFE --&gt;|"image_vec"| CLIP["CandleClipEmbedder\n(512 dim)"]
-    PFE --&gt;|other fields| DEF["Default Embedder"]
-</code></pre>
+<h3 id="using-a-custom-analyzer"><a class="header" href="#using-a-custom-analyzer">Using a Custom Analyzer</a></h3>
+<p>Pass your analyzer to <code>EngineBuilder</code>:</p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>use std::sync::Arc;
-use laurus::PerFieldEmbedder;
 
-let bert = Arc::new(CandleBertEmbedder::new("...")?);
-let clip = Arc::new(CandleClipEmbedder::new("...")?);
+let analyzer = Arc::new(ReverseAnalyzer);
+let engine = Engine::builder(storage, schema)
+    .analyzer(analyzer)
+    .build()
+    .await?;
+<span class="boring">}</span></code></pre>
+<p>For per-field analyzers, wrap with <code>PerFieldAnalyzer</code>:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use laurus::analysis::analyzer::per_field::PerFieldAnalyzer;
+use laurus::analysis::analyzer::standard::StandardAnalyzer;
 
+let mut per_field = PerFieldAnalyzer::new(Arc::new(StandardAnalyzer::new()?));
+per_field.add_analyzer("custom_field", Arc::new(ReverseAnalyzer));
 
-let mut per_field = PerFieldEmbedder::new(bert.clone());
-per_field.add_embedder("text_vec", bert.clone());
-per_field.add_embedder("image_vec", clip.clone());
+let engine = Engine::builder(storage, schema)
+    .analyzer(Arc::new(per_field))
+    .build()
+    .await?;
+<span class="boring">}</span></code></pre>
+<h2 id="custom-embedder"><a class="header" href="#custom-embedder">Custom Embedder</a></h2>
+<p>Implement the <code>Embedder</code> trait to integrate your own vector embedding model:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use async_trait::async_trait;
+use laurus::embedding::embedder::{Embedder, EmbedInput, EmbedInputType};
+use laurus::vector::core::vector::Vector;
+use laurus::{LaurusError, Result};
+
+#[derive(Debug)]
+struct MyEmbedder {
+    dimension: usize,
+}
+
+#[async_trait]
+impl Embedder for MyEmbedder {
+    async fn embed(&amp;self, input: &amp;EmbedInput&lt;'_&gt;) -&gt; Result&lt;Vector&gt; {
+        match input {
+            EmbedInput::Text(text) =&gt; {
+                // Your embedding logic here
+                let vector = vec![0.0f32; self.dimension];
+                Ok(Vector::new(vector))
+            }
+            _ =&gt; Err(LaurusError::invalid_argument(
+                "this embedder only supports text input",
+            )),
+        }
+    }
+
+    fn supported_input_types(&amp;self) -&gt; Vec&lt;EmbedInputType&gt; {
+        vec![EmbedInputType::Text]
+    }
+
+    fn name(&amp;self) -&gt; &amp;str {
+        "my-embedder"
+    }
+
+    fn as_any(&amp;self) -&gt; &amp;dyn std::any::Any {
+        self
+    }
+}
+<span class="boring">}</span></code></pre>
+<h3 id="required-methods-1"><a class="header" href="#required-methods-1">Required Methods</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Method</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>async embed(&amp;self, input: &amp;EmbedInput) -&gt; Result&lt;Vector&gt;</code></td><td style="text-align: left">Generate an embedding vector for the given input</td></tr>
+<tr><td style="text-align: left"><code>supported_input_types(&amp;self) -&gt; Vec&lt;EmbedInputType&gt;</code></td><td style="text-align: left">Declare supported input types (<code>Text</code>, <code>Image</code>)</td></tr>
+<tr><td style="text-align: left"><code>as_any(&amp;self) -&gt; &amp;dyn Any</code></td><td style="text-align: left">Enable downcasting</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="optional-methods"><a class="header" href="#optional-methods">Optional Methods</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Method</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>async embed_batch(&amp;self, inputs) -&gt; Result&lt;Vec&lt;Vector&gt;&gt;</code></td><td style="text-align: left">Sequential calls to <code>embed</code></td><td style="text-align: left">Override for batch optimization</td></tr>
+<tr><td style="text-align: left"><code>name(&amp;self) -&gt; &amp;str</code></td><td style="text-align: left"><code>"unknown"</code></td><td style="text-align: left">Identifier for logging</td></tr>
+<tr><td style="text-align: left"><code>supports(&amp;self, input_type) -&gt; bool</code></td><td style="text-align: left">Checks <code>supported_input_types</code></td><td style="text-align: left">Input type support check</td></tr>
+<tr><td style="text-align: left"><code>supports_text() -&gt; bool</code></td><td style="text-align: left">Checks for <code>Text</code></td><td style="text-align: left">Text support shorthand</td></tr>
+<tr><td style="text-align: left"><code>supports_image() -&gt; bool</code></td><td style="text-align: left">Checks for <code>Image</code></td><td style="text-align: left">Image support shorthand</td></tr>
+<tr><td style="text-align: left"><code>is_multimodal() -&gt; bool</code></td><td style="text-align: left">Both text and image</td><td style="text-align: left">Multimodal check</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="using-a-custom-embedder"><a class="header" href="#using-a-custom-embedder">Using a Custom Embedder</a></h3>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let embedder = Arc::new(MyEmbedder { dimension: 384 });
+let engine = Engine::builder(storage, schema)
+    .embedder(embedder)
+    .build()
+    .await?;
+<span class="boring">}</span></code></pre>
+<p>For per-field embedders, wrap with <code>PerFieldEmbedder</code>:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use laurus::embedding::per_field::PerFieldEmbedder;
+
+let mut per_field = PerFieldEmbedder::new(Arc::new(MyEmbedder { dimension: 384 }));
+per_field.add_embedder("image_vec", Arc::new(ClipEmbedder::new()?));
 
 let engine = Engine::builder(storage, schema)
     .embedder(Arc::new(per_field))
     .build()
     .await?;
 <span class="boring">}</span></code></pre>
-<p>This is especially useful when:</p>
-<ul>
-<li>Different vector fields need different models (e.g., BERT for text, CLIP for images)</li>
-<li>Different fields have different vector dimensions</li>
-<li>You want to mix local and remote embedders</li>
-</ul>
-<h2 id="how-embeddings-are-used"><a class="header" href="#how-embeddings-are-used">How Embeddings Are Used</a></h2>
-<h3 id="at-index-time"><a class="header" href="#at-index-time">At Index Time</a></h3>
-<p>When you add a text value to a vector field, the engine automatically embeds it:</p>
+<h2 id="custom-storage"><a class="header" href="#custom-storage">Custom Storage</a></h2>
+<p>Implement the <code>Storage</code> trait to add a new storage backend:</p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>let doc = Document::builder()
-    .add_text("text_vec", "Rust is a systems programming language")
-    .build();
-engine.add_document("doc-1", doc).await?;
-// The embedder converts the text to a vector before indexing
-<span class="boring">}</span></code></pre>
-<h3 id="at-search-time"><a class="header" href="#at-search-time">At Search Time</a></h3>
-<p>When you search with text, the engine embeds the query text as well:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>// Builder API
-let request = VectorSearchRequestBuilder::new()
-    .add_text("text_vec", "systems programming")
-    .build();
+</span>use laurus::storage::{Storage, StorageInput, StorageOutput, LoadingMode, FileMetadata};
+use laurus::Result;
 
-// Query DSL
-let request = vector_parser.parse(r#"text_vec:~"systems programming""#).await?;
+#[derive(Debug)]
+struct S3Storage {
+    bucket: String,
+    prefix: String,
+}
+
+impl Storage for S3Storage {
+    fn loading_mode(&amp;self) -&gt; LoadingMode {
+        LoadingMode::Eager  // S3 requires full download
+    }
+
+    fn open_input(&amp;self, name: &amp;str) -&gt; Result&lt;Box&lt;dyn StorageInput&gt;&gt; {
+        // Download from S3 and return a reader
+        todo!()
+    }
+
+    fn create_output(&amp;self, name: &amp;str) -&gt; Result&lt;Box&lt;dyn StorageOutput&gt;&gt; {
+        // Create an upload stream to S3
+        todo!()
+    }
+
+    fn create_output_append(&amp;self, name: &amp;str) -&gt; Result&lt;Box&lt;dyn StorageOutput&gt;&gt; {
+        todo!()
+    }
+
+    fn file_exists(&amp;self, name: &amp;str) -&gt; bool {
+        todo!()
+    }
+
+    fn delete_file(&amp;self, name: &amp;str) -&gt; Result&lt;()&gt; {
+        todo!()
+    }
+
+    fn list_files(&amp;self) -&gt; Result&lt;Vec&lt;String&gt;&gt; {
+        todo!()
+    }
+
+    fn file_size(&amp;self, name: &amp;str) -&gt; Result&lt;u64&gt; {
+        todo!()
+    }
+
+    fn metadata(&amp;self, name: &amp;str) -&gt; Result&lt;FileMetadata&gt; {
+        todo!()
+    }
+
+    fn rename_file(&amp;self, old_name: &amp;str, new_name: &amp;str) -&gt; Result&lt;()&gt; {
+        todo!()
+    }
+
+    fn create_temp_output(&amp;self, prefix: &amp;str) -&gt; Result&lt;(String, Box&lt;dyn StorageOutput&gt;)&gt; {
+        todo!()
+    }
+
+    fn sync(&amp;self) -&gt; Result&lt;()&gt; {
+        todo!()
+    }
+
+    fn close(&amp;mut self) -&gt; Result&lt;()&gt; {
+        todo!()
+    }
+}
 <span class="boring">}</span></code></pre>
-<p>Both approaches embed the query text using the same embedder that was used at index time, ensuring consistent vector spaces.</p>
-<h2 id="choosing-an-embedder"><a class="header" href="#choosing-an-embedder">Choosing an Embedder</a></h2>
+<h3 id="required-methods-2"><a class="header" href="#required-methods-2">Required Methods</a></h3>
 <div class="table-wrapper">
 <table>
 <thead>
-<tr><th style="text-align: left">Scenario</th><th style="text-align: left">Recommended Embedder</th></tr>
+<tr><th style="text-align: left">Method</th><th style="text-align: left">Description</th></tr>
 </thead>
 <tbody>
-<tr><td style="text-align: left">Quick prototyping, offline use</td><td style="text-align: left"><code>CandleBertEmbedder</code></td></tr>
-<tr><td style="text-align: left">Production with high accuracy</td><td style="text-align: left"><code>OpenAIEmbedder</code></td></tr>
-<tr><td style="text-align: left">Text + image search</td><td style="text-align: left"><code>CandleClipEmbedder</code></td></tr>
-<tr><td style="text-align: left">Pre-computed vectors from external pipeline</td><td style="text-align: left"><code>PrecomputedEmbedder</code></td></tr>
-<tr><td style="text-align: left">Multiple models per field</td><td style="text-align: left"><code>PerFieldEmbedder</code> wrapping others</td></tr>
+<tr><td style="text-align: left"><code>open_input(name) -&gt; Result&lt;Box&lt;dyn StorageInput&gt;&gt;</code></td><td style="text-align: left">Open a file for reading</td></tr>
+<tr><td style="text-align: left"><code>create_output(name) -&gt; Result&lt;Box&lt;dyn StorageOutput&gt;&gt;</code></td><td style="text-align: left">Create a file for writing</td></tr>
+<tr><td style="text-align: left"><code>create_output_append(name) -&gt; Result&lt;Box&lt;dyn StorageOutput&gt;&gt;</code></td><td style="text-align: left">Open a file for appending</td></tr>
+<tr><td style="text-align: left"><code>file_exists(name) -&gt; bool</code></td><td style="text-align: left">Check if a file exists</td></tr>
+<tr><td style="text-align: left"><code>delete_file(name) -&gt; Result&lt;()&gt;</code></td><td style="text-align: left">Delete a file</td></tr>
+<tr><td style="text-align: left"><code>list_files() -&gt; Result&lt;Vec&lt;String&gt;&gt;</code></td><td style="text-align: left">List all files</td></tr>
+<tr><td style="text-align: left"><code>file_size(name) -&gt; Result&lt;u64&gt;</code></td><td style="text-align: left">Get file size in bytes</td></tr>
+<tr><td style="text-align: left"><code>metadata(name) -&gt; Result&lt;FileMetadata&gt;</code></td><td style="text-align: left">Get file metadata</td></tr>
+<tr><td style="text-align: left"><code>rename_file(old, new) -&gt; Result&lt;()&gt;</code></td><td style="text-align: left">Rename a file</td></tr>
+<tr><td style="text-align: left"><code>create_temp_output(prefix) -&gt; Result&lt;(String, Box&lt;dyn StorageOutput&gt;)&gt;</code></td><td style="text-align: left">Create a temporary file</td></tr>
+<tr><td style="text-align: left"><code>sync() -&gt; Result&lt;()&gt;</code></td><td style="text-align: left">Flush all pending writes</td></tr>
+<tr><td style="text-align: left"><code>close(&amp;mut self) -&gt; Result&lt;()&gt;</code></td><td style="text-align: left">Close storage and release resources</td></tr>
 </tbody>
 </table>
 </div>
+<h3 id="optional-methods-1"><a class="header" href="#optional-methods-1">Optional Methods</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Method</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>loading_mode() -&gt; LoadingMode</code></td><td style="text-align: left"><code>LoadingMode::Eager</code></td><td style="text-align: left">Preferred data loading mode</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="thread-safety"><a class="header" href="#thread-safety">Thread Safety</a></h2>
+<p>All three traits require <code>Send + Sync</code>. This means your implementations must be safe to share across threads. Use <code>Arc&lt;Mutex&lt;_&gt;&gt;</code> or lock-free data structures for shared mutable state.</p>
+<h2 id="next-steps"><a class="header" href="#next-steps">Next Steps</a></h2>
+<ul>
+<li><a href="error_handling.html">Error Handling</a> — handle errors in custom implementations</li>
+<li><a href="../concepts/analysis.html">Text Analysis</a> — built-in analyzers and pipeline components</li>
+<li><a href="../concepts/embedding.html">Embeddings</a> — built-in embedder options</li>
+<li><a href="../concepts/storage.html">Storage</a> — built-in storage backends</li>
+</ul>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="../concepts/analysis.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../advanced/error_handling.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
-                            <a rel="next prefetch" href="../concepts/storage.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="../architecture.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                             </a>
 
@@ -388,11 +475,11 @@ let request = vector_parser.parse(r#"text_vec:~"systems programming""#).await?;
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="../concepts/analysis.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="../advanced/error_handling.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 
-                    <a rel="next prefetch" href="../concepts/storage.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="../architecture.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                     </a>
             </nav>

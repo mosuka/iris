@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-4437056a.js";
+            window.path_to_searchindex_js = "searchindex-4a4c2e1f.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-cdeea0d2.js"></script>
+        <script src="toc-12aaa25a.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -181,7 +181,7 @@
 <p>Laurus provides a command-line tool <code>laurus</code> that lets you create indexes, manage documents, and run search queries without writing code.</p>
 <h2 id="features"><a class="header" href="#features">Features</a></h2>
 <ul>
-<li><strong>Index management</strong> — Create and inspect indexes from TOML schema files</li>
+<li><strong>Index management</strong> — Create and inspect indexes from TOML schema files, with an interactive schema generator</li>
 <li><strong>Document CRUD</strong> — Add, retrieve, and delete documents via JSON</li>
 <li><strong>Search</strong> — Execute queries using the <a href="advanced/query_dsl.html">Query DSL</a></li>
 <li><strong>Dual output</strong> — Human-readable tables or machine-parseable JSON</li>
@@ -191,7 +191,10 @@
 <pre><code class="language-bash"># Install
 cargo install laurus-cli
 
-# Create an index
+# Generate a schema interactively
+laurus create schema
+
+# Create an index from the schema
 laurus --data-dir ./my_index create index --schema schema.toml
 
 # Add a document
@@ -207,6 +210,7 @@ laurus --data-dir ./my_index search "body:world"
 <ul>
 <li><a href="cli/installation.html">Installation</a> — How to install the CLI</li>
 <li><a href="cli/commands.html">Commands</a> — Full command reference</li>
+<li><a href="cli/schema_format.html">Schema Format</a> — Schema TOML format reference</li>
 <li><a href="cli/repl.html">REPL</a> — Interactive mode</li>
 </ul>
 
@@ -214,7 +218,7 @@ laurus --data-dir ./my_index search "body:world"
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="advanced/deletions.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="search/spelling_correction.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
@@ -228,7 +232,7 @@ laurus --data-dir ./my_index search "body:world"
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="advanced/deletions.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="search/spelling_correction.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 
