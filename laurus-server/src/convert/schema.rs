@@ -125,19 +125,13 @@ fn field_option_from_proto(fo: &v1::FieldOption) -> Option<FieldOption> {
             m: o.m as usize,
             ef_construction: o.ef_construction as usize,
             base_weight: o.base_weight,
-            quantizer: o
-                .quantizer
-                .as_ref()
-                .map(quantization_from_proto),
+            quantizer: o.quantizer.as_ref().map(quantization_from_proto),
         })),
         Some(Opt::Flat(o)) => Some(FieldOption::Flat(FlatOption {
             dimension: o.dimension as usize,
             distance: distance_from_proto(o.distance),
             base_weight: o.base_weight,
-            quantizer: o
-                .quantizer
-                .as_ref()
-                .map(quantization_from_proto),
+            quantizer: o.quantizer.as_ref().map(quantization_from_proto),
         })),
         Some(Opt::Ivf(o)) => Some(FieldOption::Ivf(IvfOption {
             dimension: o.dimension as usize,
@@ -145,10 +139,7 @@ fn field_option_from_proto(fo: &v1::FieldOption) -> Option<FieldOption> {
             n_clusters: o.n_clusters as usize,
             n_probe: o.n_probe as usize,
             base_weight: o.base_weight,
-            quantizer: o
-                .quantizer
-                .as_ref()
-                .map(quantization_from_proto),
+            quantizer: o.quantizer.as_ref().map(quantization_from_proto),
         })),
         None => None,
     }

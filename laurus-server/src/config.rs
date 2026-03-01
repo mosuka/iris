@@ -12,13 +12,18 @@ pub struct Config {
     pub log: LogConfig,
 }
 
-/// Server network settings.
+/// Server network configuration.
 #[derive(Debug, Deserialize)]
 pub struct ServerConfig {
+    /// Listen address for the gRPC server.
     #[serde(default = "default_host")]
     pub host: String,
+    /// Listen port for the gRPC server.
     #[serde(default = "default_port")]
     pub port: u16,
+    /// Listen port for the HTTP Gateway. The Gateway is started only when this is set.
+    #[serde(default)]
+    pub http_port: Option<u16>,
 }
 
 impl Default for ServerConfig {
@@ -26,6 +31,7 @@ impl Default for ServerConfig {
         Self {
             host: default_host(),
             port: default_port(),
+            http_port: None,
         }
     }
 }
@@ -83,5 +89,4 @@ impl Config {
         let config: Config = toml::from_str(&content)?;
         Ok(config)
     }
-
 }

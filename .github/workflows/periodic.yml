@@ -40,6 +40,11 @@ jobs:
       - name: Run checkout
         uses: actions/checkout@v6
 
+      - name: Install protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Install toolchain
         uses: dtolnay/rust-toolchain@v1
         with:
@@ -75,6 +80,11 @@ jobs:
     steps:
       - name: Run checkout
         uses: actions/checkout@v6
+
+      - name: Install protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install toolchain
         uses: dtolnay/rust-toolchain@v1

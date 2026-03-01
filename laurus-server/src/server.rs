@@ -1,34 +1,38 @@
 use std::net::SocketAddr;
 use std::sync::Arc;
 
+use tokio::net::TcpListener;
 use tokio::sync::RwLock;
-use tonic::transport::Server;
+use tonic::transport::{Endpoint, Server};
 use tracing_subscriber::EnvFilter;
 
 use crate::config::Config;
 use crate::context;
+use crate::gateway;
 use crate::proto::laurus::v1::{
-    document_service_server::DocumentServiceServer,
-    health_service_server::HealthServiceServer,
-    index_service_server::IndexServiceServer,
-    search_service_server::SearchServiceServer,
+    document_service_server::DocumentServiceServer, health_service_server::HealthServiceServer,
+    index_service_server::IndexServiceServer, search_service_server::SearchServiceServer,
 };
-use crate::service::{document::DocumentService, health::HealthService, index::IndexService, search::SearchService};
+use crate::service::{
+    document::DocumentService, health::HealthService, index::IndexService, search::SearchService,
+};
 
-/// Run the gRPC server with the given configuration.
+/// Starts the server based on the given configuration.
+///
+/// If `http_port` is configured, both the gRPC server and HTTP Gateway are started concurrently.
+/// Otherwise, only the gRPC server is started.
 pub async fn run(config: &Config) -> anyhow::Result<()> {
     // Initialize tracing.
     tracing_subscriber::fmt()
         .with_env_filter(
-            EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| EnvFilter::new(&config.log.level)),
+            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(&config.log.level)),
         )
         .init();
 
     tracing::info!("Laurus server starting");
     tracing::info!("Data directory: {}", config.index.data_dir.display());
 
-    // Try to open an existing index, or start without one.
+    // Open an existing index. If none exists, start without an index.
     let engine = match context::open_index(&config.index.data_dir).await {
         Ok(engine) => {
             tracing::info!("Opened existing index");
@@ -55,21 +59,51 @@ pub async fn run(config: &Config) -> anyhow::Result<()> {
         engine: engine.clone(),
     };
 
-    let addr: SocketAddr = format!("{}:{}", config.server.host, config.server.port).parse()?;
-    tracing::info!("Listening on {addr}");
+    let grpc_addr: SocketAddr = format!("{}:{}", config.server.host, config.server.port).parse()?;
+    tracing::info!("gRPC server listening on {grpc_addr}");
 
-    Server::builder()
+    let grpc_server = Server::builder()
         .add_service(HealthServiceServer::new(health_service))
         .add_service(DocumentServiceServer::new(document_service))
         .add_service(IndexServiceServer::new(index_service))
-        .add_service(SearchServiceServer::new(search_service))
-        .serve_with_shutdown(addr, shutdown_signal(engine.clone()))
-        .await?;
+        .add_service(SearchServiceServer::new(search_service));
+
+    if let Some(http_port) = config.server.http_port {
+        // Also start the gRPC Gateway (HTTP server) concurrently.
+        let channel = Endpoint::from_shared(format!("http://127.0.0.1:{}", config.server.port))?
+            .connect_lazy();
+        let gateway_state = gateway::GatewayState::new(channel);
+        let router = gateway::create_router(gateway_state);
+
+        let http_addr: SocketAddr = format!("{}:{}", config.server.host, http_port).parse()?;
+        let listener = TcpListener::bind(http_addr).await?;
+        tracing::info!("HTTP gateway listening on {http_addr}");
+
+        // Run the gRPC server and HTTP Gateway concurrently, shutting both down on Ctrl+C.
+        tokio::select! {
+            result = grpc_server.serve(grpc_addr) => {
+                if let Err(e) = result {
+                    tracing::error!("gRPC server error: {e}");
+                }
+            }
+            result = axum::serve(listener, router) => {
+                if let Err(e) = result {
+                    tracing::error!("HTTP gateway error: {e}");
+                }
+            }
+            _ = shutdown_signal(engine.clone()) => {}
+        }
+    } else {
+        // Start only the gRPC server (legacy behavior).
+        grpc_server
+            .serve_with_shutdown(grpc_addr, shutdown_signal(engine.clone()))
+            .await?;
+    }
 
     Ok(())
 }
 
-/// Wait for a shutdown signal (Ctrl+C) and commit before exiting.
+/// Waits for a shutdown signal (Ctrl+C) and commits pending changes before exiting.
 async fn shutdown_signal(engine: Arc<RwLock<Option<laurus::Engine>>>) {
     tokio::signal::ctrl_c()
         .await

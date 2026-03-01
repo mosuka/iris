@@ -8,8 +8,8 @@ use laurus::Engine;
 
 use crate::convert::{error, search as search_convert};
 use crate::proto::laurus::v1::{
-    search_service_server::SearchService as SearchServiceTrait, SearchRequest, SearchResponse,
-    SearchResult,
+    SearchRequest, SearchResponse, SearchResult,
+    search_service_server::SearchService as SearchServiceTrait,
 };
 
 /// gRPC SearchService implementation.
@@ -32,8 +32,14 @@ impl SearchServiceTrait for SearchService {
             .as_ref()
             .ok_or_else(|| Status::failed_precondition("No index is open"))?;
 
-        let results = engine.search(search_request).await.map_err(error::to_status)?;
-        let results: Vec<SearchResult> = results.iter().map(search_convert::result_to_proto).collect();
+        let results = engine
+            .search(search_request)
+            .await
+            .map_err(error::to_status)?;
+        let results: Vec<SearchResult> = results
+            .iter()
+            .map(search_convert::result_to_proto)
+            .collect();
 
         Ok(Response::new(SearchResponse { results }))
     }
@@ -52,7 +58,10 @@ impl SearchServiceTrait for SearchService {
             .as_ref()
             .ok_or_else(|| Status::failed_precondition("No index is open"))?;
 
-        let results = engine.search(search_request).await.map_err(error::to_status)?;
+        let results = engine
+            .search(search_request)
+            .await
+            .map_err(error::to_status)?;
 
         let (tx, rx) = tokio::sync::mpsc::channel(64);
         tokio::spawn(async move {

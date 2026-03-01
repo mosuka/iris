@@ -1,6 +1,7 @@
 pub mod config;
 mod context;
 mod convert;
+pub mod gateway;
 pub mod server;
 mod service;
 

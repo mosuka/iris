@@ -1,8 +1,8 @@
 use tonic::{Request, Response, Status};
 
 use crate::proto::laurus::v1::{
-    self, health_service_server::HealthService as HealthServiceTrait, HealthCheckRequest,
-    HealthCheckResponse,
+    self, HealthCheckRequest, HealthCheckResponse,
+    health_service_server::HealthService as HealthServiceTrait,
 };
 
 /// gRPC HealthService implementation.

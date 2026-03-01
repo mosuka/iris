@@ -1,0 +1,716 @@
+//! Conversion helpers between JSON (`serde_json::Value`) and proto messages.
+
+use std::collections::HashMap;
+
+use serde_json::{Map, Value, json};
+
+use crate::proto::laurus::v1;
+
+// ---------------------------------------------------------------------------
+// Value conversion
+// ---------------------------------------------------------------------------
+
+/// Converts a JSON value to a proto `Value`.
+pub fn json_value_to_proto(json: &Value) -> v1::Value {
+    use v1::value::Kind;
+    let kind = match json {
+        Value::Null => Some(Kind::NullValue(true)),
+        Value::Bool(b) => Some(Kind::BoolValue(*b)),
+        Value::Number(n) => {
+            if let Some(i) = n.as_i64() {
+                Some(Kind::Int64Value(i))
+            } else if let Some(f) = n.as_f64() {
+                Some(Kind::Float64Value(f))
+            } else {
+                Some(Kind::Float64Value(0.0))
+            }
+        }
+        Value::String(s) => Some(Kind::TextValue(s.clone())),
+        Value::Array(arr) => {
+            // Treat numeric arrays as vectors
+            let values: Vec<f32> = arr
+                .iter()
+                .filter_map(|v| v.as_f64().map(|f| f as f32))
+                .collect();
+            if values.len() == arr.len() && !arr.is_empty() {
+                Some(Kind::VectorValue(v1::VectorValue { values }))
+            } else {
+                // Treat non-numeric arrays as text
+                Some(Kind::TextValue(json.to_string()))
+            }
+        }
+        Value::Object(obj) => {
+            // Geo point ({"latitude": ..., "longitude": ...})
+            if let (Some(lat), Some(lon)) = (
+                obj.get("latitude").and_then(|v| v.as_f64()),
+                obj.get("longitude").and_then(|v| v.as_f64()),
+            ) {
+                Some(Kind::GeoValue(v1::GeoPoint {
+                    latitude: lat,
+                    longitude: lon,
+                }))
+            } else {
+                Some(Kind::TextValue(json.to_string()))
+            }
+        }
+    };
+    v1::Value { kind }
+}
+
+/// Converts a proto `Value` to a JSON value.
+pub fn proto_value_to_json(val: &v1::Value) -> Value {
+    use v1::value::Kind;
+    match &val.kind {
+        Some(Kind::NullValue(_)) => Value::Null,
+        Some(Kind::BoolValue(b)) => Value::Bool(*b),
+        Some(Kind::Int64Value(i)) => json!(*i),
+        Some(Kind::Float64Value(f)) => json!(*f),
+        Some(Kind::TextValue(s)) => Value::String(s.clone()),
+        Some(Kind::BytesValue(b)) => {
+            use std::io::Write;
+            let mut buf = Vec::new();
+            // Base64 encode
+            let engine = base64_engine();
+            write!(buf, "{}", base64_encode(&engine, b)).ok();
+            Value::String(String::from_utf8_lossy(&buf).into_owned())
+        }
+        Some(Kind::VectorValue(v)) => Value::Array(v.values.iter().map(|f| json!(*f)).collect()),
+        Some(Kind::DatetimeValue(us)) => {
+            let secs = us / 1_000_000;
+            let nanos = ((us % 1_000_000) * 1_000) as u32;
+            if let Some(dt) = chrono::DateTime::from_timestamp(secs, nanos) {
+                Value::String(dt.to_rfc3339())
+            } else {
+                json!(*us)
+            }
+        }
+        Some(Kind::GeoValue(g)) => {
+            json!({"latitude": g.latitude, "longitude": g.longitude})
+        }
+        None => Value::Null,
+    }
+}
+
+// Base64 helper (standard encoding without external crates)
+fn base64_engine() -> Base64Engine {
+    Base64Engine
+}
+
+struct Base64Engine;
+
+fn base64_encode(_engine: &Base64Engine, data: &[u8]) -> String {
+    // Standard base64 encoding implementation
+    const CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut result = String::new();
+    for chunk in data.chunks(3) {
+        let b0 = chunk[0] as u32;
+        let b1 = if chunk.len() > 1 { chunk[1] as u32 } else { 0 };
+        let b2 = if chunk.len() > 2 { chunk[2] as u32 } else { 0 };
+        let triple = (b0 << 16) | (b1 << 8) | b2;
+        result.push(CHARS[((triple >> 18) & 0x3F) as usize] as char);
+        result.push(CHARS[((triple >> 12) & 0x3F) as usize] as char);
+        if chunk.len() > 1 {
+            result.push(CHARS[((triple >> 6) & 0x3F) as usize] as char);
+        } else {
+            result.push('=');
+        }
+        if chunk.len() > 2 {
+            result.push(CHARS[(triple & 0x3F) as usize] as char);
+        } else {
+            result.push('=');
+        }
+    }
+    result
+}
+
+// ---------------------------------------------------------------------------
+// Document conversion
+// ---------------------------------------------------------------------------
+
+/// Converts a JSON object to a proto `Document`.
+///
+/// Input format: `{"fields": {"field_name": value, ...}}`
+pub fn json_to_proto_document(json: &Value) -> Result<v1::Document, String> {
+    let fields_val = json
+        .get("fields")
+        .ok_or_else(|| "missing \"fields\" key".to_string())?;
+    let fields_obj = fields_val
+        .as_object()
+        .ok_or_else(|| "\"fields\" must be an object".to_string())?;
+
+    let fields: HashMap<String, v1::Value> = fields_obj
+        .iter()
+        .map(|(k, v)| (k.clone(), json_value_to_proto(v)))
+        .collect();
+
+    Ok(v1::Document { fields })
+}
+
+/// Converts a proto `Document` to a JSON value.
+pub fn proto_document_to_json(doc: &v1::Document) -> Value {
+    let fields: Map<String, Value> = doc
+        .fields
+        .iter()
+        .map(|(k, v)| (k.clone(), proto_value_to_json(v)))
+        .collect();
+    json!({ "fields": fields })
+}
+
+// ---------------------------------------------------------------------------
+// Schema conversion
+// ---------------------------------------------------------------------------
+
+/// Converts a JSON object to a proto `Schema`.
+pub fn json_to_proto_schema(json: &Value) -> Result<v1::Schema, String> {
+    let fields_val = json
+        .get("fields")
+        .ok_or_else(|| "missing \"fields\" key in schema".to_string())?;
+    let fields_obj = fields_val
+        .as_object()
+        .ok_or_else(|| "\"fields\" must be an object".to_string())?;
+
+    let mut fields = HashMap::new();
+    for (name, opt_json) in fields_obj {
+        let field_option =
+            json_to_proto_field_option(opt_json).map_err(|e| format!("field \"{name}\": {e}"))?;
+        fields.insert(name.clone(), field_option);
+    }
+
+    let default_fields = json
+        .get("default_fields")
+        .and_then(|v| v.as_array())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                .collect()
+        })
+        .unwrap_or_default();
+
+    Ok(v1::Schema {
+        fields,
+        default_fields,
+    })
+}
+
+/// Converts a proto `Schema` to a JSON value.
+pub fn proto_schema_to_json(schema: &v1::Schema) -> Value {
+    let fields: Map<String, Value> = schema
+        .fields
+        .iter()
+        .map(|(k, v)| (k.clone(), proto_field_option_to_json(v)))
+        .collect();
+    json!({
+        "fields": fields,
+        "default_fields": schema.default_fields,
+    })
+}
+
+// ---------------------------------------------------------------------------
+// FieldOption conversion
+// ---------------------------------------------------------------------------
+
+fn json_to_proto_field_option(json: &Value) -> Result<v1::FieldOption, String> {
+    let obj = json
+        .as_object()
+        .ok_or_else(|| "field option must be an object".to_string())?;
+
+    use v1::field_option::Option as Opt;
+
+    let option = if let Some(v) = obj.get("text") {
+        Opt::Text(v1::TextOption {
+            indexed: v.get("indexed").and_then(|v| v.as_bool()).unwrap_or(false),
+            stored: v.get("stored").and_then(|v| v.as_bool()).unwrap_or(false),
+            term_vectors: v
+                .get("term_vectors")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false),
+        })
+    } else if let Some(v) = obj.get("integer") {
+        Opt::Integer(v1::IntegerOption {
+            indexed: v.get("indexed").and_then(|v| v.as_bool()).unwrap_or(false),
+            stored: v.get("stored").and_then(|v| v.as_bool()).unwrap_or(false),
+        })
+    } else if let Some(v) = obj.get("float") {
+        Opt::Float(v1::FloatOption {
+            indexed: v.get("indexed").and_then(|v| v.as_bool()).unwrap_or(false),
+            stored: v.get("stored").and_then(|v| v.as_bool()).unwrap_or(false),
+        })
+    } else if let Some(v) = obj.get("boolean") {
+        Opt::Boolean(v1::BooleanOption {
+            indexed: v.get("indexed").and_then(|v| v.as_bool()).unwrap_or(false),
+            stored: v.get("stored").and_then(|v| v.as_bool()).unwrap_or(false),
+        })
+    } else if let Some(v) = obj.get("date_time") {
+        Opt::DateTime(v1::DateTimeOption {
+            indexed: v.get("indexed").and_then(|v| v.as_bool()).unwrap_or(false),
+            stored: v.get("stored").and_then(|v| v.as_bool()).unwrap_or(false),
+        })
+    } else if let Some(v) = obj.get("geo") {
+        Opt::Geo(v1::GeoOption {
+            indexed: v.get("indexed").and_then(|v| v.as_bool()).unwrap_or(false),
+            stored: v.get("stored").and_then(|v| v.as_bool()).unwrap_or(false),
+        })
+    } else if let Some(v) = obj.get("bytes") {
+        Opt::Bytes(v1::BytesOption {
+            stored: v.get("stored").and_then(|v| v.as_bool()).unwrap_or(false),
+        })
+    } else if let Some(v) = obj.get("hnsw") {
+        Opt::Hnsw(json_to_hnsw_option(v)?)
+    } else if let Some(v) = obj.get("flat") {
+        Opt::Flat(json_to_flat_option(v)?)
+    } else if let Some(v) = obj.get("ivf") {
+        Opt::Ivf(json_to_ivf_option(v)?)
+    } else {
+        return Err("unknown field option type".to_string());
+    };
+
+    Ok(v1::FieldOption {
+        option: Some(option),
+    })
+}
+
+fn proto_field_option_to_json(opt: &v1::FieldOption) -> Value {
+    use v1::field_option::Option as Opt;
+    match &opt.option {
+        Some(Opt::Text(v)) => json!({
+            "text": {
+                "indexed": v.indexed,
+                "stored": v.stored,
+                "term_vectors": v.term_vectors,
+            }
+        }),
+        Some(Opt::Integer(v)) => json!({
+            "integer": { "indexed": v.indexed, "stored": v.stored }
+        }),
+        Some(Opt::Float(v)) => json!({
+            "float": { "indexed": v.indexed, "stored": v.stored }
+        }),
+        Some(Opt::Boolean(v)) => json!({
+            "boolean": { "indexed": v.indexed, "stored": v.stored }
+        }),
+        Some(Opt::DateTime(v)) => json!({
+            "date_time": { "indexed": v.indexed, "stored": v.stored }
+        }),
+        Some(Opt::Geo(v)) => json!({
+            "geo": { "indexed": v.indexed, "stored": v.stored }
+        }),
+        Some(Opt::Bytes(v)) => json!({
+            "bytes": { "stored": v.stored }
+        }),
+        Some(Opt::Hnsw(v)) => json!({ "hnsw": hnsw_option_to_json(v) }),
+        Some(Opt::Flat(v)) => json!({ "flat": flat_option_to_json(v) }),
+        Some(Opt::Ivf(v)) => json!({ "ivf": ivf_option_to_json(v) }),
+        None => Value::Null,
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Vector field option conversion
+// ---------------------------------------------------------------------------
+
+fn parse_distance_metric(s: &str) -> i32 {
+    match s.to_lowercase().as_str() {
+        "cosine" => v1::DistanceMetric::Cosine as i32,
+        "euclidean" => v1::DistanceMetric::Euclidean as i32,
+        "manhattan" => v1::DistanceMetric::Manhattan as i32,
+        "dot_product" => v1::DistanceMetric::DotProduct as i32,
+        "angular" => v1::DistanceMetric::Angular as i32,
+        _ => v1::DistanceMetric::Cosine as i32,
+    }
+}
+
+fn distance_metric_to_string(val: i32) -> &'static str {
+    match v1::DistanceMetric::try_from(val) {
+        Ok(v1::DistanceMetric::Cosine) => "cosine",
+        Ok(v1::DistanceMetric::Euclidean) => "euclidean",
+        Ok(v1::DistanceMetric::Manhattan) => "manhattan",
+        Ok(v1::DistanceMetric::DotProduct) => "dot_product",
+        Ok(v1::DistanceMetric::Angular) => "angular",
+        Err(_) => "cosine",
+    }
+}
+
+fn json_to_quantizer(json: &Value) -> Option<v1::QuantizationConfig> {
+    let obj = json.as_object()?;
+    let method_str = obj.get("method")?.as_str()?;
+    let method = match method_str.to_lowercase().as_str() {
+        "scalar_8bit" => v1::QuantizationMethod::Scalar8bit as i32,
+        "product_quantization" => v1::QuantizationMethod::ProductQuantization as i32,
+        _ => v1::QuantizationMethod::None as i32,
+    };
+    let subvector_count = obj
+        .get("subvector_count")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(0) as u32;
+    Some(v1::QuantizationConfig {
+        method,
+        subvector_count,
+    })
+}
+
+fn quantizer_to_json(q: &v1::QuantizationConfig) -> Value {
+    let method = match v1::QuantizationMethod::try_from(q.method) {
+        Ok(v1::QuantizationMethod::None) => "none",
+        Ok(v1::QuantizationMethod::Scalar8bit) => "scalar_8bit",
+        Ok(v1::QuantizationMethod::ProductQuantization) => "product_quantization",
+        Err(_) => "none",
+    };
+    json!({
+        "method": method,
+        "subvector_count": q.subvector_count,
+    })
+}
+
+fn json_to_hnsw_option(json: &Value) -> Result<v1::HnswOption, String> {
+    Ok(v1::HnswOption {
+        dimension: json.get("dimension").and_then(|v| v.as_u64()).unwrap_or(0) as u32,
+        distance: json
+            .get("distance")
+            .and_then(|v| v.as_str())
+            .map(parse_distance_metric)
+            .unwrap_or(v1::DistanceMetric::Cosine as i32),
+        m: json.get("m").and_then(|v| v.as_u64()).unwrap_or(0) as u32,
+        ef_construction: json
+            .get("ef_construction")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0) as u32,
+        base_weight: json
+            .get("base_weight")
+            .and_then(|v| v.as_f64())
+            .unwrap_or(0.0) as f32,
+        quantizer: json.get("quantizer").and_then(json_to_quantizer),
+    })
+}
+
+fn json_to_flat_option(json: &Value) -> Result<v1::FlatOption, String> {
+    Ok(v1::FlatOption {
+        dimension: json.get("dimension").and_then(|v| v.as_u64()).unwrap_or(0) as u32,
+        distance: json
+            .get("distance")
+            .and_then(|v| v.as_str())
+            .map(parse_distance_metric)
+            .unwrap_or(v1::DistanceMetric::Cosine as i32),
+        base_weight: json
+            .get("base_weight")
+            .and_then(|v| v.as_f64())
+            .unwrap_or(0.0) as f32,
+        quantizer: json.get("quantizer").and_then(json_to_quantizer),
+    })
+}
+
+fn json_to_ivf_option(json: &Value) -> Result<v1::IvfOption, String> {
+    Ok(v1::IvfOption {
+        dimension: json.get("dimension").and_then(|v| v.as_u64()).unwrap_or(0) as u32,
+        distance: json
+            .get("distance")
+            .and_then(|v| v.as_str())
+            .map(parse_distance_metric)
+            .unwrap_or(v1::DistanceMetric::Cosine as i32),
+        n_clusters: json.get("n_clusters").and_then(|v| v.as_u64()).unwrap_or(0) as u32,
+        n_probe: json.get("n_probe").and_then(|v| v.as_u64()).unwrap_or(0) as u32,
+        base_weight: json
+            .get("base_weight")
+            .and_then(|v| v.as_f64())
+            .unwrap_or(0.0) as f32,
+        quantizer: json.get("quantizer").and_then(json_to_quantizer),
+    })
+}
+
+fn hnsw_option_to_json(opt: &v1::HnswOption) -> Value {
+    let mut obj = json!({
+        "dimension": opt.dimension,
+        "distance": distance_metric_to_string(opt.distance),
+        "m": opt.m,
+        "ef_construction": opt.ef_construction,
+        "base_weight": opt.base_weight,
+    });
+    if let Some(q) = &opt.quantizer {
+        obj["quantizer"] = quantizer_to_json(q);
+    }
+    obj
+}
+
+fn flat_option_to_json(opt: &v1::FlatOption) -> Value {
+    let mut obj = json!({
+        "dimension": opt.dimension,
+        "distance": distance_metric_to_string(opt.distance),
+        "base_weight": opt.base_weight,
+    });
+    if let Some(q) = &opt.quantizer {
+        obj["quantizer"] = quantizer_to_json(q);
+    }
+    obj
+}
+
+fn ivf_option_to_json(opt: &v1::IvfOption) -> Value {
+    let mut obj = json!({
+        "dimension": opt.dimension,
+        "distance": distance_metric_to_string(opt.distance),
+        "n_clusters": opt.n_clusters,
+        "n_probe": opt.n_probe,
+        "base_weight": opt.base_weight,
+    });
+    if let Some(q) = &opt.quantizer {
+        obj["quantizer"] = quantizer_to_json(q);
+    }
+    obj
+}
+
+// ---------------------------------------------------------------------------
+// SearchRequest conversion
+// ---------------------------------------------------------------------------
+
+/// Converts a JSON object to a proto `SearchRequest`.
+pub fn json_to_proto_search_request(json: &Value) -> Result<v1::SearchRequest, String> {
+    let query = json
+        .get("query")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+
+    let query_vectors = json
+        .get("query_vectors")
+        .and_then(|v| v.as_array())
+        .map(|arr| arr.iter().filter_map(json_to_query_vector).collect())
+        .unwrap_or_default();
+
+    let limit = json.get("limit").and_then(|v| v.as_u64()).unwrap_or(10) as u32;
+    let offset = json.get("offset").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
+
+    let fusion = json.get("fusion").and_then(json_to_fusion_algorithm);
+    let lexical_params = json.get("lexical_params").and_then(json_to_lexical_params);
+    let vector_params = json.get("vector_params").and_then(json_to_vector_params);
+
+    let field_boosts = json
+        .get("field_boosts")
+        .and_then(|v| v.as_object())
+        .map(|obj| {
+            obj.iter()
+                .filter_map(|(k, v)| v.as_f64().map(|f| (k.clone(), f as f32)))
+                .collect()
+        })
+        .unwrap_or_default();
+
+    Ok(v1::SearchRequest {
+        query,
+        query_vectors,
+        limit,
+        offset,
+        fusion,
+        lexical_params,
+        vector_params,
+        field_boosts,
+    })
+}
+
+fn json_to_query_vector(json: &Value) -> Option<v1::QueryVector> {
+    let vector = json
+        .get("vector")?
+        .as_array()?
+        .iter()
+        .filter_map(|v| v.as_f64().map(|f| f as f32))
+        .collect();
+    let weight = json.get("weight").and_then(|v| v.as_f64()).unwrap_or(1.0) as f32;
+    let fields = json
+        .get("fields")
+        .and_then(|v| v.as_array())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                .collect()
+        })
+        .unwrap_or_default();
+    Some(v1::QueryVector {
+        vector,
+        weight,
+        fields,
+    })
+}
+
+fn json_to_fusion_algorithm(json: &Value) -> Option<v1::FusionAlgorithm> {
+    use v1::fusion_algorithm::Algorithm;
+    if let Some(rrf) = json.get("rrf") {
+        let k = rrf.get("k").and_then(|v| v.as_f64()).unwrap_or(60.0);
+        Some(v1::FusionAlgorithm {
+            algorithm: Some(Algorithm::Rrf(v1::Rrf { k })),
+        })
+    } else if let Some(ws) = json.get("weighted_sum") {
+        let lexical_weight = ws
+            .get("lexical_weight")
+            .and_then(|v| v.as_f64())
+            .unwrap_or(0.5) as f32;
+        let vector_weight = ws
+            .get("vector_weight")
+            .and_then(|v| v.as_f64())
+            .unwrap_or(0.5) as f32;
+        Some(v1::FusionAlgorithm {
+            algorithm: Some(Algorithm::WeightedSum(v1::WeightedSum {
+                lexical_weight,
+                vector_weight,
+            })),
+        })
+    } else {
+        None
+    }
+}
+
+fn json_to_lexical_params(json: &Value) -> Option<v1::LexicalParams> {
+    let obj = json.as_object()?;
+    Some(v1::LexicalParams {
+        min_score: obj.get("min_score").and_then(|v| v.as_f64()).unwrap_or(0.0) as f32,
+        timeout_ms: obj.get("timeout_ms").and_then(|v| v.as_u64()),
+        parallel: obj
+            .get("parallel")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false),
+        sort_by: obj.get("sort_by").and_then(|v| {
+            let field = v.get("field")?.as_str()?.to_string();
+            let order = match v.get("order").and_then(|o| o.as_str()).unwrap_or("asc") {
+                "desc" => v1::SortOrder::Desc as i32,
+                _ => v1::SortOrder::Asc as i32,
+            };
+            Some(v1::SortSpec { field, order })
+        }),
+    })
+}
+
+fn json_to_vector_params(json: &Value) -> Option<v1::VectorParams> {
+    let obj = json.as_object()?;
+    Some(v1::VectorParams {
+        fields: obj
+            .get("fields")
+            .and_then(|v| v.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                    .collect()
+            })
+            .unwrap_or_default(),
+        score_mode: obj
+            .get("score_mode")
+            .and_then(|v| v.as_str())
+            .map(|s| match s.to_lowercase().as_str() {
+                "max_sim" => v1::VectorScoreMode::MaxSim as i32,
+                "late_interaction" => v1::VectorScoreMode::LateInteraction as i32,
+                _ => v1::VectorScoreMode::WeightedSum as i32,
+            })
+            .unwrap_or(v1::VectorScoreMode::WeightedSum as i32),
+        overfetch: obj.get("overfetch").and_then(|v| v.as_f64()).unwrap_or(0.0) as f32,
+        min_score: obj.get("min_score").and_then(|v| v.as_f64()).unwrap_or(0.0) as f32,
+    })
+}
+
+/// Converts a proto `SearchResult` to a JSON value.
+pub fn proto_search_result_to_json(result: &v1::SearchResult) -> Value {
+    let mut obj = json!({
+        "id": result.id,
+        "score": result.score,
+    });
+    if let Some(doc) = &result.document {
+        obj["document"] = proto_document_to_json(doc);
+    }
+    obj
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_json_value_roundtrip_null() {
+        let json = Value::Null;
+        let proto = json_value_to_proto(&json);
+        let back = proto_value_to_json(&proto);
+        assert_eq!(back, Value::Null);
+    }
+
+    #[test]
+    fn test_json_value_roundtrip_bool() {
+        let json = json!(true);
+        let proto = json_value_to_proto(&json);
+        let back = proto_value_to_json(&proto);
+        assert_eq!(back, json!(true));
+    }
+
+    #[test]
+    fn test_json_value_roundtrip_int() {
+        let json = json!(42);
+        let proto = json_value_to_proto(&json);
+        let back = proto_value_to_json(&proto);
+        assert_eq!(back, json!(42));
+    }
+
+    #[test]
+    fn test_json_value_roundtrip_float() {
+        let json = json!(1.23);
+        let proto = json_value_to_proto(&json);
+        let back = proto_value_to_json(&proto);
+        assert_eq!(back, json!(1.23));
+    }
+
+    #[test]
+    fn test_json_value_roundtrip_text() {
+        let json = json!("hello");
+        let proto = json_value_to_proto(&json);
+        let back = proto_value_to_json(&proto);
+        assert_eq!(back, json!("hello"));
+    }
+
+    #[test]
+    fn test_json_value_roundtrip_vector() {
+        let json = json!([1.0, 2.0, 3.0]);
+        let proto = json_value_to_proto(&json);
+        let back = proto_value_to_json(&proto);
+        assert_eq!(back, json!([1.0, 2.0, 3.0]));
+    }
+
+    #[test]
+    fn test_json_value_roundtrip_geo() {
+        let json = json!({"latitude": 35.6762, "longitude": 139.6503});
+        let proto = json_value_to_proto(&json);
+        let back = proto_value_to_json(&proto);
+        assert_eq!(back["latitude"], json!(35.6762));
+        assert_eq!(back["longitude"], json!(139.6503));
+    }
+
+    #[test]
+    fn test_json_to_proto_document() {
+        let json = json!({
+            "fields": {
+                "title": "hello",
+                "count": 42
+            }
+        });
+        let doc = json_to_proto_document(&json).unwrap();
+        assert_eq!(doc.fields.len(), 2);
+    }
+
+    #[test]
+    fn test_json_to_proto_schema() {
+        let json = json!({
+            "fields": {
+                "title": { "text": { "indexed": true, "stored": true } },
+                "embedding": { "hnsw": { "dimension": 768, "distance": "cosine" } }
+            },
+            "default_fields": ["title"]
+        });
+        let schema = json_to_proto_schema(&json).unwrap();
+        assert_eq!(schema.fields.len(), 2);
+        assert_eq!(schema.default_fields, vec!["title"]);
+    }
+
+    #[test]
+    fn test_json_to_proto_search_request() {
+        let json = json!({
+            "query": "body:test",
+            "limit": 10,
+            "offset": 0,
+            "field_boosts": { "title": 2.0 }
+        });
+        let req = json_to_proto_search_request(&json).unwrap();
+        assert_eq!(req.query, "body:test");
+        assert_eq!(req.limit, 10);
+        assert_eq!(req.offset, 0);
+        assert_eq!(*req.field_boosts.get("title").unwrap(), 2.0);
+    }
+}

@@ -15,6 +15,7 @@ laurus serve [OPTIONS]
 | `--config <PATH>` | `-c` | `LAURUS_CONFIG` | — | Path to a TOML configuration file |
 | `--host <HOST>` | `-H` | `LAURUS_HOST` | `0.0.0.0` | Listen address |
 | `--port <PORT>` | `-p` | `LAURUS_PORT` | `50051` | Listen port |
+| `--http-port <PORT>` | — | `LAURUS_HTTP_PORT` | — | HTTP Gateway port (enables HTTP gateway when set) |
 | `--log-level <LEVEL>` | `-l` | `LAURUS_LOG_LEVEL` | `info` | Log level (`trace`, `debug`, `info`, `warn`, `error`) |
 
 The global `--data-dir` option (env: `LAURUS_DATA_DIR`) specifies the index data directory:
@@ -48,6 +49,7 @@ laurus serve --config config.toml
 [server]
 host = "0.0.0.0"
 port = 50051
+http_port = 8080  # Optional: enables HTTP Gateway
 
 [index]
 data_dir = "./laurus_data"
@@ -86,7 +88,91 @@ When the server receives a shutdown signal (Ctrl+C / SIGINT), it automatically:
 2. Commits any pending changes to the index
 3. Exits cleanly
 
-## Connecting to the Server
+## HTTP Gateway
+
+When `http_port` is set, an HTTP/JSON gateway starts alongside the gRPC server. The gateway proxies HTTP requests to the gRPC server internally:
+
+```text
+User Request (HTTP/JSON) → gRPC Gateway (axum) → gRPC Server (tonic) → Engine
+```
+
+If `http_port` is omitted, only the gRPC server starts (default behavior).
+
+### Starting with HTTP Gateway
+
+```bash
+# Via CLI
+laurus serve --http-port 8080
+
+# Via config file (set http_port in [server] section)
+laurus serve --config config.toml
+
+# Via environment variable
+LAURUS_HTTP_PORT=8080 laurus serve
+```
+
+### HTTP API Endpoints
+
+| Method | Path | gRPC Method |
+| :--- | :--- | :--- |
+| GET | `/v1/health` | `HealthService/Check` |
+| POST | `/v1/index` | `IndexService/CreateIndex` |
+| GET | `/v1/index` | `IndexService/GetIndex` |
+| GET | `/v1/schema` | `IndexService/GetSchema` |
+| PUT | `/v1/documents/:id` | `DocumentService/PutDocument` |
+| POST | `/v1/documents/:id` | `DocumentService/AddDocument` |
+| GET | `/v1/documents/:id` | `DocumentService/GetDocuments` |
+| DELETE | `/v1/documents/:id` | `DocumentService/DeleteDocuments` |
+| POST | `/v1/commit` | `DocumentService/Commit` |
+| POST | `/v1/search` | `SearchService/Search` |
+| POST | `/v1/search/stream` | `SearchService/SearchStream` (SSE) |
+
+### HTTP API Examples
+
+```bash
+# Health check
+curl http://localhost:8080/v1/health
+
+# Create an index
+curl -X POST http://localhost:8080/v1/index \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "schema": {
+      "fields": {
+        "title": {"text": {"indexed": true, "stored": true}},
+        "body": {"text": {"indexed": true, "stored": true}}
+      },
+      "default_fields": ["title", "body"]
+    }
+  }'
+
+# Add a document
+curl -X POST http://localhost:8080/v1/documents/doc1 \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "document": {
+      "fields": {
+        "title": "Hello World",
+        "body": "This is a test document."
+      }
+    }
+  }'
+
+# Commit
+curl -X POST http://localhost:8080/v1/commit
+
+# Search
+curl -X POST http://localhost:8080/v1/search \
+  -H 'Content-Type: application/json' \
+  -d '{"query": "body:test", "limit": 10}'
+
+# Streaming search (SSE)
+curl -N -X POST http://localhost:8080/v1/search/stream \
+  -H 'Content-Type: application/json' \
+  -d '{"query": "body:test", "limit": 10}'
+```
+
+## Connecting via gRPC
 
 Any gRPC client can connect to the server. For quick testing, [grpcurl](https://github.com/fullstorydev/grpcurl) is useful:
 
