@@ -36,4 +36,5 @@ See the sub-sections for detailed documentation:
 
 - [Installation](cli/installation.md) — How to install the CLI
 - [Commands](cli/commands.md) — Full command reference
+- [Schema Format](cli/schema_format.md) — Schema TOML format reference
 - [REPL](cli/repl.md) — Interactive mode

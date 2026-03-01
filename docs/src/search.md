@@ -28,3 +28,11 @@ Combining lexical and vector search for best-of-both-worlds results. Covers:
 - Fusion algorithms (RRF, WeightedSum)
 - Filtered hybrid search
 - Pagination with offset/limit
+
+### [Spelling Correction](search/spelling_correction.md)
+
+Suggest corrections for misspelled query terms. Covers:
+
+- SpellingCorrector and "Did you mean?" features
+- Custom dictionaries and configuration
+- Learning from index terms and user queries

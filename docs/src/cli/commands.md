@@ -34,7 +34,7 @@ laurus create index --schema <FILE>
 
 **Schema file format:**
 
-The schema file follows the same structure as the `Schema` type in the Laurus library. Example:
+The schema file follows the same structure as the `Schema` type in the Laurus library. See [Schema Format Reference](schema_format.md) for full details. Example:
 
 ```toml
 default_fields = ["title", "body"]

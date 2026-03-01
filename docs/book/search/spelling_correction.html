@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Quick Start - Laurus Documentation</title>
+        <title>Spelling Correction - Laurus Documentation</title>
 
 
         <!-- Custom HTML head -->
@@ -178,193 +178,149 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="quick-start"><a class="header" href="#quick-start">Quick Start</a></h1>
-<p>This tutorial walks you through building a complete search engine in 5 steps. By the end, you will be able to index documents and search them by keyword.</p>
-<h2 id="step-1--create-storage"><a class="header" href="#step-1--create-storage">Step 1 — Create Storage</a></h2>
-<p>Storage determines where Laurus persists index data. For development and testing, use <code>MemoryStorage</code>:</p>
+                        <h1 id="spelling-correction"><a class="header" href="#spelling-correction">Spelling Correction</a></h1>
+<p>Laurus includes a built-in spelling correction system that can suggest corrections for misspelled query terms and provide "Did you mean?" functionality.</p>
+<h2 id="overview"><a class="header" href="#overview">Overview</a></h2>
+<p>The spelling corrector uses edit distance (Levenshtein distance) combined with word frequency data to suggest corrections. It supports:</p>
+<ul>
+<li><strong>Word-level suggestions</strong> — correct individual misspelled words</li>
+<li><strong>Auto-correction</strong> — automatically apply high-confidence corrections</li>
+<li><strong>"Did you mean?"</strong> — suggest alternative queries to the user</li>
+<li><strong>Query learning</strong> — improve suggestions by learning from user queries</li>
+<li><strong>Custom dictionaries</strong> — use your own word lists</li>
+</ul>
+<h2 id="basic-usage"><a class="header" href="#basic-usage">Basic Usage</a></h2>
+<h3 id="spellingcorrector"><a class="header" href="#spellingcorrector">SpellingCorrector</a></h3>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use std::sync::Arc;
-use laurus::storage::memory::MemoryStorage;
-use laurus::Storage;
+</span>use laurus::spelling::corrector::SpellingCorrector;
 
-let storage: Arc&lt;dyn Storage&gt; = Arc::new(
-    MemoryStorage::new(Default::default())
-);
-<span class="boring">}</span></code></pre></pre>
-<blockquote>
-<p><strong>Tip:</strong> For production, consider <code>FileStorage</code> (with optional <code>use_mmap</code> for memory-mapped I/O). See <a href="../concepts/storage.html">Storage</a> for details.</p>
-</blockquote>
-<h2 id="step-2--define-a-schema"><a class="header" href="#step-2--define-a-schema">Step 2 — Define a Schema</a></h2>
-<p>A <code>Schema</code> declares the fields in your documents and how each field should be indexed:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use laurus::Schema;
-use laurus::lexical::TextOption;
+// Create a corrector with the built-in English dictionary
+let mut corrector = SpellingCorrector::new();
 
-let schema = Schema::builder()
-    .add_text_field("title", TextOption::default())
-    .add_text_field("body", TextOption::default())
-    .add_default_field("body")  // used when no field is specified in a query
-    .build();
-<span class="boring">}</span></code></pre></pre>
-<p>Each field has a type. Common types include:</p>
-<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Method</th><th style="text-align: left">Field Type</th><th style="text-align: left">Example Values</th></tr></thead><tbody>
-<tr><td style="text-align: left"><code>add_text_field</code></td><td style="text-align: left">Text (full-text searchable)</td><td style="text-align: left"><code>"Hello world"</code></td></tr>
-<tr><td style="text-align: left"><code>add_integer_field</code></td><td style="text-align: left">64-bit integer</td><td style="text-align: left"><code>42</code></td></tr>
-<tr><td style="text-align: left"><code>add_float_field</code></td><td style="text-align: left">64-bit float</td><td style="text-align: left"><code>3.14</code></td></tr>
-<tr><td style="text-align: left"><code>add_boolean_field</code></td><td style="text-align: left">Boolean</td><td style="text-align: left"><code>true</code> / <code>false</code></td></tr>
-<tr><td style="text-align: left"><code>add_datetime_field</code></td><td style="text-align: left">UTC datetime</td><td style="text-align: left"><code>2024-01-15T10:30:00Z</code></td></tr>
-<tr><td style="text-align: left"><code>add_hnsw_field</code></td><td style="text-align: left">Vector (HNSW index)</td><td style="text-align: left"><code>[0.1, 0.2, ...]</code></td></tr>
-<tr><td style="text-align: left"><code>add_flat_field</code></td><td style="text-align: left">Vector (Flat index)</td><td style="text-align: left"><code>[0.1, 0.2, ...]</code></td></tr>
-</tbody></table>
-</div>
-<blockquote>
-<p>See <a href="../concepts/schema_and_fields.html">Schema &amp; Fields</a> for the full list.</p>
-</blockquote>
-<h2 id="step-3--build-an-engine"><a class="header" href="#step-3--build-an-engine">Step 3 — Build an Engine</a></h2>
-<p>The <code>Engine</code> ties storage, schema, and runtime components together:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use laurus::Engine;
+// Correct a query
+let result = corrector.correct("programing langauge");
 
-let engine = Engine::builder(storage, schema)
-    .build()
-    .await?;
-<span class="boring">}</span></code></pre></pre>
-<p>When you only use text fields, the default <code>StandardAnalyzer</code> is used automatically. To customize analysis or add vector embeddings, see <a href="../architecture.html">Architecture</a>.</p>
-<h2 id="step-4--index-documents"><a class="header" href="#step-4--index-documents">Step 4 — Index Documents</a></h2>
-<p>Create documents with the <code>DocumentBuilder</code> and add them to the engine:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use laurus::Document;
-
-// Each document needs a unique external ID (string)
-let doc = Document::builder()
-    .add_text("title", "Introduction to Rust")
-    .add_text("body", "Rust is a systems programming language focused on safety and performance.")
-    .build();
-engine.add_document("doc-1", doc).await?;
-
-let doc = Document::builder()
-    .add_text("title", "Python for Data Science")
-    .add_text("body", "Python is widely used in machine learning and data analysis.")
-    .build();
-engine.add_document("doc-2", doc).await?;
-
-let doc = Document::builder()
-    .add_text("title", "Web Development with JavaScript")
-    .add_text("body", "JavaScript powers interactive web applications and server-side code with Node.js.")
-    .build();
-engine.add_document("doc-3", doc).await?;
-
-// Commit to make documents searchable
-engine.commit().await?;
-<span class="boring">}</span></code></pre></pre>
-<blockquote>
-<p><strong>Important:</strong> Documents are not searchable until <code>commit()</code> is called.</p>
-</blockquote>
-<h2 id="step-5--search"><a class="header" href="#step-5--search">Step 5 — Search</a></h2>
-<p>Use <code>SearchRequestBuilder</code> with a query to search the index:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use laurus::{SearchRequestBuilder, LexicalSearchRequest};
-use laurus::lexical::TermQuery;
-
-// Search for "rust" in the "body" field
-let request = SearchRequestBuilder::new()
-    .lexical_search_request(
-        LexicalSearchRequest::new(
-            Box::new(TermQuery::new("body", "rust"))
-        )
-    )
-    .limit(10)
-    .build();
-
-let results = engine.search(request).await?;
-
-for result in &amp;results {
-    println!("ID: {}, Score: {:.4}", result.id, result.score);
-    if let Some(doc) = &amp;result.document {
-        if let Some(title) = doc.get("title") {
-            println!("  Title: {:?}", title);
-        }
+// Check if suggestions are available
+if result.has_suggestions() {
+    for (word, suggestions) in &amp;result.word_suggestions {
+        println!("'{}' -&gt; {:?}", word, suggestions);
     }
 }
+
+// Get the best corrected query
+if let Some(corrected) = result.query() {
+    println!("Corrected: {}", corrected);
+}
 <span class="boring">}</span></code></pre></pre>
-<h2 id="complete-example"><a class="header" href="#complete-example">Complete Example</a></h2>
-<p>Here is the full program that you can copy, paste, and run:</p>
-<pre><pre class="playground"><code class="language-rust">use std::sync::Arc;
-use laurus::{
-    Document, Engine, LexicalSearchRequest,
-    Result, Schema, SearchRequestBuilder,
+<h3 id="did-you-mean"><a class="header" href="#did-you-mean">"Did You Mean?"</a></h3>
+<p>The <code>DidYouMean</code> wrapper provides a higher-level interface for search UIs:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use laurus::spelling::corrector::{SpellingCorrector, DidYouMean};
+
+let corrector = SpellingCorrector::new();
+let mut did_you_mean = DidYouMean::new(corrector);
+
+if let Some(suggestion) = did_you_mean.suggest("programing") {
+    println!("Did you mean: {}?", suggestion);
+}
+<span class="boring">}</span></code></pre></pre>
+<h2 id="configuration"><a class="header" href="#configuration">Configuration</a></h2>
+<p>Use <code>CorrectorConfig</code> to customize behavior:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use laurus::spelling::corrector::{CorrectorConfig, SpellingCorrector};
+
+let config = CorrectorConfig {
+    max_distance: 2,              // Maximum edit distance (default: 2)
+    max_suggestions: 5,           // Max suggestions per word (default: 5)
+    min_frequency: 1,             // Minimum word frequency threshold (default: 1)
+    auto_correct: false,          // Enable auto-correction (default: false)
+    auto_correct_threshold: 0.8,  // Confidence threshold for auto-correction (default: 0.8)
+    use_index_terms: true,        // Use indexed terms as dictionary (default: true)
+    learn_from_queries: true,     // Learn from user queries (default: true)
 };
-use laurus::lexical::{TextOption, TermQuery};
-use laurus::storage::memory::MemoryStorage;
+<span class="boring">}</span></code></pre></pre>
+<h3 id="configuration-options"><a class="header" href="#configuration-options">Configuration Options</a></h3>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Option</th><th style="text-align: left">Type</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>max_distance</code></td><td style="text-align: left"><code>usize</code></td><td style="text-align: left"><code>2</code></td><td style="text-align: left">Maximum Levenshtein edit distance for candidate suggestions</td></tr>
+<tr><td style="text-align: left"><code>max_suggestions</code></td><td style="text-align: left"><code>usize</code></td><td style="text-align: left"><code>5</code></td><td style="text-align: left">Maximum number of suggestions returned per word</td></tr>
+<tr><td style="text-align: left"><code>min_frequency</code></td><td style="text-align: left"><code>u32</code></td><td style="text-align: left"><code>1</code></td><td style="text-align: left">Minimum frequency a word must have in the dictionary to be suggested</td></tr>
+<tr><td style="text-align: left"><code>auto_correct</code></td><td style="text-align: left"><code>bool</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">When true, automatically apply corrections above the threshold</td></tr>
+<tr><td style="text-align: left"><code>auto_correct_threshold</code></td><td style="text-align: left"><code>f64</code></td><td style="text-align: left"><code>0.8</code></td><td style="text-align: left">Confidence score (0.0–1.0) required for auto-correction</td></tr>
+<tr><td style="text-align: left"><code>use_index_terms</code></td><td style="text-align: left"><code>bool</code></td><td style="text-align: left"><code>true</code></td><td style="text-align: left">Use terms from the search index as dictionary words</td></tr>
+<tr><td style="text-align: left"><code>learn_from_queries</code></td><td style="text-align: left"><code>bool</code></td><td style="text-align: left"><code>true</code></td><td style="text-align: left">Learn new words from user search queries</td></tr>
+</tbody></table>
+</div>
+<h2 id="correctionresult"><a class="header" href="#correctionresult">CorrectionResult</a></h2>
+<p>The <code>correct()</code> method returns a <code>CorrectionResult</code> with detailed information:</p>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Field</th><th style="text-align: left">Type</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>original</code></td><td style="text-align: left"><code>String</code></td><td style="text-align: left">The original query string</td></tr>
+<tr><td style="text-align: left"><code>corrected</code></td><td style="text-align: left"><code>Option&lt;String&gt;</code></td><td style="text-align: left">The corrected query (if auto-correction was applied)</td></tr>
+<tr><td style="text-align: left"><code>word_suggestions</code></td><td style="text-align: left"><code>HashMap&lt;String, Vec&lt;Suggestion&gt;&gt;</code></td><td style="text-align: left">Suggestions grouped by misspelled word</td></tr>
+<tr><td style="text-align: left"><code>confidence</code></td><td style="text-align: left"><code>f64</code></td><td style="text-align: left">Overall confidence score (0.0–1.0)</td></tr>
+<tr><td style="text-align: left"><code>auto_corrected</code></td><td style="text-align: left"><code>bool</code></td><td style="text-align: left">Whether auto-correction was applied</td></tr>
+</tbody></table>
+</div>
+<h3 id="helper-methods"><a class="header" href="#helper-methods">Helper Methods</a></h3>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Method</th><th style="text-align: left">Returns</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>has_suggestions()</code></td><td style="text-align: left"><code>bool</code></td><td style="text-align: left">True if any word has suggestions</td></tr>
+<tr><td style="text-align: left"><code>best_suggestion()</code></td><td style="text-align: left"><code>Option&lt;&amp;Suggestion&gt;</code></td><td style="text-align: left">The single highest-scoring suggestion</td></tr>
+<tr><td style="text-align: left"><code>query()</code></td><td style="text-align: left"><code>Option&lt;String&gt;</code></td><td style="text-align: left">The corrected query string, if corrections were made</td></tr>
+<tr><td style="text-align: left"><code>should_show_did_you_mean()</code></td><td style="text-align: left"><code>bool</code></td><td style="text-align: left">Whether to display a "Did you mean?" prompt</td></tr>
+</tbody></table>
+</div>
+<h2 id="custom-dictionaries"><a class="header" href="#custom-dictionaries">Custom Dictionaries</a></h2>
+<p>You can provide your own dictionary instead of using the built-in English one:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use laurus::spelling::corrector::SpellingCorrector;
+use laurus::spelling::dictionary::SpellingDictionary;
 
-#[tokio::main]
-async fn main() -&gt; Result&lt;()&gt; {
-    // 1. Storage
-    let storage = Arc::new(MemoryStorage::new(Default::default()));
+// Build a custom dictionary
+let mut dictionary = SpellingDictionary::new();
+dictionary.add_word("elasticsearch", 100);
+dictionary.add_word("lucene", 80);
+dictionary.add_word("laurus", 90);
 
-    // 2. Schema
-    let schema = Schema::builder()
-        .add_text_field("title", TextOption::default())
-        .add_text_field("body", TextOption::default())
-        .add_default_field("body")
-        .build();
+let corrector = SpellingCorrector::with_dictionary(dictionary);
+<span class="boring">}</span></code></pre></pre>
+<h2 id="learning-from-index-terms"><a class="header" href="#learning-from-index-terms">Learning from Index Terms</a></h2>
+<p>When <code>use_index_terms</code> is enabled, the corrector can learn from terms in your search index:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let mut corrector = SpellingCorrector::new();
 
-    // 3. Engine
-    let engine = Engine::builder(storage, schema).build().await?;
-
-    // 4. Index documents
-    for (id, title, body) in [
-        ("doc-1", "Introduction to Rust", "Rust is a systems programming language focused on safety."),
-        ("doc-2", "Python for Data Science", "Python is widely used in machine learning."),
-        ("doc-3", "Web Development", "JavaScript powers interactive web applications."),
-    ] {
-        let doc = Document::builder()
-            .add_text("title", title)
-            .add_text("body", body)
-            .build();
-        engine.add_document(id, doc).await?;
-    }
-    engine.commit().await?;
-
-    // 5. Search
-    let request = SearchRequestBuilder::new()
-        .lexical_search_request(
-            LexicalSearchRequest::new(
-                Box::new(TermQuery::new("body", "rust"))
-            )
-        )
-        .limit(10)
-        .build();
-
-    let results = engine.search(request).await?;
-    for r in &amp;results {
-        println!("{}: score={:.4}", r.id, r.score);
-    }
-
-    Ok(())
-}</code></pre></pre>
+// Feed index terms to the corrector
+let index_terms = vec!["rust", "programming", "search", "engine"];
+corrector.learn_from_terms(&amp;index_terms);
+<span class="boring">}</span></code></pre></pre>
+<p>This improves suggestion quality by incorporating domain-specific vocabulary.</p>
+<h2 id="statistics"><a class="header" href="#statistics">Statistics</a></h2>
+<p>Monitor the corrector's state with <code>stats()</code>:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let stats = corrector.stats();
+println!("Dictionary words: {}", stats.dictionary_words);
+println!("Total frequency: {}", stats.dictionary_total_frequency);
+println!("Learned queries: {}", stats.queries_learned);
+<span class="boring">}</span></code></pre></pre>
 <h2 id="next-steps"><a class="header" href="#next-steps">Next Steps</a></h2>
 <ul>
-<li>Learn how the Engine works internally: <a href="../architecture.html">Architecture</a></li>
-<li>Understand Schema and field types: <a href="../concepts/schema_and_fields.html">Schema &amp; Fields</a></li>
-<li>Add vector search: <a href="../search/vector_search.html">Vector Search</a></li>
-<li>Combine lexical + vector: <a href="../search/hybrid_search.html">Hybrid Search</a></li>
+<li><a href="lexical_search.html">Lexical Search</a> — full-text search with query types</li>
+<li><a href="../advanced/query_dsl.html">Query DSL</a> — human-readable query syntax</li>
 </ul>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="../getting_started/installation.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../search/hybrid_search.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <i class="fa fa-angle-left"></i>
                             </a>
 
-                            <a rel="next prefetch" href="../concepts.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="../cli.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <i class="fa fa-angle-right"></i>
                             </a>
 
@@ -374,11 +330,11 @@ async fn main() -&gt; Result&lt;()&gt; {
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="../getting_started/installation.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="../search/hybrid_search.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <i class="fa fa-angle-left"></i>
                     </a>
 
-                    <a rel="next prefetch" href="../concepts.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="../cli.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <i class="fa fa-angle-right"></i>
                     </a>
             </nav>

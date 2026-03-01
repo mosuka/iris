@@ -22,3 +22,15 @@ How Laurus ensures data durability through Write-Ahead Logging (WAL) and the com
 ### [Deletions & Compaction](advanced/deletions.md)
 
 How documents are deleted (logical deletion via bitmaps) and how space is reclaimed (compaction).
+
+### [Error Handling](advanced/error_handling.md)
+
+Understanding `LaurusError` and `Result<T>` for robust application development. Covers all error variants, matching patterns, and common error scenarios.
+
+### [Extensibility](advanced/extensibility.md)
+
+Implementing custom components by extending Laurus's trait-based abstractions:
+
+- Custom `Analyzer` for text analysis
+- Custom `Embedder` for vector embeddings
+- Custom `Storage` for new backends

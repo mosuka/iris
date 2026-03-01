@@ -16,9 +16,12 @@ The central coordinator for all indexing and search operations.
 | `engine.put_document(id, doc).await?` | Upsert a document (replace if ID exists) |
 | `engine.add_document(id, doc).await?` | Add a document as a chunk (multiple chunks can share an ID) |
 | `engine.delete_documents(id).await?` | Delete all documents/chunks by external ID |
+| `engine.get_documents(id).await?` | Get all documents/chunks by external ID |
 | `engine.search(request).await?` | Execute a search request |
 | `engine.commit().await?` | Flush all pending changes to storage |
 | `engine.stats()?` | Get index statistics |
+
+> **`put_document` vs `add_document`:** `put_document` performs an upsert — if a document with the same external ID already exists, it is deleted and replaced. `add_document` always appends, allowing multiple document chunks to share the same external ID. See [Schema & Fields — Indexing Documents](concepts/schema_and_fields.md#indexing-documents) for details.
 
 ### EngineBuilder
 

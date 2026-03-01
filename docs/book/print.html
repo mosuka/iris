@@ -540,200 +540,6 @@ async fn main() -&gt; Result&lt;()&gt; {
 <li>Add vector search: <a href="getting_started/../search/vector_search.html">Vector Search</a></li>
 <li>Combine lexical + vector: <a href="getting_started/../search/hybrid_search.html">Hybrid Search</a></li>
 </ul>
-<div style="break-before: page; page-break-before: always;"></div><h1 id="architecture"><a class="header" href="#architecture">Architecture</a></h1>
-<p>This page explains how Laurus is structured internally. Understanding the architecture will help you make better decisions about schema design, analyzer selection, and search strategies.</p>
-<h2 id="high-level-overview"><a class="header" href="#high-level-overview">High-Level Overview</a></h2>
-<p>Laurus is organized around a single <code>Engine</code> that coordinates four internal components:</p>
-<pre><code class="language-mermaid">graph TB
-    subgraph Engine
-        SCH["Schema"]
-        LS["LexicalStore\n(Inverted Index)"]
-        VS["VectorStore\n(HNSW / Flat / IVF)"]
-        DL["DocumentLog\n(WAL + Document Storage)"]
-    end
-
-    Storage["Storage (trait)\nMemory / File / File+Mmap"]
-
-    LS --- Storage
-    VS --- Storage
-    DL --- Storage
-</code></pre>
-<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Component</th><th style="text-align: left">Responsibility</th></tr></thead><tbody>
-<tr><td style="text-align: left"><strong>Schema</strong></td><td style="text-align: left">Declares fields and their types; determines how each field is routed</td></tr>
-<tr><td style="text-align: left"><strong>LexicalStore</strong></td><td style="text-align: left">Inverted index for keyword search (BM25 scoring)</td></tr>
-<tr><td style="text-align: left"><strong>VectorStore</strong></td><td style="text-align: left">Vector index for similarity search (Flat, HNSW, or IVF)</td></tr>
-<tr><td style="text-align: left"><strong>DocumentLog</strong></td><td style="text-align: left">Write-ahead log (WAL) for durability + raw document storage</td></tr>
-</tbody></table>
-</div>
-<p>All three stores share a single <code>Storage</code> backend, isolated by key prefixes (<code>lexical/</code>, <code>vector/</code>, <code>documents/</code>).</p>
-<h2 id="engine-lifecycle"><a class="header" href="#engine-lifecycle">Engine Lifecycle</a></h2>
-<h3 id="building-an-engine"><a class="header" href="#building-an-engine">Building an Engine</a></h3>
-<p>The <code>EngineBuilder</code> assembles the engine from its parts:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>let engine = Engine::builder(storage, schema)
-    .analyzer(analyzer)      // optional: for text fields
-    .embedder(embedder)      // optional: for vector fields
-    .build()
-    .await?;
-<span class="boring">}</span></code></pre></pre>
-<pre><code class="language-mermaid">sequenceDiagram
-    participant User
-    participant EngineBuilder
-    participant Engine
-
-    User-&gt;&gt;EngineBuilder: new(storage, schema)
-    User-&gt;&gt;EngineBuilder: .analyzer(analyzer)
-    User-&gt;&gt;EngineBuilder: .embedder(embedder)
-    User-&gt;&gt;EngineBuilder: .build().await
-    EngineBuilder-&gt;&gt;EngineBuilder: split_schema()
-    Note over EngineBuilder: Separate fields into\nLexicalIndexConfig\n+ VectorIndexConfig
-    EngineBuilder-&gt;&gt;Engine: Create LexicalStore
-    EngineBuilder-&gt;&gt;Engine: Create VectorStore
-    EngineBuilder-&gt;&gt;Engine: Create DocumentLog
-    EngineBuilder-&gt;&gt;Engine: Recover from WAL
-    EngineBuilder--&gt;&gt;User: Engine ready
-</code></pre>
-<p>During <code>build()</code>, the engine:</p>
-<ol>
-<li><strong>Splits the schema</strong> — lexical fields go to <code>LexicalIndexConfig</code>, vector fields go to <code>VectorIndexConfig</code></li>
-<li><strong>Creates prefixed storage</strong> — each component gets an isolated namespace (<code>lexical/</code>, <code>vector/</code>, <code>documents/</code>)</li>
-<li><strong>Initializes stores</strong> — <code>LexicalStore</code> and <code>VectorStore</code> are constructed with their configs</li>
-<li><strong>Recovers from WAL</strong> — replays any uncommitted operations from a previous session</li>
-</ol>
-<h3 id="schema-splitting"><a class="header" href="#schema-splitting">Schema Splitting</a></h3>
-<p>The <code>Schema</code> contains both lexical and vector fields. At build time, <code>split_schema()</code> separates them:</p>
-<pre><code class="language-mermaid">graph LR
-    S["Schema\ntitle: Text\nbody: Text\ncategory: Text\npage: Integer\ncontent_vec: HNSW"]
-
-    S --&gt; LC["LexicalIndexConfig\ntitle: TextOption\nbody: TextOption\ncategory: TextOption\npage: IntegerOption\n_id: KeywordAnalyzer"]
-
-    S --&gt; VC["VectorIndexConfig\ncontent_vec: HnswOption\n(dim=384, m=16, ef=200)"]
-</code></pre>
-<p>Key details:</p>
-<ul>
-<li>The reserved <code>_id</code> field is always added to the lexical config with <code>KeywordAnalyzer</code> (exact match)</li>
-<li>A <code>PerFieldAnalyzer</code> wraps per-field analyzer settings; if you pass a simple <code>StandardAnalyzer</code>, it becomes the default for all text fields</li>
-<li>A <code>PerFieldEmbedder</code> works the same way for vector fields</li>
-</ul>
-<h2 id="indexing-data-flow"><a class="header" href="#indexing-data-flow">Indexing Data Flow</a></h2>
-<p>When you call <code>engine.add_document(id, doc)</code>:</p>
-<pre><code class="language-mermaid">sequenceDiagram
-    participant User
-    participant Engine
-    participant WAL as DocumentLog (WAL)
-    participant Lexical as LexicalStore
-    participant Vector as VectorStore
-
-    User-&gt;&gt;Engine: add_document("doc-1", doc)
-    Engine-&gt;&gt;WAL: Append to WAL
-    Engine-&gt;&gt;Engine: Assign internal ID (u64)
-
-    loop For each field in document
-        alt Lexical field (text, integer, etc.)
-            Engine-&gt;&gt;Lexical: Analyze + index field
-        else Vector field
-            Engine-&gt;&gt;Vector: Embed + index field
-        end
-    end
-
-    Note over Engine: Document is buffered\nbut NOT yet searchable
-
-    User-&gt;&gt;Engine: commit()
-    Engine-&gt;&gt;Lexical: Flush segments to storage
-    Engine-&gt;&gt;Vector: Flush segments to storage
-    Engine-&gt;&gt;WAL: Truncate WAL
-    Note over Engine: Documents are\nnow searchable
-</code></pre>
-<p>Key points:</p>
-<ul>
-<li><strong>WAL-first</strong>: every write is logged before modifying in-memory structures</li>
-<li><strong>Dual indexing</strong>: each field is routed to either the lexical or vector store based on the schema</li>
-<li><strong>Commit required</strong>: documents become searchable only after <code>commit()</code></li>
-</ul>
-<h2 id="search-data-flow"><a class="header" href="#search-data-flow">Search Data Flow</a></h2>
-<p>When you call <code>engine.search(request)</code>:</p>
-<pre><code class="language-mermaid">sequenceDiagram
-    participant User
-    participant Engine
-    participant Lexical as LexicalStore
-    participant Vector as VectorStore
-    participant Fusion
-
-    User-&gt;&gt;Engine: search(request)
-
-    opt Filter query present
-        Engine-&gt;&gt;Lexical: Execute filter query
-        Lexical--&gt;&gt;Engine: Allowed document IDs
-    end
-
-    par Lexical search
-        Engine-&gt;&gt;Lexical: Execute lexical query
-        Lexical--&gt;&gt;Engine: Ranked hits (BM25)
-    and Vector search
-        Engine-&gt;&gt;Vector: Execute vector query
-        Vector--&gt;&gt;Engine: Ranked hits (similarity)
-    end
-
-    alt Both lexical and vector results
-        Engine-&gt;&gt;Fusion: Fuse results (RRF or WeightedSum)
-        Fusion--&gt;&gt;Engine: Merged ranked list
-    end
-
-    Engine-&gt;&gt;Engine: Apply offset + limit
-    Engine--&gt;&gt;User: Vec of SearchResult
-</code></pre>
-<p>The search pipeline has three stages:</p>
-<ol>
-<li><strong>Filter</strong> (optional) — execute a filter query on the lexical index to get a set of allowed document IDs</li>
-<li><strong>Search</strong> — run lexical and/or vector queries in parallel</li>
-<li><strong>Fusion</strong> — if both query types are present, merge results using RRF (default, k=60) or WeightedSum</li>
-</ol>
-<h2 id="storage-architecture"><a class="header" href="#storage-architecture">Storage Architecture</a></h2>
-<p>All components share a single <code>Storage</code> trait implementation, but use key prefixes to isolate their data:</p>
-<pre><code class="language-mermaid">graph TB
-    Engine --&gt; PS1["PrefixedStorage\nprefix: 'lexical/'"]
-    Engine --&gt; PS2["PrefixedStorage\nprefix: 'vector/'"]
-    Engine --&gt; PS3["PrefixedStorage\nprefix: 'documents/'"]
-
-    PS1 --&gt; S["Storage Backend\n(Memory / File / File+Mmap)"]
-    PS2 --&gt; S
-    PS3 --&gt; S
-</code></pre>
-<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Backend</th><th style="text-align: left">Description</th><th style="text-align: left">Best For</th></tr></thead><tbody>
-<tr><td style="text-align: left"><code>MemoryStorage</code></td><td style="text-align: left">All data in memory</td><td style="text-align: left">Testing, small datasets, ephemeral use</td></tr>
-<tr><td style="text-align: left"><code>FileStorage</code></td><td style="text-align: left">Standard file I/O</td><td style="text-align: left">General production use</td></tr>
-<tr><td style="text-align: left"><code>FileStorage</code> (mmap)</td><td style="text-align: left">Memory-mapped files (<code>use_mmap = true</code>)</td><td style="text-align: left">Large datasets, read-heavy workloads</td></tr>
-</tbody></table>
-</div>
-<h2 id="per-field-dispatch"><a class="header" href="#per-field-dispatch">Per-Field Dispatch</a></h2>
-<p>When a <code>PerFieldAnalyzer</code> is provided, the engine dispatches analysis to field-specific analyzers. The same pattern applies to <code>PerFieldEmbedder</code>.</p>
-<pre><code class="language-mermaid">graph LR
-    PFA["PerFieldAnalyzer"]
-    PFA --&gt;|"title"| KA["KeywordAnalyzer"]
-    PFA --&gt;|"body"| SA["StandardAnalyzer"]
-    PFA --&gt;|"description"| JA["JapaneseAnalyzer"]
-    PFA --&gt;|"_id"| KA2["KeywordAnalyzer\n(always)"]
-    PFA --&gt;|other fields| DEF["Default Analyzer\n(StandardAnalyzer)"]
-</code></pre>
-<p>This allows different fields to use different analysis strategies within the same engine.</p>
-<h2 id="summary"><a class="header" href="#summary">Summary</a></h2>
-<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Aspect</th><th style="text-align: left">Detail</th></tr></thead><tbody>
-<tr><td style="text-align: left"><strong>Core struct</strong></td><td style="text-align: left"><code>Engine</code> — coordinates all operations</td></tr>
-<tr><td style="text-align: left"><strong>Builder</strong></td><td style="text-align: left"><code>EngineBuilder</code> — assembles Engine from Storage + Schema + Analyzer + Embedder</td></tr>
-<tr><td style="text-align: left"><strong>Schema split</strong></td><td style="text-align: left">Lexical fields → <code>LexicalIndexConfig</code>, Vector fields → <code>VectorIndexConfig</code></td></tr>
-<tr><td style="text-align: left"><strong>Write path</strong></td><td style="text-align: left">WAL → in-memory buffers → <code>commit()</code> → persistent storage</td></tr>
-<tr><td style="text-align: left"><strong>Read path</strong></td><td style="text-align: left">Query → parallel lexical/vector search → fusion → ranked results</td></tr>
-<tr><td style="text-align: left"><strong>Storage isolation</strong></td><td style="text-align: left"><code>PrefixedStorage</code> with <code>lexical/</code>, <code>vector/</code>, <code>documents/</code> prefixes</td></tr>
-<tr><td style="text-align: left"><strong>Per-field dispatch</strong></td><td style="text-align: left"><code>PerFieldAnalyzer</code> and <code>PerFieldEmbedder</code> route to field-specific implementations</td></tr>
-</tbody></table>
-</div>
-<h2 id="next-steps-1"><a class="header" href="#next-steps-1">Next Steps</a></h2>
-<ul>
-<li>Understand field types and schema design: <a href="concepts/schema_and_fields.html">Schema &amp; Fields</a></li>
-<li>Learn about text analysis: <a href="concepts/analysis.html">Text Analysis</a></li>
-<li>Learn about embeddings: <a href="concepts/embedding.html">Embeddings</a></li>
-</ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="core-concepts"><a class="header" href="#core-concepts">Core Concepts</a></h1>
 <p>This section covers the foundational building blocks of Laurus. Understanding these concepts will help you design effective schemas and configure your search engine.</p>
 <h2 id="topics"><a class="header" href="#topics">Topics</a></h2>
@@ -771,6 +577,9 @@ async fn main() -&gt; Result&lt;()&gt; {
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="schema--fields-1"><a class="header" href="#schema--fields-1">Schema &amp; Fields</a></h1>
 <p>The <code>Schema</code> defines the structure of your documents — what fields exist and how each field is indexed. It is the single source of truth for the Engine.</p>
+<blockquote>
+<p>For the TOML file format used by the CLI, see <a href="concepts/../cli/schema_format.html">Schema Format Reference</a>.</p>
+</blockquote>
 <h2 id="schema"><a class="header" href="#schema">Schema</a></h2>
 <p>A <code>Schema</code> is a collection of named fields. Each field is either a <strong>lexical field</strong> (for keyword search) or a <strong>vector field</strong> (for similarity search).</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
@@ -793,20 +602,18 @@ let schema = Schema::builder()
 <h2 id="field-types"><a class="header" href="#field-types">Field Types</a></h2>
 <pre><code class="language-mermaid">graph TB
     FO["FieldOption"]
-    FO --&gt; LEX["Lexical"]
-    FO --&gt; VEC["Vector"]
 
-    LEX --&gt; T["Text"]
-    LEX --&gt; I["Integer"]
-    LEX --&gt; FL["Float"]
-    LEX --&gt; B["Boolean"]
-    LEX --&gt; DT["DateTime"]
-    LEX --&gt; G["Geo"]
-    LEX --&gt; BY["Bytes"]
+    FO --&gt; T["Text"]
+    FO --&gt; I["Integer"]
+    FO --&gt; FL["Float"]
+    FO --&gt; B["Boolean"]
+    FO --&gt; DT["DateTime"]
+    FO --&gt; G["Geo"]
+    FO --&gt; BY["Bytes"]
 
-    VEC --&gt; FLAT["Flat"]
-    VEC --&gt; HNSW["HNSW"]
-    VEC --&gt; IVF["IVF"]
+    FO --&gt; FLAT["Flat"]
+    FO --&gt; HNSW["HNSW"]
+    FO --&gt; IVF["IVF"]
 </code></pre>
 <h3 id="lexical-fields"><a class="header" href="#lexical-fields">Lexical Fields</a></h3>
 <p>Lexical fields are indexed using an inverted index and support keyword-based queries.</p>
@@ -879,6 +686,54 @@ let doc = Document::builder()
     .add_boolean("published", true)
     .build();
 <span class="boring">}</span></code></pre></pre>
+<h3 id="indexing-documents"><a class="header" href="#indexing-documents">Indexing Documents</a></h3>
+<p>The <code>Engine</code> provides two methods for adding documents, each with different semantics:</p>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Method</th><th style="text-align: left">Behavior</th><th style="text-align: left">Use Case</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>put_document(id, doc)</code></td><td style="text-align: left"><strong>Upsert</strong> — if a document with the same ID exists, it is replaced</td><td style="text-align: left">Standard document indexing</td></tr>
+<tr><td style="text-align: left"><code>add_document(id, doc)</code></td><td style="text-align: left"><strong>Append</strong> — adds the document as a new chunk; multiple chunks can share the same ID</td><td style="text-align: left">Chunked/split documents (e.g., long articles split into paragraphs)</td></tr>
+</tbody></table>
+</div>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Upsert: replaces any existing document with id "doc1"
+engine.put_document("doc1", doc).await?;
+
+// Append: adds another chunk under the same id "doc1"
+engine.add_document("doc1", chunk2).await?;
+
+// Always commit after indexing
+engine.commit().await?;
+<span class="boring">}</span></code></pre></pre>
+<h3 id="retrieving-documents"><a class="header" href="#retrieving-documents">Retrieving Documents</a></h3>
+<p>Use <code>get_documents</code> to retrieve all documents (including chunks) by external ID:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let docs = engine.get_documents("doc1").await?;
+for doc in &amp;docs {
+    if let Some(title) = doc.get("title") {
+        println!("Title: {:?}", title);
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="deleting-documents"><a class="header" href="#deleting-documents">Deleting Documents</a></h3>
+<p>Delete all documents and chunks sharing an external ID:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>engine.delete_documents("doc1").await?;
+engine.commit().await?;
+<span class="boring">}</span></code></pre></pre>
+<h3 id="document-lifecycle"><a class="header" href="#document-lifecycle">Document Lifecycle</a></h3>
+<pre><code class="language-mermaid">graph LR
+    A["Build Document"] --&gt; B["put/add_document()"]
+    B --&gt; C["WAL"]
+    C --&gt; D["commit()"]
+    D --&gt; E["Searchable"]
+    E --&gt; F["get_documents()"]
+    E --&gt; G["delete_documents()"]
+</code></pre>
+<blockquote>
+<p><strong>Important:</strong> Documents are not searchable until <code>commit()</code> is called.</p>
+</blockquote>
 <h3 id="documentbuilder-methods"><a class="header" href="#documentbuilder-methods">DocumentBuilder Methods</a></h3>
 <div class="table-wrapper"><table><thead><tr><th style="text-align: left">Method</th><th style="text-align: left">Value Type</th><th style="text-align: left">Description</th></tr></thead><tbody>
 <tr><td style="text-align: left"><code>add_text(name, value)</code></td><td style="text-align: left"><code>String</code></td><td style="text-align: left">Add a text field</td></tr>
@@ -934,6 +789,9 @@ let v: DataValue = vec![0.1f32, 0.2].into(); // Vector
 </li>
 <li>
 <p><strong>Set default fields</strong> — if you use the Query DSL, set default fields so users can write <code>hello</code> instead of <code>body:hello</code>.</p>
+</li>
+<li>
+<p><strong>Use the schema generator</strong> — run <code>laurus create schema</code> to interactively build a schema TOML file instead of writing it by hand. See <a href="concepts/../cli/commands.html#create-schema">CLI Commands</a>.</p>
 </li>
 </ol>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="text-analysis-1"><a class="header" href="#text-analysis-1">Text Analysis</a></h1>
@@ -1503,7 +1361,7 @@ let storage = StorageFactory::create(
 <li><strong>Production (general)</strong>: Use <code>FileStorage</code> for reliable persistence</li>
 <li><strong>Production (large scale)</strong>: Use <code>FileStorage</code> with <code>use_mmap = true</code> when you have large indexes and want to leverage OS page cache</li>
 </ul>
-<h2 id="next-steps-2"><a class="header" href="#next-steps-2">Next Steps</a></h2>
+<h2 id="next-steps-1"><a class="header" href="#next-steps-1">Next Steps</a></h2>
 <ul>
 <li>Learn how the lexical index works: <a href="concepts/../indexing/lexical_indexing.html">Lexical Indexing</a></li>
 <li>Learn how the vector index works: <a href="concepts/../indexing/vector_indexing.html">Vector Indexing</a></li>
@@ -1680,7 +1538,7 @@ async fn main() -&gt; laurus::Result&lt;()&gt; {
 
     Ok(())
 }</code></pre></pre>
-<h2 id="next-steps-3"><a class="header" href="#next-steps-3">Next Steps</a></h2>
+<h2 id="next-steps-2"><a class="header" href="#next-steps-2">Next Steps</a></h2>
 <ul>
 <li>Learn how vector indexes work: <a href="indexing/vector_indexing.html">Vector Indexing</a></li>
 <li>Run queries against the lexical index: <a href="indexing/../search/lexical_search.html">Lexical Search</a></li>
@@ -1928,7 +1786,7 @@ async fn main() -&gt; laurus::Result&lt;()&gt; {
 
     Ok(())
 }</code></pre></pre>
-<h2 id="next-steps-4"><a class="header" href="#next-steps-4">Next Steps</a></h2>
+<h2 id="next-steps-3"><a class="header" href="#next-steps-3">Next Steps</a></h2>
 <ul>
 <li>Search the vector index: <a href="indexing/../search/vector_search.html">Vector Search</a></li>
 <li>Combine with lexical search: <a href="indexing/../search/hybrid_search.html">Hybrid Search</a></li>
@@ -1957,6 +1815,13 @@ async fn main() -&gt; laurus::Result&lt;()&gt; {
 <li>Fusion algorithms (RRF, WeightedSum)</li>
 <li>Filtered hybrid search</li>
 <li>Pagination with offset/limit</li>
+</ul>
+<h3 id="spelling-correction"><a class="header" href="#spelling-correction"><a href="search/spelling_correction.html">Spelling Correction</a></a></h3>
+<p>Suggest corrections for misspelled query terms. Covers:</p>
+<ul>
+<li>SpellingCorrector and "Did you mean?" features</li>
+<li>Custom dictionaries and configuration</li>
+<li>Learning from index terms and user queries</li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="lexical-search-1"><a class="header" href="#lexical-search-1">Lexical Search</a></h1>
 <p>Lexical search finds documents by matching keywords against an inverted index. Laurus provides a rich set of query types that cover exact matching, phrase matching, fuzzy matching, and more.</p>
@@ -2203,7 +2068,7 @@ let query = parser.parse("programing~2")?;
 let query = parser.parse("year:[2020 TO 2024]")?;
 <span class="boring">}</span></code></pre></pre>
 <p>See <a href="search/../advanced/query_dsl.html">Query DSL</a> for the complete syntax reference.</p>
-<h2 id="next-steps-5"><a class="header" href="#next-steps-5">Next Steps</a></h2>
+<h2 id="next-steps-4"><a class="header" href="#next-steps-4">Next Steps</a></h2>
 <ul>
 <li>Semantic similarity search: <a href="search/vector_search.html">Vector Search</a></li>
 <li>Combine lexical + vector: <a href="search/hybrid_search.html">Hybrid Search</a></li>
@@ -2404,7 +2269,7 @@ async fn main() -&gt; laurus::Result&lt;()&gt; {
 
     Ok(())
 }</code></pre></pre>
-<h2 id="next-steps-6"><a class="header" href="#next-steps-6">Next Steps</a></h2>
+<h2 id="next-steps-5"><a class="header" href="#next-steps-5">Next Steps</a></h2>
 <ul>
 <li>Combine with keyword search: <a href="search/hybrid_search.html">Hybrid Search</a></li>
 <li>DSL syntax for vector queries: <a href="search/../advanced/query_dsl.html">Query DSL</a></li>
@@ -2656,11 +2521,822 @@ async fn main() -&gt; laurus::Result&lt;()&gt; {
 
     Ok(())
 }</code></pre></pre>
-<h2 id="next-steps-7"><a class="header" href="#next-steps-7">Next Steps</a></h2>
+<h2 id="next-steps-6"><a class="header" href="#next-steps-6">Next Steps</a></h2>
 <ul>
 <li>Full query syntax reference: <a href="search/../advanced/query_dsl.html">Query DSL</a></li>
 <li>Understand ID resolution: <a href="search/../advanced/id_management.html">ID Management</a></li>
 <li>Data durability: <a href="search/../advanced/persistence.html">Persistence &amp; WAL</a></li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="spelling-correction-1"><a class="header" href="#spelling-correction-1">Spelling Correction</a></h1>
+<p>Laurus includes a built-in spelling correction system that can suggest corrections for misspelled query terms and provide "Did you mean?" functionality.</p>
+<h2 id="overview"><a class="header" href="#overview">Overview</a></h2>
+<p>The spelling corrector uses edit distance (Levenshtein distance) combined with word frequency data to suggest corrections. It supports:</p>
+<ul>
+<li><strong>Word-level suggestions</strong> — correct individual misspelled words</li>
+<li><strong>Auto-correction</strong> — automatically apply high-confidence corrections</li>
+<li><strong>"Did you mean?"</strong> — suggest alternative queries to the user</li>
+<li><strong>Query learning</strong> — improve suggestions by learning from user queries</li>
+<li><strong>Custom dictionaries</strong> — use your own word lists</li>
+</ul>
+<h2 id="basic-usage-3"><a class="header" href="#basic-usage-3">Basic Usage</a></h2>
+<h3 id="spellingcorrector"><a class="header" href="#spellingcorrector">SpellingCorrector</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use laurus::spelling::corrector::SpellingCorrector;
+
+// Create a corrector with the built-in English dictionary
+let mut corrector = SpellingCorrector::new();
+
+// Correct a query
+let result = corrector.correct("programing langauge");
+
+// Check if suggestions are available
+if result.has_suggestions() {
+    for (word, suggestions) in &amp;result.word_suggestions {
+        println!("'{}' -&gt; {:?}", word, suggestions);
+    }
+}
+
+// Get the best corrected query
+if let Some(corrected) = result.query() {
+    println!("Corrected: {}", corrected);
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="did-you-mean"><a class="header" href="#did-you-mean">"Did You Mean?"</a></h3>
+<p>The <code>DidYouMean</code> wrapper provides a higher-level interface for search UIs:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use laurus::spelling::corrector::{SpellingCorrector, DidYouMean};
+
+let corrector = SpellingCorrector::new();
+let mut did_you_mean = DidYouMean::new(corrector);
+
+if let Some(suggestion) = did_you_mean.suggest("programing") {
+    println!("Did you mean: {}?", suggestion);
+}
+<span class="boring">}</span></code></pre></pre>
+<h2 id="configuration"><a class="header" href="#configuration">Configuration</a></h2>
+<p>Use <code>CorrectorConfig</code> to customize behavior:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use laurus::spelling::corrector::{CorrectorConfig, SpellingCorrector};
+
+let config = CorrectorConfig {
+    max_distance: 2,              // Maximum edit distance (default: 2)
+    max_suggestions: 5,           // Max suggestions per word (default: 5)
+    min_frequency: 1,             // Minimum word frequency threshold (default: 1)
+    auto_correct: false,          // Enable auto-correction (default: false)
+    auto_correct_threshold: 0.8,  // Confidence threshold for auto-correction (default: 0.8)
+    use_index_terms: true,        // Use indexed terms as dictionary (default: true)
+    learn_from_queries: true,     // Learn from user queries (default: true)
+};
+<span class="boring">}</span></code></pre></pre>
+<h3 id="configuration-options"><a class="header" href="#configuration-options">Configuration Options</a></h3>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Option</th><th style="text-align: left">Type</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>max_distance</code></td><td style="text-align: left"><code>usize</code></td><td style="text-align: left"><code>2</code></td><td style="text-align: left">Maximum Levenshtein edit distance for candidate suggestions</td></tr>
+<tr><td style="text-align: left"><code>max_suggestions</code></td><td style="text-align: left"><code>usize</code></td><td style="text-align: left"><code>5</code></td><td style="text-align: left">Maximum number of suggestions returned per word</td></tr>
+<tr><td style="text-align: left"><code>min_frequency</code></td><td style="text-align: left"><code>u32</code></td><td style="text-align: left"><code>1</code></td><td style="text-align: left">Minimum frequency a word must have in the dictionary to be suggested</td></tr>
+<tr><td style="text-align: left"><code>auto_correct</code></td><td style="text-align: left"><code>bool</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">When true, automatically apply corrections above the threshold</td></tr>
+<tr><td style="text-align: left"><code>auto_correct_threshold</code></td><td style="text-align: left"><code>f64</code></td><td style="text-align: left"><code>0.8</code></td><td style="text-align: left">Confidence score (0.0–1.0) required for auto-correction</td></tr>
+<tr><td style="text-align: left"><code>use_index_terms</code></td><td style="text-align: left"><code>bool</code></td><td style="text-align: left"><code>true</code></td><td style="text-align: left">Use terms from the search index as dictionary words</td></tr>
+<tr><td style="text-align: left"><code>learn_from_queries</code></td><td style="text-align: left"><code>bool</code></td><td style="text-align: left"><code>true</code></td><td style="text-align: left">Learn new words from user search queries</td></tr>
+</tbody></table>
+</div>
+<h2 id="correctionresult"><a class="header" href="#correctionresult">CorrectionResult</a></h2>
+<p>The <code>correct()</code> method returns a <code>CorrectionResult</code> with detailed information:</p>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Field</th><th style="text-align: left">Type</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>original</code></td><td style="text-align: left"><code>String</code></td><td style="text-align: left">The original query string</td></tr>
+<tr><td style="text-align: left"><code>corrected</code></td><td style="text-align: left"><code>Option&lt;String&gt;</code></td><td style="text-align: left">The corrected query (if auto-correction was applied)</td></tr>
+<tr><td style="text-align: left"><code>word_suggestions</code></td><td style="text-align: left"><code>HashMap&lt;String, Vec&lt;Suggestion&gt;&gt;</code></td><td style="text-align: left">Suggestions grouped by misspelled word</td></tr>
+<tr><td style="text-align: left"><code>confidence</code></td><td style="text-align: left"><code>f64</code></td><td style="text-align: left">Overall confidence score (0.0–1.0)</td></tr>
+<tr><td style="text-align: left"><code>auto_corrected</code></td><td style="text-align: left"><code>bool</code></td><td style="text-align: left">Whether auto-correction was applied</td></tr>
+</tbody></table>
+</div>
+<h3 id="helper-methods"><a class="header" href="#helper-methods">Helper Methods</a></h3>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Method</th><th style="text-align: left">Returns</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>has_suggestions()</code></td><td style="text-align: left"><code>bool</code></td><td style="text-align: left">True if any word has suggestions</td></tr>
+<tr><td style="text-align: left"><code>best_suggestion()</code></td><td style="text-align: left"><code>Option&lt;&amp;Suggestion&gt;</code></td><td style="text-align: left">The single highest-scoring suggestion</td></tr>
+<tr><td style="text-align: left"><code>query()</code></td><td style="text-align: left"><code>Option&lt;String&gt;</code></td><td style="text-align: left">The corrected query string, if corrections were made</td></tr>
+<tr><td style="text-align: left"><code>should_show_did_you_mean()</code></td><td style="text-align: left"><code>bool</code></td><td style="text-align: left">Whether to display a "Did you mean?" prompt</td></tr>
+</tbody></table>
+</div>
+<h2 id="custom-dictionaries"><a class="header" href="#custom-dictionaries">Custom Dictionaries</a></h2>
+<p>You can provide your own dictionary instead of using the built-in English one:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use laurus::spelling::corrector::SpellingCorrector;
+use laurus::spelling::dictionary::SpellingDictionary;
+
+// Build a custom dictionary
+let mut dictionary = SpellingDictionary::new();
+dictionary.add_word("elasticsearch", 100);
+dictionary.add_word("lucene", 80);
+dictionary.add_word("laurus", 90);
+
+let corrector = SpellingCorrector::with_dictionary(dictionary);
+<span class="boring">}</span></code></pre></pre>
+<h2 id="learning-from-index-terms"><a class="header" href="#learning-from-index-terms">Learning from Index Terms</a></h2>
+<p>When <code>use_index_terms</code> is enabled, the corrector can learn from terms in your search index:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let mut corrector = SpellingCorrector::new();
+
+// Feed index terms to the corrector
+let index_terms = vec!["rust", "programming", "search", "engine"];
+corrector.learn_from_terms(&amp;index_terms);
+<span class="boring">}</span></code></pre></pre>
+<p>This improves suggestion quality by incorporating domain-specific vocabulary.</p>
+<h2 id="statistics"><a class="header" href="#statistics">Statistics</a></h2>
+<p>Monitor the corrector's state with <code>stats()</code>:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let stats = corrector.stats();
+println!("Dictionary words: {}", stats.dictionary_words);
+println!("Total frequency: {}", stats.dictionary_total_frequency);
+println!("Learned queries: {}", stats.queries_learned);
+<span class="boring">}</span></code></pre></pre>
+<h2 id="next-steps-7"><a class="header" href="#next-steps-7">Next Steps</a></h2>
+<ul>
+<li><a href="search/lexical_search.html">Lexical Search</a> — full-text search with query types</li>
+<li><a href="search/../advanced/query_dsl.html">Query DSL</a> — human-readable query syntax</li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="cli-command-line-interface"><a class="header" href="#cli-command-line-interface">CLI (Command-Line Interface)</a></h1>
+<p>Laurus provides a command-line tool <code>laurus</code> that lets you create indexes, manage documents, and run search queries without writing code.</p>
+<h2 id="features"><a class="header" href="#features">Features</a></h2>
+<ul>
+<li><strong>Index management</strong> — Create and inspect indexes from TOML schema files, with an interactive schema generator</li>
+<li><strong>Document CRUD</strong> — Add, retrieve, and delete documents via JSON</li>
+<li><strong>Search</strong> — Execute queries using the <a href="advanced/query_dsl.html">Query DSL</a></li>
+<li><strong>Dual output</strong> — Human-readable tables or machine-parseable JSON</li>
+<li><strong>Interactive REPL</strong> — Explore your index in a live session</li>
+</ul>
+<h2 id="getting-started-1"><a class="header" href="#getting-started-1">Getting Started</a></h2>
+<pre><code class="language-bash"># Install
+cargo install laurus-cli
+
+# Generate a schema interactively
+laurus create schema
+
+# Create an index from the schema
+laurus --data-dir ./my_index create index --schema schema.toml
+
+# Add a document
+laurus --data-dir ./my_index add doc --id doc1 --data '{"title":"Hello","body":"World"}'
+
+# Commit changes
+laurus --data-dir ./my_index commit
+
+# Search
+laurus --data-dir ./my_index search "body:world"
+</code></pre>
+<p>See the sub-sections for detailed documentation:</p>
+<ul>
+<li><a href="cli/installation.html">Installation</a> — How to install the CLI</li>
+<li><a href="cli/commands.html">Commands</a> — Full command reference</li>
+<li><a href="cli/schema_format.html">Schema Format</a> — Schema TOML format reference</li>
+<li><a href="cli/repl.html">REPL</a> — Interactive mode</li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="installation-1"><a class="header" href="#installation-1">Installation</a></h1>
+<h2 id="from-cratesio"><a class="header" href="#from-cratesio">From crates.io</a></h2>
+<pre><code class="language-bash">cargo install laurus-cli
+</code></pre>
+<p>This installs the <code>laurus</code> binary to <code>~/.cargo/bin/</code>.</p>
+<h2 id="from-source"><a class="header" href="#from-source">From source</a></h2>
+<pre><code class="language-bash">git clone https://github.com/mosuka/laurus.git
+cd laurus
+cargo install --path laurus-cli
+</code></pre>
+<h2 id="verify"><a class="header" href="#verify">Verify</a></h2>
+<pre><code class="language-bash">laurus --version
+</code></pre>
+<h2 id="shell-completion"><a class="header" href="#shell-completion">Shell Completion</a></h2>
+<p>Generate completion scripts for your shell:</p>
+<pre><code class="language-bash"># Bash
+laurus --help
+
+# The CLI uses clap, so shell completions can be generated
+# with clap_complete if needed in a future release.
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="command-reference"><a class="header" href="#command-reference">Command Reference</a></h1>
+<h2 id="global-options"><a class="header" href="#global-options">Global Options</a></h2>
+<p>Every command accepts these options:</p>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Option</th><th style="text-align: left">Environment Variable</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>--data-dir &lt;PATH&gt;</code></td><td style="text-align: left"><code>LAURUS_DATA_DIR</code></td><td style="text-align: left"><code>./laurus_data</code></td><td style="text-align: left">Path to the index data directory</td></tr>
+<tr><td style="text-align: left"><code>--format &lt;FORMAT&gt;</code></td><td style="text-align: left">—</td><td style="text-align: left"><code>table</code></td><td style="text-align: left">Output format: <code>table</code> or <code>json</code></td></tr>
+</tbody></table>
+</div>
+<pre><code class="language-bash"># Example: use JSON output with a custom data directory
+laurus --data-dir /var/data/my_index --format json search "title:rust"
+</code></pre>
+<hr />
+<h2 id="create--create-a-resource"><a class="header" href="#create--create-a-resource"><code>create</code> — Create a Resource</a></h2>
+<h3 id="create-index"><a class="header" href="#create-index"><code>create index</code></a></h3>
+<p>Create a new index from a schema TOML file.</p>
+<pre><code class="language-bash">laurus create index --schema &lt;FILE&gt;
+</code></pre>
+<p><strong>Arguments:</strong></p>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Flag</th><th style="text-align: left">Required</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>--schema &lt;FILE&gt;</code></td><td style="text-align: left">Yes</td><td style="text-align: left">Path to a TOML file defining the index schema</td></tr>
+</tbody></table>
+</div>
+<p><strong>Schema file format:</strong></p>
+<p>The schema file follows the same structure as the <code>Schema</code> type in the Laurus library. See <a href="cli/schema_format.html">Schema Format Reference</a> for full details. Example:</p>
+<pre><code class="language-toml">default_fields = ["title", "body"]
+
+[fields.title.Text]
+stored = true
+indexed = true
+
+[fields.body.Text]
+stored = true
+indexed = true
+
+[fields.category.Text]
+stored = true
+indexed = true
+</code></pre>
+<p><strong>Example:</strong></p>
+<pre><code class="language-bash">laurus --data-dir ./my_index create index --schema schema.toml
+# Index created at ./my_index.
+</code></pre>
+<blockquote>
+<p><strong>Note:</strong> An error is returned if the index already exists. Delete the data directory to recreate.</p>
+</blockquote>
+<h3 id="create-schema"><a class="header" href="#create-schema"><code>create schema</code></a></h3>
+<p>Interactively generate a schema TOML file through a guided wizard.</p>
+<pre><code class="language-bash">laurus create schema [--output &lt;FILE&gt;]
+</code></pre>
+<p><strong>Arguments:</strong></p>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Flag</th><th style="text-align: left">Required</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>--output &lt;FILE&gt;</code></td><td style="text-align: left">No</td><td style="text-align: left"><code>schema.toml</code></td><td style="text-align: left">Output file path for the generated schema</td></tr>
+</tbody></table>
+</div>
+<p>The wizard guides you through:</p>
+<ol>
+<li><strong>Field definition</strong> — Enter a field name, select the type, and configure type-specific options</li>
+<li><strong>Repeat</strong> — Add as many fields as needed</li>
+<li><strong>Default fields</strong> — Select which lexical fields to use as default search fields</li>
+<li><strong>Preview</strong> — Review the generated TOML before saving</li>
+<li><strong>Save</strong> — Write the schema file</li>
+</ol>
+<p><strong>Supported field types:</strong></p>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Type</th><th style="text-align: left">Category</th><th style="text-align: left">Options</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>Text</code></td><td style="text-align: left">Lexical</td><td style="text-align: left"><code>indexed</code>, <code>stored</code>, <code>term_vectors</code></td></tr>
+<tr><td style="text-align: left"><code>Integer</code></td><td style="text-align: left">Lexical</td><td style="text-align: left"><code>indexed</code>, <code>stored</code></td></tr>
+<tr><td style="text-align: left"><code>Float</code></td><td style="text-align: left">Lexical</td><td style="text-align: left"><code>indexed</code>, <code>stored</code></td></tr>
+<tr><td style="text-align: left"><code>Boolean</code></td><td style="text-align: left">Lexical</td><td style="text-align: left"><code>indexed</code>, <code>stored</code></td></tr>
+<tr><td style="text-align: left"><code>DateTime</code></td><td style="text-align: left">Lexical</td><td style="text-align: left"><code>indexed</code>, <code>stored</code></td></tr>
+<tr><td style="text-align: left"><code>Geo</code></td><td style="text-align: left">Lexical</td><td style="text-align: left"><code>indexed</code>, <code>stored</code></td></tr>
+<tr><td style="text-align: left"><code>Bytes</code></td><td style="text-align: left">Lexical</td><td style="text-align: left"><code>stored</code></td></tr>
+<tr><td style="text-align: left"><code>Hnsw</code></td><td style="text-align: left">Vector</td><td style="text-align: left"><code>dimension</code>, <code>distance</code>, <code>m</code>, <code>ef_construction</code></td></tr>
+<tr><td style="text-align: left"><code>Flat</code></td><td style="text-align: left">Vector</td><td style="text-align: left"><code>dimension</code>, <code>distance</code></td></tr>
+<tr><td style="text-align: left"><code>Ivf</code></td><td style="text-align: left">Vector</td><td style="text-align: left"><code>dimension</code>, <code>distance</code>, <code>n_clusters</code>, <code>n_probe</code></td></tr>
+</tbody></table>
+</div>
+<p><strong>Example:</strong></p>
+<pre><code class="language-bash"># Generate schema.toml interactively
+laurus create schema
+
+# Specify output path
+laurus create schema --output my_schema.toml
+
+# Then create an index from the generated schema
+laurus create index --schema schema.toml
+</code></pre>
+<hr />
+<h2 id="get--get-a-resource"><a class="header" href="#get--get-a-resource"><code>get</code> — Get a Resource</a></h2>
+<h3 id="get-index"><a class="header" href="#get-index"><code>get index</code></a></h3>
+<p>Display statistics about the index.</p>
+<pre><code class="language-bash">laurus get index
+</code></pre>
+<p><strong>Table output example:</strong></p>
+<pre><code class="language-text">Document count: 42
+
+Vector fields:
+╭──────────┬─────────┬───────────╮
+│ Field    │ Vectors │ Dimension │
+├──────────┼─────────┼───────────┤
+│ text_vec │ 42      │ 384       │
+╰──────────┴─────────┴───────────╯
+</code></pre>
+<p><strong>JSON output example:</strong></p>
+<pre><code class="language-bash">laurus --format json get index
+</code></pre>
+<pre><code class="language-json">{
+  "document_count": 42,
+  "fields": {
+    "text_vec": {
+      "vector_count": 42,
+      "dimension": 384
+    }
+  }
+}
+</code></pre>
+<h3 id="get-doc"><a class="header" href="#get-doc"><code>get doc</code></a></h3>
+<p>Retrieve a document (and all its chunks) by external ID.</p>
+<pre><code class="language-bash">laurus get doc --id &lt;ID&gt;
+</code></pre>
+<p><strong>Table output example:</strong></p>
+<pre><code class="language-text">╭──────┬─────────────────────────────────────────╮
+│ ID   │ Fields                                  │
+├──────┼─────────────────────────────────────────┤
+│ doc1 │ body: This is a test, title: Hello World │
+╰──────┴─────────────────────────────────────────╯
+</code></pre>
+<p><strong>JSON output example:</strong></p>
+<pre><code class="language-bash">laurus --format json get doc --id doc1
+</code></pre>
+<pre><code class="language-json">[
+  {
+    "id": "doc1",
+    "document": {
+      "title": "Hello World",
+      "body": "This is a test document."
+    }
+  }
+]
+</code></pre>
+<hr />
+<h2 id="add--add-a-resource"><a class="header" href="#add--add-a-resource"><code>add</code> — Add a Resource</a></h2>
+<h3 id="add-doc"><a class="header" href="#add-doc"><code>add doc</code></a></h3>
+<p>Add a document to the index. Documents are not searchable until <code>commit</code> is called.</p>
+<pre><code class="language-bash">laurus add doc --id &lt;ID&gt; --data &lt;JSON&gt;
+</code></pre>
+<p><strong>Arguments:</strong></p>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Flag</th><th style="text-align: left">Required</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>--id &lt;ID&gt;</code></td><td style="text-align: left">Yes</td><td style="text-align: left">External document ID (string)</td></tr>
+<tr><td style="text-align: left"><code>--data &lt;JSON&gt;</code></td><td style="text-align: left">Yes</td><td style="text-align: left">Document fields as a JSON string</td></tr>
+</tbody></table>
+</div>
+<p>The JSON format is a flat object mapping field names to values:</p>
+<pre><code class="language-json">{
+  "title": "Introduction to Rust",
+  "body": "Rust is a systems programming language.",
+  "category": "programming"
+}
+</code></pre>
+<p><strong>Example:</strong></p>
+<pre><code class="language-bash">laurus add doc --id doc1 --data '{"title":"Hello World","body":"This is a test document."}'
+# Document 'doc1' added. Run 'commit' to persist changes.
+</code></pre>
+<blockquote>
+<p><strong>Tip:</strong> Multiple documents can share the same external ID (chunking pattern). Use <code>add doc</code> for each chunk.</p>
+</blockquote>
+<hr />
+<h2 id="delete--delete-a-resource"><a class="header" href="#delete--delete-a-resource"><code>delete</code> — Delete a Resource</a></h2>
+<h3 id="delete-doc"><a class="header" href="#delete-doc"><code>delete doc</code></a></h3>
+<p>Delete a document (and all its chunks) by external ID.</p>
+<pre><code class="language-bash">laurus delete doc --id &lt;ID&gt;
+</code></pre>
+<p><strong>Example:</strong></p>
+<pre><code class="language-bash">laurus delete doc --id doc1
+# Document 'doc1' deleted. Run 'commit' to persist changes.
+</code></pre>
+<hr />
+<h2 id="commit"><a class="header" href="#commit"><code>commit</code></a></h2>
+<p>Commit pending changes (additions and deletions) to the index. Until committed, changes are not visible to search.</p>
+<pre><code class="language-bash">laurus commit
+</code></pre>
+<p><strong>Example:</strong></p>
+<pre><code class="language-bash">laurus --data-dir ./my_index commit
+# Changes committed successfully.
+</code></pre>
+<hr />
+<h2 id="search-1"><a class="header" href="#search-1"><code>search</code></a></h2>
+<p>Execute a search query using the <a href="cli/../advanced/query_dsl.html">Query DSL</a>.</p>
+<pre><code class="language-bash">laurus search &lt;QUERY&gt; [--limit &lt;N&gt;] [--offset &lt;N&gt;]
+</code></pre>
+<p><strong>Arguments:</strong></p>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Argument / Flag</th><th style="text-align: left">Required</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>&lt;QUERY&gt;</code></td><td style="text-align: left">Yes</td><td style="text-align: left">—</td><td style="text-align: left">Query string in Laurus Query DSL</td></tr>
+<tr><td style="text-align: left"><code>--limit &lt;N&gt;</code></td><td style="text-align: left">No</td><td style="text-align: left"><code>10</code></td><td style="text-align: left">Maximum number of results</td></tr>
+<tr><td style="text-align: left"><code>--offset &lt;N&gt;</code></td><td style="text-align: left">No</td><td style="text-align: left"><code>0</code></td><td style="text-align: left">Number of results to skip</td></tr>
+</tbody></table>
+</div>
+<p><strong>Query syntax examples:</strong></p>
+<pre><code class="language-bash"># Term query
+laurus search "body:rust"
+
+# Phrase query
+laurus search 'body:"machine learning"'
+
+# Boolean query
+laurus search "+body:programming -body:python"
+
+# Fuzzy query (typo tolerance)
+laurus search "body:programing~2"
+
+# Wildcard query
+laurus search "title:intro*"
+
+# Range query
+laurus search "price:[10 TO 50]"
+</code></pre>
+<p><strong>Table output example:</strong></p>
+<pre><code class="language-text">╭──────┬────────┬─────────────────────────────────────────╮
+│ ID   │ Score  │ Fields                                  │
+├──────┼────────┼─────────────────────────────────────────┤
+│ doc1 │ 0.8532 │ body: Rust is a systems..., title: Intr │
+│ doc3 │ 0.4210 │ body: JavaScript powers..., title: Web  │
+╰──────┴────────┴─────────────────────────────────────────╯
+</code></pre>
+<p><strong>JSON output example:</strong></p>
+<pre><code class="language-bash">laurus --format json search "body:rust" --limit 5
+</code></pre>
+<pre><code class="language-json">[
+  {
+    "id": "doc1",
+    "score": 0.8532,
+    "document": {
+      "title": "Introduction to Rust",
+      "body": "Rust is a systems programming language."
+    }
+  }
+]
+</code></pre>
+<hr />
+<h2 id="repl"><a class="header" href="#repl"><code>repl</code></a></h2>
+<p>Start an interactive REPL session. See <a href="cli/repl.html">REPL</a> for details.</p>
+<pre><code class="language-bash">laurus repl
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="schema-format-reference"><a class="header" href="#schema-format-reference">Schema Format Reference</a></h1>
+<p>The schema file defines the structure of your index — what fields exist, their types, and how they are indexed. Laurus uses TOML format for schema files.</p>
+<h2 id="overview-1"><a class="header" href="#overview-1">Overview</a></h2>
+<p>A schema consists of two top-level elements:</p>
+<pre><code class="language-toml"># Fields to search by default when a query does not specify a field.
+default_fields = ["title", "body"]
+
+# Field definitions. Each field has a name and a typed configuration.
+[fields.&lt;field_name&gt;.&lt;FieldType&gt;]
+# ... type-specific options
+</code></pre>
+<ul>
+<li><strong><code>default_fields</code></strong> — A list of field names used as default search targets by the <a href="cli/../advanced/query_dsl.html">Query DSL</a>. Only lexical fields (Text, Integer, Float, etc.) can be default fields. This key is optional and defaults to an empty list.</li>
+<li><strong><code>fields</code></strong> — A map of field names to their typed configuration. Each field must specify exactly one field type.</li>
+</ul>
+<h2 id="field-naming"><a class="header" href="#field-naming">Field Naming</a></h2>
+<ul>
+<li>Field names are arbitrary strings (e.g., <code>title</code>, <code>body_vec</code>, <code>created_at</code>).</li>
+<li>The <code>_id</code> field is reserved by Laurus for internal document ID management — do not use it.</li>
+<li>Field names must be unique within a schema.</li>
+</ul>
+<h2 id="field-types-1"><a class="header" href="#field-types-1">Field Types</a></h2>
+<p>Fields fall into two categories: <strong>Lexical</strong> (for keyword/full-text search) and <strong>Vector</strong> (for similarity search). A single field cannot be both.</p>
+<h3 id="lexical-fields-1"><a class="header" href="#lexical-fields-1">Lexical Fields</a></h3>
+<h4 id="text"><a class="header" href="#text">Text</a></h4>
+<p>Full-text searchable field. Text is processed by the analysis pipeline (tokenization, normalization, stemming, etc.).</p>
+<pre><code class="language-toml">[fields.title.Text]
+indexed = true       # Whether to index this field for search
+stored = true        # Whether to store the original value for retrieval
+term_vectors = false # Whether to store term positions (for phrase queries, highlighting)
+</code></pre>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Option</th><th style="text-align: left">Type</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>indexed</code></td><td style="text-align: left"><code>bool</code></td><td style="text-align: left"><code>true</code></td><td style="text-align: left">Enables searching this field</td></tr>
+<tr><td style="text-align: left"><code>stored</code></td><td style="text-align: left"><code>bool</code></td><td style="text-align: left"><code>true</code></td><td style="text-align: left">Stores the original value so it can be returned in results</td></tr>
+<tr><td style="text-align: left"><code>term_vectors</code></td><td style="text-align: left"><code>bool</code></td><td style="text-align: left"><code>true</code></td><td style="text-align: left">Stores term positions for phrase queries, highlighting, and more-like-this</td></tr>
+</tbody></table>
+</div>
+<h4 id="integer"><a class="header" href="#integer">Integer</a></h4>
+<p>64-bit signed integer field. Supports range queries and exact match.</p>
+<pre><code class="language-toml">[fields.year.Integer]
+indexed = true
+stored = true
+</code></pre>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Option</th><th style="text-align: left">Type</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>indexed</code></td><td style="text-align: left"><code>bool</code></td><td style="text-align: left"><code>true</code></td><td style="text-align: left">Enables range and exact-match queries</td></tr>
+<tr><td style="text-align: left"><code>stored</code></td><td style="text-align: left"><code>bool</code></td><td style="text-align: left"><code>true</code></td><td style="text-align: left">Stores the original value</td></tr>
+</tbody></table>
+</div>
+<h4 id="float"><a class="header" href="#float">Float</a></h4>
+<p>64-bit floating point field. Supports range queries.</p>
+<pre><code class="language-toml">[fields.rating.Float]
+indexed = true
+stored = true
+</code></pre>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Option</th><th style="text-align: left">Type</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>indexed</code></td><td style="text-align: left"><code>bool</code></td><td style="text-align: left"><code>true</code></td><td style="text-align: left">Enables range queries</td></tr>
+<tr><td style="text-align: left"><code>stored</code></td><td style="text-align: left"><code>bool</code></td><td style="text-align: left"><code>true</code></td><td style="text-align: left">Stores the original value</td></tr>
+</tbody></table>
+</div>
+<h4 id="boolean"><a class="header" href="#boolean">Boolean</a></h4>
+<p>Boolean field (<code>true</code> / <code>false</code>).</p>
+<pre><code class="language-toml">[fields.published.Boolean]
+indexed = true
+stored = true
+</code></pre>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Option</th><th style="text-align: left">Type</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>indexed</code></td><td style="text-align: left"><code>bool</code></td><td style="text-align: left"><code>true</code></td><td style="text-align: left">Enables filtering by boolean value</td></tr>
+<tr><td style="text-align: left"><code>stored</code></td><td style="text-align: left"><code>bool</code></td><td style="text-align: left"><code>true</code></td><td style="text-align: left">Stores the original value</td></tr>
+</tbody></table>
+</div>
+<h4 id="datetime"><a class="header" href="#datetime">DateTime</a></h4>
+<p>UTC timestamp field. Supports range queries.</p>
+<pre><code class="language-toml">[fields.created_at.DateTime]
+indexed = true
+stored = true
+</code></pre>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Option</th><th style="text-align: left">Type</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>indexed</code></td><td style="text-align: left"><code>bool</code></td><td style="text-align: left"><code>true</code></td><td style="text-align: left">Enables range queries on date/time</td></tr>
+<tr><td style="text-align: left"><code>stored</code></td><td style="text-align: left"><code>bool</code></td><td style="text-align: left"><code>true</code></td><td style="text-align: left">Stores the original value</td></tr>
+</tbody></table>
+</div>
+<h4 id="geo"><a class="header" href="#geo">Geo</a></h4>
+<p>Geographic point field (latitude/longitude). Supports radius and bounding box queries.</p>
+<pre><code class="language-toml">[fields.location.Geo]
+indexed = true
+stored = true
+</code></pre>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Option</th><th style="text-align: left">Type</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>indexed</code></td><td style="text-align: left"><code>bool</code></td><td style="text-align: left"><code>true</code></td><td style="text-align: left">Enables geo queries (radius, bounding box)</td></tr>
+<tr><td style="text-align: left"><code>stored</code></td><td style="text-align: left"><code>bool</code></td><td style="text-align: left"><code>true</code></td><td style="text-align: left">Stores the original value</td></tr>
+</tbody></table>
+</div>
+<h4 id="bytes"><a class="header" href="#bytes">Bytes</a></h4>
+<p>Raw binary data field. Not indexed — stored only.</p>
+<pre><code class="language-toml">[fields.thumbnail.Bytes]
+stored = true
+</code></pre>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Option</th><th style="text-align: left">Type</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>stored</code></td><td style="text-align: left"><code>bool</code></td><td style="text-align: left"><code>true</code></td><td style="text-align: left">Stores the binary data</td></tr>
+</tbody></table>
+</div>
+<h3 id="vector-fields-1"><a class="header" href="#vector-fields-1">Vector Fields</a></h3>
+<p>Vector fields are indexed for approximate nearest neighbor (ANN) search. They require a <code>dimension</code> (the length of each vector) and a <code>distance</code> metric.</p>
+<h4 id="hnsw"><a class="header" href="#hnsw">Hnsw</a></h4>
+<p>Hierarchical Navigable Small World graph index. Best for most use cases — offers a good balance of speed and recall.</p>
+<pre><code class="language-toml">[fields.body_vec.Hnsw]
+dimension = 384
+distance = "Cosine"
+m = 16
+ef_construction = 200
+base_weight = 1.0
+</code></pre>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Option</th><th style="text-align: left">Type</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>dimension</code></td><td style="text-align: left"><code>integer</code></td><td style="text-align: left"><code>128</code></td><td style="text-align: left">Vector dimensionality (must match your embedding model)</td></tr>
+<tr><td style="text-align: left"><code>distance</code></td><td style="text-align: left"><code>string</code></td><td style="text-align: left"><code>"Cosine"</code></td><td style="text-align: left">Distance metric (see <a href="cli/schema_format.html#distance-metrics">Distance Metrics</a>)</td></tr>
+<tr><td style="text-align: left"><code>m</code></td><td style="text-align: left"><code>integer</code></td><td style="text-align: left"><code>16</code></td><td style="text-align: left">Max bi-directional connections per node. Higher = better recall, more memory</td></tr>
+<tr><td style="text-align: left"><code>ef_construction</code></td><td style="text-align: left"><code>integer</code></td><td style="text-align: left"><code>200</code></td><td style="text-align: left">Search width during index construction. Higher = better quality, slower build</td></tr>
+<tr><td style="text-align: left"><code>base_weight</code></td><td style="text-align: left"><code>float</code></td><td style="text-align: left"><code>1.0</code></td><td style="text-align: left">Scoring weight in hybrid search fusion</td></tr>
+<tr><td style="text-align: left"><code>quantizer</code></td><td style="text-align: left"><code>object</code></td><td style="text-align: left"><em>none</em></td><td style="text-align: left">Optional quantization method (see <a href="cli/schema_format.html#quantization">Quantization</a>)</td></tr>
+</tbody></table>
+</div>
+<p><strong>Tuning guidelines:</strong></p>
+<ul>
+<li><code>m</code>: 12–48 is typical. Use higher values for higher-dimensional vectors.</li>
+<li><code>ef_construction</code>: 100–500. Higher values produce a better graph but increase build time.</li>
+<li><code>dimension</code>: Must exactly match the output dimension of your embedding model (e.g., 384 for <code>all-MiniLM-L6-v2</code>, 768 for <code>BERT-base</code>, 1536 for <code>text-embedding-3-small</code>).</li>
+</ul>
+<h4 id="flat"><a class="header" href="#flat">Flat</a></h4>
+<p>Brute-force linear scan index. Provides exact results with no approximation. Best for small datasets (&lt; 10,000 vectors).</p>
+<pre><code class="language-toml">[fields.embedding.Flat]
+dimension = 384
+distance = "Cosine"
+base_weight = 1.0
+</code></pre>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Option</th><th style="text-align: left">Type</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>dimension</code></td><td style="text-align: left"><code>integer</code></td><td style="text-align: left"><code>128</code></td><td style="text-align: left">Vector dimensionality</td></tr>
+<tr><td style="text-align: left"><code>distance</code></td><td style="text-align: left"><code>string</code></td><td style="text-align: left"><code>"Cosine"</code></td><td style="text-align: left">Distance metric (see <a href="cli/schema_format.html#distance-metrics">Distance Metrics</a>)</td></tr>
+<tr><td style="text-align: left"><code>base_weight</code></td><td style="text-align: left"><code>float</code></td><td style="text-align: left"><code>1.0</code></td><td style="text-align: left">Scoring weight in hybrid search fusion</td></tr>
+<tr><td style="text-align: left"><code>quantizer</code></td><td style="text-align: left"><code>object</code></td><td style="text-align: left"><em>none</em></td><td style="text-align: left">Optional quantization method (see <a href="cli/schema_format.html#quantization">Quantization</a>)</td></tr>
+</tbody></table>
+</div>
+<h4 id="ivf"><a class="header" href="#ivf">Ivf</a></h4>
+<p>Inverted File Index. Clusters vectors and searches only a subset of clusters. Suitable for very large datasets.</p>
+<pre><code class="language-toml">[fields.embedding.Ivf]
+dimension = 384
+distance = "Cosine"
+n_clusters = 100
+n_probe = 1
+base_weight = 1.0
+</code></pre>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Option</th><th style="text-align: left">Type</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>dimension</code></td><td style="text-align: left"><code>integer</code></td><td style="text-align: left"><em>(required)</em></td><td style="text-align: left">Vector dimensionality</td></tr>
+<tr><td style="text-align: left"><code>distance</code></td><td style="text-align: left"><code>string</code></td><td style="text-align: left"><code>"Cosine"</code></td><td style="text-align: left">Distance metric (see <a href="cli/schema_format.html#distance-metrics">Distance Metrics</a>)</td></tr>
+<tr><td style="text-align: left"><code>n_clusters</code></td><td style="text-align: left"><code>integer</code></td><td style="text-align: left"><code>100</code></td><td style="text-align: left">Number of clusters. More clusters = finer partitioning</td></tr>
+<tr><td style="text-align: left"><code>n_probe</code></td><td style="text-align: left"><code>integer</code></td><td style="text-align: left"><code>1</code></td><td style="text-align: left">Number of clusters to search at query time. Higher = better recall, slower</td></tr>
+<tr><td style="text-align: left"><code>base_weight</code></td><td style="text-align: left"><code>float</code></td><td style="text-align: left"><code>1.0</code></td><td style="text-align: left">Scoring weight in hybrid search fusion</td></tr>
+<tr><td style="text-align: left"><code>quantizer</code></td><td style="text-align: left"><code>object</code></td><td style="text-align: left"><em>none</em></td><td style="text-align: left">Optional quantization method (see <a href="cli/schema_format.html#quantization">Quantization</a>)</td></tr>
+</tbody></table>
+</div>
+<blockquote>
+<p><strong>Note:</strong> Unlike Hnsw and Flat, the <code>dimension</code> field in Ivf is <strong>required</strong> and has no default value.</p>
+</blockquote>
+<p><strong>Tuning guidelines:</strong></p>
+<ul>
+<li><code>n_clusters</code>: A common heuristic is <code>sqrt(N)</code> where N is the total number of vectors.</li>
+<li><code>n_probe</code>: Start with 1 and increase until recall is acceptable. Typical range is 1–20.</li>
+</ul>
+<h2 id="distance-metrics-2"><a class="header" href="#distance-metrics-2">Distance Metrics</a></h2>
+<p>The <code>distance</code> option for vector fields accepts the following values:</p>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Value</th><th style="text-align: left">Description</th><th style="text-align: left">Use When</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>"Cosine"</code></td><td style="text-align: left">Cosine distance (1 - cosine similarity). Default.</td><td style="text-align: left">Normalized text/image embeddings</td></tr>
+<tr><td style="text-align: left"><code>"Euclidean"</code></td><td style="text-align: left">L2 (Euclidean) distance</td><td style="text-align: left">Spatial data, non-normalized vectors</td></tr>
+<tr><td style="text-align: left"><code>"Manhattan"</code></td><td style="text-align: left">L1 (Manhattan) distance</td><td style="text-align: left">Sparse feature vectors</td></tr>
+<tr><td style="text-align: left"><code>"DotProduct"</code></td><td style="text-align: left">Dot product (higher = more similar)</td><td style="text-align: left">Pre-normalized vectors where magnitude matters</td></tr>
+<tr><td style="text-align: left"><code>"Angular"</code></td><td style="text-align: left">Angular distance</td><td style="text-align: left">Similar to cosine, but based on angle</td></tr>
+</tbody></table>
+</div>
+<p>For most embedding models (BERT, Sentence Transformers, OpenAI, etc.), <code>"Cosine"</code> is the correct choice.</p>
+<h2 id="quantization-1"><a class="header" href="#quantization-1">Quantization</a></h2>
+<p>Vector fields optionally support quantization to reduce memory usage at the cost of some accuracy. Specify the <code>quantizer</code> option as a TOML table.</p>
+<h3 id="none-default"><a class="header" href="#none-default">None (default)</a></h3>
+<p>No quantization — full precision 32-bit floats.</p>
+<pre><code class="language-toml">[fields.embedding.Hnsw]
+dimension = 384
+distance = "Cosine"
+# quantizer is omitted (no quantization)
+</code></pre>
+<h3 id="scalar-8-bit"><a class="header" href="#scalar-8-bit">Scalar 8-bit</a></h3>
+<p>Compresses each float32 component to uint8 (~4x memory reduction).</p>
+<pre><code class="language-toml">[fields.embedding.Hnsw]
+dimension = 384
+distance = "Cosine"
+quantizer = "Scalar8Bit"
+</code></pre>
+<h3 id="product-quantization"><a class="header" href="#product-quantization">Product Quantization</a></h3>
+<p>Splits the vector into subvectors and quantizes each independently.</p>
+<pre><code class="language-toml">[fields.embedding.Hnsw]
+dimension = 384
+distance = "Cosine"
+
+[fields.embedding.Hnsw.quantizer.ProductQuantization]
+subvector_count = 48
+</code></pre>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Option</th><th style="text-align: left">Type</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>subvector_count</code></td><td style="text-align: left"><code>integer</code></td><td style="text-align: left">Number of subvectors. Must evenly divide <code>dimension</code>.</td></tr>
+</tbody></table>
+</div>
+<h2 id="complete-examples"><a class="header" href="#complete-examples">Complete Examples</a></h2>
+<h3 id="full-text-search-only"><a class="header" href="#full-text-search-only">Full-text search only</a></h3>
+<p>A simple blog post index with lexical search:</p>
+<pre><code class="language-toml">default_fields = ["title", "body"]
+
+[fields.title.Text]
+indexed = true
+stored = true
+term_vectors = false
+
+[fields.body.Text]
+indexed = true
+stored = true
+term_vectors = false
+
+[fields.category.Text]
+indexed = true
+stored = true
+term_vectors = false
+
+[fields.published_at.DateTime]
+indexed = true
+stored = true
+</code></pre>
+<h3 id="vector-search-only"><a class="header" href="#vector-search-only">Vector search only</a></h3>
+<p>A vector-only index for semantic similarity:</p>
+<pre><code class="language-toml">[fields.embedding.Hnsw]
+dimension = 768
+distance = "Cosine"
+m = 16
+ef_construction = 200
+</code></pre>
+<h3 id="hybrid-search-lexical--vector"><a class="header" href="#hybrid-search-lexical--vector">Hybrid search (lexical + vector)</a></h3>
+<p>Combine lexical and vector search for best-of-both-worlds retrieval:</p>
+<pre><code class="language-toml">default_fields = ["title", "body"]
+
+[fields.title.Text]
+indexed = true
+stored = true
+term_vectors = false
+
+[fields.body.Text]
+indexed = true
+stored = true
+term_vectors = true
+
+[fields.category.Text]
+indexed = true
+stored = true
+term_vectors = false
+
+[fields.body_vec.Hnsw]
+dimension = 384
+distance = "Cosine"
+m = 16
+ef_construction = 200
+</code></pre>
+<blockquote>
+<p><strong>Tip:</strong> A single field cannot be both lexical and vector. Use separate fields (e.g., <code>body</code> for text, <code>body_vec</code> for embedding) and map them both to the same source content.</p>
+</blockquote>
+<h3 id="e-commerce-product-index"><a class="header" href="#e-commerce-product-index">E-commerce product index</a></h3>
+<p>A more complex schema with mixed field types:</p>
+<pre><code class="language-toml">default_fields = ["name", "description"]
+
+[fields.name.Text]
+indexed = true
+stored = true
+term_vectors = false
+
+[fields.description.Text]
+indexed = true
+stored = true
+term_vectors = true
+
+[fields.price.Float]
+indexed = true
+stored = true
+
+[fields.in_stock.Boolean]
+indexed = true
+stored = true
+
+[fields.created_at.DateTime]
+indexed = true
+stored = true
+
+[fields.location.Geo]
+indexed = true
+stored = true
+
+[fields.description_vec.Hnsw]
+dimension = 384
+distance = "Cosine"
+</code></pre>
+<h2 id="generating-a-schema"><a class="header" href="#generating-a-schema">Generating a Schema</a></h2>
+<p>You can generate a schema TOML file interactively using the CLI:</p>
+<pre><code class="language-bash">laurus create schema
+laurus create schema --output my_schema.toml
+</code></pre>
+<p>See <a href="cli/commands.html#create-schema"><code>create schema</code></a> for details.</p>
+<h2 id="using-a-schema"><a class="header" href="#using-a-schema">Using a Schema</a></h2>
+<p>Once you have a schema file, create an index from it:</p>
+<pre><code class="language-bash">laurus create index --schema schema.toml
+</code></pre>
+<p>Or load it programmatically in Rust:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use laurus::Schema;
+
+let toml_str = std::fs::read_to_string("schema.toml")?;
+let schema: Schema = toml::from_str(&amp;toml_str)?;
+<span class="boring">}</span></code></pre></pre>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="repl-interactive-mode"><a class="header" href="#repl-interactive-mode">REPL (Interactive Mode)</a></h1>
+<p>The REPL provides an interactive session for exploring your index without typing the full <code>laurus</code> command each time.</p>
+<h2 id="starting-the-repl"><a class="header" href="#starting-the-repl">Starting the REPL</a></h2>
+<pre><code class="language-bash">laurus --data-dir ./my_index repl
+</code></pre>
+<pre><code class="language-text">Laurus REPL (type 'help' for commands, 'quit' to exit)
+laurus&gt;
+</code></pre>
+<p>The REPL opens the index at startup and keeps it loaded throughout the session.</p>
+<h2 id="available-commands"><a class="header" href="#available-commands">Available Commands</a></h2>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Command</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>search &lt;query&gt; [limit]</code></td><td style="text-align: left">Search the index</td></tr>
+<tr><td style="text-align: left"><code>doc add &lt;id&gt; &lt;json&gt;</code></td><td style="text-align: left">Add a document</td></tr>
+<tr><td style="text-align: left"><code>doc get &lt;id&gt;</code></td><td style="text-align: left">Get a document by ID</td></tr>
+<tr><td style="text-align: left"><code>doc delete &lt;id&gt;</code></td><td style="text-align: left">Delete a document by ID</td></tr>
+<tr><td style="text-align: left"><code>commit</code></td><td style="text-align: left">Commit pending changes</td></tr>
+<tr><td style="text-align: left"><code>stats</code></td><td style="text-align: left">Show index statistics</td></tr>
+<tr><td style="text-align: left"><code>help</code></td><td style="text-align: left">Show available commands</td></tr>
+<tr><td style="text-align: left"><code>quit</code> / <code>exit</code></td><td style="text-align: left">Exit the REPL</td></tr>
+</tbody></table>
+</div>
+<h2 id="usage-examples"><a class="header" href="#usage-examples">Usage Examples</a></h2>
+<h3 id="searching"><a class="header" href="#searching">Searching</a></h3>
+<pre><code class="language-text">laurus&gt; search body:rust
+╭──────┬────────┬────────────────────────────────────╮
+│ ID   │ Score  │ Fields                             │
+├──────┼────────┼────────────────────────────────────┤
+│ doc1 │ 0.8532 │ body: Rust is a systems..., title… │
+╰──────┴────────┴────────────────────────────────────╯
+</code></pre>
+<h3 id="adding-and-committing-documents"><a class="header" href="#adding-and-committing-documents">Adding and Committing Documents</a></h3>
+<pre><code class="language-text">laurus&gt; doc add doc4 {"title":"New Document","body":"Some content here."}
+Document 'doc4' added.
+laurus&gt; commit
+Changes committed.
+</code></pre>
+<h3 id="retrieving-documents-1"><a class="header" href="#retrieving-documents-1">Retrieving Documents</a></h3>
+<pre><code class="language-text">laurus&gt; doc get doc4
+╭──────┬───────────────────────────────────────────────╮
+│ ID   │ Fields                                        │
+├──────┼───────────────────────────────────────────────┤
+│ doc4 │ body: Some content here., title: New Document │
+╰──────┴───────────────────────────────────────────────╯
+</code></pre>
+<h3 id="deleting-documents-1"><a class="header" href="#deleting-documents-1">Deleting Documents</a></h3>
+<pre><code class="language-text">laurus&gt; doc delete doc4
+Document 'doc4' deleted.
+laurus&gt; commit
+Changes committed.
+</code></pre>
+<h3 id="viewing-statistics"><a class="header" href="#viewing-statistics">Viewing Statistics</a></h3>
+<pre><code class="language-text">laurus&gt; stats
+Document count: 3
+</code></pre>
+<h2 id="features-1"><a class="header" href="#features-1">Features</a></h2>
+<ul>
+<li><strong>Line editing</strong> — Arrow keys, Home/End, and standard readline shortcuts</li>
+<li><strong>History</strong> — Use Up/Down arrows to recall previous commands</li>
+<li><strong>Ctrl+C / Ctrl+D</strong> — Exit the REPL gracefully</li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="advanced-features"><a class="header" href="#advanced-features">Advanced Features</a></h1>
 <p>This section covers advanced topics for users who want to go deeper into Laurus's capabilities.</p>
@@ -2677,9 +3353,18 @@ async fn main() -&gt; laurus::Result&lt;()&gt; {
 <p>How Laurus ensures data durability through Write-Ahead Logging (WAL) and the commit lifecycle.</p>
 <h3 id="deletions--compaction"><a class="header" href="#deletions--compaction"><a href="advanced/deletions.html">Deletions &amp; Compaction</a></a></h3>
 <p>How documents are deleted (logical deletion via bitmaps) and how space is reclaimed (compaction).</p>
+<h3 id="error-handling"><a class="header" href="#error-handling"><a href="advanced/error_handling.html">Error Handling</a></a></h3>
+<p>Understanding <code>LaurusError</code> and <code>Result&lt;T&gt;</code> for robust application development. Covers all error variants, matching patterns, and common error scenarios.</p>
+<h3 id="extensibility"><a class="header" href="#extensibility"><a href="advanced/extensibility.html">Extensibility</a></a></h3>
+<p>Implementing custom components by extending Laurus's trait-based abstractions:</p>
+<ul>
+<li>Custom <code>Analyzer</code> for text analysis</li>
+<li>Custom <code>Embedder</code> for vector embeddings</li>
+<li>Custom <code>Storage</code> for new backends</li>
+</ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="query-dsl-3"><a class="header" href="#query-dsl-3">Query DSL</a></h1>
 <p>Laurus provides a unified query DSL (Domain Specific Language) that allows lexical (keyword) and vector (semantic) search in a single query string. The <code>UnifiedQueryParser</code> splits the input into lexical and vector portions and delegates to the appropriate sub-parser.</p>
-<h2 id="overview"><a class="header" href="#overview">Overview</a></h2>
+<h2 id="overview-2"><a class="header" href="#overview-2">Overview</a></h2>
 <pre><code class="language-text">title:hello AND content:~"cute kitten"^0.8
 |--- lexical --|    |--- vector --------|
 </code></pre>
@@ -3048,7 +3733,7 @@ engine.add_document("doc-3", doc3).await?;
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="deletions--compaction-1"><a class="header" href="#deletions--compaction-1">Deletions &amp; Compaction</a></h1>
 <p>Laurus uses a two-phase deletion strategy: fast <strong>logical deletion</strong> followed by periodic <strong>physical compaction</strong>.</p>
-<h2 id="deleting-documents"><a class="header" href="#deleting-documents">Deleting Documents</a></h2>
+<h2 id="deleting-documents-2"><a class="header" href="#deleting-documents-2">Deleting Documents</a></h2>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// Delete a document by its external ID
@@ -3142,6 +3827,612 @@ engine.commit().await?;
 <li>How data is persisted: <a href="advanced/persistence.html">Persistence &amp; WAL</a></li>
 <li>ID management and internal/external ID mapping: <a href="advanced/id_management.html">ID Management</a></li>
 </ul>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="error-handling-1"><a class="header" href="#error-handling-1">Error Handling</a></h1>
+<p>Laurus uses a unified error type for all operations. Understanding the error system helps you write robust applications that handle failures gracefully.</p>
+<h2 id="lauruserror"><a class="header" href="#lauruserror">LaurusError</a></h2>
+<p>All Laurus operations return <code>Result&lt;T&gt;</code>, which is an alias for <code>std::result::Result&lt;T, LaurusError&gt;</code>.</p>
+<p><code>LaurusError</code> is an enum with variants for each category of failure:</p>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Variant</th><th style="text-align: left">Description</th><th style="text-align: left">Common Causes</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>Io</code></td><td style="text-align: left">I/O errors</td><td style="text-align: left">File not found, permission denied, disk full</td></tr>
+<tr><td style="text-align: left"><code>Index</code></td><td style="text-align: left">Index operation errors</td><td style="text-align: left">Corrupt index, segment read failure</td></tr>
+<tr><td style="text-align: left"><code>Schema</code></td><td style="text-align: left">Schema-related errors</td><td style="text-align: left">Unknown field name, type mismatch</td></tr>
+<tr><td style="text-align: left"><code>Analysis</code></td><td style="text-align: left">Text analysis errors</td><td style="text-align: left">Tokenizer failure, invalid filter config</td></tr>
+<tr><td style="text-align: left"><code>Query</code></td><td style="text-align: left">Query parsing/execution errors</td><td style="text-align: left">Malformed Query DSL, unknown field in query</td></tr>
+<tr><td style="text-align: left"><code>Storage</code></td><td style="text-align: left">Storage backend errors</td><td style="text-align: left">Failed to open storage, write failure</td></tr>
+<tr><td style="text-align: left"><code>Field</code></td><td style="text-align: left">Field definition errors</td><td style="text-align: left">Invalid field options, duplicate field name</td></tr>
+<tr><td style="text-align: left"><code>Json</code></td><td style="text-align: left">JSON serialization errors</td><td style="text-align: left">Malformed document JSON</td></tr>
+<tr><td style="text-align: left"><code>InvalidOperation</code></td><td style="text-align: left">Invalid operation</td><td style="text-align: left">Searching before commit, double close</td></tr>
+<tr><td style="text-align: left"><code>ResourceExhausted</code></td><td style="text-align: left">Resource limits exceeded</td><td style="text-align: left">Out of memory, too many open files</td></tr>
+<tr><td style="text-align: left"><code>SerializationError</code></td><td style="text-align: left">Binary serialization errors</td><td style="text-align: left">Corrupt data on disk</td></tr>
+<tr><td style="text-align: left"><code>OperationCancelled</code></td><td style="text-align: left">Operation was cancelled</td><td style="text-align: left">Timeout, user cancellation</td></tr>
+<tr><td style="text-align: left"><code>NotImplemented</code></td><td style="text-align: left">Feature not available</td><td style="text-align: left">Unimplemented operation</td></tr>
+<tr><td style="text-align: left"><code>Other</code></td><td style="text-align: left">Generic errors</td><td style="text-align: left">Timeout, invalid config, invalid argument</td></tr>
+</tbody></table>
+</div>
+<h2 id="basic-error-handling"><a class="header" href="#basic-error-handling">Basic Error Handling</a></h2>
+<h3 id="using-the--operator"><a class="header" href="#using-the--operator">Using the <code>?</code> Operator</a></h3>
+<p>The simplest approach — propagate errors to the caller:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use laurus::{Engine, Result};
+
+async fn index_documents(engine: &amp;Engine) -&gt; Result&lt;()&gt; {
+    let doc = laurus::Document::builder()
+        .add_text("title", "Rust Programming")
+        .build();
+
+    engine.put_document("doc1", doc).await?;
+    engine.commit().await?;
+    Ok(())
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="matching-on-error-variants"><a class="header" href="#matching-on-error-variants">Matching on Error Variants</a></h3>
+<p>When you need different behavior for different error types:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use laurus::{Engine, LaurusError};
+
+async fn safe_search(engine: &amp;Engine, query: &amp;str) {
+    match engine.search(/* request */).await {
+        Ok(results) =&gt; {
+            for result in results {
+                println!("{}: {}", result.id, result.score);
+            }
+        }
+        Err(LaurusError::Query(msg)) =&gt; {
+            eprintln!("Invalid query syntax: {}", msg);
+        }
+        Err(LaurusError::Io(e)) =&gt; {
+            eprintln!("Storage I/O error: {}", e);
+        }
+        Err(e) =&gt; {
+            eprintln!("Unexpected error: {}", e);
+        }
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="checking-error-types-with-downcast"><a class="header" href="#checking-error-types-with-downcast">Checking Error Types with <code>downcast</code></a></h3>
+<p>Since <code>LaurusError</code> implements <code>std::error::Error</code>, you can use standard error handling patterns:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use laurus::LaurusError;
+
+fn is_retriable(error: &amp;LaurusError) -&gt; bool {
+    matches!(error, LaurusError::Io(_) | LaurusError::ResourceExhausted(_))
+}
+<span class="boring">}</span></code></pre></pre>
+<h2 id="common-error-scenarios"><a class="header" href="#common-error-scenarios">Common Error Scenarios</a></h2>
+<h3 id="schema-mismatch"><a class="header" href="#schema-mismatch">Schema Mismatch</a></h3>
+<p>Adding a document with fields that don't match the schema:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Schema has "title" (Text) and "year" (Integer)
+let doc = Document::builder()
+    .add_text("title", "Hello")
+    .add_text("unknown_field", "this field is not in schema")
+    .build();
+
+// Fields not in the schema are silently ignored during indexing.
+// No error is raised — only schema-defined fields are processed.
+<span class="boring">}</span></code></pre></pre>
+<h3 id="query-parsing-errors"><a class="header" href="#query-parsing-errors">Query Parsing Errors</a></h3>
+<p>Invalid Query DSL syntax returns a <code>Query</code> error:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use laurus::engine::query::UnifiedQueryParser;
+
+let parser = UnifiedQueryParser::new();
+match parser.parse("title:\"unclosed phrase") {
+    Ok(request) =&gt; { /* ... */ }
+    Err(LaurusError::Query(msg)) =&gt; {
+        // msg contains details about the parse failure
+        eprintln!("Bad query: {}", msg);
+    }
+    Err(e) =&gt; { /* other errors */ }
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="storage-io-errors"><a class="header" href="#storage-io-errors">Storage I/O Errors</a></h3>
+<p>File-based storage may encounter I/O errors:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use laurus::storage::{StorageConfig, StorageFactory};
+
+match StorageFactory::open(StorageConfig::File {
+    path: "/nonexistent/path".into(),
+    loading_mode: Default::default(),
+}) {
+    Ok(storage) =&gt; { /* ... */ }
+    Err(LaurusError::Io(e)) =&gt; {
+        eprintln!("Cannot open storage: {}", e);
+    }
+    Err(e) =&gt; { /* other errors */ }
+}
+<span class="boring">}</span></code></pre></pre>
+<h2 id="convenience-constructors"><a class="header" href="#convenience-constructors">Convenience Constructors</a></h2>
+<p><code>LaurusError</code> provides factory methods for creating errors in custom implementations:</p>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Method</th><th style="text-align: left">Creates</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>LaurusError::index(msg)</code></td><td style="text-align: left"><code>Index</code> variant</td></tr>
+<tr><td style="text-align: left"><code>LaurusError::schema(msg)</code></td><td style="text-align: left"><code>Schema</code> variant</td></tr>
+<tr><td style="text-align: left"><code>LaurusError::analysis(msg)</code></td><td style="text-align: left"><code>Analysis</code> variant</td></tr>
+<tr><td style="text-align: left"><code>LaurusError::query(msg)</code></td><td style="text-align: left"><code>Query</code> variant</td></tr>
+<tr><td style="text-align: left"><code>LaurusError::storage(msg)</code></td><td style="text-align: left"><code>Storage</code> variant</td></tr>
+<tr><td style="text-align: left"><code>LaurusError::field(msg)</code></td><td style="text-align: left"><code>Field</code> variant</td></tr>
+<tr><td style="text-align: left"><code>LaurusError::other(msg)</code></td><td style="text-align: left"><code>Other</code> variant</td></tr>
+<tr><td style="text-align: left"><code>LaurusError::cancelled(msg)</code></td><td style="text-align: left"><code>OperationCancelled</code> variant</td></tr>
+<tr><td style="text-align: left"><code>LaurusError::invalid_argument(msg)</code></td><td style="text-align: left"><code>Other</code> with "Invalid argument" prefix</td></tr>
+<tr><td style="text-align: left"><code>LaurusError::invalid_config(msg)</code></td><td style="text-align: left"><code>Other</code> with "Invalid configuration" prefix</td></tr>
+<tr><td style="text-align: left"><code>LaurusError::not_found(msg)</code></td><td style="text-align: left"><code>Other</code> with "Not found" prefix</td></tr>
+<tr><td style="text-align: left"><code>LaurusError::timeout(msg)</code></td><td style="text-align: left"><code>Other</code> with "Timeout" prefix</td></tr>
+</tbody></table>
+</div>
+<p>These are useful when implementing custom <a href="advanced/extensibility.html">Analyzer, Embedder, or Storage</a> traits:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use laurus::{LaurusError, Result};
+
+fn validate_dimension(dim: usize) -&gt; Result&lt;()&gt; {
+    if dim == 0 {
+        return Err(LaurusError::invalid_argument("dimension must be &gt; 0"));
+    }
+    Ok(())
+}
+<span class="boring">}</span></code></pre></pre>
+<h2 id="automatic-conversions"><a class="header" href="#automatic-conversions">Automatic Conversions</a></h2>
+<p><code>LaurusError</code> implements <code>From</code> for common error types, so they convert automatically with <code>?</code>:</p>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Source Type</th><th style="text-align: left">Target Variant</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>std::io::Error</code></td><td style="text-align: left"><code>LaurusError::Io</code></td></tr>
+<tr><td style="text-align: left"><code>serde_json::Error</code></td><td style="text-align: left"><code>LaurusError::Json</code></td></tr>
+<tr><td style="text-align: left"><code>anyhow::Error</code></td><td style="text-align: left"><code>LaurusError::Anyhow</code></td></tr>
+</tbody></table>
+</div>
+<h2 id="next-steps-10"><a class="header" href="#next-steps-10">Next Steps</a></h2>
+<ul>
+<li><a href="advanced/extensibility.html">Extensibility</a> — implement custom traits with proper error handling</li>
+<li><a href="advanced/../api_reference.html">API Reference</a> — full method signatures and return types</li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="extensibility-1"><a class="header" href="#extensibility-1">Extensibility</a></h1>
+<p>Laurus uses trait-based abstractions for its core components. You can implement these traits to provide custom analyzers, embedders, and storage backends.</p>
+<h2 id="custom-analyzer"><a class="header" href="#custom-analyzer">Custom Analyzer</a></h2>
+<p>Implement the <code>Analyzer</code> trait to create a custom text analysis pipeline:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use laurus::analysis::analyzer::analyzer::Analyzer;
+use laurus::analysis::token::{Token, TokenStream};
+use laurus::Result;
+
+#[derive(Debug)]
+struct ReverseAnalyzer;
+
+impl Analyzer for ReverseAnalyzer {
+    fn analyze(&amp;self, text: &amp;str) -&gt; Result&lt;TokenStream&gt; {
+        let tokens: Vec&lt;Token&gt; = text
+            .split_whitespace()
+            .enumerate()
+            .map(|(i, word)| Token {
+                text: word.chars().rev().collect(),
+                position: i,
+                ..Default::default()
+            })
+            .collect();
+        Ok(Box::new(tokens.into_iter()))
+    }
+
+    fn name(&amp;self) -&gt; &amp;str {
+        "reverse"
+    }
+
+    fn as_any(&amp;self) -&gt; &amp;dyn std::any::Any {
+        self
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="required-methods"><a class="header" href="#required-methods">Required Methods</a></h3>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Method</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>analyze(&amp;self, text: &amp;str) -&gt; Result&lt;TokenStream&gt;</code></td><td style="text-align: left">Process text into a stream of tokens</td></tr>
+<tr><td style="text-align: left"><code>name(&amp;self) -&gt; &amp;str</code></td><td style="text-align: left">Return a unique identifier for this analyzer</td></tr>
+<tr><td style="text-align: left"><code>as_any(&amp;self) -&gt; &amp;dyn Any</code></td><td style="text-align: left">Enable downcasting to the concrete type</td></tr>
+</tbody></table>
+</div>
+<h3 id="using-a-custom-analyzer"><a class="header" href="#using-a-custom-analyzer">Using a Custom Analyzer</a></h3>
+<p>Pass your analyzer to <code>EngineBuilder</code>:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use std::sync::Arc;
+
+let analyzer = Arc::new(ReverseAnalyzer);
+let engine = Engine::builder(storage, schema)
+    .analyzer(analyzer)
+    .build()
+    .await?;
+<span class="boring">}</span></code></pre></pre>
+<p>For per-field analyzers, wrap with <code>PerFieldAnalyzer</code>:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use laurus::analysis::analyzer::per_field::PerFieldAnalyzer;
+use laurus::analysis::analyzer::standard::StandardAnalyzer;
+
+let mut per_field = PerFieldAnalyzer::new(Arc::new(StandardAnalyzer::new()?));
+per_field.add_analyzer("custom_field", Arc::new(ReverseAnalyzer));
+
+let engine = Engine::builder(storage, schema)
+    .analyzer(Arc::new(per_field))
+    .build()
+    .await?;
+<span class="boring">}</span></code></pre></pre>
+<h2 id="custom-embedder"><a class="header" href="#custom-embedder">Custom Embedder</a></h2>
+<p>Implement the <code>Embedder</code> trait to integrate your own vector embedding model:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use async_trait::async_trait;
+use laurus::embedding::embedder::{Embedder, EmbedInput, EmbedInputType};
+use laurus::vector::core::vector::Vector;
+use laurus::{LaurusError, Result};
+
+#[derive(Debug)]
+struct MyEmbedder {
+    dimension: usize,
+}
+
+#[async_trait]
+impl Embedder for MyEmbedder {
+    async fn embed(&amp;self, input: &amp;EmbedInput&lt;'_&gt;) -&gt; Result&lt;Vector&gt; {
+        match input {
+            EmbedInput::Text(text) =&gt; {
+                // Your embedding logic here
+                let vector = vec![0.0f32; self.dimension];
+                Ok(Vector::new(vector))
+            }
+            _ =&gt; Err(LaurusError::invalid_argument(
+                "this embedder only supports text input",
+            )),
+        }
+    }
+
+    fn supported_input_types(&amp;self) -&gt; Vec&lt;EmbedInputType&gt; {
+        vec![EmbedInputType::Text]
+    }
+
+    fn name(&amp;self) -&gt; &amp;str {
+        "my-embedder"
+    }
+
+    fn as_any(&amp;self) -&gt; &amp;dyn std::any::Any {
+        self
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="required-methods-1"><a class="header" href="#required-methods-1">Required Methods</a></h3>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Method</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>async embed(&amp;self, input: &amp;EmbedInput) -&gt; Result&lt;Vector&gt;</code></td><td style="text-align: left">Generate an embedding vector for the given input</td></tr>
+<tr><td style="text-align: left"><code>supported_input_types(&amp;self) -&gt; Vec&lt;EmbedInputType&gt;</code></td><td style="text-align: left">Declare supported input types (<code>Text</code>, <code>Image</code>)</td></tr>
+<tr><td style="text-align: left"><code>as_any(&amp;self) -&gt; &amp;dyn Any</code></td><td style="text-align: left">Enable downcasting</td></tr>
+</tbody></table>
+</div>
+<h3 id="optional-methods"><a class="header" href="#optional-methods">Optional Methods</a></h3>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Method</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>async embed_batch(&amp;self, inputs) -&gt; Result&lt;Vec&lt;Vector&gt;&gt;</code></td><td style="text-align: left">Sequential calls to <code>embed</code></td><td style="text-align: left">Override for batch optimization</td></tr>
+<tr><td style="text-align: left"><code>name(&amp;self) -&gt; &amp;str</code></td><td style="text-align: left"><code>"unknown"</code></td><td style="text-align: left">Identifier for logging</td></tr>
+<tr><td style="text-align: left"><code>supports(&amp;self, input_type) -&gt; bool</code></td><td style="text-align: left">Checks <code>supported_input_types</code></td><td style="text-align: left">Input type support check</td></tr>
+<tr><td style="text-align: left"><code>supports_text() -&gt; bool</code></td><td style="text-align: left">Checks for <code>Text</code></td><td style="text-align: left">Text support shorthand</td></tr>
+<tr><td style="text-align: left"><code>supports_image() -&gt; bool</code></td><td style="text-align: left">Checks for <code>Image</code></td><td style="text-align: left">Image support shorthand</td></tr>
+<tr><td style="text-align: left"><code>is_multimodal() -&gt; bool</code></td><td style="text-align: left">Both text and image</td><td style="text-align: left">Multimodal check</td></tr>
+</tbody></table>
+</div>
+<h3 id="using-a-custom-embedder"><a class="header" href="#using-a-custom-embedder">Using a Custom Embedder</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let embedder = Arc::new(MyEmbedder { dimension: 384 });
+let engine = Engine::builder(storage, schema)
+    .embedder(embedder)
+    .build()
+    .await?;
+<span class="boring">}</span></code></pre></pre>
+<p>For per-field embedders, wrap with <code>PerFieldEmbedder</code>:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use laurus::embedding::per_field::PerFieldEmbedder;
+
+let mut per_field = PerFieldEmbedder::new(Arc::new(MyEmbedder { dimension: 384 }));
+per_field.add_embedder("image_vec", Arc::new(ClipEmbedder::new()?));
+
+let engine = Engine::builder(storage, schema)
+    .embedder(Arc::new(per_field))
+    .build()
+    .await?;
+<span class="boring">}</span></code></pre></pre>
+<h2 id="custom-storage"><a class="header" href="#custom-storage">Custom Storage</a></h2>
+<p>Implement the <code>Storage</code> trait to add a new storage backend:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use laurus::storage::{Storage, StorageInput, StorageOutput, LoadingMode, FileMetadata};
+use laurus::Result;
+
+#[derive(Debug)]
+struct S3Storage {
+    bucket: String,
+    prefix: String,
+}
+
+impl Storage for S3Storage {
+    fn loading_mode(&amp;self) -&gt; LoadingMode {
+        LoadingMode::Eager  // S3 requires full download
+    }
+
+    fn open_input(&amp;self, name: &amp;str) -&gt; Result&lt;Box&lt;dyn StorageInput&gt;&gt; {
+        // Download from S3 and return a reader
+        todo!()
+    }
+
+    fn create_output(&amp;self, name: &amp;str) -&gt; Result&lt;Box&lt;dyn StorageOutput&gt;&gt; {
+        // Create an upload stream to S3
+        todo!()
+    }
+
+    fn create_output_append(&amp;self, name: &amp;str) -&gt; Result&lt;Box&lt;dyn StorageOutput&gt;&gt; {
+        todo!()
+    }
+
+    fn file_exists(&amp;self, name: &amp;str) -&gt; bool {
+        todo!()
+    }
+
+    fn delete_file(&amp;self, name: &amp;str) -&gt; Result&lt;()&gt; {
+        todo!()
+    }
+
+    fn list_files(&amp;self) -&gt; Result&lt;Vec&lt;String&gt;&gt; {
+        todo!()
+    }
+
+    fn file_size(&amp;self, name: &amp;str) -&gt; Result&lt;u64&gt; {
+        todo!()
+    }
+
+    fn metadata(&amp;self, name: &amp;str) -&gt; Result&lt;FileMetadata&gt; {
+        todo!()
+    }
+
+    fn rename_file(&amp;self, old_name: &amp;str, new_name: &amp;str) -&gt; Result&lt;()&gt; {
+        todo!()
+    }
+
+    fn create_temp_output(&amp;self, prefix: &amp;str) -&gt; Result&lt;(String, Box&lt;dyn StorageOutput&gt;)&gt; {
+        todo!()
+    }
+
+    fn sync(&amp;self) -&gt; Result&lt;()&gt; {
+        todo!()
+    }
+
+    fn close(&amp;mut self) -&gt; Result&lt;()&gt; {
+        todo!()
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="required-methods-2"><a class="header" href="#required-methods-2">Required Methods</a></h3>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Method</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>open_input(name) -&gt; Result&lt;Box&lt;dyn StorageInput&gt;&gt;</code></td><td style="text-align: left">Open a file for reading</td></tr>
+<tr><td style="text-align: left"><code>create_output(name) -&gt; Result&lt;Box&lt;dyn StorageOutput&gt;&gt;</code></td><td style="text-align: left">Create a file for writing</td></tr>
+<tr><td style="text-align: left"><code>create_output_append(name) -&gt; Result&lt;Box&lt;dyn StorageOutput&gt;&gt;</code></td><td style="text-align: left">Open a file for appending</td></tr>
+<tr><td style="text-align: left"><code>file_exists(name) -&gt; bool</code></td><td style="text-align: left">Check if a file exists</td></tr>
+<tr><td style="text-align: left"><code>delete_file(name) -&gt; Result&lt;()&gt;</code></td><td style="text-align: left">Delete a file</td></tr>
+<tr><td style="text-align: left"><code>list_files() -&gt; Result&lt;Vec&lt;String&gt;&gt;</code></td><td style="text-align: left">List all files</td></tr>
+<tr><td style="text-align: left"><code>file_size(name) -&gt; Result&lt;u64&gt;</code></td><td style="text-align: left">Get file size in bytes</td></tr>
+<tr><td style="text-align: left"><code>metadata(name) -&gt; Result&lt;FileMetadata&gt;</code></td><td style="text-align: left">Get file metadata</td></tr>
+<tr><td style="text-align: left"><code>rename_file(old, new) -&gt; Result&lt;()&gt;</code></td><td style="text-align: left">Rename a file</td></tr>
+<tr><td style="text-align: left"><code>create_temp_output(prefix) -&gt; Result&lt;(String, Box&lt;dyn StorageOutput&gt;)&gt;</code></td><td style="text-align: left">Create a temporary file</td></tr>
+<tr><td style="text-align: left"><code>sync() -&gt; Result&lt;()&gt;</code></td><td style="text-align: left">Flush all pending writes</td></tr>
+<tr><td style="text-align: left"><code>close(&amp;mut self) -&gt; Result&lt;()&gt;</code></td><td style="text-align: left">Close storage and release resources</td></tr>
+</tbody></table>
+</div>
+<h3 id="optional-methods-1"><a class="header" href="#optional-methods-1">Optional Methods</a></h3>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Method</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>loading_mode() -&gt; LoadingMode</code></td><td style="text-align: left"><code>LoadingMode::Eager</code></td><td style="text-align: left">Preferred data loading mode</td></tr>
+</tbody></table>
+</div>
+<h2 id="thread-safety"><a class="header" href="#thread-safety">Thread Safety</a></h2>
+<p>All three traits require <code>Send + Sync</code>. This means your implementations must be safe to share across threads. Use <code>Arc&lt;Mutex&lt;_&gt;&gt;</code> or lock-free data structures for shared mutable state.</p>
+<h2 id="next-steps-11"><a class="header" href="#next-steps-11">Next Steps</a></h2>
+<ul>
+<li><a href="advanced/error_handling.html">Error Handling</a> — handle errors in custom implementations</li>
+<li><a href="advanced/../concepts/analysis.html">Text Analysis</a> — built-in analyzers and pipeline components</li>
+<li><a href="advanced/../concepts/embedding.html">Embeddings</a> — built-in embedder options</li>
+<li><a href="advanced/../concepts/storage.html">Storage</a> — built-in storage backends</li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="architecture"><a class="header" href="#architecture">Architecture</a></h1>
+<p>This page explains how Laurus is structured internally. Understanding the architecture will help you make better decisions about schema design, analyzer selection, and search strategies.</p>
+<h2 id="high-level-overview"><a class="header" href="#high-level-overview">High-Level Overview</a></h2>
+<p>Laurus is organized around a single <code>Engine</code> that coordinates four internal components:</p>
+<pre><code class="language-mermaid">graph TB
+    subgraph Engine
+        SCH["Schema"]
+        LS["LexicalStore\n(Inverted Index)"]
+        VS["VectorStore\n(HNSW / Flat / IVF)"]
+        DL["DocumentLog\n(WAL + Document Storage)"]
+    end
+
+    Storage["Storage (trait)\nMemory / File / File+Mmap"]
+
+    LS --- Storage
+    VS --- Storage
+    DL --- Storage
+</code></pre>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Component</th><th style="text-align: left">Responsibility</th></tr></thead><tbody>
+<tr><td style="text-align: left"><strong>Schema</strong></td><td style="text-align: left">Declares fields and their types; determines how each field is routed</td></tr>
+<tr><td style="text-align: left"><strong>LexicalStore</strong></td><td style="text-align: left">Inverted index for keyword search (BM25 scoring)</td></tr>
+<tr><td style="text-align: left"><strong>VectorStore</strong></td><td style="text-align: left">Vector index for similarity search (Flat, HNSW, or IVF)</td></tr>
+<tr><td style="text-align: left"><strong>DocumentLog</strong></td><td style="text-align: left">Write-ahead log (WAL) for durability + raw document storage</td></tr>
+</tbody></table>
+</div>
+<p>All three stores share a single <code>Storage</code> backend, isolated by key prefixes (<code>lexical/</code>, <code>vector/</code>, <code>documents/</code>).</p>
+<h2 id="engine-lifecycle"><a class="header" href="#engine-lifecycle">Engine Lifecycle</a></h2>
+<h3 id="building-an-engine"><a class="header" href="#building-an-engine">Building an Engine</a></h3>
+<p>The <code>EngineBuilder</code> assembles the engine from its parts:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let engine = Engine::builder(storage, schema)
+    .analyzer(analyzer)      // optional: for text fields
+    .embedder(embedder)      // optional: for vector fields
+    .build()
+    .await?;
+<span class="boring">}</span></code></pre></pre>
+<pre><code class="language-mermaid">sequenceDiagram
+    participant User
+    participant EngineBuilder
+    participant Engine
+
+    User-&gt;&gt;EngineBuilder: new(storage, schema)
+    User-&gt;&gt;EngineBuilder: .analyzer(analyzer)
+    User-&gt;&gt;EngineBuilder: .embedder(embedder)
+    User-&gt;&gt;EngineBuilder: .build().await
+    EngineBuilder-&gt;&gt;EngineBuilder: split_schema()
+    Note over EngineBuilder: Separate fields into\nLexicalIndexConfig\n+ VectorIndexConfig
+    EngineBuilder-&gt;&gt;Engine: Create LexicalStore
+    EngineBuilder-&gt;&gt;Engine: Create VectorStore
+    EngineBuilder-&gt;&gt;Engine: Create DocumentLog
+    EngineBuilder-&gt;&gt;Engine: Recover from WAL
+    EngineBuilder--&gt;&gt;User: Engine ready
+</code></pre>
+<p>During <code>build()</code>, the engine:</p>
+<ol>
+<li><strong>Splits the schema</strong> — lexical fields go to <code>LexicalIndexConfig</code>, vector fields go to <code>VectorIndexConfig</code></li>
+<li><strong>Creates prefixed storage</strong> — each component gets an isolated namespace (<code>lexical/</code>, <code>vector/</code>, <code>documents/</code>)</li>
+<li><strong>Initializes stores</strong> — <code>LexicalStore</code> and <code>VectorStore</code> are constructed with their configs</li>
+<li><strong>Recovers from WAL</strong> — replays any uncommitted operations from a previous session</li>
+</ol>
+<h3 id="schema-splitting"><a class="header" href="#schema-splitting">Schema Splitting</a></h3>
+<p>The <code>Schema</code> contains both lexical and vector fields. At build time, <code>split_schema()</code> separates them:</p>
+<pre><code class="language-mermaid">graph LR
+    S["Schema\ntitle: Text\nbody: Text\ncategory: Text\npage: Integer\ncontent_vec: HNSW"]
+
+    S --&gt; LC["LexicalIndexConfig\ntitle: TextOption\nbody: TextOption\ncategory: TextOption\npage: IntegerOption\n_id: KeywordAnalyzer"]
+
+    S --&gt; VC["VectorIndexConfig\ncontent_vec: HnswOption\n(dim=384, m=16, ef=200)"]
+</code></pre>
+<p>Key details:</p>
+<ul>
+<li>The reserved <code>_id</code> field is always added to the lexical config with <code>KeywordAnalyzer</code> (exact match)</li>
+<li>A <code>PerFieldAnalyzer</code> wraps per-field analyzer settings; if you pass a simple <code>StandardAnalyzer</code>, it becomes the default for all text fields</li>
+<li>A <code>PerFieldEmbedder</code> works the same way for vector fields</li>
+</ul>
+<h2 id="indexing-data-flow"><a class="header" href="#indexing-data-flow">Indexing Data Flow</a></h2>
+<p>When you call <code>engine.add_document(id, doc)</code>:</p>
+<pre><code class="language-mermaid">sequenceDiagram
+    participant User
+    participant Engine
+    participant WAL as DocumentLog (WAL)
+    participant Lexical as LexicalStore
+    participant Vector as VectorStore
+
+    User-&gt;&gt;Engine: add_document("doc-1", doc)
+    Engine-&gt;&gt;WAL: Append to WAL
+    Engine-&gt;&gt;Engine: Assign internal ID (u64)
+
+    loop For each field in document
+        alt Lexical field (text, integer, etc.)
+            Engine-&gt;&gt;Lexical: Analyze + index field
+        else Vector field
+            Engine-&gt;&gt;Vector: Embed + index field
+        end
+    end
+
+    Note over Engine: Document is buffered\nbut NOT yet searchable
+
+    User-&gt;&gt;Engine: commit()
+    Engine-&gt;&gt;Lexical: Flush segments to storage
+    Engine-&gt;&gt;Vector: Flush segments to storage
+    Engine-&gt;&gt;WAL: Truncate WAL
+    Note over Engine: Documents are\nnow searchable
+</code></pre>
+<p>Key points:</p>
+<ul>
+<li><strong>WAL-first</strong>: every write is logged before modifying in-memory structures</li>
+<li><strong>Dual indexing</strong>: each field is routed to either the lexical or vector store based on the schema</li>
+<li><strong>Commit required</strong>: documents become searchable only after <code>commit()</code></li>
+</ul>
+<h2 id="search-data-flow"><a class="header" href="#search-data-flow">Search Data Flow</a></h2>
+<p>When you call <code>engine.search(request)</code>:</p>
+<pre><code class="language-mermaid">sequenceDiagram
+    participant User
+    participant Engine
+    participant Lexical as LexicalStore
+    participant Vector as VectorStore
+    participant Fusion
+
+    User-&gt;&gt;Engine: search(request)
+
+    opt Filter query present
+        Engine-&gt;&gt;Lexical: Execute filter query
+        Lexical--&gt;&gt;Engine: Allowed document IDs
+    end
+
+    par Lexical search
+        Engine-&gt;&gt;Lexical: Execute lexical query
+        Lexical--&gt;&gt;Engine: Ranked hits (BM25)
+    and Vector search
+        Engine-&gt;&gt;Vector: Execute vector query
+        Vector--&gt;&gt;Engine: Ranked hits (similarity)
+    end
+
+    alt Both lexical and vector results
+        Engine-&gt;&gt;Fusion: Fuse results (RRF or WeightedSum)
+        Fusion--&gt;&gt;Engine: Merged ranked list
+    end
+
+    Engine-&gt;&gt;Engine: Apply offset + limit
+    Engine--&gt;&gt;User: Vec of SearchResult
+</code></pre>
+<p>The search pipeline has three stages:</p>
+<ol>
+<li><strong>Filter</strong> (optional) — execute a filter query on the lexical index to get a set of allowed document IDs</li>
+<li><strong>Search</strong> — run lexical and/or vector queries in parallel</li>
+<li><strong>Fusion</strong> — if both query types are present, merge results using RRF (default, k=60) or WeightedSum</li>
+</ol>
+<h2 id="storage-architecture"><a class="header" href="#storage-architecture">Storage Architecture</a></h2>
+<p>All components share a single <code>Storage</code> trait implementation, but use key prefixes to isolate their data:</p>
+<pre><code class="language-mermaid">graph TB
+    Engine --&gt; PS1["PrefixedStorage\nprefix: 'lexical/'"]
+    Engine --&gt; PS2["PrefixedStorage\nprefix: 'vector/'"]
+    Engine --&gt; PS3["PrefixedStorage\nprefix: 'documents/'"]
+
+    PS1 --&gt; S["Storage Backend\n(Memory / File / File+Mmap)"]
+    PS2 --&gt; S
+    PS3 --&gt; S
+</code></pre>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Backend</th><th style="text-align: left">Description</th><th style="text-align: left">Best For</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>MemoryStorage</code></td><td style="text-align: left">All data in memory</td><td style="text-align: left">Testing, small datasets, ephemeral use</td></tr>
+<tr><td style="text-align: left"><code>FileStorage</code></td><td style="text-align: left">Standard file I/O</td><td style="text-align: left">General production use</td></tr>
+<tr><td style="text-align: left"><code>FileStorage</code> (mmap)</td><td style="text-align: left">Memory-mapped files (<code>use_mmap = true</code>)</td><td style="text-align: left">Large datasets, read-heavy workloads</td></tr>
+</tbody></table>
+</div>
+<h2 id="per-field-dispatch"><a class="header" href="#per-field-dispatch">Per-Field Dispatch</a></h2>
+<p>When a <code>PerFieldAnalyzer</code> is provided, the engine dispatches analysis to field-specific analyzers. The same pattern applies to <code>PerFieldEmbedder</code>.</p>
+<pre><code class="language-mermaid">graph LR
+    PFA["PerFieldAnalyzer"]
+    PFA --&gt;|"title"| KA["KeywordAnalyzer"]
+    PFA --&gt;|"body"| SA["StandardAnalyzer"]
+    PFA --&gt;|"description"| JA["JapaneseAnalyzer"]
+    PFA --&gt;|"_id"| KA2["KeywordAnalyzer\n(always)"]
+    PFA --&gt;|other fields| DEF["Default Analyzer\n(StandardAnalyzer)"]
+</code></pre>
+<p>This allows different fields to use different analysis strategies within the same engine.</p>
+<h2 id="summary"><a class="header" href="#summary">Summary</a></h2>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Aspect</th><th style="text-align: left">Detail</th></tr></thead><tbody>
+<tr><td style="text-align: left"><strong>Core struct</strong></td><td style="text-align: left"><code>Engine</code> — coordinates all operations</td></tr>
+<tr><td style="text-align: left"><strong>Builder</strong></td><td style="text-align: left"><code>EngineBuilder</code> — assembles Engine from Storage + Schema + Analyzer + Embedder</td></tr>
+<tr><td style="text-align: left"><strong>Schema split</strong></td><td style="text-align: left">Lexical fields → <code>LexicalIndexConfig</code>, Vector fields → <code>VectorIndexConfig</code></td></tr>
+<tr><td style="text-align: left"><strong>Write path</strong></td><td style="text-align: left">WAL → in-memory buffers → <code>commit()</code> → persistent storage</td></tr>
+<tr><td style="text-align: left"><strong>Read path</strong></td><td style="text-align: left">Query → parallel lexical/vector search → fusion → ranked results</td></tr>
+<tr><td style="text-align: left"><strong>Storage isolation</strong></td><td style="text-align: left"><code>PrefixedStorage</code> with <code>lexical/</code>, <code>vector/</code>, <code>documents/</code> prefixes</td></tr>
+<tr><td style="text-align: left"><strong>Per-field dispatch</strong></td><td style="text-align: left"><code>PerFieldAnalyzer</code> and <code>PerFieldEmbedder</code> route to field-specific implementations</td></tr>
+</tbody></table>
+</div>
+<h2 id="next-steps-12"><a class="header" href="#next-steps-12">Next Steps</a></h2>
+<ul>
+<li>Understand field types and schema design: <a href="concepts/schema_and_fields.html">Schema &amp; Fields</a></li>
+<li>Learn about text analysis: <a href="concepts/analysis.html">Text Analysis</a></li>
+<li>Learn about embeddings: <a href="concepts/embedding.html">Embeddings</a></li>
+</ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="api-reference"><a class="header" href="#api-reference">API Reference</a></h1>
 <p>This page provides a quick reference of the most important types and methods in Laurus. For full details, generate the Rustdoc:</p>
 <pre><code class="language-bash">cargo doc --open
@@ -3153,11 +4444,15 @@ engine.commit().await?;
 <tr><td style="text-align: left"><code>engine.put_document(id, doc).await?</code></td><td style="text-align: left">Upsert a document (replace if ID exists)</td></tr>
 <tr><td style="text-align: left"><code>engine.add_document(id, doc).await?</code></td><td style="text-align: left">Add a document as a chunk (multiple chunks can share an ID)</td></tr>
 <tr><td style="text-align: left"><code>engine.delete_documents(id).await?</code></td><td style="text-align: left">Delete all documents/chunks by external ID</td></tr>
+<tr><td style="text-align: left"><code>engine.get_documents(id).await?</code></td><td style="text-align: left">Get all documents/chunks by external ID</td></tr>
 <tr><td style="text-align: left"><code>engine.search(request).await?</code></td><td style="text-align: left">Execute a search request</td></tr>
 <tr><td style="text-align: left"><code>engine.commit().await?</code></td><td style="text-align: left">Flush all pending changes to storage</td></tr>
 <tr><td style="text-align: left"><code>engine.stats()?</code></td><td style="text-align: left">Get index statistics</td></tr>
 </tbody></table>
 </div>
+<blockquote>
+<p><strong><code>put_document</code> vs <code>add_document</code>:</strong> <code>put_document</code> performs an upsert — if a document with the same external ID already exists, it is deleted and replaced. <code>add_document</code> always appends, allowing multiple document chunks to share the same external ID. See <a href="concepts/schema_and_fields.html#indexing-documents">Schema &amp; Fields — Indexing Documents</a> for details.</p>
+</blockquote>
 <h3 id="enginebuilder"><a class="header" href="#enginebuilder">EngineBuilder</a></h3>
 <div class="table-wrapper"><table><thead><tr><th style="text-align: left">Method</th><th style="text-align: left">Description</th></tr></thead><tbody>
 <tr><td style="text-align: left"><code>EngineBuilder::new(storage, schema)</code></td><td style="text-align: left">Create a builder with storage and schema</td></tr>
@@ -3210,7 +4505,7 @@ engine.commit().await?;
 <tr><td style="text-align: left"><code>.build()</code></td><td style="text-align: left">Build the <code>Document</code></td></tr>
 </tbody></table>
 </div>
-<h2 id="search-1"><a class="header" href="#search-1">Search</a></h2>
+<h2 id="search-2"><a class="header" href="#search-2">Search</a></h2>
 <h3 id="searchrequestbuilder"><a class="header" href="#searchrequestbuilder">SearchRequestBuilder</a></h3>
 <div class="table-wrapper"><table><thead><tr><th style="text-align: left">Method</th><th style="text-align: left">Description</th></tr></thead><tbody>
 <tr><td style="text-align: left"><code>SearchRequestBuilder::new()</code></td><td style="text-align: left">Create a new builder</td></tr>
