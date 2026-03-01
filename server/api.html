@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Embeddings - Laurus Documentation</title>
+        <title>gRPC API Reference - Laurus Documentation</title>
 
 
         <!-- Custom HTML head -->
@@ -177,195 +177,323 @@
 
                 <div id="mdbook-content" class="content">
                     <main>
-                        <h1 id="embeddings"><a class="header" href="#embeddings">Embeddings</a></h1>
-<p>Embeddings convert text (or images) into dense numeric vectors that capture semantic meaning. Two texts with similar meanings produce vectors that are close together in vector space, enabling similarity-based search.</p>
-<h2 id="the-embedder-trait"><a class="header" href="#the-embedder-trait">The Embedder Trait</a></h2>
-<p>All embedders implement the <code>Embedder</code> trait:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>#[async_trait]
-pub trait Embedder: Send + Sync + Debug {
-    async fn embed(&amp;self, input: &amp;EmbedInput&lt;'_&gt;) -&gt; Result&lt;Vector&gt;;
-    async fn embed_batch(&amp;self, inputs: &amp;[EmbedInput&lt;'_&gt;]) -&gt; Result&lt;Vec&lt;Vector&gt;&gt;;
-    fn supported_input_types(&amp;self) -&gt; Vec&lt;EmbedInputType&gt;;
-    fn name(&amp;self) -&gt; &amp;str;
-    fn as_any(&amp;self) -&gt; &amp;dyn Any;
-}
-<span class="boring">}</span></code></pre>
-<p>The <code>embed()</code> method returns a <code>Vector</code> (a struct wrapping <code>Vec&lt;f32&gt;</code>).</p>
-<p><code>EmbedInput</code> supports two modalities:</p>
+                        <h1 id="grpc-api-reference"><a class="header" href="#grpc-api-reference">gRPC API Reference</a></h1>
+<p>All services are defined under the <code>laurus.v1</code> protobuf package.</p>
+<h2 id="services-overview"><a class="header" href="#services-overview">Services Overview</a></h2>
 <div class="table-wrapper">
 <table>
 <thead>
-<tr><th style="text-align: left">Variant</th><th style="text-align: left">Description</th></tr>
+<tr><th style="text-align: left">Service</th><th style="text-align: left">RPCs</th><th style="text-align: left">Description</th></tr>
 </thead>
 <tbody>
-<tr><td style="text-align: left"><code>EmbedInput::Text(&amp;str)</code></td><td style="text-align: left">Text input</td></tr>
-<tr><td style="text-align: left"><code>EmbedInput::Bytes(&amp;[u8], Option&lt;&amp;str&gt;)</code></td><td style="text-align: left">Binary input with optional MIME type (for images)</td></tr>
+<tr><td style="text-align: left"><code>HealthService</code></td><td style="text-align: left"><code>Check</code></td><td style="text-align: left">Health checking</td></tr>
+<tr><td style="text-align: left"><code>IndexService</code></td><td style="text-align: left"><code>CreateIndex</code>, <code>GetIndex</code>, <code>GetSchema</code></td><td style="text-align: left">Index lifecycle and schema</td></tr>
+<tr><td style="text-align: left"><code>DocumentService</code></td><td style="text-align: left"><code>PutDocument</code>, <code>AddDocument</code>, <code>GetDocuments</code>, <code>DeleteDocuments</code>, <code>Commit</code></td><td style="text-align: left">Document CRUD and commit</td></tr>
+<tr><td style="text-align: left"><code>SearchService</code></td><td style="text-align: left"><code>Search</code>, <code>SearchStream</code></td><td style="text-align: left">Unary and streaming search</td></tr>
 </tbody>
 </table>
 </div>
-<h2 id="built-in-embedders"><a class="header" href="#built-in-embedders">Built-in Embedders</a></h2>
-<h3 id="candlebertembedder"><a class="header" href="#candlebertembedder">CandleBertEmbedder</a></h3>
-<p>Runs a BERT model locally using Hugging Face Candle. No API key required.</p>
-<p><strong>Feature flag:</strong> <code>embeddings-candle</code></p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use laurus::CandleBertEmbedder;
-
-// Downloads model on first run (~80MB)
-let embedder = CandleBertEmbedder::new(
-    "sentence-transformers/all-MiniLM-L6-v2"  // model name
-)?;
-// Output: 384-dimensional vector
-<span class="boring">}</span></code></pre>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th style="text-align: left">Property</th><th style="text-align: left">Value</th></tr>
-</thead>
-<tbody>
-<tr><td style="text-align: left">Model</td><td style="text-align: left"><code>sentence-transformers/all-MiniLM-L6-v2</code></td></tr>
-<tr><td style="text-align: left">Dimensions</td><td style="text-align: left">384</td></tr>
-<tr><td style="text-align: left">Runtime</td><td style="text-align: left">Local (CPU)</td></tr>
-<tr><td style="text-align: left">First-run download</td><td style="text-align: left">~80 MB</td></tr>
-</tbody>
-</table>
-</div>
-<h3 id="openaiembedder"><a class="header" href="#openaiembedder">OpenAIEmbedder</a></h3>
-<p>Calls the OpenAI Embeddings API. Requires an API key.</p>
-<p><strong>Feature flag:</strong> <code>embeddings-openai</code></p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use laurus::OpenAIEmbedder;
-
-let embedder = OpenAIEmbedder::new(
-    api_key,
-    "text-embedding-3-small".to_string()
-).await?;
-// Output: 1536-dimensional vector
-<span class="boring">}</span></code></pre>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th style="text-align: left">Property</th><th style="text-align: left">Value</th></tr>
-</thead>
-<tbody>
-<tr><td style="text-align: left">Model</td><td style="text-align: left"><code>text-embedding-3-small</code> (or any OpenAI model)</td></tr>
-<tr><td style="text-align: left">Dimensions</td><td style="text-align: left">1536 (for text-embedding-3-small)</td></tr>
-<tr><td style="text-align: left">Runtime</td><td style="text-align: left">Remote API call</td></tr>
-<tr><td style="text-align: left">Requires</td><td style="text-align: left"><code>OPENAI_API_KEY</code> environment variable</td></tr>
-</tbody>
-</table>
-</div>
-<h3 id="candleclipembedder"><a class="header" href="#candleclipembedder">CandleClipEmbedder</a></h3>
-<p>Runs a CLIP model locally for multimodal (text + image) embeddings.</p>
-<p><strong>Feature flag:</strong> <code>embeddings-multimodal</code></p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use laurus::CandleClipEmbedder;
-
-let embedder = CandleClipEmbedder::new(
-    "openai/clip-vit-base-patch32"
-)?;
-// Text or images → 512-dimensional vector
-<span class="boring">}</span></code></pre>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th style="text-align: left">Property</th><th style="text-align: left">Value</th></tr>
-</thead>
-<tbody>
-<tr><td style="text-align: left">Model</td><td style="text-align: left"><code>openai/clip-vit-base-patch32</code></td></tr>
-<tr><td style="text-align: left">Dimensions</td><td style="text-align: left">512</td></tr>
-<tr><td style="text-align: left">Input types</td><td style="text-align: left">Text AND images</td></tr>
-<tr><td style="text-align: left">Use case</td><td style="text-align: left">Text-to-image search, image-to-image search</td></tr>
-</tbody>
-</table>
-</div>
-<h3 id="precomputedembedder"><a class="header" href="#precomputedembedder">PrecomputedEmbedder</a></h3>
-<p>Use pre-computed vectors directly without any embedding computation. Useful when vectors are generated externally.</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use laurus::PrecomputedEmbedder;
-
-let embedder = PrecomputedEmbedder::new();  // no parameters needed
-<span class="boring">}</span></code></pre>
-<p>When using <code>PrecomputedEmbedder</code>, you provide vectors directly in documents instead of text for embedding:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>let doc = Document::builder()
-    .add_vector("embedding", vec![0.1, 0.2, 0.3, ...])
-    .build();
-<span class="boring">}</span></code></pre>
-<h2 id="perfieldembedder"><a class="header" href="#perfieldembedder">PerFieldEmbedder</a></h2>
-<p><code>PerFieldEmbedder</code> routes embedding requests to field-specific embedders:</p>
-<pre><code class="language-mermaid">graph LR
-    PFE["PerFieldEmbedder"]
-    PFE --&gt;|"text_vec"| BERT["CandleBertEmbedder\n(384 dim)"]
-    PFE --&gt;|"image_vec"| CLIP["CandleClipEmbedder\n(512 dim)"]
-    PFE --&gt;|other fields| DEF["Default Embedder"]
+<hr>
+<h2 id="healthservice"><a class="header" href="#healthservice">HealthService</a></h2>
+<h3 id="check"><a class="header" href="#check"><code>Check</code></a></h3>
+<p>Returns the current serving status of the server.</p>
+<pre><code class="language-protobuf">rpc Check(HealthCheckRequest) returns (HealthCheckResponse);
 </code></pre>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use std::sync::Arc;
-use laurus::PerFieldEmbedder;
-
-let bert = Arc::new(CandleBertEmbedder::new("...")?);
-let clip = Arc::new(CandleClipEmbedder::new("...")?);
-
-
-let mut per_field = PerFieldEmbedder::new(bert.clone());
-per_field.add_embedder("text_vec", bert.clone());
-per_field.add_embedder("image_vec", clip.clone());
-
-let engine = Engine::builder(storage, schema)
-    .embedder(Arc::new(per_field))
-    .build()
-    .await?;
-<span class="boring">}</span></code></pre>
-<p>This is especially useful when:</p>
-<ul>
-<li>Different vector fields need different models (e.g., BERT for text, CLIP for images)</li>
-<li>Different fields have different vector dimensions</li>
-<li>You want to mix local and remote embedders</li>
-</ul>
-<h2 id="how-embeddings-are-used"><a class="header" href="#how-embeddings-are-used">How Embeddings Are Used</a></h2>
-<h3 id="at-index-time"><a class="header" href="#at-index-time">At Index Time</a></h3>
-<p>When you add a text value to a vector field, the engine automatically embeds it:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>let doc = Document::builder()
-    .add_text("text_vec", "Rust is a systems programming language")
-    .build();
-engine.add_document("doc-1", doc).await?;
-// The embedder converts the text to a vector before indexing
-<span class="boring">}</span></code></pre>
-<h3 id="at-search-time"><a class="header" href="#at-search-time">At Search Time</a></h3>
-<p>When you search with text, the engine embeds the query text as well:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>// Builder API
-let request = VectorSearchRequestBuilder::new()
-    .add_text("text_vec", "systems programming")
-    .build();
-
-// Query DSL
-let request = vector_parser.parse(r#"text_vec:~"systems programming""#).await?;
-<span class="boring">}</span></code></pre>
-<p>Both approaches embed the query text using the same embedder that was used at index time, ensuring consistent vector spaces.</p>
-<h2 id="choosing-an-embedder"><a class="header" href="#choosing-an-embedder">Choosing an Embedder</a></h2>
+<p><strong>Response fields:</strong></p>
 <div class="table-wrapper">
 <table>
 <thead>
-<tr><th style="text-align: left">Scenario</th><th style="text-align: left">Recommended Embedder</th></tr>
+<tr><th style="text-align: left">Field</th><th style="text-align: left">Type</th><th style="text-align: left">Description</th></tr>
 </thead>
 <tbody>
-<tr><td style="text-align: left">Quick prototyping, offline use</td><td style="text-align: left"><code>CandleBertEmbedder</code></td></tr>
-<tr><td style="text-align: left">Production with high accuracy</td><td style="text-align: left"><code>OpenAIEmbedder</code></td></tr>
-<tr><td style="text-align: left">Text + image search</td><td style="text-align: left"><code>CandleClipEmbedder</code></td></tr>
-<tr><td style="text-align: left">Pre-computed vectors from external pipeline</td><td style="text-align: left"><code>PrecomputedEmbedder</code></td></tr>
-<tr><td style="text-align: left">Multiple models per field</td><td style="text-align: left"><code>PerFieldEmbedder</code> wrapping others</td></tr>
+<tr><td style="text-align: left"><code>status</code></td><td style="text-align: left"><code>ServingStatus</code></td><td style="text-align: left"><code>SERVING_STATUS_SERVING</code> when the server is ready</td></tr>
+</tbody>
+</table>
+</div>
+<hr>
+<h2 id="indexservice"><a class="header" href="#indexservice">IndexService</a></h2>
+<h3 id="createindex"><a class="header" href="#createindex"><code>CreateIndex</code></a></h3>
+<p>Create a new index with the given schema. Fails with <code>ALREADY_EXISTS</code> if an index is already open.</p>
+<pre><code class="language-protobuf">rpc CreateIndex(CreateIndexRequest) returns (CreateIndexResponse);
+</code></pre>
+<p><strong>Request fields:</strong></p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Field</th><th style="text-align: left">Type</th><th style="text-align: left">Required</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>schema</code></td><td style="text-align: left"><code>Schema</code></td><td style="text-align: left">Yes</td><td style="text-align: left">Index schema definition</td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>Schema structure:</strong></p>
+<pre><code class="language-protobuf">message Schema {
+  map&lt;string, FieldOption&gt; fields = 1;
+  repeated string default_fields = 2;
+}
+</code></pre>
+<p>Each <code>FieldOption</code> is a <code>oneof</code> with one of the following field types:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Lexical Fields</th><th style="text-align: left">Vector Fields</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>TextOption</code> (<code>indexed</code>, <code>stored</code>, <code>term_vectors</code>)</td><td style="text-align: left"><code>HnswOption</code> (<code>dimension</code>, <code>distance</code>, <code>m</code>, <code>ef_construction</code>, <code>base_weight</code>, <code>quantizer</code>)</td></tr>
+<tr><td style="text-align: left"><code>IntegerOption</code> (<code>indexed</code>, <code>stored</code>)</td><td style="text-align: left"><code>FlatOption</code> (<code>dimension</code>, <code>distance</code>, <code>base_weight</code>, <code>quantizer</code>)</td></tr>
+<tr><td style="text-align: left"><code>FloatOption</code> (<code>indexed</code>, <code>stored</code>)</td><td style="text-align: left"><code>IvfOption</code> (<code>dimension</code>, <code>distance</code>, <code>n_clusters</code>, <code>n_probe</code>, <code>base_weight</code>, <code>quantizer</code>)</td></tr>
+<tr><td style="text-align: left"><code>BooleanOption</code> (<code>indexed</code>, <code>stored</code>)</td><td style="text-align: left"></td></tr>
+<tr><td style="text-align: left"><code>DateTimeOption</code> (<code>indexed</code>, <code>stored</code>)</td><td style="text-align: left"></td></tr>
+<tr><td style="text-align: left"><code>GeoOption</code> (<code>indexed</code>, <code>stored</code>)</td><td style="text-align: left"></td></tr>
+<tr><td style="text-align: left"><code>BytesOption</code> (<code>stored</code>)</td><td style="text-align: left"></td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>Distance metrics:</strong> <code>COSINE</code>, <code>EUCLIDEAN</code>, <code>MANHATTAN</code>, <code>DOT_PRODUCT</code>, <code>ANGULAR</code></p>
+<p><strong>Quantization methods:</strong> <code>NONE</code>, <code>SCALAR_8BIT</code>, <code>PRODUCT_QUANTIZATION</code></p>
+<p><strong>Example:</strong></p>
+<pre><code class="language-json">{
+  "schema": {
+    "fields": {
+      "title": {"text": {"indexed": true, "stored": true, "term_vectors": true}},
+      "embedding": {"hnsw": {"dimension": 384, "distance": "DISTANCE_METRIC_COSINE", "m": 16, "ef_construction": 200}}
+    },
+    "default_fields": ["title"]
+  }
+}
+</code></pre>
+<h3 id="getindex"><a class="header" href="#getindex"><code>GetIndex</code></a></h3>
+<p>Get index statistics.</p>
+<pre><code class="language-protobuf">rpc GetIndex(GetIndexRequest) returns (GetIndexResponse);
+</code></pre>
+<p><strong>Response fields:</strong></p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Field</th><th style="text-align: left">Type</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>document_count</code></td><td style="text-align: left"><code>uint64</code></td><td style="text-align: left">Total number of documents in the index</td></tr>
+<tr><td style="text-align: left"><code>vector_fields</code></td><td style="text-align: left"><code>map&lt;string, VectorFieldStats&gt;</code></td><td style="text-align: left">Per-field vector statistics</td></tr>
+</tbody>
+</table>
+</div>
+<p>Each <code>VectorFieldStats</code> contains <code>vector_count</code> and <code>dimension</code>.</p>
+<h3 id="getschema"><a class="header" href="#getschema"><code>GetSchema</code></a></h3>
+<p>Retrieve the current index schema.</p>
+<pre><code class="language-protobuf">rpc GetSchema(GetSchemaRequest) returns (GetSchemaResponse);
+</code></pre>
+<p><strong>Response fields:</strong></p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Field</th><th style="text-align: left">Type</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>schema</code></td><td style="text-align: left"><code>Schema</code></td><td style="text-align: left">The index schema</td></tr>
+</tbody>
+</table>
+</div>
+<hr>
+<h2 id="documentservice"><a class="header" href="#documentservice">DocumentService</a></h2>
+<h3 id="putdocument"><a class="header" href="#putdocument"><code>PutDocument</code></a></h3>
+<p>Insert or replace a document by ID. If a document with the same ID already exists, it is replaced.</p>
+<pre><code class="language-protobuf">rpc PutDocument(PutDocumentRequest) returns (PutDocumentResponse);
+</code></pre>
+<p><strong>Request fields:</strong></p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Field</th><th style="text-align: left">Type</th><th style="text-align: left">Required</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>id</code></td><td style="text-align: left"><code>string</code></td><td style="text-align: left">Yes</td><td style="text-align: left">External document ID</td></tr>
+<tr><td style="text-align: left"><code>document</code></td><td style="text-align: left"><code>Document</code></td><td style="text-align: left">Yes</td><td style="text-align: left">Document content</td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>Document structure:</strong></p>
+<pre><code class="language-protobuf">message Document {
+  map&lt;string, Value&gt; fields = 1;
+}
+</code></pre>
+<p>Each <code>Value</code> is a <code>oneof</code> with these types:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Type</th><th style="text-align: left">Proto Field</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left">Null</td><td style="text-align: left"><code>null_value</code></td><td style="text-align: left">Null value</td></tr>
+<tr><td style="text-align: left">Boolean</td><td style="text-align: left"><code>bool_value</code></td><td style="text-align: left">Boolean value</td></tr>
+<tr><td style="text-align: left">Integer</td><td style="text-align: left"><code>int64_value</code></td><td style="text-align: left">64-bit integer</td></tr>
+<tr><td style="text-align: left">Float</td><td style="text-align: left"><code>float64_value</code></td><td style="text-align: left">64-bit floating point</td></tr>
+<tr><td style="text-align: left">Text</td><td style="text-align: left"><code>text_value</code></td><td style="text-align: left">UTF-8 string</td></tr>
+<tr><td style="text-align: left">Bytes</td><td style="text-align: left"><code>bytes_value</code></td><td style="text-align: left">Raw bytes</td></tr>
+<tr><td style="text-align: left">Vector</td><td style="text-align: left"><code>vector_value</code></td><td style="text-align: left"><code>VectorValue</code> (list of floats)</td></tr>
+<tr><td style="text-align: left">DateTime</td><td style="text-align: left"><code>datetime_value</code></td><td style="text-align: left">Unix microseconds (UTC)</td></tr>
+<tr><td style="text-align: left">Geo</td><td style="text-align: left"><code>geo_value</code></td><td style="text-align: left"><code>GeoPoint</code> (latitude, longitude)</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="adddocument"><a class="header" href="#adddocument"><code>AddDocument</code></a></h3>
+<p>Add a document. Unlike <code>PutDocument</code>, this does not replace existing documents with the same ID — multiple documents can share an ID (chunking pattern).</p>
+<pre><code class="language-protobuf">rpc AddDocument(AddDocumentRequest) returns (AddDocumentResponse);
+</code></pre>
+<p>Request fields are the same as <code>PutDocument</code>.</p>
+<h3 id="getdocuments"><a class="header" href="#getdocuments"><code>GetDocuments</code></a></h3>
+<p>Retrieve all documents matching the given external ID.</p>
+<pre><code class="language-protobuf">rpc GetDocuments(GetDocumentsRequest) returns (GetDocumentsResponse);
+</code></pre>
+<p><strong>Request fields:</strong></p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Field</th><th style="text-align: left">Type</th><th style="text-align: left">Required</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>id</code></td><td style="text-align: left"><code>string</code></td><td style="text-align: left">Yes</td><td style="text-align: left">External document ID</td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>Response fields:</strong></p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Field</th><th style="text-align: left">Type</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>documents</code></td><td style="text-align: left"><code>repeated Document</code></td><td style="text-align: left">Matching documents</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="deletedocuments"><a class="header" href="#deletedocuments"><code>DeleteDocuments</code></a></h3>
+<p>Delete all documents matching the given external ID.</p>
+<pre><code class="language-protobuf">rpc DeleteDocuments(DeleteDocumentsRequest) returns (DeleteDocumentsResponse);
+</code></pre>
+<h3 id="commit"><a class="header" href="#commit"><code>Commit</code></a></h3>
+<p>Commit pending changes (additions and deletions) to the index. Changes are not visible to search until committed.</p>
+<pre><code class="language-protobuf">rpc Commit(CommitRequest) returns (CommitResponse);
+</code></pre>
+<hr>
+<h2 id="searchservice"><a class="header" href="#searchservice">SearchService</a></h2>
+<h3 id="search"><a class="header" href="#search"><code>Search</code></a></h3>
+<p>Execute a search query and return results as a single response.</p>
+<pre><code class="language-protobuf">rpc Search(SearchRequest) returns (SearchResponse);
+</code></pre>
+<h3 id="searchstream"><a class="header" href="#searchstream"><code>SearchStream</code></a></h3>
+<p>Execute a search query and stream results back one at a time.</p>
+<pre><code class="language-protobuf">rpc SearchStream(SearchRequest) returns (stream SearchResult);
+</code></pre>
+<h3 id="searchrequest-fields"><a class="header" href="#searchrequest-fields">SearchRequest Fields</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Field</th><th style="text-align: left">Type</th><th style="text-align: left">Required</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>query</code></td><td style="text-align: left"><code>string</code></td><td style="text-align: left">No</td><td style="text-align: left">Lexical search query in <a href="../advanced/query_dsl.html">Query DSL</a></td></tr>
+<tr><td style="text-align: left"><code>query_vectors</code></td><td style="text-align: left"><code>repeated QueryVector</code></td><td style="text-align: left">No</td><td style="text-align: left">Vector search queries</td></tr>
+<tr><td style="text-align: left"><code>limit</code></td><td style="text-align: left"><code>uint32</code></td><td style="text-align: left">No</td><td style="text-align: left">Maximum number of results (default: engine default)</td></tr>
+<tr><td style="text-align: left"><code>offset</code></td><td style="text-align: left"><code>uint32</code></td><td style="text-align: left">No</td><td style="text-align: left">Number of results to skip</td></tr>
+<tr><td style="text-align: left"><code>fusion</code></td><td style="text-align: left"><code>FusionAlgorithm</code></td><td style="text-align: left">No</td><td style="text-align: left">Fusion algorithm for hybrid search</td></tr>
+<tr><td style="text-align: left"><code>lexical_params</code></td><td style="text-align: left"><code>LexicalParams</code></td><td style="text-align: left">No</td><td style="text-align: left">Lexical search parameters</td></tr>
+<tr><td style="text-align: left"><code>vector_params</code></td><td style="text-align: left"><code>VectorParams</code></td><td style="text-align: left">No</td><td style="text-align: left">Vector search parameters</td></tr>
+<tr><td style="text-align: left"><code>field_boosts</code></td><td style="text-align: left"><code>map&lt;string, float&gt;</code></td><td style="text-align: left">No</td><td style="text-align: left">Per-field score boosting</td></tr>
+</tbody>
+</table>
+</div>
+<p>At least one of <code>query</code> or <code>query_vectors</code> must be provided.</p>
+<h3 id="queryvector"><a class="header" href="#queryvector">QueryVector</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Field</th><th style="text-align: left">Type</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>vector</code></td><td style="text-align: left"><code>repeated float</code></td><td style="text-align: left">Query vector</td></tr>
+<tr><td style="text-align: left"><code>weight</code></td><td style="text-align: left"><code>float</code></td><td style="text-align: left">Weight for this vector (default: 1.0)</td></tr>
+<tr><td style="text-align: left"><code>fields</code></td><td style="text-align: left"><code>repeated string</code></td><td style="text-align: left">Target vector fields (empty = all)</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="fusionalgorithm"><a class="header" href="#fusionalgorithm">FusionAlgorithm</a></h3>
+<p>A <code>oneof</code> with two options:</p>
+<ul>
+<li><strong>RRF</strong> (Reciprocal Rank Fusion): <code>k</code> parameter (default: 60)</li>
+<li><strong>WeightedSum</strong>: <code>lexical_weight</code> and <code>vector_weight</code></li>
+</ul>
+<h3 id="lexicalparams"><a class="header" href="#lexicalparams">LexicalParams</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Field</th><th style="text-align: left">Type</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>min_score</code></td><td style="text-align: left"><code>float</code></td><td style="text-align: left">Minimum score threshold</td></tr>
+<tr><td style="text-align: left"><code>timeout_ms</code></td><td style="text-align: left"><code>uint64</code></td><td style="text-align: left">Search timeout in milliseconds</td></tr>
+<tr><td style="text-align: left"><code>parallel</code></td><td style="text-align: left"><code>bool</code></td><td style="text-align: left">Enable parallel search</td></tr>
+<tr><td style="text-align: left"><code>sort_by</code></td><td style="text-align: left"><code>SortSpec</code></td><td style="text-align: left">Sort by a field instead of score</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="vectorparams"><a class="header" href="#vectorparams">VectorParams</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Field</th><th style="text-align: left">Type</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>fields</code></td><td style="text-align: left"><code>repeated string</code></td><td style="text-align: left">Target vector fields</td></tr>
+<tr><td style="text-align: left"><code>score_mode</code></td><td style="text-align: left"><code>VectorScoreMode</code></td><td style="text-align: left"><code>WEIGHTED_SUM</code>, <code>MAX_SIM</code>, or <code>LATE_INTERACTION</code></td></tr>
+<tr><td style="text-align: left"><code>overfetch</code></td><td style="text-align: left"><code>float</code></td><td style="text-align: left">Overfetch factor (default: 2.0)</td></tr>
+<tr><td style="text-align: left"><code>min_score</code></td><td style="text-align: left"><code>float</code></td><td style="text-align: left">Minimum score threshold</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="searchresult"><a class="header" href="#searchresult">SearchResult</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Field</th><th style="text-align: left">Type</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>id</code></td><td style="text-align: left"><code>string</code></td><td style="text-align: left">External document ID</td></tr>
+<tr><td style="text-align: left"><code>score</code></td><td style="text-align: left"><code>float</code></td><td style="text-align: left">Relevance score</td></tr>
+<tr><td style="text-align: left"><code>document</code></td><td style="text-align: left"><code>Document</code></td><td style="text-align: left">Document content</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="example"><a class="header" href="#example">Example</a></h3>
+<pre><code class="language-json">{
+  "query": "body:rust",
+  "query_vectors": [
+    {"vector": [0.1, 0.2, 0.3], "weight": 1.0}
+  ],
+  "limit": 10,
+  "fusion": {
+    "rrf": {"k": 60}
+  },
+  "field_boosts": {
+    "title": 2.0
+  }
+}
+</code></pre>
+<hr>
+<h2 id="error-handling"><a class="header" href="#error-handling">Error Handling</a></h2>
+<p>gRPC errors are returned as standard <code>Status</code> codes:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Laurus Error</th><th style="text-align: left">gRPC Status</th><th style="text-align: left">When</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left">Schema / Query / Field / JSON</td><td style="text-align: left"><code>INVALID_ARGUMENT</code></td><td style="text-align: left">Malformed request or schema</td></tr>
+<tr><td style="text-align: left">No index open</td><td style="text-align: left"><code>FAILED_PRECONDITION</code></td><td style="text-align: left">RPC called before <code>CreateIndex</code></td></tr>
+<tr><td style="text-align: left">Index already exists</td><td style="text-align: left"><code>ALREADY_EXISTS</code></td><td style="text-align: left"><code>CreateIndex</code> called twice</td></tr>
+<tr><td style="text-align: left">Not implemented</td><td style="text-align: left"><code>UNIMPLEMENTED</code></td><td style="text-align: left">Feature not yet supported</td></tr>
+<tr><td style="text-align: left">Internal errors</td><td style="text-align: left"><code>INTERNAL</code></td><td style="text-align: left">I/O, storage, or unexpected errors</td></tr>
 </tbody>
 </table>
 </div>
@@ -374,11 +502,11 @@ let request = vector_parser.parse(r#"text_vec:~"systems programming""#).await?;
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="../concepts/analysis.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../server/getting_started.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
-                            <a rel="next prefetch" href="../concepts/storage.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="../advanced.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                             </a>
 
@@ -388,11 +516,11 @@ let request = vector_parser.parse(r#"text_vec:~"systems programming""#).await?;
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="../concepts/analysis.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="../server/getting_started.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 
-                    <a rel="next prefetch" href="../concepts/storage.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="../advanced.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                     </a>
             </nav>

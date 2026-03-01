@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Indexing - Laurus Documentation</title>
+        <title>gRPC Server - Laurus Documentation</title>
 
 
         <!-- Custom HTML head -->
@@ -177,35 +177,41 @@
 
                 <div id="mdbook-content" class="content">
                     <main>
-                        <h1 id="indexing"><a class="header" href="#indexing">Indexing</a></h1>
-<p>This section explains how Laurus stores and organizes data internally. Understanding the indexing layer will help you choose the right field types and tune performance.</p>
-<h2 id="topics"><a class="header" href="#topics">Topics</a></h2>
-<h3 id="lexical-indexing"><a class="header" href="#lexical-indexing"><a href="indexing/lexical_indexing.html">Lexical Indexing</a></a></h3>
-<p>How text, numeric, and geographic fields are indexed using an inverted index. Covers:</p>
+                        <h1 id="grpc-server"><a class="header" href="#grpc-server">gRPC Server</a></h1>
+<p>Laurus includes a built-in gRPC server that keeps the search engine resident in memory, eliminating the per-command startup overhead of the CLI. This is the recommended way to run Laurus in production or when integrating with other services.</p>
+<h2 id="features"><a class="header" href="#features">Features</a></h2>
 <ul>
-<li>The inverted index structure (term dictionary, posting lists)</li>
-<li>BKD trees for numeric range queries</li>
-<li>Segment files and their formats</li>
-<li>BM25 scoring</li>
+<li><strong>Persistent engine</strong> — The index stays open across requests; no WAL replay on every call</li>
+<li><strong>Full gRPC API</strong> — Index management, document CRUD, commit, and search (unary + streaming)</li>
+<li><strong>Health checking</strong> — Standard health check endpoint for load balancers and orchestrators</li>
+<li><strong>Graceful shutdown</strong> — Pending changes are committed automatically on Ctrl+C / SIGINT</li>
+<li><strong>TOML configuration</strong> — Optional config file with CLI override support</li>
 </ul>
-<h3 id="vector-indexing"><a class="header" href="#vector-indexing"><a href="indexing/vector_indexing.html">Vector Indexing</a></a></h3>
-<p>How vector fields are indexed for approximate nearest neighbor search. Covers:</p>
+<h2 id="quick-start"><a class="header" href="#quick-start">Quick Start</a></h2>
+<pre><code class="language-bash"># Start the server with default settings
+laurus serve
+
+# Start with a custom data directory and port
+laurus --data-dir ./my_index serve --port 8080
+
+# Start with a configuration file
+laurus serve --config config.toml
+</code></pre>
+<h2 id="sections"><a class="header" href="#sections">Sections</a></h2>
 <ul>
-<li>Index types: Flat, HNSW, IVF</li>
-<li>Parameter tuning (m, ef_construction, n_clusters, n_probe)</li>
-<li>Distance metrics (Cosine, Euclidean, DotProduct)</li>
-<li>Quantization (SQ8, PQ)</li>
+<li><a href="server/getting_started.html">Getting Started</a> — Installation, startup options, and configuration</li>
+<li><a href="server/api.html">gRPC API Reference</a> — Full API documentation for all services and RPCs</li>
 </ul>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="concepts/storage.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="cli/repl.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
-                            <a rel="next prefetch" href="indexing/lexical_indexing.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="server/getting_started.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                             </a>
 
@@ -215,11 +221,11 @@
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="concepts/storage.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="cli/repl.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 
-                    <a rel="next prefetch" href="indexing/lexical_indexing.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="server/getting_started.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                     </a>
             </nav>

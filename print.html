@@ -36,10 +36,10 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-4a4c2e1f.js";
+            window.path_to_searchindex_js = "searchindex-cc6f5a82.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-12aaa25a.js"></script>
+        <script src="toc-f13dbb35.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -2951,6 +2951,7 @@ println!("Learned queries: {}", stats.queries_learned);
 <li><strong>Search</strong> — Execute queries using the <a href="#query-dsl-3">Query DSL</a></li>
 <li><strong>Dual output</strong> — Human-readable tables or machine-parseable JSON</li>
 <li><strong>Interactive REPL</strong> — Explore your index in a live session</li>
+<li><strong>gRPC server</strong> — Start a <a href="#grpc-server">gRPC server</a> with <code>laurus serve</code></li>
 </ul>
 <h2 id="getting-started-1"><a class="header" href="#getting-started-1">Getting Started</a></h2>
 <pre><code class="language-bash"># Install
@@ -3278,6 +3279,38 @@ laurus search "price:[10 TO 50]"
 <h2 id="repl"><a class="header" href="#repl"><code>repl</code></a></h2>
 <p>Start an interactive REPL session. See <a href="#repl-interactive-mode">REPL</a> for details.</p>
 <pre><code class="language-bash">laurus repl
+</code></pre>
+<hr>
+<h2 id="serve"><a class="header" href="#serve"><code>serve</code></a></h2>
+<p>Start the gRPC server. See <a href="#grpc-server">gRPC Server</a> for full documentation.</p>
+<pre><code class="language-bash">laurus serve [OPTIONS]
+</code></pre>
+<p><strong>Options:</strong></p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Option</th><th style="text-align: left">Short</th><th style="text-align: left">Env Variable</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>--config &lt;PATH&gt;</code></td><td style="text-align: left"><code>-c</code></td><td style="text-align: left"><code>LAURUS_CONFIG</code></td><td style="text-align: left">—</td><td style="text-align: left">Path to a TOML configuration file</td></tr>
+<tr><td style="text-align: left"><code>--host &lt;HOST&gt;</code></td><td style="text-align: left"><code>-H</code></td><td style="text-align: left"><code>LAURUS_HOST</code></td><td style="text-align: left"><code>0.0.0.0</code></td><td style="text-align: left">Listen address</td></tr>
+<tr><td style="text-align: left"><code>--port &lt;PORT&gt;</code></td><td style="text-align: left"><code>-p</code></td><td style="text-align: left"><code>LAURUS_PORT</code></td><td style="text-align: left"><code>50051</code></td><td style="text-align: left">Listen port</td></tr>
+<tr><td style="text-align: left"><code>--log-level &lt;LEVEL&gt;</code></td><td style="text-align: left"><code>-l</code></td><td style="text-align: left"><code>LAURUS_LOG_LEVEL</code></td><td style="text-align: left"><code>info</code></td><td style="text-align: left">Log level (<code>trace</code>, <code>debug</code>, <code>info</code>, <code>warn</code>, <code>error</code>)</td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>Example:</strong></p>
+<pre><code class="language-bash"># Start with defaults (port 50051)
+laurus --data-dir ./my_index serve
+
+# Custom port and log level
+laurus serve --port 8080 --log-level debug
+
+# Use a configuration file
+laurus serve --config config.toml
+
+# Use environment variables
+LAURUS_DATA_DIR=./my_index LAURUS_PORT=8080 laurus serve
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="schema-format-reference"><a class="header" href="#schema-format-reference">Schema Format Reference</a></h1>
@@ -3739,6 +3772,453 @@ Document count: 3
 <li><strong>Ctrl+C / Ctrl+D</strong> — Exit the REPL gracefully</li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div>
+<h1 id="grpc-server"><a class="header" href="#grpc-server">gRPC Server</a></h1>
+<p>Laurus includes a built-in gRPC server that keeps the search engine resident in memory, eliminating the per-command startup overhead of the CLI. This is the recommended way to run Laurus in production or when integrating with other services.</p>
+<h2 id="features-2"><a class="header" href="#features-2">Features</a></h2>
+<ul>
+<li><strong>Persistent engine</strong> — The index stays open across requests; no WAL replay on every call</li>
+<li><strong>Full gRPC API</strong> — Index management, document CRUD, commit, and search (unary + streaming)</li>
+<li><strong>Health checking</strong> — Standard health check endpoint for load balancers and orchestrators</li>
+<li><strong>Graceful shutdown</strong> — Pending changes are committed automatically on Ctrl+C / SIGINT</li>
+<li><strong>TOML configuration</strong> — Optional config file with CLI override support</li>
+</ul>
+<h2 id="quick-start-1"><a class="header" href="#quick-start-1">Quick Start</a></h2>
+<pre><code class="language-bash"># Start the server with default settings
+laurus serve
+
+# Start with a custom data directory and port
+laurus --data-dir ./my_index serve --port 8080
+
+# Start with a configuration file
+laurus serve --config config.toml
+</code></pre>
+<h2 id="sections"><a class="header" href="#sections">Sections</a></h2>
+<ul>
+<li><a href="#getting-started-with-the-grpc-server">Getting Started</a> — Installation, startup options, and configuration</li>
+<li><a href="#grpc-api-reference">gRPC API Reference</a> — Full API documentation for all services and RPCs</li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="getting-started-with-the-grpc-server"><a class="header" href="#getting-started-with-the-grpc-server">Getting Started with the gRPC Server</a></h1>
+<h2 id="starting-the-server"><a class="header" href="#starting-the-server">Starting the Server</a></h2>
+<p>The gRPC server is started via the <code>serve</code> subcommand of the <code>laurus</code> CLI:</p>
+<pre><code class="language-bash">laurus serve [OPTIONS]
+</code></pre>
+<h3 id="options"><a class="header" href="#options">Options</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Option</th><th style="text-align: left">Short</th><th style="text-align: left">Env Variable</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>--config &lt;PATH&gt;</code></td><td style="text-align: left"><code>-c</code></td><td style="text-align: left"><code>LAURUS_CONFIG</code></td><td style="text-align: left">—</td><td style="text-align: left">Path to a TOML configuration file</td></tr>
+<tr><td style="text-align: left"><code>--host &lt;HOST&gt;</code></td><td style="text-align: left"><code>-H</code></td><td style="text-align: left"><code>LAURUS_HOST</code></td><td style="text-align: left"><code>0.0.0.0</code></td><td style="text-align: left">Listen address</td></tr>
+<tr><td style="text-align: left"><code>--port &lt;PORT&gt;</code></td><td style="text-align: left"><code>-p</code></td><td style="text-align: left"><code>LAURUS_PORT</code></td><td style="text-align: left"><code>50051</code></td><td style="text-align: left">Listen port</td></tr>
+<tr><td style="text-align: left"><code>--log-level &lt;LEVEL&gt;</code></td><td style="text-align: left"><code>-l</code></td><td style="text-align: left"><code>LAURUS_LOG_LEVEL</code></td><td style="text-align: left"><code>info</code></td><td style="text-align: left">Log level (<code>trace</code>, <code>debug</code>, <code>info</code>, <code>warn</code>, <code>error</code>)</td></tr>
+</tbody>
+</table>
+</div>
+<p>The global <code>--data-dir</code> option (env: <code>LAURUS_DATA_DIR</code>) specifies the index data directory:</p>
+<pre><code class="language-bash"># Using CLI arguments
+laurus --data-dir ./my_index serve --port 8080 --log-level debug
+
+# Using environment variables
+export LAURUS_DATA_DIR=./my_index
+export LAURUS_PORT=8080
+export LAURUS_LOG_LEVEL=debug
+laurus serve
+</code></pre>
+<h3 id="startup-behavior"><a class="header" href="#startup-behavior">Startup Behavior</a></h3>
+<p>On startup, the server attempts to open an existing index at the configured data directory. If no index exists, the server starts without one — you can create an index later via the <code>CreateIndex</code> RPC.</p>
+<h2 id="configuration-file"><a class="header" href="#configuration-file">Configuration File</a></h2>
+<p>You can use a TOML configuration file instead of (or in addition to) command-line options:</p>
+<pre><code class="language-bash">laurus serve --config config.toml
+</code></pre>
+<h3 id="format"><a class="header" href="#format">Format</a></h3>
+<pre><code class="language-toml">[server]
+host = "0.0.0.0"
+port = 50051
+
+[index]
+data_dir = "./laurus_data"
+
+[log]
+level = "info"
+</code></pre>
+<h3 id="priority"><a class="header" href="#priority">Priority</a></h3>
+<p>Settings are resolved in the following order (highest priority first):</p>
+<pre><code class="language-text">CLI arguments &gt; Environment variables &gt; Config file &gt; Defaults
+</code></pre>
+<p>For example, if <code>config.toml</code> sets <code>port = 50051</code>, the environment variable <code>LAURUS_PORT=4567</code> is set, and <code>--port 1234</code> is passed on the command line:</p>
+<pre><code class="language-bash">LAURUS_PORT=4567 laurus serve --config config.toml --port 1234
+# → Listens on port 1234 (CLI argument wins)
+</code></pre>
+<p>If the CLI argument is omitted:</p>
+<pre><code class="language-bash">LAURUS_PORT=4567 laurus serve --config config.toml
+# → Listens on port 4567 (environment variable wins over config file)
+</code></pre>
+<h2 id="graceful-shutdown"><a class="header" href="#graceful-shutdown">Graceful Shutdown</a></h2>
+<p>When the server receives a shutdown signal (Ctrl+C / SIGINT), it automatically:</p>
+<ol>
+<li>Stops accepting new connections</li>
+<li>Commits any pending changes to the index</li>
+<li>Exits cleanly</li>
+</ol>
+<h2 id="connecting-to-the-server"><a class="header" href="#connecting-to-the-server">Connecting to the Server</a></h2>
+<p>Any gRPC client can connect to the server. For quick testing, <a href="https://github.com/fullstorydev/grpcurl">grpcurl</a> is useful:</p>
+<pre><code class="language-bash"># Health check
+grpcurl -plaintext localhost:50051 laurus.v1.HealthService/Check
+
+# Create an index
+grpcurl -plaintext -d '{
+  "schema": {
+    "fields": {
+      "title": {"text": {"indexed": true, "stored": true, "term_vectors": true}},
+      "body": {"text": {"indexed": true, "stored": true, "term_vectors": true}}
+    },
+    "default_fields": ["title", "body"]
+  }
+}' localhost:50051 laurus.v1.IndexService/CreateIndex
+
+# Add a document
+grpcurl -plaintext -d '{
+  "id": "doc1",
+  "document": {
+    "fields": {
+      "title": {"text_value": "Hello World"},
+      "body": {"text_value": "This is a test document."}
+    }
+  }
+}' localhost:50051 laurus.v1.DocumentService/AddDocument
+
+# Commit
+grpcurl -plaintext localhost:50051 laurus.v1.DocumentService/Commit
+
+# Search
+grpcurl -plaintext -d '{"query": "body:test", "limit": 10}' \
+  localhost:50051 laurus.v1.SearchService/Search
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="grpc-api-reference"><a class="header" href="#grpc-api-reference">gRPC API Reference</a></h1>
+<p>All services are defined under the <code>laurus.v1</code> protobuf package.</p>
+<h2 id="services-overview"><a class="header" href="#services-overview">Services Overview</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Service</th><th style="text-align: left">RPCs</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>HealthService</code></td><td style="text-align: left"><code>Check</code></td><td style="text-align: left">Health checking</td></tr>
+<tr><td style="text-align: left"><code>IndexService</code></td><td style="text-align: left"><code>CreateIndex</code>, <code>GetIndex</code>, <code>GetSchema</code></td><td style="text-align: left">Index lifecycle and schema</td></tr>
+<tr><td style="text-align: left"><code>DocumentService</code></td><td style="text-align: left"><code>PutDocument</code>, <code>AddDocument</code>, <code>GetDocuments</code>, <code>DeleteDocuments</code>, <code>Commit</code></td><td style="text-align: left">Document CRUD and commit</td></tr>
+<tr><td style="text-align: left"><code>SearchService</code></td><td style="text-align: left"><code>Search</code>, <code>SearchStream</code></td><td style="text-align: left">Unary and streaming search</td></tr>
+</tbody>
+</table>
+</div>
+<hr>
+<h2 id="healthservice"><a class="header" href="#healthservice">HealthService</a></h2>
+<h3 id="check"><a class="header" href="#check"><code>Check</code></a></h3>
+<p>Returns the current serving status of the server.</p>
+<pre><code class="language-protobuf">rpc Check(HealthCheckRequest) returns (HealthCheckResponse);
+</code></pre>
+<p><strong>Response fields:</strong></p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Field</th><th style="text-align: left">Type</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>status</code></td><td style="text-align: left"><code>ServingStatus</code></td><td style="text-align: left"><code>SERVING_STATUS_SERVING</code> when the server is ready</td></tr>
+</tbody>
+</table>
+</div>
+<hr>
+<h2 id="indexservice"><a class="header" href="#indexservice">IndexService</a></h2>
+<h3 id="createindex"><a class="header" href="#createindex"><code>CreateIndex</code></a></h3>
+<p>Create a new index with the given schema. Fails with <code>ALREADY_EXISTS</code> if an index is already open.</p>
+<pre><code class="language-protobuf">rpc CreateIndex(CreateIndexRequest) returns (CreateIndexResponse);
+</code></pre>
+<p><strong>Request fields:</strong></p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Field</th><th style="text-align: left">Type</th><th style="text-align: left">Required</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>schema</code></td><td style="text-align: left"><code>Schema</code></td><td style="text-align: left">Yes</td><td style="text-align: left">Index schema definition</td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>Schema structure:</strong></p>
+<pre><code class="language-protobuf">message Schema {
+  map&lt;string, FieldOption&gt; fields = 1;
+  repeated string default_fields = 2;
+}
+</code></pre>
+<p>Each <code>FieldOption</code> is a <code>oneof</code> with one of the following field types:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Lexical Fields</th><th style="text-align: left">Vector Fields</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>TextOption</code> (<code>indexed</code>, <code>stored</code>, <code>term_vectors</code>)</td><td style="text-align: left"><code>HnswOption</code> (<code>dimension</code>, <code>distance</code>, <code>m</code>, <code>ef_construction</code>, <code>base_weight</code>, <code>quantizer</code>)</td></tr>
+<tr><td style="text-align: left"><code>IntegerOption</code> (<code>indexed</code>, <code>stored</code>)</td><td style="text-align: left"><code>FlatOption</code> (<code>dimension</code>, <code>distance</code>, <code>base_weight</code>, <code>quantizer</code>)</td></tr>
+<tr><td style="text-align: left"><code>FloatOption</code> (<code>indexed</code>, <code>stored</code>)</td><td style="text-align: left"><code>IvfOption</code> (<code>dimension</code>, <code>distance</code>, <code>n_clusters</code>, <code>n_probe</code>, <code>base_weight</code>, <code>quantizer</code>)</td></tr>
+<tr><td style="text-align: left"><code>BooleanOption</code> (<code>indexed</code>, <code>stored</code>)</td><td style="text-align: left"></td></tr>
+<tr><td style="text-align: left"><code>DateTimeOption</code> (<code>indexed</code>, <code>stored</code>)</td><td style="text-align: left"></td></tr>
+<tr><td style="text-align: left"><code>GeoOption</code> (<code>indexed</code>, <code>stored</code>)</td><td style="text-align: left"></td></tr>
+<tr><td style="text-align: left"><code>BytesOption</code> (<code>stored</code>)</td><td style="text-align: left"></td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>Distance metrics:</strong> <code>COSINE</code>, <code>EUCLIDEAN</code>, <code>MANHATTAN</code>, <code>DOT_PRODUCT</code>, <code>ANGULAR</code></p>
+<p><strong>Quantization methods:</strong> <code>NONE</code>, <code>SCALAR_8BIT</code>, <code>PRODUCT_QUANTIZATION</code></p>
+<p><strong>Example:</strong></p>
+<pre><code class="language-json">{
+  "schema": {
+    "fields": {
+      "title": {"text": {"indexed": true, "stored": true, "term_vectors": true}},
+      "embedding": {"hnsw": {"dimension": 384, "distance": "DISTANCE_METRIC_COSINE", "m": 16, "ef_construction": 200}}
+    },
+    "default_fields": ["title"]
+  }
+}
+</code></pre>
+<h3 id="getindex"><a class="header" href="#getindex"><code>GetIndex</code></a></h3>
+<p>Get index statistics.</p>
+<pre><code class="language-protobuf">rpc GetIndex(GetIndexRequest) returns (GetIndexResponse);
+</code></pre>
+<p><strong>Response fields:</strong></p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Field</th><th style="text-align: left">Type</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>document_count</code></td><td style="text-align: left"><code>uint64</code></td><td style="text-align: left">Total number of documents in the index</td></tr>
+<tr><td style="text-align: left"><code>vector_fields</code></td><td style="text-align: left"><code>map&lt;string, VectorFieldStats&gt;</code></td><td style="text-align: left">Per-field vector statistics</td></tr>
+</tbody>
+</table>
+</div>
+<p>Each <code>VectorFieldStats</code> contains <code>vector_count</code> and <code>dimension</code>.</p>
+<h3 id="getschema"><a class="header" href="#getschema"><code>GetSchema</code></a></h3>
+<p>Retrieve the current index schema.</p>
+<pre><code class="language-protobuf">rpc GetSchema(GetSchemaRequest) returns (GetSchemaResponse);
+</code></pre>
+<p><strong>Response fields:</strong></p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Field</th><th style="text-align: left">Type</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>schema</code></td><td style="text-align: left"><code>Schema</code></td><td style="text-align: left">The index schema</td></tr>
+</tbody>
+</table>
+</div>
+<hr>
+<h2 id="documentservice"><a class="header" href="#documentservice">DocumentService</a></h2>
+<h3 id="putdocument"><a class="header" href="#putdocument"><code>PutDocument</code></a></h3>
+<p>Insert or replace a document by ID. If a document with the same ID already exists, it is replaced.</p>
+<pre><code class="language-protobuf">rpc PutDocument(PutDocumentRequest) returns (PutDocumentResponse);
+</code></pre>
+<p><strong>Request fields:</strong></p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Field</th><th style="text-align: left">Type</th><th style="text-align: left">Required</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>id</code></td><td style="text-align: left"><code>string</code></td><td style="text-align: left">Yes</td><td style="text-align: left">External document ID</td></tr>
+<tr><td style="text-align: left"><code>document</code></td><td style="text-align: left"><code>Document</code></td><td style="text-align: left">Yes</td><td style="text-align: left">Document content</td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>Document structure:</strong></p>
+<pre><code class="language-protobuf">message Document {
+  map&lt;string, Value&gt; fields = 1;
+}
+</code></pre>
+<p>Each <code>Value</code> is a <code>oneof</code> with these types:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Type</th><th style="text-align: left">Proto Field</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left">Null</td><td style="text-align: left"><code>null_value</code></td><td style="text-align: left">Null value</td></tr>
+<tr><td style="text-align: left">Boolean</td><td style="text-align: left"><code>bool_value</code></td><td style="text-align: left">Boolean value</td></tr>
+<tr><td style="text-align: left">Integer</td><td style="text-align: left"><code>int64_value</code></td><td style="text-align: left">64-bit integer</td></tr>
+<tr><td style="text-align: left">Float</td><td style="text-align: left"><code>float64_value</code></td><td style="text-align: left">64-bit floating point</td></tr>
+<tr><td style="text-align: left">Text</td><td style="text-align: left"><code>text_value</code></td><td style="text-align: left">UTF-8 string</td></tr>
+<tr><td style="text-align: left">Bytes</td><td style="text-align: left"><code>bytes_value</code></td><td style="text-align: left">Raw bytes</td></tr>
+<tr><td style="text-align: left">Vector</td><td style="text-align: left"><code>vector_value</code></td><td style="text-align: left"><code>VectorValue</code> (list of floats)</td></tr>
+<tr><td style="text-align: left">DateTime</td><td style="text-align: left"><code>datetime_value</code></td><td style="text-align: left">Unix microseconds (UTC)</td></tr>
+<tr><td style="text-align: left">Geo</td><td style="text-align: left"><code>geo_value</code></td><td style="text-align: left"><code>GeoPoint</code> (latitude, longitude)</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="adddocument"><a class="header" href="#adddocument"><code>AddDocument</code></a></h3>
+<p>Add a document. Unlike <code>PutDocument</code>, this does not replace existing documents with the same ID — multiple documents can share an ID (chunking pattern).</p>
+<pre><code class="language-protobuf">rpc AddDocument(AddDocumentRequest) returns (AddDocumentResponse);
+</code></pre>
+<p>Request fields are the same as <code>PutDocument</code>.</p>
+<h3 id="getdocuments"><a class="header" href="#getdocuments"><code>GetDocuments</code></a></h3>
+<p>Retrieve all documents matching the given external ID.</p>
+<pre><code class="language-protobuf">rpc GetDocuments(GetDocumentsRequest) returns (GetDocumentsResponse);
+</code></pre>
+<p><strong>Request fields:</strong></p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Field</th><th style="text-align: left">Type</th><th style="text-align: left">Required</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>id</code></td><td style="text-align: left"><code>string</code></td><td style="text-align: left">Yes</td><td style="text-align: left">External document ID</td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>Response fields:</strong></p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Field</th><th style="text-align: left">Type</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>documents</code></td><td style="text-align: left"><code>repeated Document</code></td><td style="text-align: left">Matching documents</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="deletedocuments"><a class="header" href="#deletedocuments"><code>DeleteDocuments</code></a></h3>
+<p>Delete all documents matching the given external ID.</p>
+<pre><code class="language-protobuf">rpc DeleteDocuments(DeleteDocumentsRequest) returns (DeleteDocumentsResponse);
+</code></pre>
+<h3 id="commit-1"><a class="header" href="#commit-1"><code>Commit</code></a></h3>
+<p>Commit pending changes (additions and deletions) to the index. Changes are not visible to search until committed.</p>
+<pre><code class="language-protobuf">rpc Commit(CommitRequest) returns (CommitResponse);
+</code></pre>
+<hr>
+<h2 id="searchservice"><a class="header" href="#searchservice">SearchService</a></h2>
+<h3 id="search-2"><a class="header" href="#search-2"><code>Search</code></a></h3>
+<p>Execute a search query and return results as a single response.</p>
+<pre><code class="language-protobuf">rpc Search(SearchRequest) returns (SearchResponse);
+</code></pre>
+<h3 id="searchstream"><a class="header" href="#searchstream"><code>SearchStream</code></a></h3>
+<p>Execute a search query and stream results back one at a time.</p>
+<pre><code class="language-protobuf">rpc SearchStream(SearchRequest) returns (stream SearchResult);
+</code></pre>
+<h3 id="searchrequest-fields"><a class="header" href="#searchrequest-fields">SearchRequest Fields</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Field</th><th style="text-align: left">Type</th><th style="text-align: left">Required</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>query</code></td><td style="text-align: left"><code>string</code></td><td style="text-align: left">No</td><td style="text-align: left">Lexical search query in <a href="#query-dsl-3">Query DSL</a></td></tr>
+<tr><td style="text-align: left"><code>query_vectors</code></td><td style="text-align: left"><code>repeated QueryVector</code></td><td style="text-align: left">No</td><td style="text-align: left">Vector search queries</td></tr>
+<tr><td style="text-align: left"><code>limit</code></td><td style="text-align: left"><code>uint32</code></td><td style="text-align: left">No</td><td style="text-align: left">Maximum number of results (default: engine default)</td></tr>
+<tr><td style="text-align: left"><code>offset</code></td><td style="text-align: left"><code>uint32</code></td><td style="text-align: left">No</td><td style="text-align: left">Number of results to skip</td></tr>
+<tr><td style="text-align: left"><code>fusion</code></td><td style="text-align: left"><code>FusionAlgorithm</code></td><td style="text-align: left">No</td><td style="text-align: left">Fusion algorithm for hybrid search</td></tr>
+<tr><td style="text-align: left"><code>lexical_params</code></td><td style="text-align: left"><code>LexicalParams</code></td><td style="text-align: left">No</td><td style="text-align: left">Lexical search parameters</td></tr>
+<tr><td style="text-align: left"><code>vector_params</code></td><td style="text-align: left"><code>VectorParams</code></td><td style="text-align: left">No</td><td style="text-align: left">Vector search parameters</td></tr>
+<tr><td style="text-align: left"><code>field_boosts</code></td><td style="text-align: left"><code>map&lt;string, float&gt;</code></td><td style="text-align: left">No</td><td style="text-align: left">Per-field score boosting</td></tr>
+</tbody>
+</table>
+</div>
+<p>At least one of <code>query</code> or <code>query_vectors</code> must be provided.</p>
+<h3 id="queryvector"><a class="header" href="#queryvector">QueryVector</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Field</th><th style="text-align: left">Type</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>vector</code></td><td style="text-align: left"><code>repeated float</code></td><td style="text-align: left">Query vector</td></tr>
+<tr><td style="text-align: left"><code>weight</code></td><td style="text-align: left"><code>float</code></td><td style="text-align: left">Weight for this vector (default: 1.0)</td></tr>
+<tr><td style="text-align: left"><code>fields</code></td><td style="text-align: left"><code>repeated string</code></td><td style="text-align: left">Target vector fields (empty = all)</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="fusionalgorithm"><a class="header" href="#fusionalgorithm">FusionAlgorithm</a></h3>
+<p>A <code>oneof</code> with two options:</p>
+<ul>
+<li><strong>RRF</strong> (Reciprocal Rank Fusion): <code>k</code> parameter (default: 60)</li>
+<li><strong>WeightedSum</strong>: <code>lexical_weight</code> and <code>vector_weight</code></li>
+</ul>
+<h3 id="lexicalparams"><a class="header" href="#lexicalparams">LexicalParams</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Field</th><th style="text-align: left">Type</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>min_score</code></td><td style="text-align: left"><code>float</code></td><td style="text-align: left">Minimum score threshold</td></tr>
+<tr><td style="text-align: left"><code>timeout_ms</code></td><td style="text-align: left"><code>uint64</code></td><td style="text-align: left">Search timeout in milliseconds</td></tr>
+<tr><td style="text-align: left"><code>parallel</code></td><td style="text-align: left"><code>bool</code></td><td style="text-align: left">Enable parallel search</td></tr>
+<tr><td style="text-align: left"><code>sort_by</code></td><td style="text-align: left"><code>SortSpec</code></td><td style="text-align: left">Sort by a field instead of score</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="vectorparams"><a class="header" href="#vectorparams">VectorParams</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Field</th><th style="text-align: left">Type</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>fields</code></td><td style="text-align: left"><code>repeated string</code></td><td style="text-align: left">Target vector fields</td></tr>
+<tr><td style="text-align: left"><code>score_mode</code></td><td style="text-align: left"><code>VectorScoreMode</code></td><td style="text-align: left"><code>WEIGHTED_SUM</code>, <code>MAX_SIM</code>, or <code>LATE_INTERACTION</code></td></tr>
+<tr><td style="text-align: left"><code>overfetch</code></td><td style="text-align: left"><code>float</code></td><td style="text-align: left">Overfetch factor (default: 2.0)</td></tr>
+<tr><td style="text-align: left"><code>min_score</code></td><td style="text-align: left"><code>float</code></td><td style="text-align: left">Minimum score threshold</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="searchresult-1"><a class="header" href="#searchresult-1">SearchResult</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Field</th><th style="text-align: left">Type</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>id</code></td><td style="text-align: left"><code>string</code></td><td style="text-align: left">External document ID</td></tr>
+<tr><td style="text-align: left"><code>score</code></td><td style="text-align: left"><code>float</code></td><td style="text-align: left">Relevance score</td></tr>
+<tr><td style="text-align: left"><code>document</code></td><td style="text-align: left"><code>Document</code></td><td style="text-align: left">Document content</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="example"><a class="header" href="#example">Example</a></h3>
+<pre><code class="language-json">{
+  "query": "body:rust",
+  "query_vectors": [
+    {"vector": [0.1, 0.2, 0.3], "weight": 1.0}
+  ],
+  "limit": 10,
+  "fusion": {
+    "rrf": {"k": 60}
+  },
+  "field_boosts": {
+    "title": 2.0
+  }
+}
+</code></pre>
+<hr>
+<h2 id="error-handling"><a class="header" href="#error-handling">Error Handling</a></h2>
+<p>gRPC errors are returned as standard <code>Status</code> codes:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Laurus Error</th><th style="text-align: left">gRPC Status</th><th style="text-align: left">When</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left">Schema / Query / Field / JSON</td><td style="text-align: left"><code>INVALID_ARGUMENT</code></td><td style="text-align: left">Malformed request or schema</td></tr>
+<tr><td style="text-align: left">No index open</td><td style="text-align: left"><code>FAILED_PRECONDITION</code></td><td style="text-align: left">RPC called before <code>CreateIndex</code></td></tr>
+<tr><td style="text-align: left">Index already exists</td><td style="text-align: left"><code>ALREADY_EXISTS</code></td><td style="text-align: left"><code>CreateIndex</code> called twice</td></tr>
+<tr><td style="text-align: left">Not implemented</td><td style="text-align: left"><code>UNIMPLEMENTED</code></td><td style="text-align: left">Feature not yet supported</td></tr>
+<tr><td style="text-align: left">Internal errors</td><td style="text-align: left"><code>INTERNAL</code></td><td style="text-align: left">I/O, storage, or unexpected errors</td></tr>
+</tbody>
+</table>
+</div>
+<div style="break-before: page; page-break-before: always;"></div>
 <h1 id="advanced-features"><a class="header" href="#advanced-features">Advanced Features</a></h1>
 <p>This section covers advanced topics for users who want to go deeper into Laurus’s capabilities.</p>
 <h2 id="topics-3"><a class="header" href="#topics-3">Topics</a></h2>
@@ -3754,7 +4234,7 @@ Document count: 3
 <p>How Laurus ensures data durability through Write-Ahead Logging (WAL) and the commit lifecycle.</p>
 <h3 id="deletions--compaction"><a class="header" href="#deletions--compaction"><a href="#deletions--compaction-1">Deletions &amp; Compaction</a></a></h3>
 <p>How documents are deleted (logical deletion via bitmaps) and how space is reclaimed (compaction).</p>
-<h3 id="error-handling"><a class="header" href="#error-handling"><a href="#error-handling-1">Error Handling</a></a></h3>
+<h3 id="error-handling-1"><a class="header" href="#error-handling-1"><a href="#error-handling-2">Error Handling</a></a></h3>
 <p>Understanding <code>LaurusError</code> and <code>Result&lt;T&gt;</code> for robust application development. Covers all error variants, matching patterns, and common error scenarios.</p>
 <h3 id="extensibility"><a class="header" href="#extensibility"><a href="#extensibility-1">Extensibility</a></a></h3>
 <p>Implementing custom components by extending Laurus’s trait-based abstractions:</p>
@@ -4281,7 +4761,7 @@ engine.commit().await?;
 <li>ID management and internal/external ID mapping: <a href="#id-management-1">ID Management</a></li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div>
-<h1 id="error-handling-1"><a class="header" href="#error-handling-1">Error Handling</a></h1>
+<h1 id="error-handling-2"><a class="header" href="#error-handling-2">Error Handling</a></h1>
 <p>Laurus uses a unified error type for all operations. Understanding the error system helps you write robust applications that handle failures gracefully.</p>
 <h2 id="lauruserror"><a class="header" href="#lauruserror">LaurusError</a></h2>
 <p>All Laurus operations return <code>Result&lt;T&gt;</code>, which is an alias for <code>std::result::Result&lt;T, LaurusError&gt;</code>.</p>
@@ -4737,7 +5217,7 @@ impl Storage for S3Storage {
 <p>All three traits require <code>Send + Sync</code>. This means your implementations must be safe to share across threads. Use <code>Arc&lt;Mutex&lt;_&gt;&gt;</code> or lock-free data structures for shared mutable state.</p>
 <h2 id="next-steps-11"><a class="header" href="#next-steps-11">Next Steps</a></h2>
 <ul>
-<li><a href="#error-handling-1">Error Handling</a> — handle errors in custom implementations</li>
+<li><a href="#error-handling-2">Error Handling</a> — handle errors in custom implementations</li>
 <li><a href="#text-analysis-1">Text Analysis</a> — built-in analyzers and pipeline components</li>
 <li><a href="#embeddings-1">Embeddings</a> — built-in embedder options</li>
 <li><a href="#storage-1">Storage</a> — built-in storage backends</li>
@@ -5064,7 +5544,7 @@ impl Storage for S3Storage {
 </tbody>
 </table>
 </div>
-<h2 id="search-2"><a class="header" href="#search-2">Search</a></h2>
+<h2 id="search-3"><a class="header" href="#search-3">Search</a></h2>
 <h3 id="searchrequestbuilder"><a class="header" href="#searchrequestbuilder">SearchRequestBuilder</a></h3>
 <div class="table-wrapper">
 <table>
@@ -5123,7 +5603,7 @@ impl Storage for S3Storage {
 </tbody>
 </table>
 </div>
-<h3 id="searchresult-1"><a class="header" href="#searchresult-1">SearchResult</a></h3>
+<h3 id="searchresult-2"><a class="header" href="#searchresult-2">SearchResult</a></h3>
 <div class="table-wrapper">
 <table>
 <thead>
@@ -5136,7 +5616,7 @@ impl Storage for S3Storage {
 </tbody>
 </table>
 </div>
-<h3 id="fusionalgorithm"><a class="header" href="#fusionalgorithm">FusionAlgorithm</a></h3>
+<h3 id="fusionalgorithm-1"><a class="header" href="#fusionalgorithm-1">FusionAlgorithm</a></h3>
 <div class="table-wrapper">
 <table>
 <thead>
