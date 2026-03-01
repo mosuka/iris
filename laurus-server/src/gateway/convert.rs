@@ -642,10 +642,10 @@ mod tests {
 
     #[test]
     fn test_json_value_roundtrip_float() {
-        let json = json!(3.14);
+        let json = json!(1.23);
         let proto = json_value_to_proto(&json);
         let back = proto_value_to_json(&proto);
-        assert_eq!(back, json!(3.14));
+        assert_eq!(back, json!(1.23));
     }
 
     #[test]
