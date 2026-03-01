@@ -15,15 +15,15 @@ name = "laurus"
 path = "src/main.rs"
 
 [dependencies]
-laurus = { workspace = true }
-laurus-server = { workspace = true }
-
 anyhow = { workspace = true }
 clap = { workspace = true }
+dialoguer = { workspace = true }
+rustyline = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-toml = { workspace = true }
-tokio = { workspace = true }
 tabled = { workspace = true }
-rustyline = { workspace = true }
-dialoguer = { workspace = true }
+tokio = { workspace = true }
+toml = { workspace = true }
+
+laurus = { workspace = true }
+laurus-server = { workspace = true }

@@ -1,8 +1,8 @@
 use std::path::Path;
 
-use anyhow::{bail, Context};
-use laurus::{Engine, Schema, StorageConfig, StorageFactory};
+use anyhow::{Context, bail};
 use laurus::storage::file::FileStorageConfig;
+use laurus::{Engine, Schema, StorageConfig, StorageFactory};
 
 const SCHEMA_FILE: &str = "schema.toml";
 const STORE_DIR: &str = "store";

@@ -139,6 +139,10 @@ pub struct ServeCommand {
     #[arg(short = 'p', long = "port", env = "LAURUS_PORT")]
     pub port: Option<u16>,
 
+    /// HTTP Gateway port. If set, starts an HTTP gateway alongside the gRPC server.
+    #[arg(long = "http-port", env = "LAURUS_HTTP_PORT")]
+    pub http_port: Option<u16>,
+
     /// Log level (trace, debug, info, warn, error).
     #[arg(short = 'l', long = "log-level", env = "LAURUS_LOG_LEVEL")]
     pub log_level: Option<String>,

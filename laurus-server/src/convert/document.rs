@@ -33,12 +33,8 @@ fn data_value_to_proto(val: &DataValue) -> v1::Value {
         DataValue::Float64(f) => Some(Kind::Float64Value(*f)),
         DataValue::Text(s) => Some(Kind::TextValue(s.clone())),
         DataValue::Bytes(b, _mime) => Some(Kind::BytesValue(b.clone())),
-        DataValue::Vector(v) => Some(Kind::VectorValue(v1::VectorValue {
-            values: v.clone(),
-        })),
-        DataValue::DateTime(dt) => {
-            Some(Kind::DatetimeValue(dt.timestamp_micros()))
-        }
+        DataValue::Vector(v) => Some(Kind::VectorValue(v1::VectorValue { values: v.clone() })),
+        DataValue::DateTime(dt) => Some(Kind::DatetimeValue(dt.timestamp_micros())),
         DataValue::Geo(lat, lon) => Some(Kind::GeoValue(v1::GeoPoint {
             latitude: *lat,
             longitude: *lon,

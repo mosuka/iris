@@ -2,8 +2,7 @@ use std::collections::HashMap;
 
 use laurus::{
     FusionAlgorithm, LexicalSearchParams, LexicalSearchQuery, LexicalSearchRequest, QueryVector,
-    SearchRequestBuilder, SearchResult, SortField, SortOrder, VectorScoreMode,
-    VectorSearchRequest,
+    SearchRequestBuilder, SearchResult, SortField, SortOrder, VectorScoreMode, VectorSearchRequest,
 };
 
 use crate::convert::document;
@@ -11,9 +10,7 @@ use crate::proto::laurus::v1;
 
 /// Build a laurus SearchRequest from a proto SearchRequest.
 #[allow(clippy::result_large_err)]
-pub fn from_proto(
-    proto: &v1::SearchRequest,
-) -> Result<laurus::SearchRequest, tonic::Status> {
+pub fn from_proto(proto: &v1::SearchRequest) -> Result<laurus::SearchRequest, tonic::Status> {
     let mut builder = SearchRequestBuilder::new();
 
     // Lexical query
@@ -46,15 +43,11 @@ pub fn from_proto(
         && let Some(alg) = &fusion.algorithm
     {
         let fusion_alg = match alg {
-            v1::fusion_algorithm::Algorithm::Rrf(rrf) => {
-                FusionAlgorithm::RRF { k: rrf.k }
-            }
-            v1::fusion_algorithm::Algorithm::WeightedSum(ws) => {
-                FusionAlgorithm::WeightedSum {
-                    lexical_weight: ws.lexical_weight,
-                    vector_weight: ws.vector_weight,
-                }
-            }
+            v1::fusion_algorithm::Algorithm::Rrf(rrf) => FusionAlgorithm::RRF { k: rrf.k },
+            v1::fusion_algorithm::Algorithm::WeightedSum(ws) => FusionAlgorithm::WeightedSum {
+                lexical_weight: ws.lexical_weight,
+                vector_weight: ws.vector_weight,
+            },
         };
         builder = builder.fusion_algorithm(fusion_alg);
     }
@@ -97,9 +90,7 @@ fn build_lexical_params(params: Option<&v1::LexicalParams>) -> LexicalSearchPara
 }
 
 #[allow(clippy::result_large_err)]
-fn build_vector_request(
-    proto: &v1::SearchRequest,
-) -> Result<VectorSearchRequest, tonic::Status> {
+fn build_vector_request(proto: &v1::SearchRequest) -> Result<VectorSearchRequest, tonic::Status> {
     let query_vectors: Vec<QueryVector> = proto
         .query_vectors
         .iter()

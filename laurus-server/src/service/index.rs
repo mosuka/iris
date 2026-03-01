@@ -9,9 +9,8 @@ use laurus::Engine;
 use crate::context;
 use crate::convert::{error, schema as schema_convert};
 use crate::proto::laurus::v1::{
-    index_service_server::IndexService as IndexServiceTrait, CreateIndexRequest,
-    CreateIndexResponse, GetIndexRequest, GetIndexResponse, GetSchemaRequest, GetSchemaResponse,
-    VectorFieldStats,
+    CreateIndexRequest, CreateIndexResponse, GetIndexRequest, GetIndexResponse, GetSchemaRequest,
+    GetSchemaResponse, VectorFieldStats, index_service_server::IndexService as IndexServiceTrait,
 };
 
 /// gRPC IndexService implementation.
@@ -32,8 +31,7 @@ impl IndexServiceTrait for IndexService {
             .schema
             .as_ref()
             .ok_or_else(|| Status::invalid_argument("schema is required"))?;
-        let schema =
-            schema_convert::from_proto(proto_schema).map_err(Status::invalid_argument)?;
+        let schema = schema_convert::from_proto(proto_schema).map_err(Status::invalid_argument)?;
 
         let mut guard = self.engine.write().await;
         if guard.is_some() {
@@ -84,8 +82,7 @@ impl IndexServiceTrait for IndexService {
         &self,
         _request: Request<GetSchemaRequest>,
     ) -> Result<Response<GetSchemaResponse>, Status> {
-        let schema =
-            context::read_schema(&self.data_dir).map_err(error::anyhow_to_status)?;
+        let schema = context::read_schema(&self.data_dir).map_err(error::anyhow_to_status)?;
         let proto_schema = schema_convert::to_proto(&schema);
         Ok(Response::new(GetSchemaResponse {
             schema: Some(proto_schema),

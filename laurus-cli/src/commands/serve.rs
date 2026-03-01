@@ -18,6 +18,9 @@ pub async fn run(cmd: ServeCommand, data_dir: &Path) -> Result<()> {
     if let Some(port) = cmd.port {
         config.server.port = port;
     }
+    if cmd.http_port.is_some() {
+        config.server.http_port = cmd.http_port;
+    }
     if let Some(log_level) = cmd.log_level {
         config.log.level = log_level;
     }

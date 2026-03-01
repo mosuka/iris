@@ -7,10 +7,9 @@ use laurus::Engine;
 
 use crate::convert::{document as doc_convert, error};
 use crate::proto::laurus::v1::{
-    document_service_server::DocumentService as DocumentServiceTrait, AddDocumentRequest,
-    AddDocumentResponse, CommitRequest, CommitResponse, DeleteDocumentsRequest,
+    AddDocumentRequest, AddDocumentResponse, CommitRequest, CommitResponse, DeleteDocumentsRequest,
     DeleteDocumentsResponse, GetDocumentsRequest, GetDocumentsResponse, PutDocumentRequest,
-    PutDocumentResponse,
+    PutDocumentResponse, document_service_server::DocumentService as DocumentServiceTrait,
 };
 
 /// gRPC DocumentService implementation.
@@ -21,9 +20,7 @@ pub struct DocumentService {
 
 impl DocumentService {
     #[allow(clippy::result_large_err)]
-    fn get_engine_ref(
-        guard: &Option<Engine>,
-    ) -> Result<&Engine, Status> {
+    fn get_engine_ref(guard: &Option<Engine>) -> Result<&Engine, Status> {
         guard
             .as_ref()
             .ok_or_else(|| Status::failed_precondition("No index is open. Create an index first."))
