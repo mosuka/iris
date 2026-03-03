@@ -1,3 +1,11 @@
+//! Interactive schema generation wizard.
+//!
+//! Guides the user through an interactive terminal session to define index
+//! fields and their options, then writes the resulting schema as a TOML file.
+//! Supports all field types provided by the laurus engine, including lexical
+//! fields (Text, Integer, Float, etc.) and vector index fields (HNSW, Flat,
+//! IVF).
+
 use std::collections::HashMap;
 use std::path::Path;
 
@@ -18,7 +26,26 @@ const FIELD_TYPES: &[&str] = &[
 /// Distance metric names shown in the interactive prompt.
 const DISTANCE_METRICS: &[&str] = &["Cosine", "Euclidean", "Manhattan", "DotProduct", "Angular"];
 
-/// Run the interactive schema generation.
+/// Run the interactive schema generation wizard.
+///
+/// Prompts the user to define fields one by one, asks for default search
+/// fields among the lexical fields, previews the resulting TOML, and writes
+/// it to `output` upon confirmation.
+///
+/// # Arguments
+///
+/// * `output` - Destination file path for the generated schema TOML.
+///
+/// # Returns
+///
+/// Returns `Ok(())` on success, or if the user cancels before writing.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - An interactive prompt fails (e.g. terminal I/O error).
+/// - The schema cannot be serialised to TOML.
+/// - The output file cannot be written.
 pub fn run(output: &Path) -> Result<()> {
     println!("\n=== Laurus Schema Generator ===\n");
 

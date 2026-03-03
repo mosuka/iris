@@ -195,16 +195,46 @@ pub struct TextOption {
 }
 
 impl TextOption {
+    /// Sets whether the field should be indexed (i.e., searchable).
+    ///
+    /// # Arguments
+    ///
+    /// * `indexed` - `true` to make the field searchable, `false` otherwise.
+    ///
+    /// # Returns
+    ///
+    /// The modified `TextOption` for method chaining.
     pub fn indexed(mut self, indexed: bool) -> Self {
         self.indexed = indexed;
         self
     }
 
+    /// Sets whether the field value should be stored in the index for retrieval.
+    ///
+    /// # Arguments
+    ///
+    /// * `stored` - `true` to store the original field value, `false` otherwise.
+    ///
+    /// # Returns
+    ///
+    /// The modified `TextOption` for method chaining.
     pub fn stored(mut self, stored: bool) -> Self {
         self.stored = stored;
         self
     }
 
+    /// Sets whether term vectors should be stored for this field.
+    ///
+    /// Term vectors enable features such as highlighting and more-like-this queries
+    /// by recording per-document term positions and frequencies.
+    ///
+    /// # Arguments
+    ///
+    /// * `term_vectors` - `true` to store term vectors, `false` otherwise.
+    ///
+    /// # Returns
+    ///
+    /// The modified `TextOption` for method chaining.
     pub fn term_vectors(mut self, term_vectors: bool) -> Self {
         self.term_vectors = term_vectors;
         self

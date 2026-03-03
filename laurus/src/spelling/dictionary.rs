@@ -1,4 +1,13 @@
 //! Dictionary management for spelling correction.
+//!
+//! This module provides [`SpellingDictionary`], a frequency-aware word dictionary used
+//! by the spelling suggestion engine. Words can be loaded from plain text files,
+//! frequency files (tab-separated `word\tcount`), or built from a raw text corpus.
+//! A [`BuiltinDictionary`] helper offers pre-configured English dictionaries for
+//! quick bootstrapping.
+//!
+//! Dictionaries support merging, pruning of low-frequency entries, prefix-based
+//! lookups, and probability calculations based on word frequency.
 
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
@@ -8,6 +17,11 @@ use std::path::Path;
 use crate::error::Result;
 
 /// A dictionary that stores words and their frequencies for spelling correction.
+///
+/// `SpellingDictionary` maintains a mapping from lowercase words to occurrence counts
+/// along with a `HashSet` for constant-time membership tests. The total word count is
+/// tracked separately to allow efficient probability calculations
+/// (frequency / total_count).
 #[derive(Debug, Clone)]
 pub struct SpellingDictionary {
     /// Words and their frequencies
@@ -29,6 +43,19 @@ impl SpellingDictionary {
     }
 
     /// Add a word to the dictionary with the given frequency.
+    ///
+    /// The word is normalized to lowercase before insertion. If the word
+    /// already exists, its frequency is **overwritten** (not accumulated).
+    /// The global `total_count` is adjusted accordingly by subtracting the
+    /// old frequency and adding the new one.
+    ///
+    /// To increment the frequency of an existing word by one instead of
+    /// replacing it, use [`increment_word`](Self::increment_word).
+    ///
+    /// # Arguments
+    ///
+    /// * `word` - The word to add (will be lowercased).
+    /// * `frequency` - The frequency to assign to the word.
     pub fn add_word(&mut self, word: String, frequency: u32) {
         let normalized = word.to_lowercase();
 
@@ -42,6 +69,15 @@ impl SpellingDictionary {
     }
 
     /// Increment the frequency of a word by 1.
+    ///
+    /// If the word does not yet exist in the dictionary, it is inserted with
+    /// a frequency of 1. Unlike [`add_word`](Self::add_word), which
+    /// overwrites the frequency, this method adds to the existing count.
+    ///
+    /// # Arguments
+    ///
+    /// * `word` - The word whose frequency should be incremented (will be
+    ///   lowercased).
     pub fn increment_word(&mut self, word: &str) {
         let normalized = word.to_lowercase();
         let current = self.words.get(&normalized).copied().unwrap_or(0);

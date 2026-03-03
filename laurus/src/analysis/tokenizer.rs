@@ -9,7 +9,7 @@
 //! - [`whitespace::WhitespaceTokenizer`] - Splits on whitespace characters
 //! - [`unicode_word::UnicodeWordTokenizer`] - Uses Unicode word boundaries
 //! - [`regex::RegexTokenizer`] - Custom regex-based tokenization
-//! - [`ngram::NGramTokenizer`] - Character n-gram tokenization
+//! - [`ngram::NgramTokenizer`] - Character n-gram tokenization
 //! - [`lindera::LinderaTokenizer`] - Japanese morphological analysis (requires `lindera` feature)
 //! - [`whole::WholeTokenizer`] - Treats entire text as single token
 //!

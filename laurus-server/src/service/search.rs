@@ -1,3 +1,8 @@
+//! Search gRPC service.
+//!
+//! Provides unary and server-streaming RPCs for executing lexical, vector,
+//! and hybrid search queries against the index.
+
 use std::sync::Arc;
 
 use tokio::sync::RwLock;
@@ -15,11 +20,14 @@ use crate::proto::laurus::v1::{
 /// gRPC SearchService implementation.
 #[derive(Clone)]
 pub struct SearchService {
+    /// Shared, mutable reference to the current search engine instance.
+    /// `None` when no index has been created yet.
     pub engine: Arc<RwLock<Option<Engine>>>,
 }
 
 #[tonic::async_trait]
 impl SearchServiceTrait for SearchService {
+    /// Executes a search query and returns all results in a single response.
     async fn search(
         &self,
         request: Request<SearchRequest>,
@@ -46,6 +54,7 @@ impl SearchServiceTrait for SearchService {
 
     type SearchStreamStream = ReceiverStream<Result<SearchResult, Status>>;
 
+    /// Executes a search query and streams results back one at a time.
     async fn search_stream(
         &self,
         request: Request<SearchRequest>,

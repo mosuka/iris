@@ -1,15 +1,59 @@
 //! # Laurus
 //!
-//! Laurus is a Rust library for building search engines with support for lexical, vector, and hybrid search. It provides a flexible and efficient way to create powerful search applications.
+//! Laurus is a Rust library for building search engines with support for lexical,
+//! vector, and hybrid search. It provides a flexible and efficient way to create
+//! powerful search applications.
 //!
 //! ## Features
 //!
-//! - Pure Rust implementation
-//! - Fast indexing and searching
-//! - Flexible text analysis pipeline
-//! - Pluggable storage backends
-//! - Multiple query types
-//! - BM25 scoring
+//! ### Lexical Search (BM25-based Inverted Index)
+//! - BM25 scoring over an inverted index
+//! - Multiple query types (term, phrase, boolean, fuzzy, range, prefix, wildcard, etc.)
+//! - Field-level boosting
+//!
+//! ### Vector Search (HNSW, Flat, IVF Indexes)
+//! - HNSW index for fast approximate nearest-neighbor lookup
+//! - Flat index for exact brute-force search
+//! - IVF index for inverted-file based approximate search
+//! - Configurable distance metrics and quantization
+//!
+//! ### Hybrid Search with Configurable Fusion (RRF, WeightedSum)
+//! - Combine lexical and vector results with a configurable fusion algorithm
+//! - Reciprocal Rank Fusion (RRF) for rank-based merging
+//! - Weighted Sum fusion with automatic min-max score normalization
+//! - Unified query DSL that mixes lexical and vector clauses in a single string
+//!
+//! ### Embedding Integration (Local BERT/CLIP via candle, OpenAI API)
+//! - Local text embeddings via candle (BERT models)
+//! - OpenAI API embeddings
+//! - Multimodal CLIP embeddings (text + image)
+//! - Per-field embedder routing via [`PerFieldEmbedder`]
+//!
+//! ### Write-Ahead Log (WAL) for Durability
+//! - WAL-backed durability with crash recovery
+//! - Automatic replay of uncommitted changes on engine startup
+//! - Rollback on partial indexing failures to maintain consistency
+//!
+//! ### Pluggable Storage (In-memory, File-based with mmap)
+//! - In-memory storage ([`MemoryStorage`](storage::memory::MemoryStorage)) for testing and ephemeral indexes
+//! - File-based storage ([`FileStorage`](storage::file::FileStorage)) with mmap-backed reads
+//! - Prefixed storage for logical partitioning within a single backend
+//!
+//! ### Text Analysis Pipeline (Tokenizers, Filters, Char Filters, Synonyms)
+//! - Pluggable analyzers: Standard, Simple, Keyword, per-field, and language-specific (English, Japanese)
+//! - Tokenizers: Unicode word, whitespace, regex, n-gram, Lindera (Japanese morphological analysis)
+//! - Token filters: lowercase, stop words, stemming (Porter, simple), synonym graph, boost, strip, limit
+//! - Char filters: Unicode normalization, character mapping, pattern replace, Japanese iteration marks
+//! - Custom analysis pipelines via [`PipelineAnalyzer`](analysis::analyzer::pipeline::PipelineAnalyzer)
+//!
+//! ### Column Storage for Filtering
+//! - Column-oriented storage for efficient filtering and range queries on scalar fields
+//!
+//! ### Spelling Correction / "Did You Mean?" Suggestions
+//! - Levenshtein-distance based spelling correction
+//! - "Did you mean?" suggestions powered by index term frequencies
+//! - Configurable auto-correction thresholds and maximum edit distances
+//! - Query history learning for improved suggestion quality
 
 // Core modules
 pub mod analysis;
@@ -56,5 +100,5 @@ pub use vector::core::field::{FlatOption, HnswOption, IvfOption};
 pub use vector::core::quantization::QuantizationMethod;
 pub use vector::store::request::{QueryVector, VectorScoreMode, VectorSearchRequest};
 
-// Version information
+/// The crate version string, populated at compile time from `Cargo.toml`.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

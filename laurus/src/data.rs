@@ -222,7 +222,8 @@ impl Document {
         self.fields.get(name)
     }
 
-    /// Alias for get (compatibility with Lexical).
+    /// Alias for [`get`](Self::get), provided for API consistency with field-based
+    /// access patterns. Behaves identically to `get`.
     pub fn get_field(&self, name: &str) -> Option<&DataValue> {
         self.get(name)
     }
@@ -305,7 +306,11 @@ impl DocumentBuilder {
         self.add_field(name.into(), DataValue::Geo(lat, lon))
     }
 
-    /// Add a binary data field.
+    /// Add a binary data field with no MIME type.
+    ///
+    /// The MIME type is set to `None`. If a MIME type is needed (e.g. for
+    /// multimodal embedding), use [`add_field`](Self::add_field) directly with
+    /// `DataValue::Bytes(data, Some(mime))`.
     pub fn add_bytes(self, name: impl Into<String>, data: Vec<u8>) -> Self {
         self.add_field(name.into(), DataValue::Bytes(data, None))
     }

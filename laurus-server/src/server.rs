@@ -1,3 +1,9 @@
+//! Server bootstrap logic.
+//!
+//! The [`run`] function initialises logging, opens or creates the search index,
+//! starts the gRPC server (and optionally the HTTP gateway), and waits for a
+//! shutdown signal (`Ctrl+C`).
+
 use std::net::SocketAddr;
 use std::sync::Arc;
 
@@ -19,8 +25,24 @@ use crate::service::{
 
 /// Starts the server based on the given configuration.
 ///
-/// If `http_port` is configured, both the gRPC server and HTTP Gateway are started concurrently.
-/// Otherwise, only the gRPC server is started.
+/// If `http_port` is configured, both the gRPC server and HTTP Gateway are
+/// started concurrently. Otherwise, only the gRPC server is started.
+///
+/// The function blocks until a shutdown signal (`Ctrl+C`) is received.
+/// On shutdown it commits any pending index changes before exiting.
+///
+/// # Arguments
+///
+/// * `config` - Server, index, and logging configuration.
+///
+/// # Returns
+///
+/// `Ok(())` when the server shuts down cleanly.
+///
+/// # Errors
+///
+/// Returns an error if the address cannot be parsed, the gRPC server fails to
+/// start, or the HTTP gateway listener cannot bind.
 pub async fn run(config: &Config) -> anyhow::Result<()> {
     // Initialize tracing.
     tracing_subscriber::fmt()

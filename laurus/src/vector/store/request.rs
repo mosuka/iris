@@ -1,6 +1,7 @@
-//! VectorStore 検索リクエスト関連の型定義
+//! Vector store search request types.
 //!
-//! このモジュールは検索リクエスト、クエリベクトル、フィールドセレクタを提供する。
+//! This module provides types for constructing vector search requests,
+//! including query vectors, field selectors, and score combination modes.
 
 use serde::{Deserialize, Serialize};
 
@@ -26,7 +27,12 @@ pub struct VectorSearchRequest {
     /// contains non-serializable data (e.g., `Arc<[u8]>`).
     #[serde(skip)]
     pub query_payloads: Vec<QueryPayload>,
-    /// Fields to search in. If None, searches all default fields.
+    /// Fields to search in.
+    ///
+    /// **Note:** The current [`VectorStore::search()`](crate::vector::store::VectorStore::search)
+    /// implementation does not use this field. All indexed vectors are searched
+    /// regardless of this value. This field is reserved for future
+    /// field-level filtering support.
     #[serde(default)]
     pub fields: Option<Vec<FieldSelector>>,
     /// Maximum number of results to return.
@@ -36,6 +42,10 @@ pub struct VectorSearchRequest {
     #[serde(default)]
     pub score_mode: VectorScoreMode,
     /// Overfetch factor for better result quality.
+    ///
+    /// **Note:** The current [`VectorStore::search()`](crate::vector::store::VectorStore::search)
+    /// implementation does not use this field. Instead, it hardcodes a 2x overfetch
+    /// (`limit.saturating_mul(2)`). This field is reserved for future use.
     #[serde(default = "default_overfetch")]
     pub overfetch: f32,
     /// Minimum score threshold. Results with scores below this value are filtered out.
@@ -63,13 +73,27 @@ impl Default for VectorSearchRequest {
     }
 }
 
+/// Selector for choosing which vector fields to include in a search.
+///
+/// Fields can be selected either by their exact name or by a name prefix,
+/// allowing flexible targeting of specific vector fields within a collection.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum FieldSelector {
+    /// Select a field by its exact name (e.g., `"title_embedding"`).
     Exact(String),
+    /// Select all fields whose names start with the given prefix
+    /// (e.g., `"image_"` matches `"image_thumbnail"`, `"image_full"`, etc.).
     Prefix(String),
 }
 
+/// Strategy for combining similarity scores when a search uses multiple query vectors.
+///
+/// Different modes suit different retrieval scenarios. For example,
+/// [`WeightedSum`](Self::WeightedSum) works well when all query vectors contribute
+/// additively, while [`MaxSim`](Self::MaxSim) is better for alternative-interpretation
+/// queries and [`LateInteraction`](Self::LateInteraction) suits ColBERT-style multi-vector
+/// representations.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum VectorScoreMode {
@@ -86,9 +110,17 @@ pub enum VectorScoreMode {
     LateInteraction,
 }
 
+/// A pre-embedded query vector with an optional weight and field restriction.
+///
+/// Each `QueryVector` carries a dense embedding that has already been produced
+/// by an external embedding model. It is used directly for similarity
+/// computation against the stored document vectors.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct QueryVector {
+    /// Dense floating-point embedding representing the query.
     pub vector: Vec<f32>,
+    /// Multiplicative weight applied to the similarity score produced by this
+    /// vector. Defaults to `1.0`.
     #[serde(default = "QueryVector::default_weight")]
     pub weight: f32,
     /// Optional list of fields to restrict this query vector to.

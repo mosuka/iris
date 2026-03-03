@@ -1,3 +1,9 @@
+//! Output formatting utilities for CLI results.
+//!
+//! This module provides functions to render search results, documents, and
+//! index statistics in either a human-readable table or JSON format. The
+//! desired format is selected via the [`OutputFormat`] enum.
+
 use std::collections::HashMap;
 
 use clap::ValueEnum;
@@ -16,7 +22,12 @@ pub enum OutputFormat {
     Json,
 }
 
-/// Print search results.
+/// Print search results to stdout.
+///
+/// # Arguments
+///
+/// * `results` - Slice of [`SearchResult`] entries returned by the engine.
+/// * `format` - The desired output format (table or JSON).
 pub fn print_search_results(results: &[SearchResult], format: OutputFormat) {
     match format {
         OutputFormat::Json => {
@@ -63,7 +74,13 @@ pub fn print_search_results(results: &[SearchResult], format: OutputFormat) {
     }
 }
 
-/// Print documents.
+/// Print documents to stdout.
+///
+/// # Arguments
+///
+/// * `id` - The external document ID used for display.
+/// * `documents` - Slice of [`Document`] entries (may contain multiple chunks).
+/// * `format` - The desired output format (table or JSON).
 pub fn print_documents(id: &str, documents: &[Document], format: OutputFormat) {
     match format {
         OutputFormat::Json => {
@@ -103,7 +120,13 @@ pub fn print_documents(id: &str, documents: &[Document], format: OutputFormat) {
     }
 }
 
-/// Print index statistics.
+/// Print index statistics to stdout.
+///
+/// # Arguments
+///
+/// * `stats` - [`VectorStats`] containing document count and per-field vector
+///   statistics.
+/// * `format` - The desired output format (table or JSON).
 pub fn print_stats(stats: &VectorStats, format: OutputFormat) {
     match format {
         OutputFormat::Json => {

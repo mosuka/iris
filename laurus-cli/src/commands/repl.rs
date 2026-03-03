@@ -1,3 +1,9 @@
+//! Interactive Read-Eval-Print Loop (REPL) for the laurus search engine.
+//!
+//! Provides a terminal-based interactive session where users can search the
+//! index, add/get/delete documents, commit changes, and view index statistics
+//! without restarting the CLI. Command history is supported via `rustyline`.
+
 use std::path::Path;
 
 use anyhow::{Context, Result};
@@ -8,7 +14,28 @@ use rustyline::DefaultEditor;
 use crate::context;
 use crate::output::{self, OutputFormat};
 
-/// Run the interactive REPL.
+/// Run the interactive REPL session.
+///
+/// Opens the index and enters a read-eval-print loop that accepts commands
+/// from the user via a `rustyline` prompt. Supported commands include
+/// `search`, `doc` (add/get/delete), `commit`, `stats`, `help`, and `quit`.
+///
+/// # Arguments
+///
+/// * `data_dir` - Path to the data directory holding the index.
+/// * `format` - The desired output format (table or JSON) for results.
+///
+/// # Returns
+///
+/// Returns `Ok(())` when the user exits the REPL via `quit`, `exit`, Ctrl-C,
+/// or Ctrl-D.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - The index cannot be opened.
+/// - The schema file cannot be read or parsed.
+/// - The readline editor fails to initialise.
 pub async fn run(data_dir: &Path, format: OutputFormat) -> Result<()> {
     let engine = context::open_index(data_dir).await?;
 

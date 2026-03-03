@@ -1,13 +1,40 @@
+//! Index lifecycle helpers for creating, opening, and inspecting indices on disk.
+//!
+//! Each index is stored under a *data directory* that contains:
+//!
+//! * `schema.toml` – the serialized [`Schema`] definition.
+//! * `store/`      – the underlying storage directory managed by [`Engine`].
+
 use std::path::Path;
 
 use anyhow::{Context, bail};
 use laurus::storage::file::FileStorageConfig;
 use laurus::{Engine, Schema, StorageConfig, StorageFactory};
 
+/// Filename used to persist the index schema inside the data directory.
 const SCHEMA_FILE: &str = "schema.toml";
+
+/// Subdirectory name for the underlying storage inside the data directory.
 const STORE_DIR: &str = "store";
 
 /// Create a new index at the given data directory with the provided schema.
+///
+/// The function persists the schema as `schema.toml`, initialises file-based
+/// storage under the `store/` subdirectory, and returns a ready-to-use [`Engine`].
+///
+/// # Arguments
+///
+/// * `data_dir` - Root directory where the index files will be stored.
+/// * `schema`   - The schema definition describing the index fields.
+///
+/// # Returns
+///
+/// A newly constructed [`Engine`] backed by the created storage.
+///
+/// # Errors
+///
+/// Returns an error if an index already exists at `data_dir`, if directory
+/// creation fails, or if the engine cannot be initialised.
 pub async fn create_index(data_dir: &Path, schema: &Schema) -> anyhow::Result<Engine> {
     let schema_path = data_dir.join(SCHEMA_FILE);
     if schema_path.exists() {
@@ -36,6 +63,23 @@ pub async fn create_index(data_dir: &Path, schema: &Schema) -> anyhow::Result<En
 }
 
 /// Open an existing index from the given data directory.
+///
+/// Reads the persisted `schema.toml`, opens the file-based storage, and
+/// constructs an [`Engine`] ready for querying and indexing.
+///
+/// # Arguments
+///
+/// * `data_dir` - Root directory of an existing index.
+///
+/// # Returns
+///
+/// An [`Engine`] loaded from the existing storage.
+///
+/// # Errors
+///
+/// Returns an error if no index exists at `data_dir` (i.e. `schema.toml` is
+/// missing), if the schema file cannot be read or parsed, or if the engine
+/// fails to initialise.
 pub async fn open_index(data_dir: &Path) -> anyhow::Result<Engine> {
     let schema_path = data_dir.join(SCHEMA_FILE);
     if !schema_path.exists() {
@@ -58,6 +102,21 @@ pub async fn open_index(data_dir: &Path) -> anyhow::Result<Engine> {
 }
 
 /// Read the schema from the data directory without opening the full engine.
+///
+/// This is a lightweight operation that only deserializes `schema.toml`
+/// and does not touch the storage layer.
+///
+/// # Arguments
+///
+/// * `data_dir` - Root directory containing the `schema.toml` file.
+///
+/// # Returns
+///
+/// The deserialized [`Schema`].
+///
+/// # Errors
+///
+/// Returns an error if the schema file cannot be read or parsed.
 pub fn read_schema(data_dir: &Path) -> anyhow::Result<Schema> {
     let schema_path = data_dir.join(SCHEMA_FILE);
     let schema_toml =

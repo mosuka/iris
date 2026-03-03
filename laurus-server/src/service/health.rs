@@ -1,3 +1,7 @@
+//! Health-check gRPC service.
+//!
+//! Provides a simple liveness probe that always returns `SERVING`.
+
 use tonic::{Request, Response, Status};
 
 use crate::proto::laurus::v1::{
@@ -11,6 +15,7 @@ pub struct HealthService;
 
 #[tonic::async_trait]
 impl HealthServiceTrait for HealthService {
+    /// Performs a health check and always returns `SERVING` status.
     async fn check(
         &self,
         _request: Request<HealthCheckRequest>,

@@ -84,12 +84,41 @@ impl CorrectionResult {
     }
 
     /// Check if the result suggests a "Did you mean?" prompt.
+    ///
+    /// Returns `true` when all of the following conditions hold:
+    /// - At least one word has suggestions ([`has_suggestions`](Self::has_suggestions)).
+    /// - The result was **not** auto-corrected (`auto_corrected == false`).
+    /// - The overall `confidence` score is below `0.7`.
     pub fn should_show_did_you_mean(&self) -> bool {
         self.has_suggestions() && !self.auto_corrected && self.confidence < 0.7
     }
 }
 
-/// Main spelling corrector.
+/// Main spelling corrector that integrates dictionary lookup and suggestion generation.
+///
+/// `SpellingCorrector` combines a [`SuggestionEngine`] (backed by a [`SpellingDictionary`])
+/// with configurable correction policies to provide query-level spelling correction.
+///
+/// # Correction algorithm
+///
+/// 1. The input query is split into individual words via
+///    `extract_query_words`, which:
+///    - Strips non-alphabetic characters from each token.
+///    - Converts tokens to lowercase.
+///    - Discards tokens shorter than 2 characters.
+///    - Removes common English stop words (e.g. "the", "and", "or").
+/// 2. Each remaining word is looked up in the underlying dictionary via the
+///    suggestion engine.
+/// 3. Words not found in the dictionary are considered potential misspellings.
+///    The engine generates candidate corrections by computing edit-distance neighbours
+///    (insertions, deletions, substitutions, transpositions) up to the configured
+///    maximum edit distance and scoring them by a combination of edit distance and
+///    dictionary frequency.
+/// 4. If the [`CorrectorConfig::auto_correct`] flag is enabled and the best suggestion
+///    exceeds [`CorrectorConfig::auto_correct_threshold`], the corrected query is
+///    returned automatically.
+/// 5. The corrector can optionally learn from indexed terms and past queries to
+///    improve future suggestions.
 pub struct SpellingCorrector {
     engine: SuggestionEngine,
     config: CorrectorConfig,

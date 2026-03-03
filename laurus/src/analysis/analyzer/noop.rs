@@ -18,11 +18,11 @@
 //! use laurus::analysis::analyzer::noop::NoOpAnalyzer;
 //!
 //! let analyzer = NoOpAnalyzer::new();
-//! let tokens: Vec<_> = analyzer.analyze("any text here").await.unwrap().collect();
+//! let tokens: Vec<_> = analyzer.analyze("any text here").unwrap().collect();
 //!
 //! // Always returns empty token stream
 //! assert_eq!(tokens.len(), 0);
-//! ```ignore
+//! ```
 use crate::analysis::analyzer::analyzer::Analyzer;
 use crate::analysis::token::TokenStream;
 use crate::error::Result;

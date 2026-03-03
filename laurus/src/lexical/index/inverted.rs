@@ -295,10 +295,30 @@ impl InvertedIndex {
         self.storage.list_files()
     }
 
+    /// Returns the last WAL (Write-Ahead Log) sequence number recorded in the index metadata.
+    ///
+    /// # Returns
+    ///
+    /// The last WAL sequence number as a `u64`.
     pub fn last_wal_seq(&self) -> u64 {
         self.metadata.read().last_wal_seq
     }
 
+    /// Sets the last WAL (Write-Ahead Log) sequence number in the index metadata
+    /// and persists the updated metadata to storage.
+    ///
+    /// # Arguments
+    ///
+    /// * `seq` - The new WAL sequence number to record.
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` on success, or an error if the index is closed or the metadata write fails.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`LaurusError`] if the index has been closed
+    /// or if persisting the metadata fails.
     pub fn set_last_wal_seq(&self, seq: u64) -> Result<()> {
         self.check_closed()?;
         {

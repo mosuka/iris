@@ -5,9 +5,11 @@
 //!
 //! # Pipeline
 //!
-//! 1. Lindera tokenizer (UniDic dictionary)
-//! 2. Lowercase filter
-//! 3. Japanese stop word filter
+//! 1. UnicodeNormalizationCharFilter (NFKC normalization)
+//! 2. JapaneseIterationMarkCharFilter (iteration mark normalization)
+//! 3. LinderaTokenizer (UniDic dictionary)
+//! 4. LowercaseFilter
+//! 5. StopFilter (Japanese stop words — 127 common particles/auxiliaries)
 //!
 //! # Examples
 //!
@@ -20,7 +22,7 @@
 //!
 //! // Properly segmented Japanese tokens
 //! assert!(tokens.len() > 0);
-//! ```ignore
+//! ```
 use std::fmt::Debug;
 use std::fmt::Formatter;
 use std::sync::Arc;
@@ -44,8 +46,9 @@ use crate::error::Result;
 ///
 /// # Components
 ///
+/// - **Char filters**: UnicodeNormalizationCharFilter (NFKC) + JapaneseIterationMarkCharFilter
 /// - **Tokenizer**: LinderaTokenizer with UniDic dictionary
-/// - **Filters**: Lowercase + Japanese stop words (127 common particles/auxiliaries)
+/// - **Token filters**: LowercaseFilter + StopFilter (Japanese stop words — 127 common particles/auxiliaries)
 ///
 /// # Examples
 ///
@@ -68,6 +71,8 @@ impl JapaneseAnalyzer {
     /// # Returns
     ///
     /// A new `JapaneseAnalyzer` instance configured with:
+    /// - UnicodeNormalizationCharFilter (NFKC)
+    /// - JapaneseIterationMarkCharFilter
     /// - LinderaTokenizer (UniDic dictionary)
     /// - LowercaseFilter
     /// - StopFilter with Japanese stop words

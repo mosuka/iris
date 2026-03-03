@@ -1,3 +1,9 @@
+//! Conversion between [`laurus::Schema`] and the protobuf `Schema` message.
+//!
+//! Handles mapping of all field option variants (text, integer, float, boolean,
+//! datetime, geo, bytes, HNSW, flat, IVF), distance metrics, and quantization
+//! configuration.
+
 use std::collections::HashMap;
 
 use laurus::{

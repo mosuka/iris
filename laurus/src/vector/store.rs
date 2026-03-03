@@ -9,7 +9,6 @@
 //!
 //! - [`config`] - Configuration types (VectorIndexConfig, VectorFieldConfig)
 //! - [`embedding_writer`] - Embedding writer wrapper
-//! - [`query`] - Search query builder
 //! - [`request`] - Search request types
 //! - [`response`] - Search response types
 
@@ -150,10 +149,26 @@ impl VectorStore {
         })
     }
 
-    /// Upsert a document by its internal ID (used for WAL recovery).
+    /// Upsert a document by its internal ID.
     ///
-    /// This method is primarily used during WAL recovery where the internal ID
+    /// This method first deletes any existing vectors for the given `doc_id`,
+    /// then iterates over all fields in the document and passes each field value
+    /// to the writer's [`add_value()`](crate::vector::writer::VectorIndexWriter::add_value)
+    /// method, which handles embedding automatically when the writer is wrapped
+    /// in an `EmbeddingVectorIndexWriter`.
+    ///
+    /// It is primarily used during WAL recovery where the internal ID
     /// is already known.
+    ///
+    /// # Arguments
+    ///
+    /// * `doc_id` - The internal document ID.
+    /// * `doc` - The document whose fields will be indexed as vectors.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if obtaining/creating the writer fails, if deleting the
+    /// existing document fails, or if adding any field value fails.
     pub async fn upsert_document_by_internal_id(&self, doc_id: u64, doc: Document) -> Result<()> {
         // Get or create writer
         let mut guard = self.writer_cache.lock().await;
@@ -176,6 +191,18 @@ impl VectorStore {
     }
 
     /// Delete a document by its internal ID.
+    ///
+    /// Obtains (or creates) the cached writer and removes all vectors
+    /// associated with the given `doc_id` from the index buffer.
+    ///
+    /// # Arguments
+    ///
+    /// * `doc_id` - The internal document ID to delete.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if obtaining/creating the writer fails or if the
+    /// underlying delete operation fails.
     pub async fn delete_document_by_internal_id(&self, doc_id: u64) -> Result<()> {
         let mut guard = self.writer_cache.lock().await;
         if guard.is_none() {
@@ -189,6 +216,18 @@ impl VectorStore {
     }
 
     /// Commit any pending changes to the index.
+    ///
+    /// If a cached writer exists, this method takes it and calls
+    /// [`commit()`](crate::vector::writer::VectorIndexWriter::commit) (which
+    /// finalizes the index and writes it to storage). It then syncs the
+    /// underlying storage to ensure all file metadata is flushed to disk,
+    /// refreshes the index metadata, and invalidates the searcher cache so
+    /// that subsequent searches see the committed data.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the writer commit, storage sync, or index refresh
+    /// fails.
     pub async fn commit(&self) -> Result<()> {
         if let Some(mut writer) = self.writer_cache.lock().await.take() {
             // commit() calls finalize() then write() to persist to storage
@@ -203,14 +242,26 @@ impl VectorStore {
         Ok(())
     }
 
-    /// Optimize the index.
+    /// Optimize the index for improved query performance.
+    ///
+    /// Delegates to the underlying [`VectorIndex::optimize()`] implementation
+    /// and then invalidates the searcher cache so the next search creates a
+    /// fresh searcher reflecting the optimized state.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the underlying index optimization fails.
     pub fn optimize(&self) -> Result<()> {
         self.index.optimize()?;
         *self.searcher_cache.write() = None;
         Ok(())
     }
 
-    /// Refresh the searcher cache.
+    /// Invalidate the searcher cache.
+    ///
+    /// Clears the cached searcher so that the next search operation creates a
+    /// new one. This is useful after external writes that bypass this store's
+    /// commit path.
     pub fn refresh(&self) -> Result<()> {
         *self.searcher_cache.write() = None;
         Ok(())
@@ -234,8 +285,37 @@ impl VectorStore {
 
     /// Execute a high-level vector search (compatible with Engine).
     ///
-    /// This method handles multiple query vectors and aggregates results.
-    /// Note: query_payloads must be pre-embedded before calling this method.
+    /// This method processes each entry in
+    /// [`query_vectors`](VectorSearchRequest::query_vectors), performs a
+    /// similarity search against the index, and aggregates the per-vector
+    /// scores according to the requested
+    /// [`score_mode`](VectorSearchRequest::score_mode). Results are filtered
+    /// by [`allowed_ids`](VectorSearchRequest::allowed_ids) and
+    /// [`min_score`](VectorSearchRequest::min_score), sorted by descending
+    /// score, and truncated to [`limit`](VectorSearchRequest::limit).
+    ///
+    /// **Note:** The following request fields are currently **ignored** by this
+    /// implementation:
+    /// - [`query_payloads`](VectorSearchRequest::query_payloads) -- callers
+    ///   must embed payloads into `query_vectors` before calling this method.
+    /// - [`fields`](VectorSearchRequest::fields) -- field-level filtering is
+    ///   not yet implemented; all indexed vectors are searched.
+    /// - [`overfetch`](VectorSearchRequest::overfetch) -- a hardcoded 2x
+    ///   overfetch (`limit * 2`) is used instead.
+    ///
+    /// # Arguments
+    ///
+    /// * `request` - The search request containing query vectors, filters, and
+    ///   scoring options.
+    ///
+    /// # Returns
+    ///
+    /// A [`VectorSearchResults`] containing hits sorted by descending score.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if obtaining the searcher or executing the underlying
+    /// index search fails.
     pub fn search(&self, request: VectorSearchRequest) -> Result<VectorSearchResults> {
         if request.query_vectors.is_empty() {
             return Ok(VectorSearchResults::default());
@@ -313,7 +393,25 @@ impl VectorStore {
         Ok(VectorSearchResults { hits })
     }
 
-    /// Count the number of vectors matching the query.
+    /// Count the number of vectors matching the given search request.
+    ///
+    /// Delegates to the searcher's
+    /// [`count()`](crate::vector::search::searcher::VectorIndexSearcher::count)
+    /// method, which returns the total number of vectors that match the query
+    /// criteria.
+    ///
+    /// # Arguments
+    ///
+    /// * `request` - A low-level vector index search request specifying the
+    ///   query vector and parameters.
+    ///
+    /// # Returns
+    ///
+    /// The number of matching vectors.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if obtaining the searcher or executing the count fails.
     pub fn count(&self, request: VectorIndexSearchRequest) -> Result<u64> {
         let searcher = self.get_searcher()?;
         searcher.count(request)

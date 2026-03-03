@@ -1,13 +1,22 @@
+//! Server configuration types deserialized from a TOML file.
+//!
+//! The top-level [`Config`] struct contains sections for the gRPC/HTTP server,
+//! index storage, and logging. All sections have sensible defaults so that
+//! a minimal (or even empty) TOML file produces a working configuration.
+
 use serde::Deserialize;
 use std::path::{Path, PathBuf};
 
 /// Top-level configuration loaded from a TOML file.
 #[derive(Debug, Deserialize, Default)]
 pub struct Config {
+    /// Network settings for the gRPC server and the optional HTTP gateway.
     #[serde(default)]
     pub server: ServerConfig,
+    /// Index storage settings (e.g. data directory path).
     #[serde(default)]
     pub index: IndexConfig,
+    /// Logging settings (e.g. log level filter).
     #[serde(default)]
     pub log: LogConfig,
 }
@@ -39,6 +48,8 @@ impl Default for ServerConfig {
 /// Index storage settings.
 #[derive(Debug, Deserialize)]
 pub struct IndexConfig {
+    /// Filesystem path where the index data (schema and store) is persisted.
+    /// Defaults to `"./laurus_data"`.
     #[serde(default = "default_data_dir")]
     pub data_dir: PathBuf,
 }
@@ -54,6 +65,8 @@ impl Default for IndexConfig {
 /// Logging settings.
 #[derive(Debug, Deserialize)]
 pub struct LogConfig {
+    /// Tracing filter directive (e.g. `"info"`, `"debug"`, `"laurus_server=trace"`).
+    /// Defaults to `"info"`.
     #[serde(default = "default_log_level")]
     pub level: String,
 }
@@ -84,6 +97,20 @@ fn default_log_level() -> String {
 
 impl Config {
     /// Load configuration from a TOML file.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - Filesystem path to the TOML configuration file.
+    ///
+    /// # Returns
+    ///
+    /// A fully populated [`Config`] instance with defaults applied for any
+    /// missing sections or fields.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the file cannot be read or if the TOML content
+    /// cannot be deserialized into a [`Config`].
     pub fn from_file(path: &Path) -> anyhow::Result<Self> {
         let content = std::fs::read_to_string(path)?;
         let config: Config = toml::from_str(&content)?;

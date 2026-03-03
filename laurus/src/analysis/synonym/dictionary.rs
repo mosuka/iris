@@ -172,6 +172,11 @@ impl SynonymDictionary {
     /// - "big" -> ["large", "huge"]
     /// - "large" -> ["big", "huge"]
     /// - "huge" -> ["big", "large"]
+    ///
+    /// # Panics
+    ///
+    /// Panics if rebuilding the internal FST fails (e.g., due to duplicate
+    /// or out-of-order keys produced by the merged synonym groups).
     pub fn add_synonym_group(&mut self, terms: Vec<String>) {
         // Extract existing mappings from FST
         let mut all_groups = Vec::new();

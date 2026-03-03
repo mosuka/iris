@@ -13,19 +13,45 @@ use crate::storage::Storage;
 use crate::storage::structured::{StructReader, StructWriter};
 
 /// A segment of stored documents.
+///
+/// Each segment represents a contiguous batch of documents that have been flushed
+/// to persistent storage as a single binary file. The segment tracks the range of
+/// document IDs it contains, enabling efficient lookup without scanning every file.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DocumentSegment {
+    /// Unique identifier for this segment, used to derive the segment file name.
     pub id: u32,
+    /// Lowest (inclusive) document ID stored in this segment.
     pub start_doc_id: u64,
+    /// Highest (inclusive) document ID stored in this segment.
     pub end_doc_id: u64,
+    /// Number of documents stored in this segment.
     pub doc_count: usize,
 }
 
 impl DocumentSegment {
+    /// Returns the file name for this segment's binary data file.
+    ///
+    /// The file name is derived from the segment [`id`](Self::id) with zero-padded
+    /// formatting (e.g. `doc_segment_000042.docs`).
+    ///
+    /// # Returns
+    ///
+    /// A `String` containing the segment file name.
     pub fn file_name(&self) -> String {
         format!("doc_segment_{:06}.docs", self.id)
     }
 
+    /// Checks whether the given document ID falls within this segment's range.
+    ///
+    /// # Arguments
+    ///
+    /// * `doc_id` - The document ID to check.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `doc_id` is between [`start_doc_id`](Self::start_doc_id) and
+    /// [`end_doc_id`](Self::end_doc_id) (inclusive), `false` otherwise.
     pub fn contains(&self, doc_id: u64) -> bool {
         doc_id >= self.start_doc_id && doc_id <= self.end_doc_id
     }
@@ -38,10 +64,38 @@ pub struct DocumentSegmentWriter {
 }
 
 impl DocumentSegmentWriter {
+    /// Creates a new `DocumentSegmentWriter` backed by the given storage.
+    ///
+    /// # Arguments
+    ///
+    /// * `storage` - The storage backend used to persist segment files.
+    ///
+    /// # Returns
+    ///
+    /// A new `DocumentSegmentWriter` instance.
     pub fn new(storage: Arc<dyn Storage>) -> Self {
         Self { storage }
     }
 
+    /// Writes a set of documents to a new segment file and returns the resulting
+    /// [`DocumentSegment`] metadata.
+    ///
+    /// Documents are serialized to JSON and written in ascending document-ID order
+    /// using a simple binary format: `[u32: doc_count] ([u64: doc_id][bytes: json_data])*`.
+    ///
+    /// # Arguments
+    ///
+    /// * `segment_id` - The unique ID to assign to the new segment.
+    /// * `docs` - A map of document IDs to [`Document`] values to be written.
+    ///
+    /// # Returns
+    ///
+    /// A [`DocumentSegment`] describing the segment that was written.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`LaurusError`] if `docs` is empty, serialization fails, or the
+    /// underlying storage I/O fails.
     pub fn write_segment(
         &self,
         segment_id: u32,
@@ -100,10 +154,36 @@ pub struct DocumentSegmentReader {
 }
 
 impl DocumentSegmentReader {
+    /// Creates a new `DocumentSegmentReader` for the specified segment.
+    ///
+    /// # Arguments
+    ///
+    /// * `storage` - The storage backend from which segment files are read.
+    /// * `segment` - The [`DocumentSegment`] metadata describing the segment to read.
+    ///
+    /// # Returns
+    ///
+    /// A new `DocumentSegmentReader` instance.
     pub fn new(storage: Arc<dyn Storage>, segment: DocumentSegment) -> Self {
         Self { storage, segment }
     }
 
+    /// Retrieves a single document by its internal document ID.
+    ///
+    /// If the `doc_id` is outside this segment's range the method returns `Ok(None)`
+    /// without performing any I/O.
+    ///
+    /// # Arguments
+    ///
+    /// * `doc_id` - The internal document ID to look up.
+    ///
+    /// # Returns
+    ///
+    /// `Ok(Some(document))` if found, `Ok(None)` if the document is not in this segment.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`LaurusError`] on storage I/O or deserialization failure.
     pub fn get_document(&self, doc_id: u64) -> Result<Option<Document>> {
         if !self.segment.contains(doc_id) {
             return Ok(None);
@@ -127,6 +207,21 @@ impl DocumentSegmentReader {
         Ok(None)
     }
 
+    /// Finds the first internal document ID whose `_id` field matches the given external ID.
+    ///
+    /// The method performs a linear scan over all documents in this segment.
+    ///
+    /// # Arguments
+    ///
+    /// * `external_id` - The external document identifier to search for (value of the `_id` field).
+    ///
+    /// # Returns
+    ///
+    /// `Ok(Some(doc_id))` if a matching document is found, `Ok(None)` otherwise.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`LaurusError`] on storage I/O or deserialization failure.
     pub fn find_by_external_id(&self, external_id: &str) -> Result<Option<u64>> {
         let input = self.storage.open_input(&self.segment.file_name())?;
         let mut reader = StructReader::new(input)?;
@@ -145,6 +240,22 @@ impl DocumentSegmentReader {
         Ok(None)
     }
 
+    /// Finds all internal document IDs whose `_id` field matches the given external ID.
+    ///
+    /// Unlike [`find_by_external_id`](Self::find_by_external_id) this method does not
+    /// stop at the first match and returns every matching document ID in the segment.
+    ///
+    /// # Arguments
+    ///
+    /// * `external_id` - The external document identifier to search for (value of the `_id` field).
+    ///
+    /// # Returns
+    ///
+    /// A `Vec<u64>` of all matching internal document IDs (may be empty).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`LaurusError`] on storage I/O or deserialization failure.
     pub fn find_all_by_external_id(&self, external_id: &str) -> Result<Vec<u64>> {
         let input = self.storage.open_input(&self.segment.file_name())?;
         let mut reader = StructReader::new(input)?;
@@ -174,7 +285,15 @@ struct StoreManifest {
     next_segment_id: u32,
 }
 
-/// A segmented storage for documents (Unified).
+/// Unified segmented document store.
+///
+/// `UnifiedDocumentStore` manages document persistence across multiple binary segment
+/// files. Newly added documents are held in an in-memory pending buffer until
+/// [`commit`](Self::commit) is called, at which point they are flushed to a new segment
+/// file and the manifest is atomically updated.
+///
+/// A JSON manifest (`segments.json`) tracks all committed segments and the next
+/// segment ID so that the store can be re-opened across process restarts.
 #[derive(Debug)]
 pub struct UnifiedDocumentStore {
     storage: Arc<dyn Storage>,
@@ -185,6 +304,18 @@ pub struct UnifiedDocumentStore {
 }
 
 impl UnifiedDocumentStore {
+    /// Creates a new, empty `UnifiedDocumentStore`.
+    ///
+    /// No manifest file is read or written; the store starts with zero segments and
+    /// document IDs beginning at 1.
+    ///
+    /// # Arguments
+    ///
+    /// * `storage` - The storage backend for segment and manifest files.
+    ///
+    /// # Returns
+    ///
+    /// A fresh `UnifiedDocumentStore` instance.
     pub fn new(storage: Arc<dyn Storage>) -> Self {
         Self {
             storage,
@@ -195,6 +326,24 @@ impl UnifiedDocumentStore {
         }
     }
 
+    /// Opens an existing document store from the given storage backend.
+    ///
+    /// If a manifest file (`segments.json`) exists it is read and the segment list and
+    /// ID counters are restored. Otherwise a fresh, empty store is returned (equivalent
+    /// to calling [`new`](Self::new)).
+    ///
+    /// # Arguments
+    ///
+    /// * `storage` - The storage backend containing the manifest and segment files.
+    ///
+    /// # Returns
+    ///
+    /// A `UnifiedDocumentStore` populated from the persisted manifest.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`LaurusError`] if the manifest file exists but cannot be read or
+    /// deserialized.
     pub fn open(storage: Arc<dyn Storage>) -> Result<Self> {
         if storage.file_exists(MANIFEST_FILE) {
             let input = storage.open_input(MANIFEST_FILE)?;
@@ -222,6 +371,15 @@ impl UnifiedDocumentStore {
         }
     }
 
+    /// Flushes pending documents to a new segment and atomically updates the manifest.
+    ///
+    /// If there are no pending documents the manifest is still written so that any
+    /// previously added segments are persisted. After the manifest is written the
+    /// storage is synced to ensure durability.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`LaurusError`] on serialization or storage I/O failure.
     pub fn commit(&mut self) -> Result<()> {
         // Flush pending documents if any
         if !self.pending_docs.is_empty() {
@@ -255,6 +413,21 @@ impl UnifiedDocumentStore {
         Ok(())
     }
 
+    /// Adds a document to the pending buffer and assigns it a new internal document ID.
+    ///
+    /// The document is **not** written to storage until [`commit`](Self::commit) is called.
+    ///
+    /// # Arguments
+    ///
+    /// * `doc` - The [`Document`] to add.
+    ///
+    /// # Returns
+    ///
+    /// The newly assigned internal document ID.
+    ///
+    /// # Errors
+    ///
+    /// Currently infallible, but returns `Result` for forward compatibility.
     pub fn add_document(&mut self, doc: Document) -> Result<u64> {
         let doc_id = self.next_doc_id;
         self.next_doc_id += 1;
@@ -283,6 +456,22 @@ impl UnifiedDocumentStore {
         }
     }
 
+    /// Writes a set of documents into a new segment file and registers it in the store.
+    ///
+    /// This is a lower-level method; most callers should use [`add_document`](Self::add_document)
+    /// followed by [`commit`](Self::commit) instead.
+    ///
+    /// # Arguments
+    ///
+    /// * `docs` - A map of internal document IDs to [`Document`] values.
+    ///
+    /// # Returns
+    ///
+    /// The [`DocumentSegment`] metadata for the newly created segment.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`LaurusError`] if `docs` is empty or the segment write fails.
     pub fn add_segment(&mut self, docs: &HashMap<u64, Document>) -> Result<DocumentSegment> {
         let writer = DocumentSegmentWriter::new(self.storage.clone());
         let segment = writer.write_segment(self.next_segment_id, docs)?;
@@ -291,6 +480,22 @@ impl UnifiedDocumentStore {
         Ok(segment)
     }
 
+    /// Retrieves a document by its internal document ID.
+    ///
+    /// Pending (uncommitted) documents are checked first, followed by committed
+    /// segments in reverse order (newest first).
+    ///
+    /// # Arguments
+    ///
+    /// * `doc_id` - The internal document ID.
+    ///
+    /// # Returns
+    ///
+    /// `Ok(Some(document))` if found, `Ok(None)` otherwise.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`LaurusError`] on storage I/O or deserialization failure.
     pub fn get_document(&self, doc_id: u64) -> Result<Option<Document>> {
         // Check pending docs first
         if let Some(doc) = self.pending_docs.get(&doc_id) {
@@ -310,6 +515,21 @@ impl UnifiedDocumentStore {
         Ok(None)
     }
 
+    /// Finds the first internal document ID whose `_id` field matches the given external ID.
+    ///
+    /// Pending documents are searched first, then committed segments in reverse order.
+    ///
+    /// # Arguments
+    ///
+    /// * `external_id` - The external document identifier to search for.
+    ///
+    /// # Returns
+    ///
+    /// `Ok(Some(doc_id))` if a matching document is found, `Ok(None)` otherwise.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`LaurusError`] on storage I/O or deserialization failure.
     pub fn find_by_external_id(&self, external_id: &str) -> Result<Option<u64>> {
         // Check pending docs first
         for (id, doc) in &self.pending_docs {
@@ -327,6 +547,21 @@ impl UnifiedDocumentStore {
         Ok(None)
     }
 
+    /// Finds all internal document IDs whose `_id` field matches the given external ID.
+    ///
+    /// Both pending documents and all committed segments are searched.
+    ///
+    /// # Arguments
+    ///
+    /// * `external_id` - The external document identifier to search for.
+    ///
+    /// # Returns
+    ///
+    /// A `Vec<u64>` of all matching internal document IDs (may be empty).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`LaurusError`] on storage I/O or deserialization failure.
     pub fn find_all_by_external_id(&self, external_id: &str) -> Result<Vec<u64>> {
         let mut results = Vec::new();
 
@@ -344,15 +579,43 @@ impl UnifiedDocumentStore {
         Ok(results)
     }
 
+    /// Marks a document as deleted.
+    ///
+    /// Logical deletion is handled externally by the deletion bitmap / deletion manager;
+    /// this method is a no-op placeholder that exists for API symmetry.
+    ///
+    /// # Arguments
+    ///
+    /// * `_doc_id` - The internal document ID to delete (currently unused).
+    ///
+    /// # Errors
+    ///
+    /// Currently infallible.
     pub fn delete_document(&mut self, _doc_id: u64) -> Result<()> {
         // Logical deletion is handled by DeletionBitmap/DeletionManager.
         Ok(())
     }
 
+    /// Returns a slice of all committed [`DocumentSegment`]s.
+    ///
+    /// # Returns
+    ///
+    /// A borrowed slice of segment metadata, ordered by creation time.
     pub fn segments(&self) -> &[DocumentSegment] {
         &self.segments
     }
 
+    /// Deletes the underlying data file for the segment with the given ID.
+    ///
+    /// If no segment with `segment_id` exists in the store the call is a no-op.
+    ///
+    /// # Arguments
+    ///
+    /// * `segment_id` - The ID of the segment whose file should be removed.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`LaurusError`] if the storage backend fails to delete the file.
     pub fn delete_segment_files(&self, segment_id: u32) -> Result<()> {
         if let Some(segment) = self.segments.iter().find(|s| s.id == segment_id) {
             self.storage.delete_file(&segment.file_name())?;

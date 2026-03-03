@@ -27,10 +27,6 @@ use crate::lexical::index::config::InvertedIndexConfig;
 ///   - Good for keyword queries
 ///   - Supports boolean operations
 ///
-/// Future index types that could be added:
-/// - **ColumnStore**: Column-oriented index for aggregations
-/// - **LSMTree**: Log-structured merge-tree for write-heavy workloads
-///
 /// # Example
 ///
 /// ```no_run
@@ -51,9 +47,6 @@ use crate::lexical::index::config::InvertedIndexConfig;
 pub enum LexicalIndexConfig {
     /// Inverted index configuration
     Inverted(InvertedIndexConfig),
-    // Future index types can be added here:
-    // ColumnStore(ColumnStoreConfig),
-    // LSMTree(LSMTreeConfig),
 }
 
 impl Default for LexicalIndexConfig {

@@ -87,12 +87,16 @@ impl FieldOption {
 /// Options for Flat vector index.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FlatOption {
+    /// Number of dimensions for each vector. Defaults to `128`.
     #[serde(default = "default_dimension")]
     pub dimension: usize,
+    /// Distance metric used for similarity computation. Defaults to [`DistanceMetric::Cosine`].
     #[serde(default = "default_distance_metric")]
     pub distance: DistanceMetric,
+    /// Base weight applied to similarity scores from this field. Defaults to `1.0`.
     #[serde(default = "default_weight")]
     pub base_weight: f32,
+    /// Optional quantization method to reduce memory usage at the cost of some precision.
     #[serde(default)]
     pub quantizer: Option<quantization::QuantizationMethod>,
 }
@@ -111,16 +115,25 @@ impl Default for FlatOption {
 /// Options for HNSW vector index.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HnswOption {
+    /// Number of dimensions for each vector. Defaults to `128`.
     #[serde(default = "default_dimension")]
     pub dimension: usize,
+    /// Distance metric used for similarity computation. Defaults to [`DistanceMetric::Cosine`].
     #[serde(default = "default_distance_metric")]
     pub distance: DistanceMetric,
+    /// Maximum number of bi-directional links per node in the HNSW graph.
+    /// Higher values improve recall but increase memory usage. Defaults to `16`.
     #[serde(default = "default_getting_m")]
     pub m: usize,
+    /// Size of the dynamic candidate list during index construction.
+    /// Higher values produce a higher-quality graph at the cost of slower
+    /// build times. Defaults to `200`.
     #[serde(default = "default_getting_ef_construction")]
     pub ef_construction: usize,
+    /// Base weight applied to similarity scores from this field. Defaults to `1.0`.
     #[serde(default = "default_weight")]
     pub base_weight: f32,
+    /// Optional quantization method to reduce memory usage at the cost of some precision.
     #[serde(default)]
     pub quantizer: Option<quantization::QuantizationMethod>,
 }
@@ -141,15 +154,23 @@ impl Default for HnswOption {
 /// Options for IVF vector index.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IvfOption {
+    /// Number of dimensions for each vector.
     pub dimension: usize,
+    /// Distance metric used for similarity computation. Defaults to [`DistanceMetric::Cosine`].
     #[serde(default = "default_distance_metric")]
     pub distance: DistanceMetric,
+    /// Number of Voronoi clusters used to partition the vector space.
+    /// More clusters speed up search but increase build time. Defaults to `100`.
     #[serde(default = "default_getting_n_clusters")]
     pub n_clusters: usize,
+    /// Number of clusters to probe during search.
+    /// Higher values improve recall at the cost of query latency. Defaults to `1`.
     #[serde(default = "default_getting_n_probe")]
     pub n_probe: usize,
+    /// Base weight applied to similarity scores from this field. Defaults to `1.0`.
     #[serde(default = "default_weight")]
     pub base_weight: f32,
+    /// Optional quantization method to reduce memory usage at the cost of some precision.
     #[serde(default)]
     pub quantizer: Option<quantization::QuantizationMethod>,
 }

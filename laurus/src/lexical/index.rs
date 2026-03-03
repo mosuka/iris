@@ -1,14 +1,15 @@
 //! Lexical indexing module for building and maintaining lexical indexes.
 //!
-//! This module handles all lexical index construction:
-//! - Building inverted indexes
-//! - Document indexing and analysis
+//! This module provides the [`LexicalIndex`] trait, an index factory, configuration,
+//! the core inverted index implementation, and supporting data structures
+//! (term dictionaries, posting lists, segments).
 //!
 //! # Module Structure
 //!
-//! - `config`: Index configuration
-//! - `factory`: Index factory for creating and opening indexes
-//! - `inverted`: Inverted index implementation (including segments and maintenance)
+//! - [`config`] - Index configuration (storage mode, analyzer, merge policy, etc.)
+//! - [`factory`] - Index factory for creating and opening indexes
+//! - [`inverted`] - Inverted index implementation (including segments and maintenance)
+//! - [`structures`] - Low-level data structures (term dictionaries, posting lists, skip lists)
 
 use std::sync::Arc;
 

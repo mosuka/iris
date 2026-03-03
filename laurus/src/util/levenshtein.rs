@@ -188,8 +188,11 @@ pub fn damerau_levenshtein_distance(s1: &str, s2: &str) -> usize {
     matrix[len1][len2]
 }
 
-/// Optimized version for calculating distance between a query and multiple candidates.
-/// This reuses computation where possible for better performance.
+/// A matcher that pre-stores a query string for calculating Levenshtein distance
+/// against multiple candidates.
+///
+/// The `distance_threshold` method delegates to [`levenshtein_distance_threshold`],
+/// so it does not cache intermediate computation across calls.
 pub struct LevenshteinMatcher {
     query: String,
     #[allow(dead_code)]
@@ -211,7 +214,25 @@ impl LevenshteinMatcher {
         }
     }
 
-    /// Calculate distance with threshold for early termination.
+    /// Calculate the Levenshtein distance between the stored query and
+    /// `candidate`, returning `None` when the distance exceeds `threshold`
+    /// (early termination).
+    ///
+    /// This method delegates directly to [`levenshtein_distance_threshold`],
+    /// passing the pre-stored query string so callers do not need to supply
+    /// it on every invocation. No intermediate computation is cached or
+    /// reused across calls.
+    ///
+    /// # Arguments
+    ///
+    /// * `candidate` - The string to compare against the query.
+    /// * `threshold` - Maximum acceptable distance. If the actual distance
+    ///   exceeds this value, `None` is returned for early termination.
+    ///
+    /// # Returns
+    ///
+    /// `Some(distance)` if the distance is at most `threshold`, or `None`
+    /// otherwise.
     pub fn distance_threshold(&self, candidate: &str, threshold: usize) -> Option<usize> {
         levenshtein_distance_threshold(&self.query, candidate, threshold)
     }

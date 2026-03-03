@@ -1,3 +1,20 @@
+//! # laurus-cli
+//!
+//! Command-line interface binary for the **laurus** search engine.
+//!
+//! This crate provides the `laurus` CLI executable, which supports creating and
+//! managing search indices, adding/retrieving/deleting documents, executing
+//! search queries, running an interactive REPL session, and starting a gRPC
+//! server.
+//!
+//! ## Usage
+//!
+//! ```shell
+//! laurus <COMMAND> [OPTIONS]
+//! ```
+//!
+//! Run `laurus --help` for a full list of available commands and options.
+
 mod cli;
 mod commands;
 mod context;

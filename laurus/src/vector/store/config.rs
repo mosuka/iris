@@ -792,9 +792,10 @@ impl<'de> Deserialize<'de> for VectorIndexConfig {
 /// Configuration for a single vector field.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VectorFieldConfig {
-    /// Vector index configuration (optional).
+    /// Configuration options for the vector field (index type, dimension, distance metric, etc.).
+    ///
+    /// When `None`, the field has no vector index.
     #[serde(default)]
-    /// Configuration options for the vector field.
     pub vector: Option<FieldOption>,
     /// Configuration options for the lexical field.
     pub lexical: Option<crate::lexical::core::field::FieldOption>,

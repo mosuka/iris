@@ -21,13 +21,13 @@
 //! let tokenizer = Arc::new(RegexTokenizer::new().unwrap());
 //! let analyzer = SimpleAnalyzer::new(tokenizer);
 //!
-//! let tokens: Vec<_> = analyzer.analyze("Hello World").await.unwrap().collect();
+//! let tokens: Vec<_> = analyzer.analyze("Hello World").unwrap().collect();
 //!
 //! // No filtering applied - original case preserved
 //! assert_eq!(tokens.len(), 2);
 //! assert_eq!(tokens[0].text, "Hello");
 //! assert_eq!(tokens[1].text, "World");
-//! ```ignore
+//! ```
 use std::sync::Arc;
 
 use crate::analysis::analyzer::analyzer::Analyzer;

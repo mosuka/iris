@@ -1,10 +1,38 @@
+//! gRPC server launcher for the laurus search engine.
+//!
+//! Builds a server configuration from an optional TOML config file merged with
+//! CLI flags and environment variables, then starts the `laurus-server` gRPC
+//! server (with an optional HTTP gateway).
+
 use std::path::Path;
 
 use anyhow::Result;
 
 use crate::cli::ServeCommand;
 
-/// Start the gRPC server.
+/// Start the gRPC server (and optional HTTP gateway).
+///
+/// Loads a base configuration from the TOML file specified in `cmd.config`
+/// (or uses defaults), applies any overrides from CLI flags / environment
+/// variables, sets the index data directory, and delegates to the
+/// `laurus-server` runtime.
+///
+/// # Arguments
+///
+/// * `cmd` - Parsed [`ServeCommand`] containing optional config path, host,
+///   port, HTTP port, and log level.
+/// * `data_dir` - Path to the data directory holding the index.
+///
+/// # Returns
+///
+/// This function runs indefinitely (until the server is shut down) and
+/// returns `Ok(())` on graceful termination.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - The configuration file cannot be read or parsed.
+/// - The server fails to start or encounters a fatal runtime error.
 pub async fn run(cmd: ServeCommand, data_dir: &Path) -> Result<()> {
     let mut config = match &cmd.config {
         Some(path) => laurus_server::config::Config::from_file(path)?,

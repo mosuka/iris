@@ -68,6 +68,8 @@ pub enum EmbedInput<'a> {
 
     /// Raw bytes for embedding.
     /// The optional string is a MIME type hint (e.g., "image/png", "text/plain").
+    /// When the MIME type is `None` or does not start with `"text/"`,
+    /// [`input_type()`](EmbedInput::input_type) defaults to [`EmbedInputType::Image`].
     Bytes(&'a [u8], Option<&'a str>),
 }
 
@@ -182,9 +184,14 @@ pub enum EmbedInputType {
 pub trait Embedder: Send + Sync + Debug {
     /// Generate an embedding vector for the given input.
     ///
+    /// The supported input variants are:
+    /// - [`EmbedInput::Text`] - a text string to embed.
+    /// - [`EmbedInput::Bytes`] - raw bytes with an optional MIME type hint.
+    ///
     /// # Arguments
     ///
-    /// * `input` - The input to embed (text, image path, image bytes, etc.)
+    /// * `input` - The input to embed. See [`EmbedInput`] for the available
+    ///   variants.
     ///
     /// # Returns
     ///
@@ -195,7 +202,7 @@ pub trait Embedder: Send + Sync + Debug {
     ///
     /// Returns an error if:
     /// - The input type is not supported by this embedder
-    /// - The embedding operation fails (e.g., model error, file not found)
+    /// - The embedding operation fails (e.g., model error)
     async fn embed(&self, input: &EmbedInput<'_>) -> Result<Vector>;
 
     /// Generate embeddings for multiple inputs in batch.

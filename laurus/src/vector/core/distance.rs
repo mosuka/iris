@@ -28,7 +28,14 @@ pub enum DistanceMetric {
     Euclidean,
     /// Manhattan (L1) distance
     Manhattan,
-    /// Dot product similarity (higher is more similar)
+    /// Dot product distance.
+    ///
+    /// Computed as `-(a . b)` (negated dot product) so that smaller values
+    /// indicate more similar vectors, consistent with the other distance
+    /// metrics. Raw dot product similarity is higher for more similar vectors,
+    /// so the negation converts it into a distance. This means the returned
+    /// distance values are typically **negative** for vectors with positive
+    /// dot product similarity.
     DotProduct,
     /// Angular distance
     Angular,
@@ -36,6 +43,24 @@ pub enum DistanceMetric {
 
 impl DistanceMetric {
     /// Calculate the distance between two vectors using this metric.
+    ///
+    /// Lower values indicate more similar vectors for all metrics. For
+    /// [`DotProduct`](Self::DotProduct), the result is `-(a . b)`, which is
+    /// typically negative when vectors have positive similarity.
+    ///
+    /// # Arguments
+    ///
+    /// * `a` - The first vector (as a float slice).
+    /// * `b` - The second vector (as a float slice). Must have the same length
+    ///   as `a`.
+    ///
+    /// # Returns
+    ///
+    /// The distance between the two vectors according to this metric.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the two vectors have different dimensions.
     pub fn distance(&self, a: &[f32], b: &[f32]) -> Result<f32> {
         if a.len() != b.len() {
             return Err(LaurusError::InvalidOperation(

@@ -1,3 +1,9 @@
+//! Error-to-[`tonic::Status`] conversion utilities.
+//!
+//! Maps [`LaurusError`] variants to appropriate gRPC status codes (e.g.
+//! `INVALID_ARGUMENT`, `UNIMPLEMENTED`, `INTERNAL`) and provides a catch-all
+//! converter for [`anyhow::Error`].
+
 use laurus::LaurusError;
 use tonic::Status;
 

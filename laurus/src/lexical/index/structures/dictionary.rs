@@ -1,7 +1,9 @@
-//! Term dictionary for efficient term-to-posting lookup.
+//! Term dictionary data structures for mapping terms to posting list metadata.
 //!
-//! This module provides a high-performance term dictionary implementation
-//! based on sorted arrays and hash tables for different use cases.
+//! This module provides multiple term dictionary implementations—sorted, hash-based,
+//! and hybrid—for efficiently mapping terms to their [`TermInfo`] (posting list
+//! offset, length, document frequency, and total frequency). A [`TermDictionaryBuilder`]
+//! is also provided for constructing any of the dictionary variants.
 
 use std::collections::BTreeMap;
 

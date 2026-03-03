@@ -9,7 +9,7 @@
 //! - [`standard::StandardAnalyzer`] - General-purpose analyzer with whitespace tokenization
 //! - [`simple::SimpleAnalyzer`] - Simple lowercase + letter tokenization
 //! - [`keyword::KeywordAnalyzer`] - Treats entire input as single token (for IDs, tags)
-//! - [`noop::NoopAnalyzer`] - No-op analyzer for testing
+//! - [`noop::NoOpAnalyzer`] - No-op analyzer for testing
 //! - [`pipeline::PipelineAnalyzer`] - Customizable analyzer with filter chain
 //! - [`per_field::PerFieldAnalyzer`] - Different analyzers per field
 //! - [`language`] - Language-specific analyzers (English, Japanese, etc.)

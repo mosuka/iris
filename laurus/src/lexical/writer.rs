@@ -10,7 +10,21 @@ use crate::lexical::core::document::Document;
 /// Trait for lexical index writers.
 ///
 /// This trait defines the common interface that all lexical index writer implementations
-/// must follow. The primary implementation is `InvertedIndexWriter`.
+/// must follow. The primary implementation is
+/// [`InvertedIndexWriter`](crate::lexical::index::inverted::writer::InvertedIndexWriter).
+///
+/// # Write Semantics
+///
+/// All write operations (`add_document`, `upsert_document`, `delete_document`, etc.)
+/// are **batched** in an in-memory buffer. Changes are only persisted to storage when
+/// [`commit()`](Self::commit) is called. Use [`rollback()`](Self::rollback) to discard
+/// all pending changes without persisting.
+///
+/// # Thread Safety
+///
+/// Implementations must be `Send + Sync`. However, all mutating methods require
+/// `&mut self`, so external synchronization (e.g., via `Mutex`) is needed if
+/// shared across threads.
 ///
 /// # Example
 ///
@@ -31,67 +45,160 @@ use crate::lexical::core::document::Document;
 /// ```
 pub trait LexicalIndexWriter: Send + Sync + std::fmt::Debug {
     /// Add a document to the index with automatic ID assignment.
-    /// Returns the assigned document ID.
+    ///
+    /// The document is analyzed (tokenized) and buffered in memory. It is not
+    /// persisted until [`commit()`](Self::commit) is called.
+    ///
+    /// # Returns
+    ///
+    /// The automatically assigned document ID on success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the writer is closed or document analysis fails.
     fn add_document(&mut self, doc: Document) -> Result<u64>;
 
     /// Upsert a document to the index with a specific document ID.
+    ///
+    /// If a document with the given `doc_id` already exists, it is replaced.
+    /// The document is analyzed and buffered in memory until [`commit()`](Self::commit).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the writer is closed or document analysis fails.
     fn upsert_document(&mut self, doc_id: u64, doc: Document) -> Result<()>;
 
     /// Add an already analyzed document to the index with automatic ID assignment.
-    /// Returns the assigned document ID.
     ///
     /// This allows adding pre-analyzed documents that were processed
-    /// using DocumentParser or from external tokenization systems.
+    /// using [`DocumentParser`](crate::lexical::core::parser::DocumentParser) or
+    /// from external tokenization systems. The document is buffered until
+    /// [`commit()`](Self::commit).
+    ///
+    /// # Returns
+    ///
+    /// The automatically assigned document ID on success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the writer is closed.
     fn add_analyzed_document(&mut self, doc: AnalyzedDocument) -> Result<u64>;
 
     /// Upsert an already analyzed document to the index with a specific document ID.
+    ///
+    /// If a document with the given `doc_id` already exists, it is replaced.
+    /// The document is buffered until [`commit()`](Self::commit).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the writer is closed.
     fn upsert_analyzed_document(&mut self, doc_id: u64, doc: AnalyzedDocument) -> Result<()>;
 
     /// Delete a document by ID.
+    ///
+    /// Removes the document from the in-memory buffer if it is still pending.
+    /// For already-committed documents, the deletion is recorded and applied
+    /// on the next [`commit()`](Self::commit).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the writer is closed.
     fn delete_document(&mut self, doc_id: u64) -> Result<()>;
 
     /// Commit all pending changes to the index.
+    ///
+    /// Flushes any buffered documents into a new segment and writes updated
+    /// index metadata to storage. After a successful commit, the changes become
+    /// visible to new readers/searchers.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the writer is closed or if flushing/persisting fails.
     fn commit(&mut self) -> Result<()>;
 
     /// Rollback all pending changes.
+    ///
+    /// Discards all buffered documents and in-memory index data that have not
+    /// yet been committed. Already-committed data is not affected.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the writer is closed.
     fn rollback(&mut self) -> Result<()>;
 
-    /// Get the number of documents added since the last commit.
+    /// Get the number of documents buffered since the last commit.
     fn pending_docs(&self) -> u64;
 
     /// Close the writer and release resources.
+    ///
+    /// After closing, all subsequent write operations will return an error.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the writer is already closed.
     fn close(&mut self) -> Result<()>;
 
     /// Check if the writer is closed.
+    ///
+    /// Returns `true` if [`close()`](Self::close) has been called.
     fn is_closed(&self) -> bool;
 
     /// Build a reader from the written index.
     ///
     /// This method allows creating a reader directly from the writer,
     /// enabling the "write-then-read" workflow used in hybrid search.
+    ///
+    /// # Returns
+    ///
+    /// An `Arc`-wrapped reader that can be shared across threads.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the reader cannot be constructed.
     fn build_reader(
         &self,
     ) -> Result<std::sync::Arc<dyn crate::lexical::reader::LexicalIndexReader>>;
 
     /// Get the next available document ID.
+    ///
+    /// Returns the ID that will be assigned to the next document added
+    /// via [`add_document()`](Self::add_document) or
+    /// [`add_analyzed_document()`](Self::add_analyzed_document).
     fn next_doc_id(&self) -> u64;
 
     /// Find the internal document ID for a given term (field:value).
     ///
-    /// This allows NRT (Near Real-Time) lookups for ID management.
+    /// Performs a near-real-time (NRT) lookup against both the in-memory buffer
+    /// and committed segments. Returns the first matching document ID, or `None`
+    /// if no document contains the given term in the specified field.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the writer is closed.
     fn find_doc_id_by_term(&self, field: &str, term: &str) -> Result<Option<u64>>;
 
     /// Find all internal document IDs for a given term (field:value).
     ///
-    /// This allows NRT lookups for multiple documents (chunks).
+    /// Similar to [`find_doc_id_by_term()`](Self::find_doc_id_by_term) but returns
+    /// all matching document IDs. This is useful for multi-chunk document lookups.
+    /// Returns `None` if no documents match.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the writer is closed.
     fn find_doc_ids_by_term(&self, field: &str, term: &str) -> Result<Option<Vec<u64>>>;
 
     /// Set the last processed WAL sequence number.
+    ///
+    /// The default implementation is a no-op. Override this to track WAL progress.
     fn set_last_wal_seq(&mut self, _seq: u64) -> Result<()> {
         Ok(())
     }
 
-    /// Check if a document is marked as deleted in the pending set.
+    /// Check if a document is marked as deleted in the pending deletion set.
+    ///
+    /// The default implementation always returns `false`. Override this if the
+    /// writer tracks pending deletions.
     fn is_updated_deleted(&self, _doc_id: u64) -> bool {
         false
     }

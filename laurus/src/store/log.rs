@@ -90,6 +90,23 @@ pub struct DocumentLog {
 
 impl DocumentLog {
     /// Create a new document log with WAL and document storage.
+    ///
+    /// The internal `next_doc_id` counter starts at **1** and is **not**
+    /// automatically recovered from any existing WAL file or document store.
+    /// Callers must invoke [`read_all`](Self::read_all) after construction to
+    /// replay the WAL and synchronize both the `next_doc_id` and `next_seq`
+    /// counters with the persisted state. Failing to do so may cause
+    /// duplicate document IDs.
+    ///
+    /// # Arguments
+    ///
+    /// * `wal_storage` - Storage backend for the WAL file.
+    /// * `wal_path` - Path (relative to the storage root) of the WAL file.
+    /// * `doc_store_storage` - Storage backend for the document store.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the document store cannot be opened.
     pub fn new(
         wal_storage: Arc<dyn Storage>,
         wal_path: &str,

@@ -1,3 +1,10 @@
+//! CLI argument definitions for the laurus command-line tool.
+//!
+//! This module defines the top-level [`Cli`] struct and all subcommand
+//! structures parsed by [`clap`]. Each subcommand maps to a specific
+//! operation such as creating an index, querying documents, or starting
+//! a gRPC server.
+
 use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
@@ -42,6 +49,9 @@ pub enum Command {
 
 // --- Create ---
 
+/// CLI arguments for the `create` subcommand.
+///
+/// Holds the target resource to create (e.g. an index or a schema file).
 #[derive(Parser)]
 pub struct CreateCommand {
     #[command(subcommand)]
@@ -66,6 +76,9 @@ pub enum CreateResource {
 
 // --- Get ---
 
+/// CLI arguments for the `get` subcommand.
+///
+/// Holds the target resource to retrieve (e.g. index stats or a document).
 #[derive(Parser)]
 pub struct GetCommand {
     #[command(subcommand)]
@@ -86,6 +99,9 @@ pub enum GetResource {
 
 // --- Add ---
 
+/// CLI arguments for the `add` subcommand.
+///
+/// Holds the target resource to add (e.g. a document).
 #[derive(Parser)]
 pub struct AddCommand {
     #[command(subcommand)]
@@ -107,6 +123,9 @@ pub enum AddResource {
 
 // --- Delete ---
 
+/// CLI arguments for the `delete` subcommand.
+///
+/// Holds the target resource to delete (e.g. a document by ID).
 #[derive(Parser)]
 pub struct DeleteCommand {
     #[command(subcommand)]
@@ -125,6 +144,11 @@ pub enum DeleteResource {
 
 // --- Serve ---
 
+/// CLI arguments for the `serve` subcommand.
+///
+/// Configures the gRPC server (and optional HTTP gateway) including
+/// listen address, ports, log level, and an optional TOML configuration
+/// file. Values can be supplied via CLI flags or environment variables.
 #[derive(Parser)]
 pub struct ServeCommand {
     /// Path to the configuration file (TOML).
@@ -150,6 +174,10 @@ pub struct ServeCommand {
 
 // --- Search ---
 
+/// CLI arguments for the `search` subcommand.
+///
+/// Accepts a query string written in the Laurus query DSL along with
+/// pagination parameters (`limit` and `offset`).
 #[derive(Parser)]
 pub struct SearchCommand {
     /// Search query string (Laurus query DSL).
