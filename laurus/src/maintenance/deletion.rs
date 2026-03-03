@@ -1,6 +1,6 @@
 //! Document deletion and compaction system.
 //!
-//! This module provides efficient document deletion using bitmap-based
+//! This module provides efficient document deletion using set-based
 //! logical deletion and periodic compaction for space reclamation.
 
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -49,7 +49,7 @@ impl Default for DeletionConfig {
     }
 }
 
-/// A bitmap-based deletion tracker for a segment.
+/// A hash set-based deletion tracker for a segment.
 #[derive(Debug)]
 pub struct DeletionBitmap {
     /// Segment ID this bitmap belongs to.
@@ -103,6 +103,17 @@ impl DeletionBitmap {
     }
 
     /// Mark a document as deleted.
+    ///
+    /// # Arguments
+    ///
+    /// * `doc_id` - The document ID to mark as deleted. Must be within the
+    ///   `[min_doc_id, max_doc_id]` range of this segment.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(true)` if the document was newly deleted, or `Ok(false)` if
+    /// it was already marked as deleted (idempotent). Returns `Err` if the
+    /// document ID is outside this segment's range.
     pub fn delete_document(&self, doc_id: u64) -> Result<bool> {
         // Range check
         if doc_id < self.min_doc_id || doc_id > self.max_doc_id {
@@ -166,10 +177,16 @@ impl DeletionBitmap {
         docs.iter().cloned().collect()
     }
 
-    /// Get memory usage of this bitmap in bytes.
+    /// Get an approximate memory usage of this deletion tracker in bytes.
+    ///
+    /// The estimate includes the struct itself, the segment ID string buffer,
+    /// and a rough approximation of the hash set overhead. The hash set term
+    /// is computed as `AHashSet::capacity() / 8`, which is a coarse heuristic
+    /// because `capacity()` returns the number of element slots (not bits),
+    /// so the true heap usage of the set may differ significantly.
     pub fn memory_usage(&self) -> usize {
         std::mem::size_of::<Self>() +
-        self.deleted_docs.read().unwrap().capacity() / 8 + // bits to bytes
+        self.deleted_docs.read().unwrap().capacity() / 8 + // element capacity to approximate bytes
         self.segment_id.capacity()
     }
 

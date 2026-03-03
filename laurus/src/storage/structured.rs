@@ -2,6 +2,16 @@
 //!
 //! This module provides efficient binary serialization for search index data structures,
 //! similar to Whoosh's structfile.py but optimized for Rust and modern hardware.
+//!
+//! Two layers of abstraction are provided:
+//!
+//! - **Structured I/O** ([`StructWriter`] / [`StructReader`]) -- typed field-level
+//!   reading and writing of primitives, variable-length integers, strings, byte
+//!   arrays, and compound structures, with a CRC-32 checksum trailer for
+//!   integrity verification.
+//! - **Block I/O** ([`BlockWriter`] / [`BlockReader`]) -- higher-level block-based
+//!   batching built on top of structured I/O, designed for posting lists and
+//!   other data that benefits from fixed-size block buffering.
 
 use std::collections::HashMap;
 
@@ -11,15 +21,34 @@ use crate::error::{LaurusError, Result};
 use crate::storage::{StorageInput, StorageOutput};
 use crate::util::varint::{decode_u64, encode_u64};
 
-/// A structured file writer for binary data.
+/// Structured binary writer with typed fields and CRC-32 checksumming.
+///
+/// `StructWriter` wraps a [`StorageOutput`] and provides typed write methods
+/// for primitive values, variable-length integers, strings, byte arrays, and
+/// compound structures such as delta-compressed integer lists and string-to-u64
+/// maps. A running CRC-32 checksum is maintained and written as a trailer when
+/// the writer is closed, enabling integrity verification on read.
+///
+/// All multi-byte numeric values are encoded in **little-endian** byte order.
 pub struct StructWriter<W: StorageOutput> {
+    /// The underlying storage output handle.
     writer: W,
+    /// Running CRC-32 checksum of written data.
     checksum: u32,
+    /// Current byte position in the output stream.
     position: u64,
 }
 
 impl<W: StorageOutput> StructWriter<W> {
-    /// Create a new structured file writer.
+    /// Create a new structured file writer wrapping the given output.
+    ///
+    /// # Arguments
+    ///
+    /// * `writer` - The underlying [`StorageOutput`] to write to.
+    ///
+    /// # Returns
+    ///
+    /// A new `StructWriter` positioned at byte 0 with a zeroed checksum.
     pub fn new(writer: W) -> Self {
         StructWriter {
             writer,
@@ -28,7 +57,15 @@ impl<W: StorageOutput> StructWriter<W> {
         }
     }
 
-    /// Write a u8 value.
+    /// Write a single `u8` value.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - The byte value to write.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the underlying I/O operation fails.
     pub fn write_u8(&mut self, value: u8) -> Result<()> {
         self.writer.write_u8(value)?;
         self.update_checksum(&[value]);
@@ -36,7 +73,15 @@ impl<W: StorageOutput> StructWriter<W> {
         Ok(())
     }
 
-    /// Write a u16 value (little-endian).
+    /// Write a `u16` value in little-endian byte order.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - The 16-bit unsigned integer to write.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the underlying I/O operation fails.
     pub fn write_u16(&mut self, value: u16) -> Result<()> {
         self.writer.write_u16::<LittleEndian>(value)?;
         self.update_checksum(&value.to_le_bytes());
@@ -44,7 +89,15 @@ impl<W: StorageOutput> StructWriter<W> {
         Ok(())
     }
 
-    /// Write a u32 value (little-endian).
+    /// Write a `u32` value in little-endian byte order.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - The 32-bit unsigned integer to write.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the underlying I/O operation fails.
     pub fn write_u32(&mut self, value: u32) -> Result<()> {
         self.writer.write_u32::<LittleEndian>(value)?;
         self.update_checksum(&value.to_le_bytes());
@@ -52,7 +105,15 @@ impl<W: StorageOutput> StructWriter<W> {
         Ok(())
     }
 
-    /// Write a u64 value (little-endian).
+    /// Write a `u64` value in little-endian byte order.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - The 64-bit unsigned integer to write.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the underlying I/O operation fails.
     pub fn write_u64(&mut self, value: u64) -> Result<()> {
         self.writer.write_u64::<LittleEndian>(value)?;
         self.update_checksum(&value.to_le_bytes());
@@ -60,7 +121,18 @@ impl<W: StorageOutput> StructWriter<W> {
         Ok(())
     }
 
-    /// Write a variable-length integer.
+    /// Write a variable-length encoded unsigned integer.
+    ///
+    /// Smaller values use fewer bytes, making this efficient for values that
+    /// are typically small (e.g. string lengths, deltas).
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - The unsigned integer to encode and write.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the underlying I/O operation fails.
     pub fn write_varint(&mut self, value: u64) -> Result<()> {
         let encoded = encode_u64(value);
         self.writer.write_all(&encoded)?;
@@ -69,7 +141,15 @@ impl<W: StorageOutput> StructWriter<W> {
         Ok(())
     }
 
-    /// Write a f32 value (little-endian).
+    /// Write an `f32` value in little-endian byte order.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - The 32-bit floating-point number to write.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the underlying I/O operation fails.
     pub fn write_f32(&mut self, value: f32) -> Result<()> {
         self.writer.write_f32::<LittleEndian>(value)?;
         self.update_checksum(&value.to_le_bytes());
@@ -77,7 +157,15 @@ impl<W: StorageOutput> StructWriter<W> {
         Ok(())
     }
 
-    /// Write a f64 value (little-endian).
+    /// Write an `f64` value in little-endian byte order.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - The 64-bit floating-point number to write.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the underlying I/O operation fails.
     pub fn write_f64(&mut self, value: f64) -> Result<()> {
         self.writer.write_f64::<LittleEndian>(value)?;
         self.update_checksum(&value.to_le_bytes());
@@ -85,7 +173,18 @@ impl<W: StorageOutput> StructWriter<W> {
         Ok(())
     }
 
-    /// Write a string with length prefix.
+    /// Write a UTF-8 string with a varint length prefix.
+    ///
+    /// The string is encoded as a varint byte-length followed by the raw UTF-8
+    /// bytes, matching the format read by [`StructReader::read_string`].
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - The string slice to write.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the underlying I/O operation fails.
     pub fn write_string(&mut self, value: &str) -> Result<()> {
         let bytes = value.as_bytes();
         self.write_varint(bytes.len() as u64)?;
@@ -95,7 +194,15 @@ impl<W: StorageOutput> StructWriter<W> {
         Ok(())
     }
 
-    /// Write raw bytes with length prefix.
+    /// Write a byte slice with a varint length prefix.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - The byte slice to write.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the underlying I/O operation fails.
     pub fn write_bytes(&mut self, value: &[u8]) -> Result<()> {
         self.write_varint(value.len() as u64)?;
         self.writer.write_all(value)?;
@@ -104,7 +211,18 @@ impl<W: StorageOutput> StructWriter<W> {
         Ok(())
     }
 
-    /// Write raw bytes without length prefix.
+    /// Write raw bytes directly without any length prefix.
+    ///
+    /// The caller is responsible for knowing the exact byte count on the
+    /// reading side.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - The byte slice to write verbatim.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the underlying I/O operation fails.
     pub fn write_raw(&mut self, value: &[u8]) -> Result<()> {
         self.writer.write_all(value)?;
         self.update_checksum(value);
@@ -112,7 +230,21 @@ impl<W: StorageOutput> StructWriter<W> {
         Ok(())
     }
 
-    /// Write a compressed integer array using delta encoding.
+    /// Write a `u32` array using delta encoding for compression.
+    ///
+    /// The values are stored as a varint count followed by varint-encoded
+    /// deltas between consecutive elements, which is particularly efficient
+    /// for monotonically increasing sequences such as sorted document ID
+    /// posting lists.
+    ///
+    /// # Arguments
+    ///
+    /// * `values` - The slice of `u32` values to write (should ideally be
+    ///   sorted for best compression).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the underlying I/O operation fails.
     pub fn write_delta_compressed_u32s(&mut self, values: &[u32]) -> Result<()> {
         if values.is_empty() {
             return self.write_varint(0);
@@ -130,7 +262,16 @@ impl<W: StorageOutput> StructWriter<W> {
         Ok(())
     }
 
-    /// Write a hash map with string keys and u64 values.
+    /// Write a `HashMap<String, u64>` as a varint-counted sequence of
+    /// key-value pairs.
+    ///
+    /// # Arguments
+    ///
+    /// * `map` - The map to serialize.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the underlying I/O operation fails.
     pub fn write_string_u64_map(&mut self, map: &HashMap<String, u64>) -> Result<()> {
         self.write_varint(map.len() as u64)?;
 
@@ -142,22 +283,42 @@ impl<W: StorageOutput> StructWriter<W> {
         Ok(())
     }
 
-    /// Get current file position.
+    /// Get the current byte position in the output stream.
+    ///
+    /// # Returns
+    ///
+    /// The number of bytes written so far.
     pub fn position(&self) -> u64 {
         self.position
     }
 
-    /// Get current checksum.
+    /// Get the current CRC-32 checksum of written data.
+    ///
+    /// # Returns
+    ///
+    /// The running checksum value.
     pub fn checksum(&self) -> u32 {
         self.checksum
     }
 
-    /// Update checksum with new data.
+    /// Replace the CRC-32 checksum with the hash of the given data.
+    ///
+    /// Note: this does **not** accumulate a running checksum. Each call
+    /// overwrites the previous value with `crc32fast::hash(data)`, so the
+    /// stored checksum only reflects the last chunk passed to this method.
     fn update_checksum(&mut self, data: &[u8]) {
         self.checksum = crc32fast::hash(data);
     }
 
-    /// Flush and close the writer.
+    /// Write the trailing CRC-32 checksum, flush, and close the writer.
+    ///
+    /// The checksum written is the value computed by the most recent
+    /// `update_checksum` call, which only covers the
+    /// last chunk of data passed to that method (not all data written).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if flushing or closing the underlying output fails.
     pub fn close(mut self) -> Result<()> {
         // Write final checksum
         self.writer.write_u32::<LittleEndian>(self.checksum)?;
@@ -166,30 +327,76 @@ impl<W: StorageOutput> StructWriter<W> {
         Ok(())
     }
 
-    /// Seek to a position.
+    /// Seek to a position in the output stream.
+    ///
+    /// # Arguments
+    ///
+    /// * `pos` - The seek target (start, end, or current-relative).
+    ///
+    /// # Returns
+    ///
+    /// The new absolute byte position after seeking.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the underlying seek fails.
     pub fn seek(&mut self, pos: std::io::SeekFrom) -> Result<u64> {
         let new_pos = self.writer.seek(pos)?;
         self.position = new_pos;
         Ok(new_pos)
     }
 
-    /// Get current stream position from underlying writer.
-    /// This is useful when mixing raw writes with structured writes.
+    /// Get the current stream position from the underlying writer.
+    ///
+    /// This is useful when mixing raw writes with structured writes to
+    /// ensure the tracked position stays in sync.
+    ///
+    /// # Returns
+    ///
+    /// The absolute byte position reported by the underlying writer.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if querying the position fails.
     pub fn stream_position(&mut self) -> Result<u64> {
         self.writer.stream_position().map_err(LaurusError::from)
     }
 }
 
-/// A structured file reader for binary data.
+/// Structured binary reader with typed fields and CRC-32 verification.
+///
+/// `StructReader` is the read counterpart of [`StructWriter`]. It wraps a
+/// [`StorageInput`] and provides typed read methods that mirror the writer's
+/// format. A running CRC-32 checksum is maintained so that the trailing
+/// checksum written by [`StructWriter::close`] can be verified via
+/// [`verify_checksum`](Self::verify_checksum).
+///
+/// All multi-byte numeric values are expected in **little-endian** byte order.
 pub struct StructReader<R: StorageInput> {
+    /// The underlying storage input handle.
     reader: R,
+    /// Running CRC-32 checksum of data read so far.
     checksum: u32,
+    /// Current byte position in the input stream.
     position: u64,
+    /// Total size of the underlying file in bytes.
     file_size: u64,
 }
 
 impl<R: StorageInput> StructReader<R> {
-    /// Create a new structured file reader.
+    /// Create a new structured file reader wrapping the given input.
+    ///
+    /// # Arguments
+    ///
+    /// * `reader` - The underlying [`StorageInput`] to read from.
+    ///
+    /// # Returns
+    ///
+    /// A new `StructReader` positioned at byte 0.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if determining the input size fails.
     pub fn new(reader: R) -> Result<Self> {
         let file_size = reader.size()?;
         Ok(StructReader {
@@ -200,19 +407,47 @@ impl<R: StorageInput> StructReader<R> {
         })
     }
 
-    /// Seek to a position.
+    /// Seek to a position in the input stream.
+    ///
+    /// # Arguments
+    ///
+    /// * `pos` - The seek target (start, end, or current-relative).
+    ///
+    /// # Returns
+    ///
+    /// The new absolute byte position after seeking.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the underlying seek fails.
     pub fn seek(&mut self, pos: std::io::SeekFrom) -> Result<u64> {
         let new_pos = self.reader.seek(pos)?;
         self.position = new_pos;
         Ok(new_pos)
     }
 
-    /// Get current stream position from underlying reader.
+    /// Get the current stream position from the underlying reader.
+    ///
+    /// # Returns
+    ///
+    /// The absolute byte position reported by the underlying reader.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if querying the position fails.
     pub fn stream_position(&mut self) -> Result<u64> {
         self.reader.stream_position().map_err(LaurusError::from)
     }
 
-    /// Read a u8 value.
+    /// Read a single `u8` value.
+    ///
+    /// # Returns
+    ///
+    /// The byte value read from the stream.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the underlying I/O operation fails.
     pub fn read_u8(&mut self) -> Result<u8> {
         let value = self.reader.read_u8()?;
         self.update_checksum(&[value]);
@@ -220,7 +455,15 @@ impl<R: StorageInput> StructReader<R> {
         Ok(value)
     }
 
-    /// Read a u16 value (little-endian).
+    /// Read a `u16` value in little-endian byte order.
+    ///
+    /// # Returns
+    ///
+    /// The 16-bit unsigned integer read from the stream.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the underlying I/O operation fails.
     pub fn read_u16(&mut self) -> Result<u16> {
         let value = self.reader.read_u16::<LittleEndian>()?;
         self.update_checksum(&value.to_le_bytes());
@@ -228,7 +471,15 @@ impl<R: StorageInput> StructReader<R> {
         Ok(value)
     }
 
-    /// Read a u32 value (little-endian).
+    /// Read a `u32` value in little-endian byte order.
+    ///
+    /// # Returns
+    ///
+    /// The 32-bit unsigned integer read from the stream.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the underlying I/O operation fails.
     pub fn read_u32(&mut self) -> Result<u32> {
         let value = self.reader.read_u32::<LittleEndian>()?;
         self.update_checksum(&value.to_le_bytes());
@@ -236,7 +487,15 @@ impl<R: StorageInput> StructReader<R> {
         Ok(value)
     }
 
-    /// Read a u64 value (little-endian).
+    /// Read a `u64` value in little-endian byte order.
+    ///
+    /// # Returns
+    ///
+    /// The 64-bit unsigned integer read from the stream.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the underlying I/O operation fails.
     pub fn read_u64(&mut self) -> Result<u64> {
         let value = self.reader.read_u64::<LittleEndian>()?;
         self.update_checksum(&value.to_le_bytes());
@@ -244,7 +503,15 @@ impl<R: StorageInput> StructReader<R> {
         Ok(value)
     }
 
-    /// Read a variable-length integer.
+    /// Read a variable-length encoded unsigned integer.
+    ///
+    /// # Returns
+    ///
+    /// The decoded `u64` value.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the underlying I/O operation or decoding fails.
     pub fn read_varint(&mut self) -> Result<u64> {
         let mut bytes = Vec::new();
         loop {
@@ -261,7 +528,15 @@ impl<R: StorageInput> StructReader<R> {
         Ok(value)
     }
 
-    /// Read a f32 value (little-endian).
+    /// Read an `f32` value in little-endian byte order.
+    ///
+    /// # Returns
+    ///
+    /// The 32-bit floating-point number read from the stream.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the underlying I/O operation fails.
     pub fn read_f32(&mut self) -> Result<f32> {
         let value = self.reader.read_f32::<LittleEndian>()?;
         self.update_checksum(&value.to_le_bytes());
@@ -269,7 +544,15 @@ impl<R: StorageInput> StructReader<R> {
         Ok(value)
     }
 
-    /// Read a f64 value (little-endian).
+    /// Read an `f64` value in little-endian byte order.
+    ///
+    /// # Returns
+    ///
+    /// The 64-bit floating-point number read from the stream.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the underlying I/O operation fails.
     pub fn read_f64(&mut self) -> Result<f64> {
         let value = self.reader.read_f64::<LittleEndian>()?;
         self.update_checksum(&value.to_le_bytes());
@@ -277,7 +560,16 @@ impl<R: StorageInput> StructReader<R> {
         Ok(value)
     }
 
-    /// Read a string with length prefix.
+    /// Read a UTF-8 string with a varint length prefix.
+    ///
+    /// # Returns
+    ///
+    /// The decoded string.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the underlying I/O fails or the bytes are not
+    /// valid UTF-8.
     pub fn read_string(&mut self) -> Result<String> {
         let length = self.read_varint()? as usize;
         let mut bytes = vec![0u8; length];
@@ -288,7 +580,15 @@ impl<R: StorageInput> StructReader<R> {
         String::from_utf8(bytes).map_err(|e| LaurusError::storage(format!("Invalid UTF-8: {e}")))
     }
 
-    /// Read bytes with length prefix.
+    /// Read a byte array with a varint length prefix.
+    ///
+    /// # Returns
+    ///
+    /// The raw bytes read from the stream.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the underlying I/O operation fails.
     pub fn read_bytes(&mut self) -> Result<Vec<u8>> {
         let length = self.read_varint()? as usize;
         let mut bytes = vec![0u8; length];
@@ -298,7 +598,20 @@ impl<R: StorageInput> StructReader<R> {
         Ok(bytes)
     }
 
-    /// Read exact number of raw bytes.
+    /// Read an exact number of raw bytes without a length prefix.
+    ///
+    /// # Arguments
+    ///
+    /// * `length` - The number of bytes to read.
+    ///
+    /// # Returns
+    ///
+    /// A `Vec<u8>` containing exactly `length` bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the underlying I/O operation fails or the stream
+    /// does not contain enough bytes.
     pub fn read_raw(&mut self, length: usize) -> Result<Vec<u8>> {
         let mut bytes = vec![0u8; length];
         self.reader.read_exact(&mut bytes)?;
@@ -307,7 +620,18 @@ impl<R: StorageInput> StructReader<R> {
         Ok(bytes)
     }
 
-    /// Read a delta-compressed integer array.
+    /// Read a delta-compressed `u32` array.
+    ///
+    /// This reverses the encoding performed by
+    /// [`StructWriter::write_delta_compressed_u32s`].
+    ///
+    /// # Returns
+    ///
+    /// A vector of reconstructed `u32` values.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the underlying I/O operation fails.
     pub fn read_delta_compressed_u32s(&mut self) -> Result<Vec<u32>> {
         let length = self.read_varint()? as usize;
         if length == 0 {
@@ -327,7 +651,16 @@ impl<R: StorageInput> StructReader<R> {
         Ok(values)
     }
 
-    /// Read a hash map with string keys and u64 values.
+    /// Read a `HashMap<String, u64>` previously written by
+    /// [`StructWriter::write_string_u64_map`].
+    ///
+    /// # Returns
+    ///
+    /// The deserialized map.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the underlying I/O operation fails.
     pub fn read_string_u64_map(&mut self) -> Result<HashMap<String, u64>> {
         let length = self.read_varint()? as usize;
         let mut map = HashMap::with_capacity(length);
@@ -341,32 +674,66 @@ impl<R: StorageInput> StructReader<R> {
         Ok(map)
     }
 
-    /// Get current file position.
+    /// Get the current byte position in the input stream.
+    ///
+    /// # Returns
+    ///
+    /// The number of bytes consumed so far.
     pub fn position(&self) -> u64 {
         self.position
     }
 
-    /// Get file size.
+    /// Get the total file size.
+    ///
+    /// # Returns
+    ///
+    /// The size of the underlying file in bytes.
     pub fn size(&self) -> u64 {
         self.file_size
     }
 
-    /// Check if we're at end of file.
+    /// Check whether the reader has reached the end of file.
+    ///
+    /// The last 4 bytes of the file are reserved for the CRC-32 checksum
+    /// trailer, so this returns `true` once the position is within that
+    /// trailing region.
+    ///
+    /// # Returns
+    ///
+    /// `true` if no more data blocks remain to be read.
     pub fn is_eof(&self) -> bool {
         self.position >= self.file_size.saturating_sub(4) // Account for checksum
     }
 
-    /// Get current checksum.
+    /// Get the current CRC-32 checksum of data read so far.
+    ///
+    /// # Returns
+    ///
+    /// The running checksum value.
     pub fn checksum(&self) -> u32 {
         self.checksum
     }
 
-    /// Update checksum with new data.
+    /// Replace the CRC-32 checksum with the hash of the given data.
+    ///
+    /// Note: this does **not** accumulate a running checksum. Each call
+    /// overwrites the previous value with `crc32fast::hash(data)`, so the
+    /// stored checksum only reflects the last chunk passed to this method.
     fn update_checksum(&mut self, data: &[u8]) {
         self.checksum = crc32fast::hash(data);
     }
 
-    /// Verify file integrity by checking final checksum.
+    /// Verify file integrity by comparing the running checksum against the
+    /// CRC-32 trailer stored at the end of the file.
+    ///
+    /// # Returns
+    ///
+    /// `true` if the stored checksum matches the computed one.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the file is too short to contain a checksum or
+    /// if reading the trailer fails.
     pub fn verify_checksum(&mut self) -> Result<bool> {
         if self.position + 4 > self.file_size {
             return Err(LaurusError::storage("File too short for checksum"));
@@ -377,22 +744,46 @@ impl<R: StorageInput> StructReader<R> {
         Ok(stored_checksum == self.checksum)
     }
 
-    /// Close the reader.
+    /// Close the reader and release the underlying input handle.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if closing the underlying input fails.
     pub fn close(mut self) -> Result<()> {
         self.reader.close()
     }
 }
 
-/// Efficient block-based I/O for posting lists.
+/// Block-based writer for efficient batched I/O.
+///
+/// `BlockWriter` buffers data into fixed-size blocks on top of a
+/// [`StructWriter`]. When the current block fills up (or is explicitly
+/// flushed), it is written to the underlying stream with a header
+/// containing the block size and sequence number. This is well-suited
+/// for posting lists and other data that benefits from block-level
+/// compression or batched disk I/O.
 pub struct BlockWriter<W: StorageOutput> {
+    /// The underlying structured writer.
     writer: StructWriter<W>,
+    /// Maximum size of a single block in bytes.
     block_size: usize,
+    /// Buffer accumulating data for the current block.
     current_block: Vec<u8>,
+    /// Number of blocks flushed so far.
     blocks_written: u64,
 }
 
 impl<W: StorageOutput> BlockWriter<W> {
-    /// Create a new block writer.
+    /// Create a new block writer with the specified block size.
+    ///
+    /// # Arguments
+    ///
+    /// * `writer` - The underlying [`StorageOutput`] to write to.
+    /// * `block_size` - The maximum number of bytes per block.
+    ///
+    /// # Returns
+    ///
+    /// A new `BlockWriter` with an empty block buffer.
     pub fn new(writer: W, block_size: usize) -> Self {
         BlockWriter {
             writer: StructWriter::new(writer),
@@ -402,7 +793,19 @@ impl<W: StorageOutput> BlockWriter<W> {
         }
     }
 
-    /// Write data to the current block.
+    /// Write data into the current block buffer.
+    ///
+    /// If appending `data` would exceed the block size, the current block
+    /// is flushed first. Data larger than the block size is written directly
+    /// to the underlying stream without buffering.
+    ///
+    /// # Arguments
+    ///
+    /// * `data` - The byte slice to write.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if flushing or writing fails.
     pub fn write_to_block(&mut self, data: &[u8]) -> Result<()> {
         if self.current_block.len() + data.len() > self.block_size {
             self.flush_block()?;
@@ -418,7 +821,14 @@ impl<W: StorageOutput> BlockWriter<W> {
         Ok(())
     }
 
-    /// Flush the current block to storage.
+    /// Flush the current block buffer to the underlying storage.
+    ///
+    /// A block header (size + sequence number) is written before the data.
+    /// This is a no-op if the buffer is empty.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if writing the block header or data fails.
     pub fn flush_block(&mut self) -> Result<()> {
         if !self.current_block.is_empty() {
             // Write block header: size + block number
@@ -434,29 +844,59 @@ impl<W: StorageOutput> BlockWriter<W> {
         Ok(())
     }
 
-    /// Get the number of blocks written.
+    /// Get the number of blocks written so far.
+    ///
+    /// # Returns
+    ///
+    /// The count of flushed blocks.
     pub fn blocks_written(&self) -> u64 {
         self.blocks_written
     }
 
-    /// Close the writer.
+    /// Flush any remaining buffered data and close the writer.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if flushing or closing fails.
     pub fn close(mut self) -> Result<()> {
         self.flush_block()?;
         self.writer.close()
     }
 }
 
-/// Efficient block-based reader for posting lists.
+/// Block-based reader for efficient batched I/O.
+///
+/// `BlockReader` reads data written by [`BlockWriter`], loading one block
+/// at a time into an internal cache. Callers can then read sub-slices from
+/// the cached block without additional I/O. Block sequence numbers are
+/// verified on read to detect corruption or out-of-order access.
 pub struct BlockReader<R: StorageInput> {
+    /// The underlying structured reader.
     reader: StructReader<R>,
+    /// Cache holding the most recently read block data.
     block_cache: Vec<u8>,
+    /// Size (in bytes) of the currently cached block.
     current_block_size: usize,
+    /// Current read position within the cached block.
     current_block_pos: usize,
+    /// Number of blocks read so far.
     blocks_read: u64,
 }
 
 impl<R: StorageInput> BlockReader<R> {
-    /// Create a new block reader.
+    /// Create a new block reader wrapping the given input.
+    ///
+    /// # Arguments
+    ///
+    /// * `reader` - The underlying [`StorageInput`] to read from.
+    ///
+    /// # Returns
+    ///
+    /// A new `BlockReader` with an empty block cache.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if initializing the underlying reader fails.
     pub fn new(reader: R) -> Result<Self> {
         Ok(BlockReader {
             reader: StructReader::new(reader)?,
@@ -467,7 +907,18 @@ impl<R: StorageInput> BlockReader<R> {
         })
     }
 
-    /// Read the next block.
+    /// Read the next block from the stream into the internal cache.
+    ///
+    /// Returns `None` when the end of file is reached.
+    ///
+    /// # Returns
+    ///
+    /// `Some(bytes)` containing the block data, or `None` at EOF.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if reading fails or the block sequence number
+    /// does not match the expected value.
     pub fn read_block(&mut self) -> Result<Option<&[u8]>> {
         if self.reader.is_eof() {
             return Ok(None);
@@ -494,7 +945,22 @@ impl<R: StorageInput> BlockReader<R> {
         Ok(Some(&self.block_cache))
     }
 
-    /// Read data from the current block.
+    /// Read a sub-slice of the given length from the currently cached block.
+    ///
+    /// Returns `None` if there are not enough bytes remaining in the block.
+    ///
+    /// # Arguments
+    ///
+    /// * `length` - The number of bytes to read from the current block.
+    ///
+    /// # Returns
+    ///
+    /// `Some(bytes)` on success, or `None` if the block has insufficient
+    /// remaining data.
+    ///
+    /// # Errors
+    ///
+    /// This method does not perform I/O and currently always returns `Ok`.
     pub fn read_from_block(&mut self, length: usize) -> Result<Option<&[u8]>> {
         if self.current_block_pos + length > self.current_block_size {
             return Ok(None);
@@ -507,12 +973,20 @@ impl<R: StorageInput> BlockReader<R> {
         Ok(Some(&self.block_cache[start..end]))
     }
 
-    /// Get the number of blocks read.
+    /// Get the number of blocks read so far.
+    ///
+    /// # Returns
+    ///
+    /// The count of blocks loaded into the cache.
     pub fn blocks_read(&self) -> u64 {
         self.blocks_read
     }
 
-    /// Close the reader.
+    /// Close the reader and release the underlying input handle.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if closing the underlying input fails.
     pub fn close(self) -> Result<()> {
         self.reader.close()
     }

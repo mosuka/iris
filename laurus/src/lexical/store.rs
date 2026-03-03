@@ -29,14 +29,14 @@ use parking_lot::RwLock;
 /// # Features
 ///
 /// - **Writer caching**: The writer is created on-demand and cached until commit
-/// - **Reader invalidation**: Readers are automatically invalidated after commits/optimizations
+/// - **Searcher invalidation**: Searchers are automatically invalidated after commits/optimizations
 /// - **Index abstraction**: Works with any `LexicalIndex` implementation (Inverted, etc.)
 /// - **Simplified workflow**: Handles the lifecycle of readers and writers automatically
 ///
 /// # Caching Strategy
 ///
 /// - **Writer**: Created on first write operation, cached until `commit()` is called
-/// - **Reader**: Invalidated after `commit()` or `optimize()` to ensure fresh data
+/// - **Searcher**: Invalidated after `commit()` or `optimize()` to ensure fresh data
 /// - This design ensures that you always read committed data while minimizing object creation
 ///
 /// # Usage Example
@@ -67,7 +67,9 @@ use parking_lot::RwLock;
 pub struct LexicalStore {
     /// The underlying lexical index.
     index: Box<dyn LexicalIndex>,
+    /// Cached writer instance, created on-demand for write operations and cleared on commit.
     writer_cache: Mutex<Option<Box<dyn LexicalIndexWriter>>>,
+    /// Cached searcher instance, invalidated after `commit()` or `optimize()` to ensure fresh data.
     searcher_cache: RwLock<Option<Box<dyn LexicalSearcher>>>,
 }
 
@@ -265,19 +267,15 @@ impl LexicalStore {
 
     /// Optimize the index.
     ///
-    /// This method triggers index optimization, which typically involves merging smaller
-    /// index segments into larger ones to improve search performance and reduce storage overhead.
-    /// After optimization, the reader and searcher caches are invalidated to reflect the optimized structure.
+    /// This method delegates to [`LexicalIndex::optimize()`], which for the default
+    /// [`InvertedIndex`](crate::lexical::index::inverted::InvertedIndex) implementation
+    /// updates the index metadata (e.g., the `modified` timestamp) and persists it to storage.
+    /// After optimization, the searcher cache is invalidated so subsequent searches
+    /// reflect the updated state.
     ///
     /// # Returns
     ///
     /// Returns `Ok(())` on success, or an error if optimization fails.
-    ///
-    /// # Performance Considerations
-    ///
-    /// - Optimization can be I/O and CPU intensive for large indexes
-    /// - It's typically performed during off-peak hours or maintenance windows
-    /// - The benefits include faster search performance and reduced storage space
     ///
     /// # Example
     ///
@@ -311,12 +309,41 @@ impl LexicalStore {
     }
 
     /// Refresh the reader to see latest changes.
+    ///
+    /// Invalidates the cached searcher so that the next search operation will
+    /// create a new searcher reflecting the most recent committed data.
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` on success.
     pub fn refresh(&self) -> Result<()> {
         *self.searcher_cache.write() = None;
         Ok(())
     }
 
     /// Get index statistics.
+    ///
+    /// Returns aggregated statistics including document count and deleted document
+    /// count from the index metadata. The `doc_count` field also includes any
+    /// documents pending in the writer cache that have not yet been committed.
+    ///
+    /// # Current Limitations
+    ///
+    /// In the current [`InvertedIndex`](crate::lexical::index::inverted::InvertedIndex)
+    /// implementation, the following fields are always returned as `0`:
+    /// - `term_count`
+    /// - `segment_count`
+    /// - `total_size`
+    ///
+    /// # Returns
+    ///
+    /// An [`InvertedIndexStats`] snapshot on success, or an error if the
+    /// underlying index cannot provide statistics.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`LaurusError`](crate::error::LaurusError) if the index stats
+    /// cannot be retrieved (e.g., the index is closed).
     pub fn stats(&self) -> Result<InvertedIndexStats> {
         let mut stats = self.index.stats()?;
 
@@ -463,7 +490,15 @@ impl LexicalStore {
         guard.as_ref().unwrap().count(request)
     }
 
-    /// Close the search engine.
+    /// Close the search engine and release resources.
+    ///
+    /// Drops the cached writer and searcher, then marks the underlying index
+    /// as closed. After this call, subsequent operations on the store will
+    /// fail with a "closed" error.
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` on success, or an error if the underlying index fails to close.
     pub fn close(&self) -> Result<()> {
         *self.writer_cache.lock() = None;
         *self.searcher_cache.write() = None;
@@ -471,6 +506,9 @@ impl LexicalStore {
     }
 
     /// Check if the engine is closed.
+    ///
+    /// Delegates to the underlying [`LexicalIndex::is_closed()`] method.
+    /// Returns `true` if [`close()`](Self::close) has been called, `false` otherwise.
     pub fn is_closed(&self) -> bool {
         self.index.is_closed()
     }

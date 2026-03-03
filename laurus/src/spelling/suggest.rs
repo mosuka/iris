@@ -1,4 +1,17 @@
 //! Spelling suggestion generation algorithms.
+//!
+//! This module implements the core suggestion engine used by [`SpellingCorrector`](super::corrector::SpellingCorrector).
+//! It provides:
+//!
+//! - [`Suggestion`] -- a single candidate correction with a combined score derived from
+//!   edit distance, dictionary frequency, prefix similarity, and optional keyboard-distance
+//!   and phonetic bonuses.
+//! - [`SuggestionConfig`] -- tuning knobs for maximum edit distance, result count limits,
+//!   minimum frequency thresholds, and weighting factors.
+//! - [`SuggestionEngine`] -- the main entry point that, given a misspelled word, generates
+//!   candidate edits (insertions, deletions, substitutions, transpositions), filters them
+//!   against the backing [`SpellingDictionary`], scores
+//!   each candidate, and returns the top-N suggestions ordered by score.
 
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, HashSet};

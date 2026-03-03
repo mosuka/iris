@@ -24,7 +24,11 @@ use self::schema::Schema;
 /// Unified Engine that manages both Lexical and Vector indices.
 ///
 /// This engine acts as a facade, coordinating document ingestion and search
-/// across the underlying specialized engines.
+/// across the underlying specialized engines. All index mutations are
+/// WAL-backed via [`DocumentLog`] for crash-recovery durability.
+///
+/// A system field `_id` is automatically injected into every indexed document
+/// to track the external document identifier.
 pub struct Engine {
     schema: Schema,
     lexical: LexicalStore,
@@ -39,6 +43,11 @@ impl Engine {
     /// Create a new Unified Engine with default analyzer and no embedder.
     ///
     /// For custom analyzer or embedder configuration, use [`Engine::builder`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if storage initialization, index creation, or
+    /// WAL recovery fails.
     pub async fn new(storage: Arc<dyn Storage>, schema: Schema) -> Result<Self> {
         EngineBuilder::new(storage, schema).build().await
     }
@@ -51,7 +60,8 @@ impl Engine {
     /// let engine = Engine::builder(storage, schema)
     ///     .analyzer(Arc::new(StandardAnalyzer::default()))
     ///     .embedder(Arc::new(MyEmbedder))
-    ///     .build()?;
+    ///     .build()
+    ///     .await?;
     /// ```
     pub fn builder(storage: Arc<dyn Storage>, schema: Schema) -> EngineBuilder {
         EngineBuilder::new(storage, schema)
@@ -142,17 +152,52 @@ impl Engine {
 
     /// Put (upsert) a document.
     ///
-    /// If a document with the same external ID exists, it is replaced.
-    /// The document will be routed to the appropriate underlying engines
-    /// based on the schema field configuration.
+    /// If a document with the same external ID exists, all its chunks are
+    /// deleted before the new document is indexed. A `_id` field is
+    /// automatically inserted into the document with the provided `id` value.
+    /// A WAL entry is written before any index mutations to ensure durability.
+    ///
+    /// The document fields are routed to the appropriate underlying stores
+    /// (lexical or vector) based on the schema field configuration. If the
+    /// vector store indexing fails after the lexical store has already been
+    /// updated, the lexical insert is rolled back to maintain cross-store
+    /// consistency.
+    ///
+    /// # Parameters
+    ///
+    /// - `id` - The external document identifier.
+    /// - `doc` - The document to index.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the WAL write, deletion of existing documents,
+    /// or indexing into either the lexical or vector store fails.
     pub async fn put_document(&self, id: &str, doc: Document) -> Result<()> {
         let _ = self.index_internal(id, doc, false).await?;
         Ok(())
     }
 
-    /// Add a document as a new chunk (always appends).
+    /// Add a document as a new chunk (always appends, never deletes existing).
     ///
-    /// This allows multiple documents (chunks) to share the same external ID.
+    /// Unlike [`put_document`](Self::put_document), this method does **not**
+    /// delete existing documents with the same external ID. Multiple chunks
+    /// can share the same ID, which is useful for indexing parts of a large
+    /// document (e.g. paragraphs or pages) separately while keeping them
+    /// associated with the same logical document.
+    ///
+    /// A `_id` field is automatically inserted into the document with the
+    /// provided `id` value. A WAL entry is written before any index mutations
+    /// to ensure durability.
+    ///
+    /// # Parameters
+    ///
+    /// - `id` - The external document identifier (may duplicate existing IDs).
+    /// - `doc` - The document chunk to index.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the WAL write or indexing into either the lexical
+    /// or vector store fails.
     pub async fn add_document(&self, id: &str, doc: Document) -> Result<()> {
         let _ = self.index_internal(id, doc, true).await?;
         Ok(())
@@ -209,6 +254,23 @@ impl Engine {
     }
 
     /// Delete all documents (including chunks) by external ID.
+    ///
+    /// Looks up all internal document IDs associated with the given external
+    /// `id` via the `_id` field in the lexical index, then removes each one
+    /// from both the lexical and vector stores. A WAL delete entry is written
+    /// for each matched document before mutation.
+    ///
+    /// If no documents match the given ID, the operation completes
+    /// successfully without error (non-existent IDs are silently ignored).
+    ///
+    /// # Parameters
+    ///
+    /// - `id` - The external document identifier to delete.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the WAL write, lexical deletion, or vector
+    /// deletion fails for any matched document.
     pub async fn delete_documents(&self, id: &str) -> Result<()> {
         let doc_ids = self.lexical.find_doc_ids_by_term("_id", id)?;
         for doc_id in doc_ids {
@@ -226,7 +288,17 @@ impl Engine {
         Ok(())
     }
 
-    /// Commit changes to both engines.
+    /// Commit changes to both stores and truncate the WAL.
+    ///
+    /// Persists all pending changes in the lexical store, vector store, and
+    /// document store (in that order), then truncates the WAL. After a
+    /// successful commit, the WAL is empty and all data is durable in the
+    /// underlying storage.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if committing the lexical store, vector store,
+    /// document store, or truncating the WAL fails.
     pub async fn commit(&self) -> Result<()> {
         self.lexical.commit()?;
         self.vector.commit().await?;
@@ -237,11 +309,32 @@ impl Engine {
     }
 
     /// Get index statistics.
+    ///
+    /// Returns [`VectorStats`](crate::vector::store::response::VectorStats)
+    /// containing the total `document_count` from the vector index. The
+    /// per-field `fields` map is currently always empty (per-field stats
+    /// are not yet aggregated). Lexical index statistics are not included.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if acquiring the vector index reader fails.
     pub fn stats(&self) -> Result<crate::vector::store::response::VectorStats> {
         self.vector.stats()
     }
 
     /// Get all documents (including chunks) by external ID.
+    ///
+    /// Only fields marked as stored in the schema are included in the
+    /// returned documents. If no documents match the given ID, an empty
+    /// `Vec` is returned (not an error).
+    ///
+    /// # Parameters
+    ///
+    /// - `id` - The external document identifier to look up.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the internal ID lookup or document retrieval fails.
     pub async fn get_documents(&self, id: &str) -> Result<Vec<Document>> {
         let doc_ids = self.lexical.find_doc_ids_by_term("_id", id)?;
         let mut docs = Vec::with_capacity(doc_ids.len());
@@ -374,7 +467,40 @@ impl Engine {
 
     /// Search the index.
     ///
-    /// Executes hybrid search combining lexical and vector results.
+    /// Supports three modes depending on which fields of the
+    /// [`SearchRequest`](self::search::SearchRequest) are populated:
+    ///
+    /// - **Lexical only**: When only `lexical_search_request` is set,
+    ///   performs BM25-scored lexical search.
+    /// - **Vector only**: When only `vector_search_request` is set,
+    ///   performs nearest-neighbor vector search. If `query_payloads` are
+    ///   present (raw text/bytes), they are embedded into vectors via the
+    ///   configured embedder before searching.
+    /// - **Hybrid**: When both are set, both searches run and results are
+    ///   merged using the configured `fusion_algorithm` (defaults to
+    ///   [`RRF { k: 60.0 }`](FusionAlgorithm::RRF)).
+    ///
+    /// When a `filter_query` is present, it is evaluated first to determine
+    /// the set of candidate documents. For lexical search, the filter is
+    /// combined with the user query via a boolean `must` + `filter` clause.
+    /// For vector search, the filter produces an `allowed_ids` list that
+    /// restricts candidate scoring. If the filter matches zero documents,
+    /// an empty result is returned immediately.
+    ///
+    /// When both lexical and vector search requests are present, both fetch
+    /// limits are doubled (2x overfetch) to improve fusion quality.
+    ///
+    /// Results are paginated via `offset` and `limit` on the
+    /// [`SearchRequest`](self::search::SearchRequest).
+    ///
+    /// # Parameters
+    ///
+    /// - `request` - The unified search request.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the filter query execution, lexical search,
+    /// vector search, embedding, or document retrieval fails.
     pub async fn search(
         &self,
         request: self::search::SearchRequest,
@@ -654,21 +780,25 @@ impl Engine {
 
 /// Builder for constructing an [`Engine`] with custom configuration.
 ///
-/// Use this when you need to specify a custom analyzer or embedder.
-/// For simple cases with default settings, use [`Engine::new`] directly.
+/// Use this when you need to specify a custom text analyzer or embedding
+/// model. For simple cases with default settings (StandardAnalyzer, no
+/// embedder), use [`Engine::new`] directly.
 ///
 /// # Example
 ///
 /// ```ignore
+/// use std::sync::Arc;
+///
 /// let schema = Schema::builder()
-///     .add_field("content", FieldOption::Lexical(LexicalFieldOption::Text(TextOption::default())))
-///     .add_field("content_vec", FieldOption::Vector(VectorOption::Flat(FlatOption { dimension: 384, ..Default::default() })))
+///     .add_field("content", FieldOption::Text(TextOption::default()))
+///     .add_field("content_vec", FieldOption::Flat(FlatOption { dimension: 384, ..Default::default() }))
 ///     .build();
 ///
 /// let engine = Engine::builder(storage, schema)
 ///     .analyzer(Arc::new(StandardAnalyzer::default()))
 ///     .embedder(Arc::new(MyEmbedder))
-///     .build()?;
+///     .build()
+///     .await?;
 /// ```
 pub struct EngineBuilder {
     storage: Arc<dyn Storage>,
@@ -714,9 +844,14 @@ impl EngineBuilder {
 
     /// Build the [`Engine`].
     ///
+    /// Creates the lexical store, vector store, and document log (WAL),
+    /// then runs WAL recovery to replay any uncommitted changes from a
+    /// previous session.
+    ///
     /// # Errors
     ///
-    /// Returns an error if the storage or index initialization fails.
+    /// Returns an error if storage initialization, index creation, WAL
+    /// opening, or recovery replay fails.
     pub async fn build(self) -> Result<Engine> {
         let (lexical_config, vector_config) =
             Engine::split_schema(&self.schema, self.analyzer, self.embedder)?;

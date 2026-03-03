@@ -14,6 +14,10 @@ pub enum QuantizationMethod {
     /// Scalar quantization to 8-bit integers.
     Scalar8Bit,
     /// Product quantization.
+    ///
+    /// **Note:** This variant is currently **unimplemented**. Calling
+    /// [`VectorQuantizer::train()`] or [`VectorQuantizer::quantize()`] with
+    /// this method will return an error.
     ProductQuantization { subvector_count: usize },
 }
 
@@ -32,6 +36,17 @@ pub struct VectorQuantizer {
 
 impl VectorQuantizer {
     /// Create a new vector quantizer.
+    ///
+    /// The quantizer is created in an **untrained** state. Before calling
+    /// [`quantize()`](Self::quantize), you must call [`train()`](Self::train)
+    /// with a representative set of vectors (unless the method is
+    /// [`QuantizationMethod::None`], which requires no training).
+    ///
+    /// # Arguments
+    ///
+    /// * `method` - The quantization method to use.
+    /// * `dimension` - The expected vector dimension. All vectors passed to
+    ///   [`quantize()`](Self::quantize) must have this dimension.
     pub fn new(method: QuantizationMethod, dimension: usize) -> Self {
         Self {
             method,
@@ -44,6 +59,27 @@ impl VectorQuantizer {
     }
 
     /// Train the quantizer on a set of vectors.
+    ///
+    /// For [`Scalar8Bit`](QuantizationMethod::Scalar8Bit), this computes
+    /// per-dimension min/max values from the training set so that vectors can
+    /// be linearly mapped to the `[0, 255]` range.
+    ///
+    /// For [`None`](QuantizationMethod::None), no training is performed and
+    /// this method returns immediately.
+    ///
+    /// For [`ProductQuantization`](QuantizationMethod::ProductQuantization),
+    /// this method currently returns an error because product quantization is
+    /// not yet implemented.
+    ///
+    /// # Arguments
+    ///
+    /// * `vectors` - A representative set of vectors to learn quantization
+    ///   parameters from. Must not be empty for `Scalar8Bit`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the training set is empty (for `Scalar8Bit`) or if
+    /// the quantization method is not yet implemented (`ProductQuantization`).
     pub fn train(&mut self, vectors: &[Vector]) -> Result<()> {
         match self.method {
             QuantizationMethod::None => {

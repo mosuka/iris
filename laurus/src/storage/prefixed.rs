@@ -1,23 +1,66 @@
+//! Prefixed storage namespace wrapper.
+//!
+//! This module provides a storage wrapper that prefixes all file names with a
+//! configurable namespace, enabling multiple logical stores to share a single
+//! physical storage backend. Each [`PrefixedStorage`] instance transparently
+//! maps file names by prepending `<prefix>/` to every operation, so that
+//! different subsystems (e.g. separate index segments) can coexist in one
+//! underlying [`Storage`] without name collisions.
+
 use std::sync::Arc;
 
 use crate::error::Result;
 use crate::storage::{FileMetadata, Storage, StorageInput, StorageOutput};
 
 /// Storage facade that transparently prefixes all file names.
+///
+/// `PrefixedStorage` wraps any [`Storage`] implementation and maps every
+/// file-name argument through a configurable prefix, effectively creating
+/// an isolated namespace within the underlying store. This is useful when
+/// multiple index segments or subsystems need to share a single storage
+/// directory without risk of name collisions.
+///
+/// Leading and trailing `/` characters are stripped from the prefix during
+/// construction, and an empty prefix results in a pass-through (no
+/// transformation).
 #[derive(Debug)]
 pub struct PrefixedStorage {
+    /// The namespace prefix prepended to all file names.
     prefix: String,
+    /// The underlying storage backend that all operations are delegated to.
     inner: Arc<dyn Storage>,
 }
 
 impl PrefixedStorage {
     /// Create a new prefixed storage namespace.
+    ///
+    /// The prefix is trimmed of leading and trailing `/` characters.
+    /// An empty prefix makes this wrapper a transparent pass-through.
+    ///
+    /// # Arguments
+    ///
+    /// * `prefix` - The namespace prefix to prepend to all file names.
+    /// * `inner` - The underlying [`Storage`] backend to delegate to.
+    ///
+    /// # Returns
+    ///
+    /// A new `PrefixedStorage` wrapping the given backend.
     pub fn new(prefix: impl Into<String>, inner: Arc<dyn Storage>) -> Self {
         let prefix = prefix.into();
         let prefix = prefix.trim_matches('/').to_string();
         Self { prefix, inner }
     }
 
+    /// Map a logical file name to its prefixed form in the underlying storage.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The logical file name within this namespace.
+    ///
+    /// # Returns
+    ///
+    /// The prefixed file name as `<prefix>/<name>`, or `name` unchanged when
+    /// the prefix is empty.
     fn map_name(&self, name: &str) -> String {
         if self.prefix.is_empty() {
             name.to_string()
@@ -28,6 +71,16 @@ impl PrefixedStorage {
         }
     }
 
+    /// Strip the namespace prefix from a fully-qualified file name.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The fully-qualified file name from the underlying storage.
+    ///
+    /// # Returns
+    ///
+    /// The logical file name with the prefix removed, or `None` if the name
+    /// does not belong to this namespace.
     fn strip_prefix(&self, name: &str) -> Option<String> {
         if self.prefix.is_empty() {
             return Some(name.to_string());

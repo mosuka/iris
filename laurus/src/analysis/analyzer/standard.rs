@@ -1,13 +1,13 @@
 //! Standard analyzer that provides good defaults for most use cases.
 //!
-//! This analyzer uses a regex tokenizer (following Unicode word boundaries),
+//! This analyzer uses a regex tokenizer (matching `\w+` word characters),
 //! lowercase normalization, and English stop word filtering. It's suitable for
 //! general text analysis in English and other languages that use spaces to
 //! separate words.
 //!
 //! # Pipeline
 //!
-//! 1. RegexTokenizer (Unicode word boundaries)
+//! 1. RegexTokenizer (`\w+` pattern — matches sequences of word characters)
 //! 2. LowercaseFilter
 //! 3. StopFilter (33 common English stop words)
 //!
@@ -18,14 +18,14 @@
 //! use laurus::analysis::analyzer::standard::StandardAnalyzer;
 //!
 //! let analyzer = StandardAnalyzer::new().unwrap();
-//! let tokens: Vec<_> = analyzer.analyze("Hello the world and test").await.unwrap().collect();
+//! let tokens: Vec<_> = analyzer.analyze("Hello the world and test").unwrap().collect();
 //!
 //! // "the" and "and" are filtered out as stop words
 //! assert_eq!(tokens.len(), 3);
 //! assert_eq!(tokens[0].text, "hello");
 //! assert_eq!(tokens[1].text, "world");
 //! assert_eq!(tokens[2].text, "test");
-//! ```ignore
+//! ```
 use std::sync::Arc;
 
 use crate::analysis::analyzer::analyzer::Analyzer;

@@ -1,4 +1,12 @@
 //! Vector index reader traits and implementations.
+//!
+//! This module defines the [`VectorIndexReader`] trait, which provides a
+//! uniform interface for reading vectors from any index type (Flat, HNSW, IVF),
+//! as well as the [`VectorIterator`] trait for sequential traversal.
+//!
+//! A concrete [`SimpleVectorReader`] is provided for in-memory use cases, and
+//! [`VectorIndexReaderFactory`] serves as the entry point for constructing
+//! readers from serialized index data.
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -52,6 +60,14 @@ pub struct ValidationReport {
 }
 
 /// Trait for reading vector indexes (similar to IndexReader for inverted indexes).
+///
+/// Implementations provide read-only access to the vectors stored in an index.
+/// Concrete readers exist for each index type (Flat, HNSW, IVF) as well as
+/// the in-memory [`SimpleVectorReader`].
+///
+/// Note that this trait does **not** include a `search()` method; similarity
+/// search is handled by
+/// [`VectorIndexSearcher`](crate::vector::search::searcher::VectorIndexSearcher).
 pub trait VectorIndexReader: Send + Sync + std::fmt::Debug {
     /// Cast to Any for downcasting to concrete types.
     fn as_any(&self) -> &dyn std::any::Any;
@@ -78,6 +94,9 @@ pub trait VectorIndexReader: Send + Sync + std::fmt::Debug {
     fn distance_metric(&self) -> DistanceMetric;
 
     /// Get index statistics.
+    ///
+    /// Returns a [`VectorStats`] containing the total vector count, vector
+    /// dimension, estimated memory usage in bytes, and build time.
     fn stats(&self) -> VectorStats;
 
     /// Check if a vector exists for a specific field.
@@ -103,6 +122,10 @@ pub trait VectorIndexReader: Send + Sync + std::fmt::Debug {
     fn metadata(&self) -> Result<VectorIndexMetadata>;
 
     /// Validate index integrity.
+    ///
+    /// Checks that all stored vectors are valid (e.g., no NaN or infinite
+    /// values) and returns a [`ValidationReport`] with any errors, warnings,
+    /// and repair suggestions.
     fn validate(&self) -> Result<ValidationReport>;
 }
 
@@ -157,6 +180,13 @@ impl SimpleVectorReader {
         })
     }
 
+    /// Attach a deletion bitmap so that deleted documents are transparently
+    /// excluded from query results.
+    ///
+    /// # Arguments
+    ///
+    /// * `bitmap` - Shared deletion bitmap indicating which document IDs have
+    ///   been logically deleted.
     pub fn set_deletion_bitmap(&mut self, bitmap: Arc<DeletionBitmap>) {
         self.deletion_bitmap = Some(bitmap);
     }

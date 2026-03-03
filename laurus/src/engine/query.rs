@@ -19,18 +19,18 @@
 //!
 //! // Hybrid search
 //! let request = parser.parse(r#"title:hello content:~"cute kitten"^0.8"#).await?;
-//! assert!(request.lexical.is_some());
-//! assert!(request.vector.is_some());
+//! assert!(request.lexical_search_request.is_some());
+//! assert!(request.vector_search_request.is_some());
 //!
 //! // Lexical only
 //! let request = parser.parse("title:hello AND body:world").await?;
-//! assert!(request.lexical.is_some());
-//! assert!(request.vector.is_none());
+//! assert!(request.lexical_search_request.is_some());
+//! assert!(request.vector_search_request.is_none());
 //!
 //! // Vector only
 //! let request = parser.parse(r#"content:~"cats" image:~"dogs"^0.5"#).await?;
-//! assert!(request.lexical.is_none());
-//! assert!(request.vector.is_some());
+//! assert!(request.lexical_search_request.is_none());
+//! assert!(request.vector_search_request.is_some());
 //! ```
 
 use std::sync::LazyLock;
@@ -51,6 +51,10 @@ use crate::vector::query::parser::VectorQueryParser;
 /// Vector clauses are identified by the `~"` pattern (tilde immediately before
 /// a double quote), which is unambiguous with lexical syntax (where `~` only
 /// appears after terms or phrases, e.g. `roam~2`, `"hello world"~10`).
+///
+/// After vector clauses are extracted, any leftover dangling boolean operators
+/// (`AND`, `OR`) at the edges or in consecutive positions are cleaned up
+/// before the lexical portion is parsed.
 pub struct UnifiedQueryParser {
     lexical_parser: QueryParser,
     vector_parser: VectorQueryParser,
@@ -58,9 +62,15 @@ pub struct UnifiedQueryParser {
 }
 
 impl UnifiedQueryParser {
-    /// Create a new UnifiedQueryParser with the given sub-parsers.
+    /// Create a new `UnifiedQueryParser` with the given sub-parsers.
     ///
-    /// Default fusion algorithm is RRF with k=60.
+    /// The default fusion algorithm for hybrid queries is
+    /// [`FusionAlgorithm::RRF { k: 60.0 }`](FusionAlgorithm::RRF).
+    ///
+    /// # Parameters
+    ///
+    /// - `lexical_parser` - Parser for lexical (text) query clauses.
+    /// - `vector_parser` - Parser for vector (`~"text"`) query clauses.
     pub fn new(lexical_parser: QueryParser, vector_parser: VectorQueryParser) -> Self {
         Self {
             lexical_parser,
@@ -70,19 +80,39 @@ impl UnifiedQueryParser {
     }
 
     /// Set the default fusion algorithm for hybrid queries.
+    ///
+    /// The fusion algorithm is only applied when the parsed query contains
+    /// **both** lexical and vector clauses. For queries with only one type
+    /// of clause, no fusion is performed.
     pub fn with_fusion(mut self, fusion: FusionAlgorithm) -> Self {
         self.default_fusion = fusion;
         self
     }
 
-    /// Parse a unified query string into a SearchRequest.
+    /// Parse a unified query string into a [`SearchRequest`].
     ///
     /// The query string may contain both lexical and vector clauses:
     /// - Vector clauses: `field:~"text"`, `~"text"`, `field:~"text"^0.8`
     /// - Lexical clauses: everything else (`title:hello`, `AND`, `"phrase"`, etc.)
     ///
     /// Vector text is embedded into vectors at parse time via the
-    /// `VectorQueryParser`'s embedder.
+    /// `VectorQueryParser`'s embedder, so this method is `async`.
+    ///
+    /// When the parsed query contains both lexical and vector clauses, the
+    /// returned `SearchRequest` will have its `fusion_algorithm` set to the
+    /// parser's default (configurable via [`with_fusion`](Self::with_fusion)).
+    ///
+    /// # Parameters
+    ///
+    /// - `query_str` - The unified query DSL string to parse.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`LaurusError::Other`] (invalid argument) if the query string
+    /// is empty or consists only of whitespace.
+    ///
+    /// Returns [`LaurusError::Other`] (invalid argument) if, after splitting,
+    /// no valid lexical or vector clause could be parsed from the input.
     pub async fn parse(&self, query_str: &str) -> Result<SearchRequest> {
         let query_str = query_str.trim();
         if query_str.is_empty() {
@@ -127,8 +157,10 @@ impl UnifiedQueryParser {
 
     /// Split a query string into lexical and vector portions.
     ///
-    /// Uses regex to identify vector clauses (`field:~"text"^boost` or `~"text"`)
-    /// and extracts them. The remainder is treated as lexical query text.
+    /// Uses a regex to identify vector clauses (patterns matching
+    /// `[field:]~"text"[^boost]`) and extracts them. The remainder, after
+    /// cleanup via [`clean_lexical_string`], is treated as the lexical
+    /// query text. Returns `(lexical, vector)` where either may be `None`.
     fn split_query(&self, input: &str) -> (Option<String>, Option<String>) {
         static VECTOR_RE: LazyLock<Regex> = LazyLock::new(|| {
             // Pattern: optional field prefix + ~"text" + optional boost

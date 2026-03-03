@@ -2,7 +2,7 @@
 //!
 //! - Core traits: `Embedder`, `PerFieldEmbedder`, `PrecomputedEmbedder`
 //! - Feature flags: `embeddings-candle`, `embeddings-openai`, `embeddings-multimodal`, `embeddings-all`
-//! - Vector 次元はフィールド定義で明示し、embedder から推定しない
+//! - Vector dimensions must be specified explicitly in field definitions and are not inferred from the embedder
 //!
 // Unified embedder trait (analogous to Analyzer in lexical module)
 pub mod embedder;

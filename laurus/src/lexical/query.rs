@@ -57,7 +57,12 @@ pub struct Hit {
     pub fields: HashMap<String, String>,
 }
 
-/// A search hit containing a document and its score (legacy).
+/// A single search hit containing a matched document and its relevance score.
+///
+/// Returned as part of [`LexicalSearchResults`] to represent each document
+/// that matched the search query. The `score` reflects the relevance ranking
+/// computed by the scorer (e.g., BM25), and the `document` field optionally
+/// holds the stored fields if they were requested.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SearchHit {
     /// The internal document ID.
@@ -68,7 +73,16 @@ pub struct SearchHit {
     pub document: Option<Document>,
 }
 
-/// Search results.
+/// Aggregated results from a lexical search query.
+///
+/// Contains the ranked list of matching documents along with summary statistics.
+///
+/// # Fields
+///
+/// - `hits` - Ranked list of [`SearchHit`] entries, ordered by descending score.
+/// - `total_hits` - Total number of documents that matched the query (may exceed `hits.len()`
+///   when a limit is applied).
+/// - `max_score` - The highest relevance score among all results, useful for normalization.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LexicalSearchResults {
     /// The search hits.
@@ -108,7 +122,22 @@ pub trait Query: Send + Sync + Debug {
     /// Clone this query.
     fn clone_box(&self) -> Box<dyn Query>;
 
-    /// Check if this query matches any documents.
+    /// Returns `true` if this query would match no documents in the given reader.
+    ///
+    /// Each implementor defines its own emptiness semantics. For example:
+    /// - [`TermQuery`] checks whether
+    ///   the term exists in the index via the reader.
+    /// - [`BooleanQuery`] returns `true`
+    ///   when it has no clauses or all of its clauses are empty.
+    ///
+    /// # Parameters
+    ///
+    /// - `reader` - The index reader used to check whether the query's terms exist.
+    ///
+    /// # Returns
+    ///
+    /// `Ok(true)` if this query would not match any documents, `Ok(false)` otherwise.
+    /// Returns an error if the reader cannot be queried.
     fn is_empty(&self, reader: &dyn LexicalIndexReader) -> Result<bool>;
 
     /// Get the estimated cost of executing this query.

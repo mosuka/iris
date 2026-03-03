@@ -67,26 +67,54 @@ pub struct FieldStatistics {
 }
 
 /// Trait for lexical index readers.
+///
+/// Provides read-only access to a committed lexical index. Implementations
+/// must be `Send + Sync` so that readers can be shared across threads
+/// (e.g., to serve concurrent search requests).
+///
+/// A reader represents a point-in-time snapshot of the index. To see
+/// newly committed data, obtain a fresh reader via
+/// [`LexicalStore::refresh()`](crate::lexical::store::LexicalStore::refresh).
 pub trait LexicalIndexReader: Send + Sync + std::fmt::Debug {
-    /// Get the number of documents in the index.
+    /// Get the number of non-deleted documents in the index.
     fn doc_count(&self) -> u64;
 
     /// Get the maximum document ID in the index.
+    ///
+    /// This is the upper bound (exclusive) for valid document IDs and is useful
+    /// for iterating over all possible document slots.
     fn max_doc(&self) -> u64;
 
-    /// Check if a document is deleted.
+    /// Check if a document has been deleted.
+    ///
+    /// Returns `true` if the document with the given `doc_id` has been marked
+    /// as deleted, `false` otherwise.
     fn is_deleted(&self, doc_id: u64) -> bool;
 
-    /// Get a document by ID.
+    /// Get a document's stored fields by ID.
+    ///
+    /// Returns `Ok(Some(document))` if the document exists and has stored fields,
+    /// `Ok(None)` if the document ID is not found or has no stored fields.
     fn document(&self, doc_id: u64) -> Result<Option<Document>>;
 
-    /// Get term information for a field and term.
+    /// Get term information for a specific field and term.
+    ///
+    /// Returns a [`ReaderTermInfo`] containing the document frequency, total
+    /// frequency, and posting list location for the given term. Returns `None`
+    /// if the term does not exist in the specified field.
     fn term_info(&self, field: &str, term: &str) -> Result<Option<ReaderTermInfo>>;
 
-    /// Get posting list for a field and term.
+    /// Get a posting list iterator for a field and term.
+    ///
+    /// Returns an iterator over the documents that contain the given term
+    /// in the specified field, or `None` if the term is not found.
     fn postings(&self, field: &str, term: &str) -> Result<Option<Box<dyn PostingIterator>>>;
 
-    /// Get field statistics.
+    /// Get statistics for a field.
+    ///
+    /// Returns a [`FieldStats`] containing term counts, document counts, and
+    /// field length statistics. Returns `None` if the field does not exist
+    /// in the index or no statistics have been recorded for it.
     fn field_stats(&self, field: &str) -> Result<Option<FieldStats>>;
 
     /// Close the reader and release resources.
@@ -111,6 +139,10 @@ pub trait LexicalIndexReader: Send + Sync + std::fmt::Debug {
     }
 
     /// Get field statistics including average field length.
+    ///
+    /// If the requested field is not found in the index, this default implementation
+    /// returns a fallback `FieldStatistics` with `avg_field_length: 10.0`,
+    /// `doc_count: 0`, and `total_terms: 0`.
     fn field_statistics(&self, field: &str) -> Result<FieldStatistics> {
         match self.field_stats(field)? {
             Some(field_stats) => Ok(FieldStatistics {
@@ -151,23 +183,57 @@ pub trait LexicalIndexReader: Send + Sync + std::fmt::Debug {
     }
 }
 
-/// Iterator over posting lists.
+/// Iterator over a posting list for a single term.
+///
+/// Yields document IDs (and associated term frequencies/positions) in
+/// ascending order. Callers must call [`next()`](Self::next) before reading
+/// [`doc_id()`](Self::doc_id) for the first time.
+///
+/// # Iteration Protocol
+///
+/// 1. Call [`next()`](Self::next) to advance to the first/next posting.
+/// 2. If `next()` returns `Ok(true)`, read [`doc_id()`](Self::doc_id),
+///    [`term_freq()`](Self::term_freq), and optionally [`positions()`](Self::positions).
+/// 3. If `next()` returns `Ok(false)`, the iterator is exhausted.
+///
+/// Use [`skip_to()`](Self::skip_to) to efficiently jump ahead to a target document ID.
 pub trait PostingIterator: Send + std::fmt::Debug {
     /// Get the current document ID.
+    ///
+    /// The value is only valid after a successful call to [`next()`](Self::next)
+    /// or [`skip_to()`](Self::skip_to) that returned `Ok(true)`.
     fn doc_id(&self) -> u64;
 
     /// Get the term frequency in the current document.
+    ///
+    /// Returns the number of times the term appears in the document at the
+    /// current iterator position.
     fn term_freq(&self) -> u64;
 
-    /// Get the positions of the term in the current document.
+    /// Get the term positions within the current document.
+    ///
+    /// Returns an ordered list of 0-based token positions where the term
+    /// occurs. Only meaningful if position data was stored during indexing.
     fn positions(&self) -> Result<Vec<u64>>;
 
-    /// Move to the next document.
+    /// Advance the iterator to the next posting.
+    ///
+    /// Returns `Ok(true)` if a next posting exists, or `Ok(false)` if the
+    /// iterator is exhausted. After `Ok(false)`, no further calls should
+    /// be made.
     fn next(&mut self) -> Result<bool>;
 
-    /// Skip to the first document >= target.
+    /// Skip forward to the first posting with `doc_id >= target`.
+    ///
+    /// Returns `Ok(true)` if such a posting exists, or `Ok(false)` if all
+    /// remaining postings have `doc_id < target` (i.e., the iterator is
+    /// exhausted). This is more efficient than repeatedly calling
+    /// [`next()`](Self::next) when large gaps in document IDs are expected.
     fn skip_to(&mut self, target: u64) -> Result<bool>;
 
-    /// Get the cost of iterating through this posting list.
+    /// Get the estimated cost (number of postings) of this iterator.
+    ///
+    /// Used by query planning to choose efficient execution strategies
+    /// (e.g., deciding iteration order for conjunctive queries).
     fn cost(&self) -> u64;
 }

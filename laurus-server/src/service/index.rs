@@ -1,3 +1,8 @@
+//! Index management gRPC service.
+//!
+//! Handles index creation, metadata retrieval, and schema inspection through
+//! the `IndexService` gRPC trait.
+
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -16,12 +21,16 @@ use crate::proto::laurus::v1::{
 /// gRPC IndexService implementation.
 #[derive(Clone)]
 pub struct IndexService {
+    /// Shared, mutable reference to the current search engine instance.
+    /// `None` when no index has been created yet.
     pub engine: Arc<RwLock<Option<Engine>>>,
+    /// Filesystem path where the index data is persisted.
     pub data_dir: PathBuf,
 }
 
 #[tonic::async_trait]
 impl IndexServiceTrait for IndexService {
+    /// Creates a new index with the given schema. Fails if an index already exists.
     async fn create_index(
         &self,
         request: Request<CreateIndexRequest>,
@@ -47,6 +56,7 @@ impl IndexServiceTrait for IndexService {
         Ok(Response::new(CreateIndexResponse {}))
     }
 
+    /// Returns index-level statistics such as document count and per-field vector stats.
     async fn get_index(
         &self,
         _request: Request<GetIndexRequest>,
@@ -78,6 +88,7 @@ impl IndexServiceTrait for IndexService {
         }))
     }
 
+    /// Returns the schema definition of the current index.
     async fn get_schema(
         &self,
         _request: Request<GetSchemaRequest>,

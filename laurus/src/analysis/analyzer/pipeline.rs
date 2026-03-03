@@ -28,7 +28,7 @@
 //!     .add_filter(Arc::new(StopFilter::from_words(vec!["the", "and"])))
 //!     .with_name("my_custom_analyzer".to_string());
 //!
-//! let tokens: Vec<_> = analyzer.analyze("Hello THE world AND test").await.unwrap().collect();
+//! let tokens: Vec<_> = analyzer.analyze("Hello THE world AND test").unwrap().collect();
 //!
 //! assert_eq!(tokens.len(), 3);
 //! assert_eq!(tokens[0].text, "hello");
@@ -44,10 +44,11 @@ use crate::analysis::token_filter::Filter;
 use crate::analysis::tokenizer::Tokenizer;
 use crate::error::Result;
 
-/// A configurable analyzer that combines a tokenizer with a chain of filters.
+/// A configurable analyzer that combines char filters, a tokenizer, and token filters.
 ///
 /// This is the main analyzer type that allows building analysis pipelines
-/// by combining different tokenizers and filters.
+/// by combining char filters (applied to the raw text before tokenization),
+/// a tokenizer, and token filters (applied to the token stream after tokenization).
 #[derive(Clone)]
 pub struct PipelineAnalyzer {
     tokenizer: Arc<dyn Tokenizer>,

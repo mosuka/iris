@@ -6,6 +6,18 @@
 use crate::error::{LaurusError, Result};
 
 /// Encode a u64 value using variable-length encoding.
+///
+/// Each output byte stores 7 data bits in the lower bits and a
+/// continuation flag in bit 7. The encoding uses 1 to 10 bytes depending
+/// on the magnitude of `value`.
+///
+/// # Arguments
+///
+/// * `value` - The unsigned 64-bit integer to encode.
+///
+/// # Returns
+///
+/// A `Vec<u8>` containing the variable-length encoded bytes.
 pub fn encode_u64(value: u64) -> Vec<u8> {
     let mut bytes = Vec::new();
     let mut val = value;
@@ -29,6 +41,25 @@ pub fn encode_u64(value: u64) -> Vec<u8> {
 }
 
 /// Decode a u64 value from variable-length encoding.
+///
+/// Reads bytes from `bytes` until a byte without the continuation bit
+/// (0x80) is found, reconstructing the original u64 value.
+///
+/// # Arguments
+///
+/// * `bytes` - A byte slice containing the variable-length encoded integer.
+///   Only the leading bytes that form the encoded value are consumed;
+///   trailing bytes are ignored.
+///
+/// # Returns
+///
+/// A tuple `(value, bytes_consumed)` where `value` is the decoded integer
+/// and `bytes_consumed` is the number of bytes read from the input slice.
+///
+/// # Errors
+///
+/// Returns an error if the encoding is incomplete (all bytes have the
+/// continuation bit set) or if the value would overflow a u64.
 pub fn decode_u64(bytes: &[u8]) -> Result<(u64, usize)> {
     let mut result = 0u64;
     let mut shift = 0;

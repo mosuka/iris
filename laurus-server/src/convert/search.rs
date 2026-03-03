@@ -1,3 +1,9 @@
+//! Conversion between search-related laurus domain types and protobuf types.
+//!
+//! [`from_proto`] builds a [`laurus::SearchRequest`] from the incoming proto
+//! message, assembling lexical parameters, vector queries, fusion settings, and
+//! field boosts. [`result_to_proto`] converts engine results back to proto.
+
 use std::collections::HashMap;
 
 use laurus::{

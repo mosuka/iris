@@ -1,7 +1,10 @@
 //! Column storage for fast field access.
 //!
 //! This module provides columnar storage capabilities for efficient
-//! faceting, sorting, and aggregation operations.
+//! faceting, sorting, and aggregation operations. Data is organized by
+//! field rather than by document, allowing rapid per-field lookups,
+//! range queries, and frequency counting without full-document
+//! deserialization.
 
 use std::collections::HashMap;
 use std::io::Write;
@@ -15,27 +18,32 @@ use crate::error::Result;
 use crate::storage::Storage;
 
 /// Column value types supported by the column storage.
+///
+/// Each variant wraps a single typed value that can be stored in a [`Column`].
+/// The enum supports serialization to/from bytes for persistence, partial
+/// ordering for range queries, and hashing for frequency counting.
+/// Cross-type numeric comparisons (e.g. `I32` vs `I64`) are also allowed.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ColumnValue {
-    /// String value
+    /// UTF-8 string value.
     String(String),
-    /// 32-bit integer
+    /// Signed 32-bit integer.
     I32(i32),
-    /// 64-bit integer
+    /// Signed 64-bit integer.
     I64(i64),
-    /// 32-bit unsigned integer
+    /// Unsigned 32-bit integer.
     U32(u32),
-    /// 64-bit unsigned integer
+    /// Unsigned 64-bit integer.
     U64(u64),
-    /// 32-bit float
+    /// 32-bit IEEE 754 floating-point number.
     F32(f32),
-    /// 64-bit float
+    /// 64-bit IEEE 754 floating-point number.
     F64(f64),
-    /// Boolean value
+    /// Boolean value.
     Bool(bool),
-    /// DateTime as Unix timestamp (seconds since epoch)
+    /// Date-time represented as a Unix timestamp (seconds since epoch).
     DateTime(i64),
-    /// Null value
+    /// Null / absent value.
     Null,
 }
 
@@ -88,7 +96,12 @@ impl std::hash::Hash for ColumnValue {
 }
 
 impl ColumnValue {
-    /// Get the type name for this column value.
+    /// Get the type name for this column value as a human-readable string.
+    ///
+    /// # Returns
+    ///
+    /// A static string slice identifying the variant (e.g. `"string"`,
+    /// `"i32"`, `"null"`).
     pub fn type_name(&self) -> &'static str {
         match self {
             ColumnValue::String(_) => "string",
@@ -105,6 +118,18 @@ impl ColumnValue {
     }
 
     /// Check if this value can be compared with another value.
+    ///
+    /// Same-type pairs are always comparable. Cross-type numeric comparisons
+    /// (e.g. `I32` vs `I64`, `F32` vs `F64`) are also allowed. `Null` is
+    /// comparable with any other variant.
+    ///
+    /// # Arguments
+    ///
+    /// * `other` - The other value to check compatibility with.
+    ///
+    /// # Returns
+    ///
+    /// `true` if the two values can be meaningfully compared.
     pub fn is_comparable_with(&self, other: &ColumnValue) -> bool {
         match (self, other) {
             (ColumnValue::Null, _) | (_, ColumnValue::Null) => true,
@@ -128,7 +153,19 @@ impl ColumnValue {
         }
     }
 
-    /// Serialize this value to bytes.
+    /// Serialize this value to its binary byte representation.
+    ///
+    /// The format is a single type-marker byte followed by the value payload
+    /// encoded in big-endian byte order. Strings are length-prefixed with a
+    /// 4-byte big-endian `u32`.
+    ///
+    /// # Returns
+    ///
+    /// A `Vec<u8>` containing the serialized bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serialization fails (should not happen in practice).
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
         let mut bytes = Vec::new();
 
@@ -179,7 +216,25 @@ impl ColumnValue {
         Ok(bytes)
     }
 
-    /// Deserialize a value from bytes.
+    /// Deserialize a `ColumnValue` from its binary byte representation.
+    ///
+    /// The first byte is interpreted as a type marker that determines which
+    /// variant to decode. An empty slice is treated as [`ColumnValue::Null`].
+    /// The payload is expected in big-endian byte order, matching the format
+    /// produced by [`to_bytes`](Self::to_bytes).
+    ///
+    /// # Arguments
+    ///
+    /// * `bytes` - The raw byte slice to deserialize from.
+    ///
+    /// # Returns
+    ///
+    /// The deserialized `ColumnValue`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the byte slice is truncated, contains invalid
+    /// UTF-8 for a string variant, or has an unrecognized type marker.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
         if bytes.is_empty() {
             return Ok(ColumnValue::Null);
@@ -291,19 +346,34 @@ impl PartialOrd for ColumnValue {
     }
 }
 
-/// A column stores values for a specific field across documents.
+/// Per-document column values for a single field.
+///
+/// A `Column` stores [`ColumnValue`] entries keyed by document ID for one
+/// field, enabling efficient per-field filtering, range queries, faceting,
+/// and aggregation without needing to deserialize full documents.
+///
+/// All public methods are safe to call from multiple threads because the
+/// internal data structures are guarded by [`RwLock`].
 #[derive(Debug)]
 pub struct Column {
-    /// Field name this column represents
+    /// The name of the field this column represents.
     field_name: String,
-    /// Values indexed by document ID
+    /// Per-document values indexed by document ID.
     values: RwLock<HashMap<u32, ColumnValue>>,
-    /// Next document ID to assign
+    /// The next document ID to assign (one past the highest seen ID).
     next_doc_id: RwLock<u32>,
 }
 
 impl Column {
-    /// Create a new column for the given field.
+    /// Create a new, empty column for the given field.
+    ///
+    /// # Arguments
+    ///
+    /// * `field_name` - The name of the field this column represents.
+    ///
+    /// # Returns
+    ///
+    /// A new `Column` with no stored values.
     pub fn new(field_name: String) -> Self {
         Column {
             field_name,
@@ -313,11 +383,27 @@ impl Column {
     }
 
     /// Get the field name for this column.
+    ///
+    /// # Returns
+    ///
+    /// A string slice referencing the field name.
     pub fn field_name(&self) -> &str {
         &self.field_name
     }
 
-    /// Add a value for a document.
+    /// Add or replace a value for a document.
+    ///
+    /// If a value already exists for the given `doc_id`, it is overwritten.
+    /// The internal `next_doc_id` counter is advanced past `doc_id` if needed.
+    ///
+    /// # Arguments
+    ///
+    /// * `doc_id` - The document identifier.
+    /// * `value` - The column value to store.
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` on success.
     pub fn add_value(&self, doc_id: u32, value: ColumnValue) -> Result<()> {
         let mut values = self.values.write().unwrap();
         values.insert(doc_id, value);
@@ -330,13 +416,25 @@ impl Column {
         Ok(())
     }
 
-    /// Get a value for a document.
+    /// Get the stored value for a document.
+    ///
+    /// # Arguments
+    ///
+    /// * `doc_id` - The document identifier.
+    ///
+    /// # Returns
+    ///
+    /// `Some(value)` if a value exists for the document, or `None` otherwise.
     pub fn get_value(&self, doc_id: u32) -> Option<ColumnValue> {
         let values = self.values.read().unwrap();
         values.get(&doc_id).cloned()
     }
 
-    /// Get all values in document ID order.
+    /// Get all stored values sorted by document ID in ascending order.
+    ///
+    /// # Returns
+    ///
+    /// A vector of `(doc_id, value)` pairs ordered by document ID.
     pub fn get_all_values(&self) -> Vec<(u32, ColumnValue)> {
         let values = self.values.read().unwrap();
         let mut result: Vec<_> = values
@@ -347,7 +445,20 @@ impl Column {
         result
     }
 
-    /// Get values for a range of documents.
+    /// Get values for a contiguous range of document IDs (inclusive).
+    ///
+    /// Documents within the range that have no stored value are omitted from
+    /// the result.
+    ///
+    /// # Arguments
+    ///
+    /// * `start_doc` - The first document ID in the range (inclusive).
+    /// * `end_doc` - The last document ID in the range (inclusive).
+    ///
+    /// # Returns
+    ///
+    /// A vector of `(doc_id, value)` pairs for documents that have values
+    /// within the specified range.
     pub fn get_values_in_range(&self, start_doc: u32, end_doc: u32) -> Vec<(u32, ColumnValue)> {
         let values = self.values.read().unwrap();
         let mut result = Vec::new();
@@ -361,13 +472,25 @@ impl Column {
         result
     }
 
-    /// Get document count.
+    /// Get the number of documents that have values stored in this column.
+    ///
+    /// # Returns
+    ///
+    /// The count of document entries in this column.
     pub fn doc_count(&self) -> u32 {
         let values = self.values.read().unwrap();
         values.len() as u32
     }
 
-    /// Get unique values and their document frequencies.
+    /// Compute the frequency of each unique value in this column.
+    ///
+    /// This is useful for faceted search, aggregation, and cardinality
+    /// estimation.
+    ///
+    /// # Returns
+    ///
+    /// A map from each distinct [`ColumnValue`] to the number of documents
+    /// that contain it.
     pub fn get_value_frequencies(&self) -> HashMap<ColumnValue, u32> {
         let values = self.values.read().unwrap();
         let mut frequencies = HashMap::new();
@@ -379,7 +502,17 @@ impl Column {
         frequencies
     }
 
-    /// Find documents with specific value.
+    /// Find all document IDs whose stored value equals the given target.
+    ///
+    /// The returned IDs are sorted in ascending order.
+    ///
+    /// # Arguments
+    ///
+    /// * `target_value` - The value to search for.
+    ///
+    /// # Returns
+    ///
+    /// A sorted vector of document IDs that have the specified value.
     pub fn find_documents_with_value(&self, target_value: &ColumnValue) -> Vec<u32> {
         let values = self.values.read().unwrap();
         let mut result = Vec::new();
@@ -394,7 +527,19 @@ impl Column {
         result
     }
 
-    /// Find documents within value range.
+    /// Find all document IDs whose stored value falls within an inclusive range.
+    ///
+    /// Both bounds are inclusive (`min_value <= value <= max_value`).
+    /// The returned IDs are sorted in ascending order.
+    ///
+    /// # Arguments
+    ///
+    /// * `min_value` - The lower bound of the range (inclusive).
+    /// * `max_value` - The upper bound of the range (inclusive).
+    ///
+    /// # Returns
+    ///
+    /// A sorted vector of document IDs whose values lie within the range.
     pub fn find_documents_in_range(
         &self,
         min_value: &ColumnValue,
@@ -414,17 +559,33 @@ impl Column {
     }
 }
 
-/// Column storage manages multiple columns for fast field access.
+/// Multi-column storage manager for fast per-field access.
+///
+/// `ColumnStorage` manages multiple [`Column`] instances, one per field name,
+/// providing a unified API for adding, retrieving, and persisting columnar
+/// data. It supports efficient faceting, sorting, and aggregation operations
+/// by delegating to the appropriate per-field column.
+///
+/// Columns are created lazily on first access and are safe for concurrent
+/// use from multiple threads.
 #[derive(Debug)]
 pub struct ColumnStorage {
-    /// Storage backend
+    /// The underlying storage backend used for persistence.
     storage: Arc<dyn Storage>,
-    /// Columns indexed by field name
+    /// Map from field name to the corresponding [`Column`].
     columns: RwLock<HashMap<String, Arc<Column>>>,
 }
 
 impl ColumnStorage {
-    /// Create a new column storage.
+    /// Create a new column storage backed by the given storage backend.
+    ///
+    /// # Arguments
+    ///
+    /// * `storage` - The underlying [`Storage`] used for persisting column data.
+    ///
+    /// # Returns
+    ///
+    /// A new `ColumnStorage` with no columns loaded.
     pub fn new(storage: Arc<dyn Storage>) -> Self {
         ColumnStorage {
             storage,
@@ -432,7 +593,15 @@ impl ColumnStorage {
         }
     }
 
-    /// Get or create a column for a field.
+    /// Get the column for a field, creating it if it does not already exist.
+    ///
+    /// # Arguments
+    ///
+    /// * `field_name` - The name of the field whose column to retrieve.
+    ///
+    /// # Returns
+    ///
+    /// A shared reference-counted handle to the [`Column`].
     pub fn get_column(&self, field_name: &str) -> Arc<Column> {
         let mut columns = self.columns.write().unwrap();
 
@@ -445,13 +614,35 @@ impl ColumnStorage {
         column
     }
 
-    /// Add a value to a column.
+    /// Add a value to the column for a given field and document.
+    ///
+    /// The column is created automatically if it does not yet exist.
+    ///
+    /// # Arguments
+    ///
+    /// * `field_name` - The field name identifying the column.
+    /// * `doc_id` - The document identifier.
+    /// * `value` - The value to store.
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` on success.
     pub fn add_value(&self, field_name: &str, doc_id: u32, value: ColumnValue) -> Result<()> {
         let column = self.get_column(field_name);
         column.add_value(doc_id, value)
     }
 
-    /// Get a value from a column.
+    /// Get a value from the column for a given field and document.
+    ///
+    /// # Arguments
+    ///
+    /// * `field_name` - The field name identifying the column.
+    /// * `doc_id` - The document identifier.
+    ///
+    /// # Returns
+    ///
+    /// `Some(value)` if the column exists and has a value for the document,
+    /// or `None` otherwise.
     pub fn get_value(&self, field_name: &str, doc_id: u32) -> Option<ColumnValue> {
         let columns = self.columns.read().unwrap();
         if let Some(column) = columns.get(field_name) {
@@ -461,13 +652,26 @@ impl ColumnStorage {
         }
     }
 
-    /// Get all field names.
+    /// Get the names of all fields that have columns in this storage.
+    ///
+    /// # Returns
+    ///
+    /// A vector of field name strings (order is unspecified).
     pub fn get_field_names(&self) -> Vec<String> {
         let columns = self.columns.read().unwrap();
         columns.keys().cloned().collect()
     }
 
-    /// Get column statistics.
+    /// Compute statistics for a column.
+    ///
+    /// # Arguments
+    ///
+    /// * `field_name` - The name of the field to compute statistics for.
+    ///
+    /// # Returns
+    ///
+    /// `Some(stats)` containing document count, unique value count, and
+    /// value frequencies, or `None` if the column does not exist.
     pub fn get_column_stats(&self, field_name: &str) -> Option<ColumnStats> {
         let columns = self.columns.read().unwrap();
         if let Some(column) = columns.get(field_name) {
@@ -486,7 +690,14 @@ impl ColumnStorage {
         }
     }
 
-    /// Persist columns to storage.
+    /// Persist all columns to the underlying storage backend.
+    ///
+    /// Each column is serialized as JSON and written to
+    /// `columns/<field_name>.json`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serialization or the underlying I/O fails.
     pub fn flush(&self) -> Result<()> {
         let columns = self.columns.read().unwrap();
 
@@ -503,7 +714,11 @@ impl ColumnStorage {
         Ok(())
     }
 
-    /// Load columns from storage.
+    /// Load columns from the underlying storage backend.
+    ///
+    /// This is a placeholder for future implementation that will
+    /// deserialize column data from the storage backend.
+    /// Currently this method is a no-op and always returns `Ok(())`.
     pub fn load(&self) -> Result<()> {
         // Implementation would load column data from storage
         // This is a simplified version
@@ -511,16 +726,21 @@ impl ColumnStorage {
     }
 }
 
-/// Statistics for a column.
+/// Aggregated statistics for a single column.
+///
+/// `ColumnStats` holds summary information about a [`Column`], including the
+/// total document count, the number of distinct values, and a frequency map
+/// showing how often each value appears. This is useful for faceting and
+/// query planning.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ColumnStats {
-    /// Field name
+    /// The name of the field this statistics snapshot belongs to.
     pub field_name: String,
-    /// Number of documents with values in this column
+    /// The total number of documents that have a value in this column.
     pub doc_count: u32,
-    /// Number of unique values
+    /// The number of distinct values stored in this column.
     pub unique_values: u32,
-    /// Value frequencies
+    /// A map from each distinct value to the number of documents containing it.
     pub value_frequencies: HashMap<ColumnValue, u32>,
 }
 

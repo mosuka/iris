@@ -1,3 +1,9 @@
+//! One-shot search query execution.
+//!
+//! Opens the index, parses the user-supplied query string using the Laurus
+//! query DSL, executes the search, and prints the results in the requested
+//! output format.
+
 use std::path::Path;
 
 use anyhow::{Context, Result};
@@ -8,7 +14,29 @@ use crate::cli::SearchCommand;
 use crate::context;
 use crate::output::{self, OutputFormat};
 
-/// Execute a search command.
+/// Execute a search command against the index.
+///
+/// Opens the index at `data_dir`, builds a query parser with the schema's
+/// default fields, parses the query from `cmd`, and prints matching results.
+///
+/// # Arguments
+///
+/// * `cmd` - Parsed [`SearchCommand`] containing the query string, limit,
+///   and offset.
+/// * `data_dir` - Path to the data directory holding the index.
+/// * `format` - The desired output format (table or JSON).
+///
+/// # Returns
+///
+/// Returns `Ok(())` on success after printing results.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - The index cannot be opened.
+/// - The schema file cannot be read or parsed.
+/// - The query parser cannot be created or the query string is invalid.
+/// - The search execution fails.
 pub async fn run(cmd: SearchCommand, data_dir: &Path, format: OutputFormat) -> Result<()> {
     let engine = context::open_index(data_dir).await?;
 

@@ -128,6 +128,9 @@ pub struct FileStorageConfig {
     /// Enable huge pages for memory-mapped files if available.
     /// Can improve TLB performance for large files (Linux only).
     /// Only used when `use_mmap` is true.
+    ///
+    /// **Note**: This field is currently a placeholder and is not yet used
+    /// by the `get_mmap()` implementation. Setting it has no effect at this time.
     pub mmap_enable_hugepages: bool,
 }
 
@@ -956,9 +959,11 @@ struct FileLockWrapper {
 }
 
 impl StorageLock for FileLockWrapper {
+    /// Returns a fixed identifier `"file_lock"` rather than the actual lock name.
+    ///
+    /// Because the real name is stored behind a `Mutex`, returning a borrowed
+    /// reference to it is not possible with the current `&str` return type.
     fn name(&self) -> &str {
-        // We can't return a reference to the name inside the mutex
-        // For now, we'll return a static string
         "file_lock"
     }
 

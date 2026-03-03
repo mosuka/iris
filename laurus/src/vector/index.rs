@@ -156,8 +156,7 @@ impl ManagedVectorIndex {
     ///
     /// # Arguments
     ///
-    /// * `config` - Vector index configuration including index type
-    /// * `config` - Vector index configuration including index type
+    /// * `config` - Vector index type configuration (Flat, HNSW, or IVF)
     /// * `storage` - Storage backend (MemoryStorage, FileStorage, etc.)
     /// * `path` - Base path/name for the index files
     pub fn new(

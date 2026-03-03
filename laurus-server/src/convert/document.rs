@@ -1,3 +1,8 @@
+//! Conversion between [`laurus::Document`] and the protobuf `Document` message.
+//!
+//! The public [`to_proto`] and [`from_proto`] functions handle the top-level
+//! document, while the private helpers convert individual [`DataValue`] fields.
+
 use std::collections::HashMap;
 
 use laurus::{DataValue, Document};

@@ -143,7 +143,25 @@ pub trait VectorIndexWriter: Send + Sync + std::fmt::Debug {
         self.write()
     }
 
-    /// Add a value (Text, Bytes, etc.) to the index, embedding it automatically if supported.
+    /// Add a value to the index, embedding it automatically if supported.
+    ///
+    /// The default implementation only accepts
+    /// [`DataValue::Vector`](crate::data::DataValue::Vector) and converts it
+    /// directly into an index vector. For non-vector inputs (e.g., text or
+    /// bytes), the writer must be wrapped in an `EmbeddingVectorIndexWriter`,
+    /// which overrides this method to embed the payload before indexing.
+    ///
+    /// # Arguments
+    ///
+    /// * `doc_id` - The internal document ID to associate the vector with.
+    /// * `field_name` - The name of the field being indexed.
+    /// * `value` - The data value to index. In the default implementation only
+    ///   the `Vector` variant is accepted; all other variants return an error.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`LaurusError::InvalidArgument`](crate::error::LaurusError) if
+    /// the value is not a `Vector` variant and auto-embedding is not supported.
     async fn add_value(
         &mut self,
         doc_id: u64,

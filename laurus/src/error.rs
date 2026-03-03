@@ -104,72 +104,133 @@ pub enum LaurusError {
 pub type Result<T> = std::result::Result<T, LaurusError>;
 
 impl LaurusError {
-    /// Create a new index error.
+    /// Creates an [`Index`](Self::Index) variant with the given message.
+    ///
+    /// # Parameters
+    ///
+    /// - `msg` - A descriptive message about the index error.
     pub fn index<S: Into<String>>(msg: S) -> Self {
         LaurusError::Index(msg.into())
     }
 
-    /// Create a new schema error.
+    /// Creates a [`Schema`](Self::Schema) variant with the given message.
+    ///
+    /// # Parameters
+    ///
+    /// - `msg` - A descriptive message about the schema error.
     pub fn schema<S: Into<String>>(msg: S) -> Self {
         LaurusError::Schema(msg.into())
     }
 
-    /// Create a new analysis error.
+    /// Creates an [`Analysis`](Self::Analysis) variant with the given message.
+    ///
+    /// # Parameters
+    ///
+    /// - `msg` - A descriptive message about the analysis error.
     pub fn analysis<S: Into<String>>(msg: S) -> Self {
         LaurusError::Analysis(msg.into())
     }
 
-    /// Create a new query error.
+    /// Creates a [`Query`](Self::Query) variant with the given message.
+    ///
+    /// # Parameters
+    ///
+    /// - `msg` - A descriptive message about the query error.
     pub fn query<S: Into<String>>(msg: S) -> Self {
         LaurusError::Query(msg.into())
     }
 
-    /// Create a new parse error.
+    /// Creates a [`Query`](Self::Query) variant for parse errors.
+    ///
+    /// Parse errors are treated as query errors because they typically
+    /// originate from malformed user query strings.
+    ///
+    /// # Parameters
+    ///
+    /// - `msg` - A descriptive message about the parse error.
     pub fn parse<S: Into<String>>(msg: S) -> Self {
         LaurusError::Query(msg.into()) // Parse errors are treated as query errors
     }
 
-    /// Create a new storage error.
+    /// Creates a [`Storage`](Self::Storage) variant with the given message.
+    ///
+    /// # Parameters
+    ///
+    /// - `msg` - A descriptive message about the storage error.
     pub fn storage<S: Into<String>>(msg: S) -> Self {
         LaurusError::Storage(msg.into())
     }
 
-    /// Create a new field error.
+    /// Creates a [`Field`](Self::Field) variant with the given message.
+    ///
+    /// # Parameters
+    ///
+    /// - `msg` - A descriptive message about the field error.
     pub fn field<S: Into<String>>(msg: S) -> Self {
         LaurusError::Field(msg.into())
     }
 
-    /// Create a new generic error.
+    /// Creates an [`Other`](Self::Other) variant with the given message.
+    ///
+    /// Use this for errors that do not fit into any specific category.
+    ///
+    /// # Parameters
+    ///
+    /// - `msg` - A descriptive error message.
     pub fn other<S: Into<String>>(msg: S) -> Self {
         LaurusError::Other(msg.into())
     }
 
-    /// Create a new timeout error.
+    /// Creates an [`Other`](Self::Other) variant with a `"Timeout: "` prefixed message.
+    ///
+    /// # Parameters
+    ///
+    /// - `msg` - A descriptive message about the timeout condition.
     pub fn timeout<S: Into<String>>(msg: S) -> Self {
         LaurusError::Other(format!("Timeout: {}", msg.into()))
     }
 
-    /// Create a new invalid config error.
+    /// Creates an [`Other`](Self::Other) variant with an `"Invalid configuration: "` prefixed message.
+    ///
+    /// # Parameters
+    ///
+    /// - `msg` - A descriptive message about the configuration error.
     pub fn invalid_config<S: Into<String>>(msg: S) -> Self {
         LaurusError::Other(format!("Invalid configuration: {}", msg.into()))
     }
 
-    /// Create a new invalid argument error.
+    /// Creates an [`Other`](Self::Other) variant with an `"Invalid argument: "` prefixed message.
+    ///
+    /// # Parameters
+    ///
+    /// - `msg` - A descriptive message about the invalid argument.
     pub fn invalid_argument<S: Into<String>>(msg: S) -> Self {
         LaurusError::Other(format!("Invalid argument: {}", msg.into()))
     }
 
-    /// Create a new internal error.
+    /// Creates an [`Other`](Self::Other) variant with an `"Internal error: "` prefixed message.
+    ///
+    /// # Parameters
+    ///
+    /// - `msg` - A descriptive message about the internal error.
     pub fn internal<S: Into<String>>(msg: S) -> Self {
         LaurusError::Other(format!("Internal error: {}", msg.into()))
     }
 
-    /// Create a new not found error.
+    /// Creates an [`Other`](Self::Other) variant with a `"Not found: "` prefixed message.
+    ///
+    /// # Parameters
+    ///
+    /// - `msg` - A descriptive message about the missing resource.
     pub fn not_found<S: Into<String>>(msg: S) -> Self {
         LaurusError::Other(format!("Not found: {}", msg.into()))
     }
 
-    /// Create a new cancelled error.
+    /// Creates an [`OperationCancelled`](Self::OperationCancelled) variant with the given message.
+    ///
+    /// # Parameters
+    ///
+    /// - `msg` - A descriptive message about why the operation was cancelled.
     pub fn cancelled<S: Into<String>>(msg: S) -> Self {
         LaurusError::OperationCancelled(msg.into())
     }

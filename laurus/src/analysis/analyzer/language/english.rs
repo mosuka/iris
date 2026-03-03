@@ -5,7 +5,7 @@
 //!
 //! # Pipeline
 //!
-//! 1. RegexTokenizer (Unicode word boundaries)
+//! 1. RegexTokenizer (`\w+` pattern — matches sequences of word characters)
 //! 2. LowercaseFilter
 //! 3. StopFilter (33 common English stop words)
 //!
@@ -16,14 +16,14 @@
 //! use laurus::analysis::analyzer::language::english::EnglishAnalyzer;
 //!
 //! let analyzer = EnglishAnalyzer::new().unwrap();
-//! let tokens: Vec<_> = analyzer.analyze("Hello the world and test").await.unwrap().collect();
+//! let tokens: Vec<_> = analyzer.analyze("Hello the world and test").unwrap().collect();
 //!
 //! // "the" and "and" are filtered out
 //! assert_eq!(tokens.len(), 3);
 //! assert_eq!(tokens[0].text, "hello");
 //! assert_eq!(tokens[1].text, "world");
 //! assert_eq!(tokens[2].text, "test");
-//! ```ignore
+//! ```
 use std::fmt::Debug;
 use std::fmt::Formatter;
 use std::sync::Arc;
@@ -36,11 +36,51 @@ use crate::analysis::token_filter::stop::StopFilter;
 use crate::analysis::tokenizer::regex::RegexTokenizer;
 use crate::error::Result;
 
+/// Analyzer optimized for English language text.
+///
+/// This analyzer uses regex-based tokenization to split English text using
+/// the `\w+` pattern (matching sequences of word characters: letters, digits,
+/// and underscores) and applies lowercase normalization and stop word removal
+/// to produce normalized tokens suitable for indexing and search.
+///
+/// # Components
+///
+/// - **Tokenizer**: RegexTokenizer (`\w+` pattern — matches word characters)
+/// - **Filters**: Lowercase + English stop words (33 common articles/prepositions/conjunctions)
+///
+/// # Examples
+///
+/// ```ignore
+/// use laurus::analysis::analyzer::analyzer::Analyzer;
+/// use laurus::analysis::analyzer::language::english::EnglishAnalyzer;
+///
+/// let analyzer = EnglishAnalyzer::new().unwrap();
+/// let tokens: Vec<_> = analyzer.analyze("Hello the world and test").unwrap().collect();
+///
+/// // "the" and "and" are filtered out
+/// assert_eq!(tokens.len(), 3);
+/// assert_eq!(tokens[0].text, "hello");
+/// ```
 pub struct EnglishAnalyzer {
     inner: PipelineAnalyzer,
 }
 
 impl EnglishAnalyzer {
+    /// Creates a new `EnglishAnalyzer` with the default English analysis pipeline.
+    ///
+    /// The pipeline consists of a [`RegexTokenizer`] for word boundary splitting,
+    /// a [`LowercaseFilter`] for case normalization, and a [`StopFilter`] loaded
+    /// with common English stop words.
+    ///
+    /// # Returns
+    ///
+    /// A new `EnglishAnalyzer` instance, or an error if the regex tokenizer
+    /// pattern fails to compile.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the underlying [`RegexTokenizer`] cannot be created
+    /// (e.g., due to an invalid regex pattern).
     pub fn new() -> Result<Self> {
         let tokenizer = Arc::new(RegexTokenizer::new()?);
         let analyzer = PipelineAnalyzer::new(tokenizer)

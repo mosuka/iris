@@ -123,7 +123,25 @@ impl LexicalIndexFactory {
         }
     }
 
-    /// Open or create a lexical index.
+    /// Open an existing lexical index or create a new one.
+    ///
+    /// Dispatches to the appropriate index implementation based on the configuration variant.
+    /// Currently, only [`LexicalIndexConfig::Inverted`] is supported, which creates or opens
+    /// an [`InvertedIndex`].
+    ///
+    /// # Arguments
+    ///
+    /// * `storage` - The storage backend used for persisting and loading index data.
+    /// * `config` - Configuration that determines the index type and its parameters.
+    ///
+    /// # Returns
+    ///
+    /// A boxed [`LexicalIndex`] trait object on success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the underlying index implementation fails to open or create
+    /// the index (e.g., due to storage I/O errors or corrupt metadata).
     pub fn open_or_create(
         storage: Arc<dyn Storage>,
         config: LexicalIndexConfig,

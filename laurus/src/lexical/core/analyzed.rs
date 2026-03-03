@@ -75,10 +75,11 @@ use crate::lexical::core::field::FieldValue;
 /// - `field_terms` - Map of field names to their analyzed terms
 /// - `stored_fields` - Original field values to be stored (for retrieval)
 /// - `field_lengths` - Number of terms per field (used for BM25 scoring)
+/// - `point_values` - Numeric point values per field (for BKD tree range queries)
 ///
 /// # Usage
 ///
-/// Typically created by [`DocumentParser`](crate::document::parser::DocumentParser)
+/// Typically created by [`DocumentParser`](crate::lexical::core::parser::DocumentParser)
 /// during the indexing process. Can also be constructed manually for
 /// pre-analyzed documents from external systems.
 #[derive(Debug, Clone)]

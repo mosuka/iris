@@ -1,4 +1,30 @@
 //! In-memory storage implementation for testing and caching.
+//!
+//! This module provides a complete [`Storage`] implementation backed entirely
+//! by in-process memory (`HashMap<String, Box<[u8]>>`). It is designed for:
+//!
+//! - **Unit and integration testing** -- fast, deterministic, no filesystem
+//!   side effects.
+//! - **Temporary indexes** -- building an ephemeral index that does not need
+//!   to survive process restarts.
+//! - **Benchmarking** -- removing disk I/O from the critical path so that
+//!   algorithmic performance can be measured in isolation.
+//!
+//! ## Thread Safety
+//!
+//! All internal data is protected by [`Mutex`] locks, so [`MemoryStorage`]
+//! can be shared across threads via `Arc<MemoryStorage>`. Individual I/O
+//! handles ([`MemoryInput`] / [`MemoryOutput`]) are **not** `Sync` but are
+//! safe to send between threads.
+//!
+//! ## When to Use `MemoryStorage` vs `FileStorage`
+//!
+//! | Criterion | `MemoryStorage` | `FileStorage` |
+//! |---|---|---|
+//! | Persistence | None (lost on drop) | Durable on disk |
+//! | Performance | Very fast (no syscalls) | Disk-bound |
+//! | Capacity | Limited by process memory | Limited by disk |
+//! | Use case | Tests, benchmarks, transient data | Production indexes |
 
 use std::collections::HashMap;
 use std::io::{Cursor, Read, Seek, SeekFrom, Write};
@@ -10,6 +36,10 @@ use crate::storage::{
 };
 
 /// Configuration specific to memory-based storage.
+///
+/// Allows callers to tune the initial capacity of the internal file map,
+/// reducing re-allocations when the approximate number of files is known
+/// ahead of time.
 #[derive(Debug, Clone)]
 pub struct MemoryStorageConfig {
     /// Initial capacity hint for the file map.
@@ -26,8 +56,11 @@ impl Default for MemoryStorageConfig {
 
 /// An in-memory storage implementation.
 ///
+/// All files are held in a shared `HashMap<String, Box<[u8]>>` guarded by a
+/// [`Mutex`]. `Box<[u8]>` is used instead of `Vec<u8>` for finalized files
+/// to avoid wasting memory on unused capacity.
+///
 /// This is useful for testing and for creating temporary indexes in memory.
-/// Uses Box<[u8]> for memory efficiency when files are finalized.
 #[derive(Debug)]
 pub struct MemoryStorage {
     /// The files stored in memory with optimized memory layout.
@@ -48,7 +81,16 @@ impl Default for MemoryStorage {
 }
 
 impl MemoryStorage {
-    /// Create a new memory storage.
+    /// Create a new memory storage with the given configuration.
+    ///
+    /// # Arguments
+    ///
+    /// * `config` - Configuration controlling initial capacity and other
+    ///   tuning parameters.
+    ///
+    /// # Returns
+    ///
+    /// A new, empty `MemoryStorage`.
     pub fn new(config: MemoryStorageConfig) -> Self {
         let initial_capacity = config.initial_capacity;
         MemoryStorage {
@@ -59,7 +101,12 @@ impl MemoryStorage {
         }
     }
 
-    /// Check if the storage is closed.
+    /// Check if the storage is closed, returning an error if so.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`StorageError::StorageClosed`] when the storage has been
+    /// closed.
     fn check_closed(&self) -> Result<()> {
         if self.closed {
             Err(StorageError::StorageClosed.into())
@@ -68,18 +115,30 @@ impl MemoryStorage {
         }
     }
 
-    /// Get the number of files stored.
+    /// Get the number of files currently stored.
+    ///
+    /// # Returns
+    ///
+    /// The file count.
     pub fn file_count(&self) -> usize {
         self.files.lock().unwrap().len()
     }
 
-    /// Get the total size of all files.
+    /// Get the total size of all files in bytes.
+    ///
+    /// # Returns
+    ///
+    /// The sum of all file sizes.
     pub fn total_size(&self) -> u64 {
         let files = self.files.lock().unwrap();
         files.values().map(|data| data.len() as u64).sum()
     }
 
-    /// Clear all files from storage.
+    /// Remove all files from storage.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the storage is closed.
     pub fn clear(&self) -> Result<()> {
         self.check_closed()?;
         let mut files = self.files.lock().unwrap();
@@ -156,6 +215,12 @@ impl Storage for MemoryStorage {
         Ok(data.len() as u64)
     }
 
+    /// Returns metadata for the named in-memory file.
+    ///
+    /// **Note:** Because in-memory storage does not track real modification or
+    /// creation timestamps, both `modified` and `created` are set to the
+    /// current wall-clock time at the moment this method is called. They do
+    /// **not** reflect when the file was actually written or first created.
     fn metadata(&self, name: &str) -> Result<crate::storage::FileMetadata> {
         self.check_closed()?;
 
@@ -226,10 +291,16 @@ impl Storage for MemoryStorage {
     }
 }
 
-/// A memory-based input implementation.
+/// A read handle backed by an in-memory byte buffer.
+///
+/// `MemoryInput` wraps a [`Cursor<Vec<u8>>`] and implements [`StorageInput`]
+/// so that callers can seek and read just as they would with a file-backed
+/// input.
 #[derive(Debug)]
 pub struct MemoryInput {
+    /// Cursor providing Read + Seek over the byte buffer.
     cursor: Cursor<Vec<u8>>,
+    /// Cached size of the data (avoids re-computing from the cursor).
     size: u64,
 }
 
@@ -271,13 +342,22 @@ impl StorageInput for MemoryInput {
     }
 }
 
-/// A memory-based output implementation.
+/// A write handle backed by an in-memory byte buffer.
+///
+/// `MemoryOutput` accumulates written bytes in a `Vec<u8>`. When the handle
+/// is closed (or dropped), the buffer is stored in the shared file map so
+/// that subsequent [`MemoryStorage::open_input`] calls can read the data.
 #[derive(Debug)]
 pub struct MemoryOutput {
+    /// The logical file name.
     name: String,
+    /// Write buffer accumulating output bytes.
     buffer: Vec<u8>,
+    /// Shared reference to the storage file map for committing on close.
     files: Arc<Mutex<HashMap<String, Box<[u8]>>>>,
+    /// Current write position within the buffer.
     position: u64,
+    /// Whether this output handle has been closed.
     closed: bool,
 }
 
@@ -417,9 +497,13 @@ impl Drop for MemoryOutput {
     }
 }
 
-/// A memory-based lock manager.
+/// A memory-based lock manager for coordinating concurrent access.
+///
+/// Locks are tracked in a `HashMap` keyed by lock name. This provides the
+/// same semantics as file-based locks but without touching the filesystem.
 #[derive(Debug)]
 pub struct MemoryLockManager {
+    /// Map of active locks, keyed by lock name.
     locks: Arc<Mutex<HashMap<String, Arc<Mutex<MemoryLock>>>>>,
 }
 
@@ -488,16 +572,18 @@ impl MemoryLock {
     }
 }
 
-/// A wrapper around MemoryLock that implements StorageLock.
+/// A wrapper around [`MemoryLock`] that implements [`StorageLock`].
 #[derive(Debug)]
 struct MemoryLockWrapper {
     lock: Arc<Mutex<MemoryLock>>,
 }
 
 impl StorageLock for MemoryLockWrapper {
+    /// Returns a fixed identifier `"memory_lock"` rather than the actual lock name.
+    ///
+    /// Because the real name is stored behind a `Mutex`, returning a borrowed
+    /// reference to it is not possible with the current `&str` return type.
     fn name(&self) -> &str {
-        // We can't return a reference to the name inside the mutex
-        // For now, we'll return a static string
         "memory_lock"
     }
 

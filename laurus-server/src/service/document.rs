@@ -1,3 +1,8 @@
+//! Document CRUD and commit gRPC service.
+//!
+//! Provides RPCs for inserting, updating, retrieving, and deleting documents,
+//! as well as explicitly committing pending changes to durable storage.
+
 use std::sync::Arc;
 
 use tokio::sync::RwLock;
@@ -15,6 +20,8 @@ use crate::proto::laurus::v1::{
 /// gRPC DocumentService implementation.
 #[derive(Clone)]
 pub struct DocumentService {
+    /// Shared, mutable reference to the current search engine instance.
+    /// `None` when no index has been created yet.
     pub engine: Arc<RwLock<Option<Engine>>>,
 }
 
@@ -29,6 +36,7 @@ impl DocumentService {
 
 #[tonic::async_trait]
 impl DocumentServiceTrait for DocumentService {
+    /// Inserts or replaces a document with the given ID.
     async fn put_document(
         &self,
         request: Request<PutDocumentRequest>,
@@ -50,6 +58,7 @@ impl DocumentServiceTrait for DocumentService {
         Ok(Response::new(PutDocumentResponse {}))
     }
 
+    /// Adds a new document. Fails if a document with the same ID already exists.
     async fn add_document(
         &self,
         request: Request<AddDocumentRequest>,
@@ -71,6 +80,7 @@ impl DocumentServiceTrait for DocumentService {
         Ok(Response::new(AddDocumentResponse {}))
     }
 
+    /// Retrieves documents matching the given ID.
     async fn get_documents(
         &self,
         request: Request<GetDocumentsRequest>,
@@ -88,6 +98,7 @@ impl DocumentServiceTrait for DocumentService {
         Ok(Response::new(GetDocumentsResponse { documents }))
     }
 
+    /// Deletes documents matching the given ID.
     async fn delete_documents(
         &self,
         request: Request<DeleteDocumentsRequest>,
@@ -104,6 +115,7 @@ impl DocumentServiceTrait for DocumentService {
         Ok(Response::new(DeleteDocumentsResponse {}))
     }
 
+    /// Flushes all pending changes to durable storage.
     async fn commit(
         &self,
         _request: Request<CommitRequest>,

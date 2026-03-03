@@ -15,21 +15,53 @@
 //!
 //! ```
 //! use laurus::analysis::char_filter::CharFilter;
-//! // use laurus::analysis::char_filter::unicode_normalize::UnicodeNormalizationCharFilter;
-//! // (Example usage to be added after implementation)
+//! use laurus::analysis::char_filter::unicode_normalize::{UnicodeNormalizationCharFilter, NormalizationForm};
+//!
+//! let filter = UnicodeNormalizationCharFilter::new(NormalizationForm::NFKC);
+//! let (normalized, _transformations) = filter.filter("ﬁne");
+//! assert_eq!(normalized, "fine");
 //! ```
 
-/// Represents a change in the text, mapping a range in the original text
-/// to a range in the new text.
+/// Represents a character offset mapping between original and filtered text.
+///
+/// When a [`CharFilter`] modifies text (e.g., replacing characters, expanding ligatures,
+/// or removing diacritics), the character positions in the filtered output no longer
+/// correspond 1:1 to positions in the original input. A `Transformation` records one
+/// such positional shift so that downstream components (tokenizer, highlighter, etc.)
+/// can map offsets back to the original text.
+///
+/// Each transformation describes a contiguous region in the original text and the
+/// corresponding region in the new (filtered) text that replaced it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Transformation {
+    /// Byte offset of the start of the affected range in the original text (inclusive).
     pub original_start: usize,
+    /// Byte offset of the end of the affected range in the original text (exclusive).
     pub original_end: usize,
+    /// Byte offset of the start of the replacement range in the filtered text (inclusive).
     pub new_start: usize,
+    /// Byte offset of the end of the replacement range in the filtered text (exclusive).
     pub new_end: usize,
 }
 
 impl Transformation {
+    /// Creates a new `Transformation` that maps a range in the original text
+    /// to a range in the filtered text.
+    ///
+    /// # Arguments
+    ///
+    /// * `original_start` - Byte offset of the start of the affected range in the
+    ///   original text (inclusive).
+    /// * `original_end` - Byte offset of the end of the affected range in the
+    ///   original text (exclusive).
+    /// * `new_start` - Byte offset of the start of the replacement range in the
+    ///   filtered text (inclusive).
+    /// * `new_end` - Byte offset of the end of the replacement range in the
+    ///   filtered text (exclusive).
+    ///
+    /// # Returns
+    ///
+    /// A new `Transformation` recording the positional mapping.
     pub fn new(
         original_start: usize,
         original_end: usize,

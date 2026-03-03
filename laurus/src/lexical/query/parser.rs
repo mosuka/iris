@@ -139,6 +139,25 @@ impl QueryParser {
     }
 
     /// Parse a field-specific query.
+    ///
+    /// Constructs a query targeting a single field. If `query_str` contains spaces
+    /// and is not already quoted, it is automatically wrapped in double quotes to
+    /// form a phrase query.
+    ///
+    /// # Arguments
+    ///
+    /// * `field` - The name of the field to search.
+    /// * `query_str` - The query string value to search for in the given field.
+    ///
+    /// # Returns
+    ///
+    /// A boxed [`Query`] targeting the specified field, or an error if parsing fails.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`LaurusError`] if the constructed
+    /// `field:query_str` expression cannot be parsed. This delegates to
+    /// [`parse()`](Self::parse), so the same error conditions apply.
     pub fn parse_field(&self, field: &str, query_str: &str) -> Result<Box<dyn Query>> {
         // Handle phrase queries specially (preserve quotes).
         // Escape embedded double quotes to prevent query injection.
@@ -151,7 +170,27 @@ impl QueryParser {
         self.parse(&full_query)
     }
 
-    /// Parses a query string into a Query object.
+    /// Parses a query string into a [`Query`] object.
+    ///
+    /// The query string follows a Lucene-like syntax supporting boolean operators,
+    /// field-specific queries, phrase queries, wildcard queries, fuzzy queries, and
+    /// range queries. When no field is specified, the parser's default fields are used.
+    ///
+    /// # Arguments
+    ///
+    /// * `query_str` - The query string to parse (e.g., `"title:rust AND body:search"`).
+    ///
+    /// # Returns
+    ///
+    /// A boxed [`Query`] representing the parsed query, or an error if the query
+    /// string is malformed.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`LaurusError`] in the following cases:
+    /// - The query string has invalid syntax (e.g., unbalanced quotes or brackets).
+    /// - The parsed input contains no valid query (e.g., an empty string).
+    /// - A sub-query (boolean clause, range, etc.) fails to parse.
     pub fn parse(&self, query_str: &str) -> Result<Box<dyn Query>> {
         let pairs = QueryStringParser::parse(Rule::query, query_str)
             .map_err(|e| LaurusError::parse(format!("Parse error: {e}")))?;
@@ -586,7 +625,10 @@ impl QueryParser {
     }
 }
 
-/// Builder for QueryParser.
+/// Builder for constructing a [`QueryParser`] with a fluent API.
+///
+/// Allows configuring the analyzer, default search fields, and default boolean
+/// occurrence before building the final [`QueryParser`] instance.
 pub struct QueryParserBuilder {
     analyzer: Arc<dyn Analyzer>,
     default_fields: Vec<String>,
