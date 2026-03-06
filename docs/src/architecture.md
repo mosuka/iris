@@ -2,6 +2,32 @@
 
 This page explains how Laurus is structured internally. Understanding the architecture will help you make better decisions about schema design, analyzer selection, and search strategies.
 
+## Project Structure
+
+Laurus is organized as a Cargo workspace with three crates:
+
+```mermaid
+graph TB
+    CLI["laurus-cli\n(Binary Crate)\nCLI + REPL"]
+    SRV["laurus-server\n(Library + Binary)\ngRPC Server + HTTP Gateway"]
+    LIB["laurus\n(Library Crate)\nCore Search Engine"]
+
+    CLI --> LIB
+    SRV --> LIB
+```
+
+| Crate | Type | Description |
+| :--- | :--- | :--- |
+| **laurus** | Library | Core search engine -- lexical, vector, and hybrid search |
+| **laurus-cli** | Binary | Command-line interface for index management and search |
+| **laurus-server** | Library + Binary | gRPC server with optional HTTP/JSON gateway |
+
+For details on each crate, see:
+
+- [Library Overview](laurus/overview.md)
+- [CLI Overview](cli/overview.md)
+- [Server Overview](server/overview.md)
+
 ## High-Level Overview
 
 Laurus is organized around a single `Engine` that coordinates four internal components:

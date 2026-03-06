@@ -21,15 +21,3 @@ cargo install --path laurus-cli
 ```bash
 laurus --version
 ```
-
-## Shell Completion
-
-Generate completion scripts for your shell:
-
-```bash
-# Bash
-laurus --help
-
-# The CLI uses clap, so shell completions can be generated
-# with clap_complete if needed in a future release.
-```

@@ -15,7 +15,7 @@ default_fields = ["title", "body"]
 # ... type-specific options
 ```
 
-- **`default_fields`** — A list of field names used as default search targets by the [Query DSL](../advanced/query_dsl.md). Only lexical fields (Text, Integer, Float, etc.) can be default fields. This key is optional and defaults to an empty list.
+- **`default_fields`** — A list of field names used as default search targets by the [Query DSL](../concepts/query_dsl.md). Only lexical fields (Text, Integer, Float, etc.) can be default fields. This key is optional and defaults to an empty list.
 - **`fields`** — A map of field names to their typed configuration. Each field must specify exactly one field type.
 
 ## Field Naming

@@ -19,7 +19,7 @@ The REPL opens the index at startup and keeps it loaded throughout the session.
 
 | Command | Description |
 | :--- | :--- |
-| `search <query> [limit]` | Search the index |
+| `search <query>` | Search the index (returns up to 10 results) |
 | `doc add <id> <json>` | Add a document |
 | `doc get <id>` | Get a document by ID |
 | `doc delete <id>` | Delete a document by ID |
@@ -27,6 +27,8 @@ The REPL opens the index at startup and keeps it loaded throughout the session.
 | `stats` | Show index statistics |
 | `help` | Show available commands |
 | `quit` / `exit` | Exit the REPL |
+
+The search command always returns up to 10 results. The limit is not currently configurable in the REPL.
 
 ## Usage Examples
 

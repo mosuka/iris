@@ -364,7 +364,7 @@ Vector fields:
 </code></pre>
 <hr />
 <h2 id="search"><a class="header" href="#search"><code>search</code></a></h2>
-<p>Execute a search query using the <a href="../advanced/query_dsl.html">Query DSL</a>.</p>
+<p>Execute a search query using the <a href="../concepts/query_dsl.html">Query DSL</a>.</p>
 <pre><code class="language-bash">laurus search &lt;QUERY&gt; [--limit &lt;N&gt;] [--offset &lt;N&gt;]
 </code></pre>
 <p><strong>Arguments:</strong></p>
@@ -419,6 +419,33 @@ laurus search "price:[10 TO 50]"
 <h2 id="repl"><a class="header" href="#repl"><code>repl</code></a></h2>
 <p>Start an interactive REPL session. See <a href="repl.html">REPL</a> for details.</p>
 <pre><code class="language-bash">laurus repl
+</code></pre>
+<hr />
+<h2 id="serve"><a class="header" href="#serve"><code>serve</code></a></h2>
+<p>Start the gRPC server. See <a href="../server/overview.html">Server Overview</a> for full documentation.</p>
+<pre><code class="language-bash">laurus serve [OPTIONS]
+</code></pre>
+<p><strong>Options:</strong></p>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Option</th><th style="text-align: left">Short</th><th style="text-align: left">Env Variable</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>--config &lt;PATH&gt;</code></td><td style="text-align: left"><code>-c</code></td><td style="text-align: left"><code>LAURUS_CONFIG</code></td><td style="text-align: left">—</td><td style="text-align: left">Path to a TOML configuration file</td></tr>
+<tr><td style="text-align: left"><code>--host &lt;HOST&gt;</code></td><td style="text-align: left"><code>-H</code></td><td style="text-align: left"><code>LAURUS_HOST</code></td><td style="text-align: left"><code>0.0.0.0</code></td><td style="text-align: left">Listen address</td></tr>
+<tr><td style="text-align: left"><code>--port &lt;PORT&gt;</code></td><td style="text-align: left"><code>-p</code></td><td style="text-align: left"><code>LAURUS_PORT</code></td><td style="text-align: left"><code>50051</code></td><td style="text-align: left">Listen port</td></tr>
+<tr><td style="text-align: left"><code>--http-port &lt;PORT&gt;</code></td><td style="text-align: left">--</td><td style="text-align: left"><code>LAURUS_HTTP_PORT</code></td><td style="text-align: left">--</td><td style="text-align: left">HTTP Gateway port (enables HTTP gateway when set)</td></tr>
+<tr><td style="text-align: left"><code>--log-level &lt;LEVEL&gt;</code></td><td style="text-align: left"><code>-l</code></td><td style="text-align: left"><code>LAURUS_LOG_LEVEL</code></td><td style="text-align: left"><code>info</code></td><td style="text-align: left">Log level (<code>trace</code>, <code>debug</code>, <code>info</code>, <code>warn</code>, <code>error</code>)</td></tr>
+</tbody></table>
+</div>
+<p><strong>Example:</strong></p>
+<pre><code class="language-bash"># Start with defaults (port 50051)
+laurus --data-dir ./my_index serve
+
+# Custom port and log level
+laurus serve --port 8080 --log-level debug
+
+# Use a configuration file
+laurus serve --config config.toml
+
+# Use environment variables
+LAURUS_DATA_DIR=./my_index LAURUS_PORT=8080 laurus serve
 </code></pre>
 
                     </main>

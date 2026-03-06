@@ -54,11 +54,14 @@ graph LR
 | :--- | :--- |
 | [Getting Started](getting_started.md) | Install Laurus and run your first search in minutes |
 | [Architecture](architecture.md) | Understand the Engine, its components, and data flow |
-| [Core Concepts](concepts.md) | Schema, text analysis, embeddings, and storage |
-| [Indexing](indexing/lexical_indexing.md) | How inverted indexes and vector indexes work internally |
-| [Search](search/lexical_search.md) | Query types, vector search, and hybrid fusion |
-| [Advanced Features](advanced.md) | Query DSL, ID management, WAL, and compaction |
-| [API Reference](api_reference.md) | Key types and methods at a glance |
+| [Core Concepts](concepts/schema_and_fields.md) | Schema, text analysis, embeddings, and storage |
+| [Indexing](concepts/indexing.md) | How inverted indexes and vector indexes work internally |
+| [Search](concepts/search.md) | Query types, vector search, and hybrid fusion |
+| [Query DSL](concepts/query_dsl.md) | Human-readable query syntax for all search types |
+| [Library (laurus)](laurus/overview.md) | Engine internals, scoring, faceting, and extensibility |
+| [CLI (laurus-cli)](cli/overview.md) | Command-line tool for index management and search |
+| [Server (laurus-server)](server/overview.md) | gRPC server with HTTP Gateway |
+| [Development Guide](development/build_and_test.md) | Build, test, and contribute to Laurus |
 
 ## Quick Example
 

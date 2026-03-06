@@ -25,7 +25,7 @@ let schema = Schema::builder()
 
 ### Default Fields
 
-`add_default_field()` specifies which field(s) are searched when a query does not explicitly name a field. This is used by the [Query DSL](../advanced/query_dsl.md) parser.
+`add_default_field()` specifies which field(s) are searched when a query does not explicitly name a field. This is used by the [Query DSL](../concepts/query_dsl.md) parser.
 
 ## Field Types
 
@@ -67,21 +67,21 @@ Lexical fields are indexed using an inverted index and support keyword-based que
 ```rust
 use laurus::lexical::TextOption;
 
-// Default: indexed + stored
+// Default: indexed + stored + term vectors (all true)
 let opt = TextOption::default();
 
-// Customize: indexed + stored + term vectors
+// Customize
 let opt = TextOption::default()
-    .set_indexed(true)
-    .set_stored(true)
-    .set_term_vectors(true);
+    .indexed(true)
+    .stored(true)
+    .term_vectors(true);
 ```
 
 | Option | Default | Description |
 | :--- | :--- | :--- |
 | `indexed` | `true` | Whether the field is searchable |
 | `stored` | `true` | Whether the original value is stored for retrieval |
-| `term_vectors` | `false` | Whether term positions are stored (needed for phrase queries) |
+| `term_vectors` | `true` | Whether term positions are stored (needed for phrase queries and highlighting) |
 
 ### Vector Fields
 
@@ -109,7 +109,7 @@ let opt = HnswOption {
 };
 ```
 
-See [Vector Indexing](../indexing/vector_indexing.md) for detailed parameter guidance.
+See [Vector Indexing](indexing/vector_indexing.md) for detailed parameter guidance.
 
 ## Document
 
@@ -237,7 +237,7 @@ The `_id` field is reserved by Laurus for internal use. It stores the external d
 
 2. **Use `KeywordAnalyzer` for exact-match fields** — category, status, and tag fields should use `KeywordAnalyzer` via `PerFieldAnalyzer` to avoid tokenization.
 
-3. **Choose the right vector index** — use HNSW for most cases, Flat for small datasets, IVF for very large datasets. See [Vector Indexing](../indexing/vector_indexing.md).
+3. **Choose the right vector index** — use HNSW for most cases, Flat for small datasets, IVF for very large datasets. See [Vector Indexing](indexing/vector_indexing.md).
 
 4. **Set default fields** — if you use the Query DSL, set default fields so users can write `hello` instead of `body:hello`.
 
