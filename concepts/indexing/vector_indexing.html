@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Commands - Laurus Documentation</title>
+        <title>Vector Indexing - Laurus Documentation</title>
 
 
         <!-- Custom HTML head -->
@@ -12,33 +12,33 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="theme-color" content="#ffffff">
 
-        <link rel="icon" href="../favicon-de23e50b.svg">
-        <link rel="shortcut icon" href="../favicon-8114d1fc.png">
-        <link rel="stylesheet" href="../css/variables-8adf115d.css">
-        <link rel="stylesheet" href="../css/general-2459343d.css">
-        <link rel="stylesheet" href="../css/chrome-ae938929.css">
-        <link rel="stylesheet" href="../css/print-9e4910d8.css" media="print">
+        <link rel="icon" href="../../favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="../../favicon-8114d1fc.png">
+        <link rel="stylesheet" href="../../css/variables-8adf115d.css">
+        <link rel="stylesheet" href="../../css/general-2459343d.css">
+        <link rel="stylesheet" href="../../css/chrome-ae938929.css">
+        <link rel="stylesheet" href="../../css/print-9e4910d8.css" media="print">
 
         <!-- Fonts -->
-        <link rel="stylesheet" href="../fonts/fonts-9644e21d.css">
+        <link rel="stylesheet" href="../../fonts/fonts-9644e21d.css">
 
         <!-- Highlight.js Stylesheets -->
-        <link rel="stylesheet" id="mdbook-highlight-css" href="../highlight-493f70e1.css">
-        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="../tomorrow-night-4c0ae647.css">
-        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="../ayu-highlight-3fdfc3ac.css">
+        <link rel="stylesheet" id="mdbook-highlight-css" href="../../highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="../../tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="../../ayu-highlight-3fdfc3ac.css">
 
         <!-- Custom theme stylesheets -->
 
 
         <!-- Provide site root and default themes to javascript -->
         <script>
-            const path_to_root = "../";
+            const path_to_root = "../../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-674b4e1e.js";
+            window.path_to_searchindex_js = "../../searchindex-674b4e1e.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-072c2e71.js"></script>
+        <script src="../../toc-072c2e71.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -105,7 +105,7 @@
             <!-- populated by js -->
             <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
             <noscript>
-                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
+                <iframe class="sidebar-iframe-outer" src="../../toc.html"></iframe>
             </noscript>
             <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
                 <div class="sidebar-resize-indicator"></div>
@@ -140,7 +140,7 @@
                     <h1 class="menu-title">Laurus Documentation</h1>
 
                     <div class="right-buttons">
-                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                        <a href="../../print.html" title="Print this book" aria-label="Print this book">
                             <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
                         </a>
                         <a href="https://github.com/mosuka/laurus" title="Git repository" aria-label="Git repository">
@@ -177,327 +177,319 @@
 
                 <div id="mdbook-content" class="content">
                     <main>
-                        <h1 id="command-reference"><a class="header" href="#command-reference">Command Reference</a></h1>
-<h2 id="global-options"><a class="header" href="#global-options">Global Options</a></h2>
-<p>Every command accepts these options:</p>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th style="text-align: left">Option</th><th style="text-align: left">Environment Variable</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr>
-</thead>
-<tbody>
-<tr><td style="text-align: left"><code>--data-dir &lt;PATH&gt;</code></td><td style="text-align: left"><code>LAURUS_DATA_DIR</code></td><td style="text-align: left"><code>./laurus_data</code></td><td style="text-align: left">Path to the index data directory</td></tr>
-<tr><td style="text-align: left"><code>--format &lt;FORMAT&gt;</code></td><td style="text-align: left">—</td><td style="text-align: left"><code>table</code></td><td style="text-align: left">Output format: <code>table</code> or <code>json</code></td></tr>
-</tbody>
-</table>
-</div>
-<pre><code class="language-bash"># Example: use JSON output with a custom data directory
-laurus --data-dir /var/data/my_index --format json search "title:rust"
-</code></pre>
-<hr>
-<h2 id="create--create-a-resource"><a class="header" href="#create--create-a-resource"><code>create</code> — Create a Resource</a></h2>
-<h3 id="create-index"><a class="header" href="#create-index"><code>create index</code></a></h3>
-<p>Create a new index from a schema TOML file.</p>
-<pre><code class="language-bash">laurus create index --schema &lt;FILE&gt;
-</code></pre>
-<p><strong>Arguments:</strong></p>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th style="text-align: left">Flag</th><th style="text-align: left">Required</th><th style="text-align: left">Description</th></tr>
-</thead>
-<tbody>
-<tr><td style="text-align: left"><code>--schema &lt;FILE&gt;</code></td><td style="text-align: left">Yes</td><td style="text-align: left">Path to a TOML file defining the index schema</td></tr>
-</tbody>
-</table>
-</div>
-<p><strong>Schema file format:</strong></p>
-<p>The schema file follows the same structure as the <code>Schema</code> type in the Laurus library. See <a href="schema_format.html">Schema Format Reference</a> for full details. Example:</p>
-<pre><code class="language-toml">default_fields = ["title", "body"]
+                        <h1 id="vector-indexing"><a class="header" href="#vector-indexing">Vector Indexing</a></h1>
+<p>Vector indexing powers similarity-based search. When a document’s vector field is indexed, Laurus stores the embedding vector in a specialized index structure that enables fast approximate nearest neighbor (ANN) retrieval.</p>
+<h2 id="how-vector-indexing-works"><a class="header" href="#how-vector-indexing-works">How Vector Indexing Works</a></h2>
+<pre><code class="language-mermaid">sequenceDiagram
+    participant Doc as Document
+    participant Embedder
+    participant Normalize as Normalizer
+    participant Index as Vector Index
 
-[fields.title.Text]
-stored = true
-indexed = true
-
-[fields.body.Text]
-stored = true
-indexed = true
-
-[fields.category.Text]
-stored = true
-indexed = true
+    Doc-&gt;&gt;Embedder: "Rust is a systems language"
+    Embedder--&gt;&gt;Normalize: [0.12, -0.45, 0.78, ...]
+    Normalize-&gt;&gt;Normalize: L2 normalize
+    Normalize--&gt;&gt;Index: [0.14, -0.52, 0.90, ...]
+    Index-&gt;&gt;Index: Insert into index structure
 </code></pre>
-<p><strong>Example:</strong></p>
-<pre><code class="language-bash">laurus --data-dir ./my_index create index --schema schema.toml
-# Index created at ./my_index.
-</code></pre>
-<blockquote>
-<p><strong>Note:</strong> An error is returned if the index already exists. Delete the data directory to recreate.</p>
-</blockquote>
-<h3 id="create-schema"><a class="header" href="#create-schema"><code>create schema</code></a></h3>
-<p>Interactively generate a schema TOML file through a guided wizard.</p>
-<pre><code class="language-bash">laurus create schema [--output &lt;FILE&gt;]
-</code></pre>
-<p><strong>Arguments:</strong></p>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th style="text-align: left">Flag</th><th style="text-align: left">Required</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr>
-</thead>
-<tbody>
-<tr><td style="text-align: left"><code>--output &lt;FILE&gt;</code></td><td style="text-align: left">No</td><td style="text-align: left"><code>schema.toml</code></td><td style="text-align: left">Output file path for the generated schema</td></tr>
-</tbody>
-</table>
-</div>
-<p>The wizard guides you through:</p>
+<h3 id="step-by-step"><a class="header" href="#step-by-step">Step by Step</a></h3>
 <ol>
-<li><strong>Field definition</strong> — Enter a field name, select the type, and configure type-specific options</li>
-<li><strong>Repeat</strong> — Add as many fields as needed</li>
-<li><strong>Default fields</strong> — Select which lexical fields to use as default search fields</li>
-<li><strong>Preview</strong> — Review the generated TOML before saving</li>
-<li><strong>Save</strong> — Write the schema file</li>
+<li><strong>Embed</strong>: The text (or image) is converted to a vector by the configured embedder</li>
+<li><strong>Normalize</strong>: The vector is L2-normalized (for cosine similarity)</li>
+<li><strong>Index</strong>: The vector is inserted into the configured index structure (Flat, HNSW, or IVF)</li>
+<li><strong>Commit</strong>: On <code>commit()</code>, the index is flushed to persistent storage</li>
 </ol>
-<p><strong>Supported field types:</strong></p>
+<h2 id="index-types"><a class="header" href="#index-types">Index Types</a></h2>
+<p>Laurus supports three vector index types, each with different performance characteristics:</p>
+<h3 id="comparison"><a class="header" href="#comparison">Comparison</a></h3>
 <div class="table-wrapper">
 <table>
 <thead>
-<tr><th style="text-align: left">Type</th><th style="text-align: left">Category</th><th style="text-align: left">Options</th></tr>
+<tr><th style="text-align: left">Property</th><th style="text-align: left">Flat</th><th style="text-align: left">HNSW</th><th style="text-align: left">IVF</th></tr>
 </thead>
 <tbody>
-<tr><td style="text-align: left"><code>Text</code></td><td style="text-align: left">Lexical</td><td style="text-align: left"><code>indexed</code>, <code>stored</code>, <code>term_vectors</code></td></tr>
-<tr><td style="text-align: left"><code>Integer</code></td><td style="text-align: left">Lexical</td><td style="text-align: left"><code>indexed</code>, <code>stored</code></td></tr>
-<tr><td style="text-align: left"><code>Float</code></td><td style="text-align: left">Lexical</td><td style="text-align: left"><code>indexed</code>, <code>stored</code></td></tr>
-<tr><td style="text-align: left"><code>Boolean</code></td><td style="text-align: left">Lexical</td><td style="text-align: left"><code>indexed</code>, <code>stored</code></td></tr>
-<tr><td style="text-align: left"><code>DateTime</code></td><td style="text-align: left">Lexical</td><td style="text-align: left"><code>indexed</code>, <code>stored</code></td></tr>
-<tr><td style="text-align: left"><code>Geo</code></td><td style="text-align: left">Lexical</td><td style="text-align: left"><code>indexed</code>, <code>stored</code></td></tr>
-<tr><td style="text-align: left"><code>Bytes</code></td><td style="text-align: left">Lexical</td><td style="text-align: left"><code>stored</code></td></tr>
-<tr><td style="text-align: left"><code>Hnsw</code></td><td style="text-align: left">Vector</td><td style="text-align: left"><code>dimension</code>, <code>distance</code>, <code>m</code>, <code>ef_construction</code></td></tr>
-<tr><td style="text-align: left"><code>Flat</code></td><td style="text-align: left">Vector</td><td style="text-align: left"><code>dimension</code>, <code>distance</code></td></tr>
-<tr><td style="text-align: left"><code>Ivf</code></td><td style="text-align: left">Vector</td><td style="text-align: left"><code>dimension</code>, <code>distance</code>, <code>n_clusters</code>, <code>n_probe</code></td></tr>
+<tr><td style="text-align: left"><strong>Accuracy</strong></td><td style="text-align: left">100% (exact)</td><td style="text-align: left">~95-99% (approximate)</td><td style="text-align: left">~90-98% (approximate)</td></tr>
+<tr><td style="text-align: left"><strong>Search speed</strong></td><td style="text-align: left">O(n) linear scan</td><td style="text-align: left">O(log n) graph walk</td><td style="text-align: left">O(n/k) cluster scan</td></tr>
+<tr><td style="text-align: left"><strong>Memory usage</strong></td><td style="text-align: left">Low</td><td style="text-align: left">Higher (graph edges)</td><td style="text-align: left">Moderate (centroids)</td></tr>
+<tr><td style="text-align: left"><strong>Index build time</strong></td><td style="text-align: left">Fast</td><td style="text-align: left">Moderate</td><td style="text-align: left">Slower (clustering)</td></tr>
+<tr><td style="text-align: left"><strong>Best for</strong></td><td style="text-align: left">&lt; 10K vectors</td><td style="text-align: left">10K - 10M vectors</td><td style="text-align: left">&gt; 1M vectors</td></tr>
 </tbody>
 </table>
 </div>
-<p><strong>Example:</strong></p>
-<pre><code class="language-bash"># Generate schema.toml interactively
-laurus create schema
+<h3 id="flat-index"><a class="header" href="#flat-index">Flat Index</a></h3>
+<p>The simplest index. Compares the query vector against every stored vector (brute-force).</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use laurus::vector::FlatOption;
+use laurus::vector::core::distance::DistanceMetric;
 
-# Specify output path
-laurus create schema --output my_schema.toml
+let opt = FlatOption {
+    dimension: 384,
+    distance: DistanceMetric::Cosine,
+    ..Default::default()
+};
+<span class="boring">}</span></code></pre>
+<ul>
+<li><strong>Pros</strong>: 100% recall (exact results), simple, low memory</li>
+<li><strong>Cons</strong>: Slow for large datasets (linear scan)</li>
+<li><strong>Use when</strong>: You have fewer than ~10,000 vectors, or you need exact results</li>
+</ul>
+<h3 id="hnsw-index"><a class="header" href="#hnsw-index">HNSW Index</a></h3>
+<p><strong>Hierarchical Navigable Small World</strong> graph. The default and most commonly used index type.</p>
+<pre><code class="language-mermaid">graph TB
+    subgraph "Layer 2 (sparse)"
+        A2["A"] --- C2["C"]
+    end
 
-# Then create an index from the generated schema
-laurus create index --schema schema.toml
-</code></pre>
-<hr>
-<h2 id="get--get-a-resource"><a class="header" href="#get--get-a-resource"><code>get</code> — Get a Resource</a></h2>
-<h3 id="get-index"><a class="header" href="#get-index"><code>get index</code></a></h3>
-<p>Display statistics about the index.</p>
-<pre><code class="language-bash">laurus get index
-</code></pre>
-<p><strong>Table output example:</strong></p>
-<pre><code class="language-text">Document count: 42
+    subgraph "Layer 1 (medium)"
+        A1["A"] --- B1["B"]
+        A1 --- C1["C"]
+        B1 --- D1["D"]
+        C1 --- D1
+    end
 
-Vector fields:
-╭──────────┬─────────┬───────────╮
-│ Field    │ Vectors │ Dimension │
-├──────────┼─────────┼───────────┤
-│ text_vec │ 42      │ 384       │
-╰──────────┴─────────┴───────────╯
+    subgraph "Layer 0 (dense - all vectors)"
+        A0["A"] --- B0["B"]
+        A0 --- C0["C"]
+        B0 --- D0["D"]
+        B0 --- E0["E"]
+        C0 --- D0
+        C0 --- F0["F"]
+        D0 --- E0
+        E0 --- F0
+    end
+
+    A2 -.-&gt;|"entry point"| A1
+    A1 -.-&gt; A0
+    C2 -.-&gt; C1
+    C1 -.-&gt; C0
+    B1 -.-&gt; B0
+    D1 -.-&gt; D0
 </code></pre>
-<p><strong>JSON output example:</strong></p>
-<pre><code class="language-bash">laurus --format json get index
-</code></pre>
-<pre><code class="language-json">{
-  "document_count": 42,
-  "fields": {
-    "text_vec": {
-      "vector_count": 42,
-      "dimension": 384
-    }
-  }
-}
-</code></pre>
-<h3 id="get-doc"><a class="header" href="#get-doc"><code>get doc</code></a></h3>
-<p>Retrieve a document (and all its chunks) by external ID.</p>
-<pre><code class="language-bash">laurus get doc --id &lt;ID&gt;
-</code></pre>
-<p><strong>Table output example:</strong></p>
-<pre><code class="language-text">╭──────┬─────────────────────────────────────────╮
-│ ID   │ Fields                                  │
-├──────┼─────────────────────────────────────────┤
-│ doc1 │ body: This is a test, title: Hello World │
-╰──────┴─────────────────────────────────────────╯
-</code></pre>
-<p><strong>JSON output example:</strong></p>
-<pre><code class="language-bash">laurus --format json get doc --id doc1
-</code></pre>
-<pre><code class="language-json">[
-  {
-    "id": "doc1",
-    "document": {
-      "title": "Hello World",
-      "body": "This is a test document."
-    }
-  }
-]
-</code></pre>
-<hr>
-<h2 id="add--add-a-resource"><a class="header" href="#add--add-a-resource"><code>add</code> — Add a Resource</a></h2>
-<h3 id="add-doc"><a class="header" href="#add-doc"><code>add doc</code></a></h3>
-<p>Add a document to the index. Documents are not searchable until <code>commit</code> is called.</p>
-<pre><code class="language-bash">laurus add doc --id &lt;ID&gt; --data &lt;JSON&gt;
-</code></pre>
-<p><strong>Arguments:</strong></p>
+<p>The HNSW algorithm searches from the top (sparse) layer down to the bottom (dense) layer, narrowing the search space at each level.</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use laurus::vector::HnswOption;
+use laurus::vector::core::distance::DistanceMetric;
+
+let opt = HnswOption {
+    dimension: 384,
+    distance: DistanceMetric::Cosine,
+    m: 16,                  // max connections per node per layer
+    ef_construction: 200,   // search width during index building
+    ..Default::default()
+};
+<span class="boring">}</span></code></pre>
+<h4 id="hnsw-parameters"><a class="header" href="#hnsw-parameters">HNSW Parameters</a></h4>
 <div class="table-wrapper">
 <table>
 <thead>
-<tr><th style="text-align: left">Flag</th><th style="text-align: left">Required</th><th style="text-align: left">Description</th></tr>
+<tr><th style="text-align: left">Parameter</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th><th style="text-align: left">Impact</th></tr>
 </thead>
 <tbody>
-<tr><td style="text-align: left"><code>--id &lt;ID&gt;</code></td><td style="text-align: left">Yes</td><td style="text-align: left">External document ID (string)</td></tr>
-<tr><td style="text-align: left"><code>--data &lt;JSON&gt;</code></td><td style="text-align: left">Yes</td><td style="text-align: left">Document fields as a JSON string</td></tr>
+<tr><td style="text-align: left"><code>m</code></td><td style="text-align: left">16</td><td style="text-align: left">Max bi-directional connections per layer</td><td style="text-align: left">Higher = better recall, more memory</td></tr>
+<tr><td style="text-align: left"><code>ef_construction</code></td><td style="text-align: left">200</td><td style="text-align: left">Search width during index building</td><td style="text-align: left">Higher = better recall, slower build</td></tr>
+<tr><td style="text-align: left"><code>dimension</code></td><td style="text-align: left">128</td><td style="text-align: left">Vector dimensions</td><td style="text-align: left">Must match embedder output</td></tr>
+<tr><td style="text-align: left"><code>distance</code></td><td style="text-align: left">Cosine</td><td style="text-align: left">Distance metric</td><td style="text-align: left">See Distance Metrics below</td></tr>
 </tbody>
 </table>
 </div>
-<p>The JSON format is a flat object mapping field names to values:</p>
-<pre><code class="language-json">{
-  "title": "Introduction to Rust",
-  "body": "Rust is a systems programming language.",
-  "category": "programming"
-}
+<p><strong>Tuning tips:</strong></p>
+<ul>
+<li>Increase <code>m</code> (e.g., 32 or 64) for higher recall at the cost of memory</li>
+<li>Increase <code>ef_construction</code> (e.g., 400) for better index quality at the cost of build time</li>
+<li>At search time, the <code>ef_search</code> parameter (set in the search request) controls the search width</li>
+</ul>
+<h3 id="ivf-index"><a class="header" href="#ivf-index">IVF Index</a></h3>
+<p><strong>Inverted File Index</strong>. Partitions vectors into clusters, then only searches relevant clusters.</p>
+<pre><code class="language-mermaid">graph TB
+    Q["Query Vector"]
+    Q --&gt; C1["Cluster 1\n(centroid)"]
+    Q --&gt; C2["Cluster 2\n(centroid)"]
+
+    C1 --&gt; V1["vec_3"]
+    C1 --&gt; V2["vec_7"]
+    C1 --&gt; V3["vec_12"]
+
+    C2 --&gt; V4["vec_1"]
+    C2 --&gt; V5["vec_9"]
+    C2 --&gt; V6["vec_15"]
+
+    style C1 fill:#f9f,stroke:#333
+    style C2 fill:#f9f,stroke:#333
 </code></pre>
-<p><strong>Example:</strong></p>
-<pre><code class="language-bash">laurus add doc --id doc1 --data '{"title":"Hello World","body":"This is a test document."}'
-# Document 'doc1' added. Run 'commit' to persist changes.
-</code></pre>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use laurus::vector::IvfOption;
+use laurus::vector::core::distance::DistanceMetric;
+
+let opt = IvfOption {
+    dimension: 384,
+    distance: DistanceMetric::Cosine,
+    n_clusters: 100,   // number of clusters
+    n_probe: 10,       // clusters to search at query time
+    ..Default::default()
+};
+<span class="boring">}</span></code></pre>
+<h4 id="ivf-parameters"><a class="header" href="#ivf-parameters">IVF Parameters</a></h4>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Parameter</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th><th style="text-align: left">Impact</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>n_clusters</code></td><td style="text-align: left">100</td><td style="text-align: left">Number of Voronoi cells</td><td style="text-align: left">More clusters = faster search, lower recall</td></tr>
+<tr><td style="text-align: left"><code>n_probe</code></td><td style="text-align: left">1</td><td style="text-align: left">Clusters to search at query time</td><td style="text-align: left">Higher = better recall, slower search</td></tr>
+<tr><td style="text-align: left"><code>dimension</code></td><td style="text-align: left">(required)</td><td style="text-align: left">Vector dimensions</td><td style="text-align: left">Must match embedder output</td></tr>
+<tr><td style="text-align: left"><code>distance</code></td><td style="text-align: left">Cosine</td><td style="text-align: left">Distance metric</td><td style="text-align: left">See Distance Metrics below</td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>Tuning tips:</strong></p>
+<ul>
+<li>Set <code>n_clusters</code> to roughly <code>sqrt(n)</code> where <code>n</code> is the number of vectors</li>
+<li>Set <code>n_probe</code> to 5-20% of <code>n_clusters</code> for a good recall/speed trade-off</li>
+<li>IVF requires a training phase — initial indexing may be slower</li>
+</ul>
+<h2 id="distance-metrics"><a class="header" href="#distance-metrics">Distance Metrics</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Metric</th><th style="text-align: left">Description</th><th style="text-align: left">Range</th><th style="text-align: left">Best For</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>Cosine</code></td><td style="text-align: left">1 - cosine similarity</td><td style="text-align: left">[0, 2]</td><td style="text-align: left">Text embeddings (most common)</td></tr>
+<tr><td style="text-align: left"><code>Euclidean</code></td><td style="text-align: left">L2 distance</td><td style="text-align: left">[0, +inf)</td><td style="text-align: left">Spatial data</td></tr>
+<tr><td style="text-align: left"><code>Manhattan</code></td><td style="text-align: left">L1 distance</td><td style="text-align: left">[0, +inf)</td><td style="text-align: left">Feature vectors</td></tr>
+<tr><td style="text-align: left"><code>DotProduct</code></td><td style="text-align: left">Negative inner product</td><td style="text-align: left">(-inf, +inf)</td><td style="text-align: left">Pre-normalized vectors</td></tr>
+<tr><td style="text-align: left"><code>Angular</code></td><td style="text-align: left">Angular distance</td><td style="text-align: left">[0, pi]</td><td style="text-align: left">Directional similarity</td></tr>
+</tbody>
+</table>
+</div>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use laurus::vector::core::distance::DistanceMetric;
+
+let metric = DistanceMetric::Cosine;      // Default for text
+let metric = DistanceMetric::Euclidean;    // For spatial data
+let metric = DistanceMetric::Manhattan;    // L1 distance
+let metric = DistanceMetric::DotProduct;   // For pre-normalized vectors
+let metric = DistanceMetric::Angular;      // Angular distance
+<span class="boring">}</span></code></pre>
 <blockquote>
-<p><strong>Tip:</strong> Multiple documents can share the same external ID (chunking pattern). Use <code>add doc</code> for each chunk.</p>
+<p><strong>Note:</strong> For cosine similarity, vectors are automatically L2-normalized before indexing. Lower distance = more similar.</p>
 </blockquote>
-<hr>
-<h2 id="delete--delete-a-resource"><a class="header" href="#delete--delete-a-resource"><code>delete</code> — Delete a Resource</a></h2>
-<h3 id="delete-doc"><a class="header" href="#delete-doc"><code>delete doc</code></a></h3>
-<p>Delete a document (and all its chunks) by external ID.</p>
-<pre><code class="language-bash">laurus delete doc --id &lt;ID&gt;
-</code></pre>
-<p><strong>Example:</strong></p>
-<pre><code class="language-bash">laurus delete doc --id doc1
-# Document 'doc1' deleted. Run 'commit' to persist changes.
-</code></pre>
-<hr>
-<h2 id="commit"><a class="header" href="#commit"><code>commit</code></a></h2>
-<p>Commit pending changes (additions and deletions) to the index. Until committed, changes are not visible to search.</p>
-<pre><code class="language-bash">laurus commit
-</code></pre>
-<p><strong>Example:</strong></p>
-<pre><code class="language-bash">laurus --data-dir ./my_index commit
-# Changes committed successfully.
-</code></pre>
-<hr>
-<h2 id="search"><a class="header" href="#search"><code>search</code></a></h2>
-<p>Execute a search query using the <a href="../concepts/query_dsl.html">Query DSL</a>.</p>
-<pre><code class="language-bash">laurus search &lt;QUERY&gt; [--limit &lt;N&gt;] [--offset &lt;N&gt;]
-</code></pre>
-<p><strong>Arguments:</strong></p>
+<h2 id="quantization"><a class="header" href="#quantization">Quantization</a></h2>
+<p>Quantization reduces memory usage by compressing vectors at the cost of some accuracy:</p>
 <div class="table-wrapper">
 <table>
 <thead>
-<tr><th style="text-align: left">Argument / Flag</th><th style="text-align: left">Required</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr>
+<tr><th style="text-align: left">Method</th><th style="text-align: left">Enum Variant</th><th style="text-align: left">Description</th><th style="text-align: left">Memory Reduction</th></tr>
 </thead>
 <tbody>
-<tr><td style="text-align: left"><code>&lt;QUERY&gt;</code></td><td style="text-align: left">Yes</td><td style="text-align: left">—</td><td style="text-align: left">Query string in Laurus Query DSL</td></tr>
-<tr><td style="text-align: left"><code>--limit &lt;N&gt;</code></td><td style="text-align: left">No</td><td style="text-align: left"><code>10</code></td><td style="text-align: left">Maximum number of results</td></tr>
-<tr><td style="text-align: left"><code>--offset &lt;N&gt;</code></td><td style="text-align: left">No</td><td style="text-align: left"><code>0</code></td><td style="text-align: left">Number of results to skip</td></tr>
+<tr><td style="text-align: left"><strong>Scalar 8-bit</strong></td><td style="text-align: left"><code>Scalar8Bit</code></td><td style="text-align: left">Scalar quantization to 8-bit integers</td><td style="text-align: left">~4x</td></tr>
+<tr><td style="text-align: left"><strong>Product Quantization</strong></td><td style="text-align: left"><code>ProductQuantization { subvector_count }</code></td><td style="text-align: left">Splits vectors into sub-vectors and quantizes each</td><td style="text-align: left">~16-64x</td></tr>
 </tbody>
 </table>
 </div>
-<p><strong>Query syntax examples:</strong></p>
-<pre><code class="language-bash"># Term query
-laurus search "body:rust"
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use laurus::vector::HnswOption;
+use laurus::vector::core::quantization::QuantizationMethod;
 
-# Phrase query
-laurus search 'body:"machine learning"'
-
-# Boolean query
-laurus search "+body:programming -body:python"
-
-# Fuzzy query (typo tolerance)
-laurus search "body:programing~2"
-
-# Wildcard query
-laurus search "title:intro*"
-
-# Range query
-laurus search "price:[10 TO 50]"
-</code></pre>
-<p><strong>Table output example:</strong></p>
-<pre><code class="language-text">╭──────┬────────┬─────────────────────────────────────────╮
-│ ID   │ Score  │ Fields                                  │
-├──────┼────────┼─────────────────────────────────────────┤
-│ doc1 │ 0.8532 │ body: Rust is a systems..., title: Intr │
-│ doc3 │ 0.4210 │ body: JavaScript powers..., title: Web  │
-╰──────┴────────┴─────────────────────────────────────────╯
-</code></pre>
-<p><strong>JSON output example:</strong></p>
-<pre><code class="language-bash">laurus --format json search "body:rust" --limit 5
-</code></pre>
-<pre><code class="language-json">[
-  {
-    "id": "doc1",
-    "score": 0.8532,
-    "document": {
-      "title": "Introduction to Rust",
-      "body": "Rust is a systems programming language."
-    }
-  }
-]
-</code></pre>
-<hr>
-<h2 id="repl"><a class="header" href="#repl"><code>repl</code></a></h2>
-<p>Start an interactive REPL session. See <a href="repl.html">REPL</a> for details.</p>
-<pre><code class="language-bash">laurus repl
-</code></pre>
-<hr>
-<h2 id="serve"><a class="header" href="#serve"><code>serve</code></a></h2>
-<p>Start the gRPC server. See <a href="../server/overview.html">Server Overview</a> for full documentation.</p>
-<pre><code class="language-bash">laurus serve [OPTIONS]
-</code></pre>
-<p><strong>Options:</strong></p>
+let opt = HnswOption {
+    dimension: 384,
+    quantizer: Some(QuantizationMethod::Scalar8Bit),
+    ..Default::default()
+};
+<span class="boring">}</span></code></pre>
+<h3 id="vectorquantizer"><a class="header" href="#vectorquantizer">VectorQuantizer</a></h3>
+<p>The <code>VectorQuantizer</code> manages the quantization lifecycle:</p>
 <div class="table-wrapper">
 <table>
 <thead>
-<tr><th style="text-align: left">Option</th><th style="text-align: left">Short</th><th style="text-align: left">Env Variable</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr>
+<tr><th style="text-align: left">Method</th><th style="text-align: left">Description</th></tr>
 </thead>
 <tbody>
-<tr><td style="text-align: left"><code>--config &lt;PATH&gt;</code></td><td style="text-align: left"><code>-c</code></td><td style="text-align: left"><code>LAURUS_CONFIG</code></td><td style="text-align: left">—</td><td style="text-align: left">Path to a TOML configuration file</td></tr>
-<tr><td style="text-align: left"><code>--host &lt;HOST&gt;</code></td><td style="text-align: left"><code>-H</code></td><td style="text-align: left"><code>LAURUS_HOST</code></td><td style="text-align: left"><code>0.0.0.0</code></td><td style="text-align: left">Listen address</td></tr>
-<tr><td style="text-align: left"><code>--port &lt;PORT&gt;</code></td><td style="text-align: left"><code>-p</code></td><td style="text-align: left"><code>LAURUS_PORT</code></td><td style="text-align: left"><code>50051</code></td><td style="text-align: left">Listen port</td></tr>
-<tr><td style="text-align: left"><code>--http-port &lt;PORT&gt;</code></td><td style="text-align: left">–</td><td style="text-align: left"><code>LAURUS_HTTP_PORT</code></td><td style="text-align: left">–</td><td style="text-align: left">HTTP Gateway port (enables HTTP gateway when set)</td></tr>
-<tr><td style="text-align: left"><code>--log-level &lt;LEVEL&gt;</code></td><td style="text-align: left"><code>-l</code></td><td style="text-align: left"><code>LAURUS_LOG_LEVEL</code></td><td style="text-align: left"><code>info</code></td><td style="text-align: left">Log level (<code>trace</code>, <code>debug</code>, <code>info</code>, <code>warn</code>, <code>error</code>)</td></tr>
+<tr><td style="text-align: left"><code>new(method, dimension)</code></td><td style="text-align: left">Create an untrained quantizer</td></tr>
+<tr><td style="text-align: left"><code>train(vectors)</code></td><td style="text-align: left">Train on representative vectors (computes per-dimension min/max for Scalar8Bit)</td></tr>
+<tr><td style="text-align: left"><code>quantize(vector)</code></td><td style="text-align: left">Compress a vector using the trained parameters</td></tr>
+<tr><td style="text-align: left"><code>dequantize(quantized)</code></td><td style="text-align: left">Decompress a quantized vector back to full precision</td></tr>
 </tbody>
 </table>
 </div>
-<p><strong>Example:</strong></p>
-<pre><code class="language-bash"># Start with defaults (port 50051)
-laurus --data-dir ./my_index serve
+<p>For <code>Scalar8Bit</code>, training computes the min and max value for each dimension. Each component is then mapped to the [0, 255] range. Dequantization reverses this mapping with some precision loss.</p>
+<blockquote>
+<p><strong>Note:</strong> <code>ProductQuantization</code> is defined in the API but is currently unimplemented. Using it will return an error.</p>
+</blockquote>
+<h2 id="segment-files"><a class="header" href="#segment-files">Segment Files</a></h2>
+<p>Each vector index type stores its data in a single segment file:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Index Type</th><th style="text-align: left">File Extension</th><th style="text-align: left">Contents</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left">HNSW</td><td style="text-align: left"><code>.hnsw</code></td><td style="text-align: left">Graph structure, vectors, and metadata</td></tr>
+<tr><td style="text-align: left">Flat</td><td style="text-align: left"><code>.flat</code></td><td style="text-align: left">Raw vectors and metadata</td></tr>
+<tr><td style="text-align: left">IVF</td><td style="text-align: left"><code>.ivf</code></td><td style="text-align: left">Cluster centroids, assigned vectors, and metadata</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="code-example"><a class="header" href="#code-example">Code Example</a></h2>
+<pre class="playground"><code class="language-rust">use std::sync::Arc;
+use laurus::{Document, Engine, Schema};
+use laurus::lexical::TextOption;
+use laurus::vector::HnswOption;
+use laurus::vector::core::distance::DistanceMetric;
+use laurus::storage::memory::MemoryStorage;
 
-# Custom port and log level
-laurus serve --port 8080 --log-level debug
+#[tokio::main]
+async fn main() -&gt; laurus::Result&lt;()&gt; {
+    let storage = Arc::new(MemoryStorage::new(Default::default()));
+    let schema = Schema::builder()
+        .add_text_field("title", TextOption::default())
+        .add_hnsw_field("embedding", HnswOption {
+            dimension: 384,
+            distance: DistanceMetric::Cosine,
+            m: 16,
+            ef_construction: 200,
+            ..Default::default()
+        })
+        .build();
 
-# Use a configuration file
-laurus serve --config config.toml
+    // With an embedder, text in vector fields is automatically embedded
+    let engine = Engine::builder(storage, schema)
+        .embedder(my_embedder)
+        .build()
+        .await?;
 
-# Use environment variables
-LAURUS_DATA_DIR=./my_index LAURUS_PORT=8080 laurus serve
-</code></pre>
+    // Add text to the vector field — it will be embedded automatically
+    engine.add_document("doc-1", Document::builder()
+        .add_text("title", "Rust Programming")
+        .add_text("embedding", "Rust is a systems programming language.")
+        .build()
+    ).await?;
+
+    engine.commit().await?;
+
+    Ok(())
+}</code></pre>
+<h2 id="next-steps"><a class="header" href="#next-steps">Next Steps</a></h2>
+<ul>
+<li>Search the vector index: <a href="../search/vector_search.html">Vector Search</a></li>
+<li>Combine with lexical search: <a href="../search/hybrid_search.html">Hybrid Search</a></li>
+</ul>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="../cli/installation.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../../concepts/indexing/lexical_indexing.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
-                            <a rel="next prefetch" href="../cli/schema_format.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="../../concepts/search.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                             </a>
 
@@ -507,11 +499,11 @@ LAURUS_DATA_DIR=./my_index LAURUS_PORT=8080 laurus serve
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="../cli/installation.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="../../concepts/indexing/lexical_indexing.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 
-                    <a rel="next prefetch" href="../cli/schema_format.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="../../concepts/search.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                     </a>
             </nav>
@@ -531,17 +523,17 @@ LAURUS_DATA_DIR=./my_index LAURUS_PORT=8080 laurus serve
         </script>
 
 
-        <script src="../elasticlunr-ef4e11c1.min.js"></script>
-        <script src="../mark-09e88c2c.min.js"></script>
-        <script src="../searcher-c2a407aa.js"></script>
+        <script src="../../elasticlunr-ef4e11c1.min.js"></script>
+        <script src="../../mark-09e88c2c.min.js"></script>
+        <script src="../../searcher-c2a407aa.js"></script>
 
-        <script src="../clipboard-1626706a.min.js"></script>
-        <script src="../highlight-abc7f01d.js"></script>
-        <script src="../book-a0b12cfe.js"></script>
+        <script src="../../clipboard-1626706a.min.js"></script>
+        <script src="../../highlight-abc7f01d.js"></script>
+        <script src="../../book-a0b12cfe.js"></script>
 
         <!-- Custom JS scripts -->
-        <script src="../mermaid-9a6dd17b.min.js"></script>
-        <script src="../mermaid-init-ddddd38b.js"></script>
+        <script src="../../mermaid-9a6dd17b.min.js"></script>
+        <script src="../../mermaid-init-ddddd38b.js"></script>
 
 
 

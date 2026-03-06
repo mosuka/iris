@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Commands - Laurus Documentation</title>
+        <title>gRPC API Reference - Laurus Documentation</title>
 
 
         <!-- Custom HTML head -->
@@ -177,327 +177,336 @@
 
                 <div id="mdbook-content" class="content">
                     <main>
-                        <h1 id="command-reference"><a class="header" href="#command-reference">Command Reference</a></h1>
-<h2 id="global-options"><a class="header" href="#global-options">Global Options</a></h2>
-<p>Every command accepts these options:</p>
+                        <h1 id="grpc-api-reference"><a class="header" href="#grpc-api-reference">gRPC API Reference</a></h1>
+<p>All services are defined under the <code>laurus.v1</code> protobuf package.</p>
+<h2 id="services-overview"><a class="header" href="#services-overview">Services Overview</a></h2>
 <div class="table-wrapper">
 <table>
 <thead>
-<tr><th style="text-align: left">Option</th><th style="text-align: left">Environment Variable</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr>
+<tr><th style="text-align: left">Service</th><th style="text-align: left">RPCs</th><th style="text-align: left">Description</th></tr>
 </thead>
 <tbody>
-<tr><td style="text-align: left"><code>--data-dir &lt;PATH&gt;</code></td><td style="text-align: left"><code>LAURUS_DATA_DIR</code></td><td style="text-align: left"><code>./laurus_data</code></td><td style="text-align: left">Path to the index data directory</td></tr>
-<tr><td style="text-align: left"><code>--format &lt;FORMAT&gt;</code></td><td style="text-align: left">—</td><td style="text-align: left"><code>table</code></td><td style="text-align: left">Output format: <code>table</code> or <code>json</code></td></tr>
+<tr><td style="text-align: left"><code>HealthService</code></td><td style="text-align: left"><code>Check</code></td><td style="text-align: left">Health checking</td></tr>
+<tr><td style="text-align: left"><code>IndexService</code></td><td style="text-align: left"><code>CreateIndex</code>, <code>GetIndex</code>, <code>GetSchema</code></td><td style="text-align: left">Index lifecycle and schema</td></tr>
+<tr><td style="text-align: left"><code>DocumentService</code></td><td style="text-align: left"><code>PutDocument</code>, <code>AddDocument</code>, <code>GetDocuments</code>, <code>DeleteDocuments</code>, <code>Commit</code></td><td style="text-align: left">Document CRUD and commit</td></tr>
+<tr><td style="text-align: left"><code>SearchService</code></td><td style="text-align: left"><code>Search</code>, <code>SearchStream</code></td><td style="text-align: left">Unary and streaming search</td></tr>
 </tbody>
 </table>
 </div>
-<pre><code class="language-bash"># Example: use JSON output with a custom data directory
-laurus --data-dir /var/data/my_index --format json search "title:rust"
-</code></pre>
 <hr>
-<h2 id="create--create-a-resource"><a class="header" href="#create--create-a-resource"><code>create</code> — Create a Resource</a></h2>
-<h3 id="create-index"><a class="header" href="#create-index"><code>create index</code></a></h3>
-<p>Create a new index from a schema TOML file.</p>
-<pre><code class="language-bash">laurus create index --schema &lt;FILE&gt;
+<h2 id="healthservice"><a class="header" href="#healthservice">HealthService</a></h2>
+<h3 id="check"><a class="header" href="#check"><code>Check</code></a></h3>
+<p>Returns the current serving status of the server.</p>
+<pre><code class="language-protobuf">rpc Check(HealthCheckRequest) returns (HealthCheckResponse);
 </code></pre>
-<p><strong>Arguments:</strong></p>
+<p><strong>Response fields:</strong></p>
 <div class="table-wrapper">
 <table>
 <thead>
-<tr><th style="text-align: left">Flag</th><th style="text-align: left">Required</th><th style="text-align: left">Description</th></tr>
+<tr><th style="text-align: left">Field</th><th style="text-align: left">Type</th><th style="text-align: left">Description</th></tr>
 </thead>
 <tbody>
-<tr><td style="text-align: left"><code>--schema &lt;FILE&gt;</code></td><td style="text-align: left">Yes</td><td style="text-align: left">Path to a TOML file defining the index schema</td></tr>
+<tr><td style="text-align: left"><code>status</code></td><td style="text-align: left"><code>ServingStatus</code></td><td style="text-align: left"><code>SERVING_STATUS_SERVING</code> when the server is ready</td></tr>
 </tbody>
 </table>
 </div>
-<p><strong>Schema file format:</strong></p>
-<p>The schema file follows the same structure as the <code>Schema</code> type in the Laurus library. See <a href="schema_format.html">Schema Format Reference</a> for full details. Example:</p>
-<pre><code class="language-toml">default_fields = ["title", "body"]
-
-[fields.title.Text]
-stored = true
-indexed = true
-
-[fields.body.Text]
-stored = true
-indexed = true
-
-[fields.category.Text]
-stored = true
-indexed = true
-</code></pre>
-<p><strong>Example:</strong></p>
-<pre><code class="language-bash">laurus --data-dir ./my_index create index --schema schema.toml
-# Index created at ./my_index.
-</code></pre>
-<blockquote>
-<p><strong>Note:</strong> An error is returned if the index already exists. Delete the data directory to recreate.</p>
-</blockquote>
-<h3 id="create-schema"><a class="header" href="#create-schema"><code>create schema</code></a></h3>
-<p>Interactively generate a schema TOML file through a guided wizard.</p>
-<pre><code class="language-bash">laurus create schema [--output &lt;FILE&gt;]
-</code></pre>
-<p><strong>Arguments:</strong></p>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th style="text-align: left">Flag</th><th style="text-align: left">Required</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr>
-</thead>
-<tbody>
-<tr><td style="text-align: left"><code>--output &lt;FILE&gt;</code></td><td style="text-align: left">No</td><td style="text-align: left"><code>schema.toml</code></td><td style="text-align: left">Output file path for the generated schema</td></tr>
-</tbody>
-</table>
-</div>
-<p>The wizard guides you through:</p>
-<ol>
-<li><strong>Field definition</strong> — Enter a field name, select the type, and configure type-specific options</li>
-<li><strong>Repeat</strong> — Add as many fields as needed</li>
-<li><strong>Default fields</strong> — Select which lexical fields to use as default search fields</li>
-<li><strong>Preview</strong> — Review the generated TOML before saving</li>
-<li><strong>Save</strong> — Write the schema file</li>
-</ol>
-<p><strong>Supported field types:</strong></p>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th style="text-align: left">Type</th><th style="text-align: left">Category</th><th style="text-align: left">Options</th></tr>
-</thead>
-<tbody>
-<tr><td style="text-align: left"><code>Text</code></td><td style="text-align: left">Lexical</td><td style="text-align: left"><code>indexed</code>, <code>stored</code>, <code>term_vectors</code></td></tr>
-<tr><td style="text-align: left"><code>Integer</code></td><td style="text-align: left">Lexical</td><td style="text-align: left"><code>indexed</code>, <code>stored</code></td></tr>
-<tr><td style="text-align: left"><code>Float</code></td><td style="text-align: left">Lexical</td><td style="text-align: left"><code>indexed</code>, <code>stored</code></td></tr>
-<tr><td style="text-align: left"><code>Boolean</code></td><td style="text-align: left">Lexical</td><td style="text-align: left"><code>indexed</code>, <code>stored</code></td></tr>
-<tr><td style="text-align: left"><code>DateTime</code></td><td style="text-align: left">Lexical</td><td style="text-align: left"><code>indexed</code>, <code>stored</code></td></tr>
-<tr><td style="text-align: left"><code>Geo</code></td><td style="text-align: left">Lexical</td><td style="text-align: left"><code>indexed</code>, <code>stored</code></td></tr>
-<tr><td style="text-align: left"><code>Bytes</code></td><td style="text-align: left">Lexical</td><td style="text-align: left"><code>stored</code></td></tr>
-<tr><td style="text-align: left"><code>Hnsw</code></td><td style="text-align: left">Vector</td><td style="text-align: left"><code>dimension</code>, <code>distance</code>, <code>m</code>, <code>ef_construction</code></td></tr>
-<tr><td style="text-align: left"><code>Flat</code></td><td style="text-align: left">Vector</td><td style="text-align: left"><code>dimension</code>, <code>distance</code></td></tr>
-<tr><td style="text-align: left"><code>Ivf</code></td><td style="text-align: left">Vector</td><td style="text-align: left"><code>dimension</code>, <code>distance</code>, <code>n_clusters</code>, <code>n_probe</code></td></tr>
-</tbody>
-</table>
-</div>
-<p><strong>Example:</strong></p>
-<pre><code class="language-bash"># Generate schema.toml interactively
-laurus create schema
-
-# Specify output path
-laurus create schema --output my_schema.toml
-
-# Then create an index from the generated schema
-laurus create index --schema schema.toml
-</code></pre>
 <hr>
-<h2 id="get--get-a-resource"><a class="header" href="#get--get-a-resource"><code>get</code> — Get a Resource</a></h2>
-<h3 id="get-index"><a class="header" href="#get-index"><code>get index</code></a></h3>
-<p>Display statistics about the index.</p>
-<pre><code class="language-bash">laurus get index
+<h2 id="indexservice"><a class="header" href="#indexservice">IndexService</a></h2>
+<h3 id="createindex"><a class="header" href="#createindex"><code>CreateIndex</code></a></h3>
+<p>Create a new index with the given schema. Fails with <code>ALREADY_EXISTS</code> if an index is already open.</p>
+<pre><code class="language-protobuf">rpc CreateIndex(CreateIndexRequest) returns (CreateIndexResponse);
 </code></pre>
-<p><strong>Table output example:</strong></p>
-<pre><code class="language-text">Document count: 42
-
-Vector fields:
-╭──────────┬─────────┬───────────╮
-│ Field    │ Vectors │ Dimension │
-├──────────┼─────────┼───────────┤
-│ text_vec │ 42      │ 384       │
-╰──────────┴─────────┴───────────╯
+<p><strong>Request fields:</strong></p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Field</th><th style="text-align: left">Type</th><th style="text-align: left">Required</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>schema</code></td><td style="text-align: left"><code>Schema</code></td><td style="text-align: left">Yes</td><td style="text-align: left">Index schema definition</td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>Schema structure:</strong></p>
+<pre><code class="language-protobuf">message Schema {
+  map&lt;string, FieldOption&gt; fields = 1;
+  repeated string default_fields = 2;
+}
 </code></pre>
-<p><strong>JSON output example:</strong></p>
-<pre><code class="language-bash">laurus --format json get index
-</code></pre>
+<p>Each <code>FieldOption</code> is a <code>oneof</code> with one of the following field types:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Lexical Fields</th><th style="text-align: left">Vector Fields</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>TextOption</code> (<code>indexed</code>, <code>stored</code>, <code>term_vectors</code>)</td><td style="text-align: left"><code>HnswOption</code> (<code>dimension</code>, <code>distance</code>, <code>m</code>, <code>ef_construction</code>, <code>base_weight</code>, <code>quantizer</code>)</td></tr>
+<tr><td style="text-align: left"><code>IntegerOption</code> (<code>indexed</code>, <code>stored</code>)</td><td style="text-align: left"><code>FlatOption</code> (<code>dimension</code>, <code>distance</code>, <code>base_weight</code>, <code>quantizer</code>)</td></tr>
+<tr><td style="text-align: left"><code>FloatOption</code> (<code>indexed</code>, <code>stored</code>)</td><td style="text-align: left"><code>IvfOption</code> (<code>dimension</code>, <code>distance</code>, <code>n_clusters</code>, <code>n_probe</code>, <code>base_weight</code>, <code>quantizer</code>)</td></tr>
+<tr><td style="text-align: left"><code>BooleanOption</code> (<code>indexed</code>, <code>stored</code>)</td><td style="text-align: left"></td></tr>
+<tr><td style="text-align: left"><code>DateTimeOption</code> (<code>indexed</code>, <code>stored</code>)</td><td style="text-align: left"></td></tr>
+<tr><td style="text-align: left"><code>GeoOption</code> (<code>indexed</code>, <code>stored</code>)</td><td style="text-align: left"></td></tr>
+<tr><td style="text-align: left"><code>BytesOption</code> (<code>stored</code>)</td><td style="text-align: left"></td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>Distance metrics:</strong> <code>COSINE</code>, <code>EUCLIDEAN</code>, <code>MANHATTAN</code>, <code>DOT_PRODUCT</code>, <code>ANGULAR</code></p>
+<p><strong>Quantization methods:</strong> <code>NONE</code>, <code>SCALAR_8BIT</code>, <code>PRODUCT_QUANTIZATION</code></p>
+<p><strong>Example:</strong></p>
 <pre><code class="language-json">{
-  "document_count": 42,
-  "fields": {
-    "text_vec": {
-      "vector_count": 42,
-      "dimension": 384
-    }
+  "schema": {
+    "fields": {
+      "title": {"text": {"indexed": true, "stored": true, "term_vectors": true}},
+      "embedding": {"hnsw": {"dimension": 384, "distance": "DISTANCE_METRIC_COSINE", "m": 16, "ef_construction": 200}}
+    },
+    "default_fields": ["title"]
   }
 }
 </code></pre>
-<h3 id="get-doc"><a class="header" href="#get-doc"><code>get doc</code></a></h3>
-<p>Retrieve a document (and all its chunks) by external ID.</p>
-<pre><code class="language-bash">laurus get doc --id &lt;ID&gt;
+<h3 id="getindex"><a class="header" href="#getindex"><code>GetIndex</code></a></h3>
+<p>Get index statistics.</p>
+<pre><code class="language-protobuf">rpc GetIndex(GetIndexRequest) returns (GetIndexResponse);
 </code></pre>
-<p><strong>Table output example:</strong></p>
-<pre><code class="language-text">╭──────┬─────────────────────────────────────────╮
-│ ID   │ Fields                                  │
-├──────┼─────────────────────────────────────────┤
-│ doc1 │ body: This is a test, title: Hello World │
-╰──────┴─────────────────────────────────────────╯
-</code></pre>
-<p><strong>JSON output example:</strong></p>
-<pre><code class="language-bash">laurus --format json get doc --id doc1
-</code></pre>
-<pre><code class="language-json">[
-  {
-    "id": "doc1",
-    "document": {
-      "title": "Hello World",
-      "body": "This is a test document."
-    }
-  }
-]
-</code></pre>
-<hr>
-<h2 id="add--add-a-resource"><a class="header" href="#add--add-a-resource"><code>add</code> — Add a Resource</a></h2>
-<h3 id="add-doc"><a class="header" href="#add-doc"><code>add doc</code></a></h3>
-<p>Add a document to the index. Documents are not searchable until <code>commit</code> is called.</p>
-<pre><code class="language-bash">laurus add doc --id &lt;ID&gt; --data &lt;JSON&gt;
-</code></pre>
-<p><strong>Arguments:</strong></p>
+<p><strong>Response fields:</strong></p>
 <div class="table-wrapper">
 <table>
 <thead>
-<tr><th style="text-align: left">Flag</th><th style="text-align: left">Required</th><th style="text-align: left">Description</th></tr>
+<tr><th style="text-align: left">Field</th><th style="text-align: left">Type</th><th style="text-align: left">Description</th></tr>
 </thead>
 <tbody>
-<tr><td style="text-align: left"><code>--id &lt;ID&gt;</code></td><td style="text-align: left">Yes</td><td style="text-align: left">External document ID (string)</td></tr>
-<tr><td style="text-align: left"><code>--data &lt;JSON&gt;</code></td><td style="text-align: left">Yes</td><td style="text-align: left">Document fields as a JSON string</td></tr>
+<tr><td style="text-align: left"><code>document_count</code></td><td style="text-align: left"><code>uint64</code></td><td style="text-align: left">Total number of documents in the index</td></tr>
+<tr><td style="text-align: left"><code>vector_fields</code></td><td style="text-align: left"><code>map&lt;string, VectorFieldStats&gt;</code></td><td style="text-align: left">Per-field vector statistics</td></tr>
 </tbody>
 </table>
 </div>
-<p>The JSON format is a flat object mapping field names to values:</p>
-<pre><code class="language-json">{
-  "title": "Introduction to Rust",
-  "body": "Rust is a systems programming language.",
-  "category": "programming"
+<p>Each <code>VectorFieldStats</code> contains <code>vector_count</code> and <code>dimension</code>.</p>
+<h3 id="getschema"><a class="header" href="#getschema"><code>GetSchema</code></a></h3>
+<p>Retrieve the current index schema.</p>
+<pre><code class="language-protobuf">rpc GetSchema(GetSchemaRequest) returns (GetSchemaResponse);
+</code></pre>
+<p><strong>Response fields:</strong></p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Field</th><th style="text-align: left">Type</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>schema</code></td><td style="text-align: left"><code>Schema</code></td><td style="text-align: left">The index schema</td></tr>
+</tbody>
+</table>
+</div>
+<hr>
+<h2 id="documentservice"><a class="header" href="#documentservice">DocumentService</a></h2>
+<h3 id="putdocument"><a class="header" href="#putdocument"><code>PutDocument</code></a></h3>
+<p>Insert or replace a document by ID. If a document with the same ID already exists, it is replaced.</p>
+<pre><code class="language-protobuf">rpc PutDocument(PutDocumentRequest) returns (PutDocumentResponse);
+</code></pre>
+<p><strong>Request fields:</strong></p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Field</th><th style="text-align: left">Type</th><th style="text-align: left">Required</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>id</code></td><td style="text-align: left"><code>string</code></td><td style="text-align: left">Yes</td><td style="text-align: left">External document ID</td></tr>
+<tr><td style="text-align: left"><code>document</code></td><td style="text-align: left"><code>Document</code></td><td style="text-align: left">Yes</td><td style="text-align: left">Document content</td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>Document structure:</strong></p>
+<pre><code class="language-protobuf">message Document {
+  map&lt;string, Value&gt; fields = 1;
 }
 </code></pre>
-<p><strong>Example:</strong></p>
-<pre><code class="language-bash">laurus add doc --id doc1 --data '{"title":"Hello World","body":"This is a test document."}'
-# Document 'doc1' added. Run 'commit' to persist changes.
-</code></pre>
-<blockquote>
-<p><strong>Tip:</strong> Multiple documents can share the same external ID (chunking pattern). Use <code>add doc</code> for each chunk.</p>
-</blockquote>
-<hr>
-<h2 id="delete--delete-a-resource"><a class="header" href="#delete--delete-a-resource"><code>delete</code> — Delete a Resource</a></h2>
-<h3 id="delete-doc"><a class="header" href="#delete-doc"><code>delete doc</code></a></h3>
-<p>Delete a document (and all its chunks) by external ID.</p>
-<pre><code class="language-bash">laurus delete doc --id &lt;ID&gt;
-</code></pre>
-<p><strong>Example:</strong></p>
-<pre><code class="language-bash">laurus delete doc --id doc1
-# Document 'doc1' deleted. Run 'commit' to persist changes.
-</code></pre>
-<hr>
-<h2 id="commit"><a class="header" href="#commit"><code>commit</code></a></h2>
-<p>Commit pending changes (additions and deletions) to the index. Until committed, changes are not visible to search.</p>
-<pre><code class="language-bash">laurus commit
-</code></pre>
-<p><strong>Example:</strong></p>
-<pre><code class="language-bash">laurus --data-dir ./my_index commit
-# Changes committed successfully.
-</code></pre>
-<hr>
-<h2 id="search"><a class="header" href="#search"><code>search</code></a></h2>
-<p>Execute a search query using the <a href="../concepts/query_dsl.html">Query DSL</a>.</p>
-<pre><code class="language-bash">laurus search &lt;QUERY&gt; [--limit &lt;N&gt;] [--offset &lt;N&gt;]
-</code></pre>
-<p><strong>Arguments:</strong></p>
+<p>Each <code>Value</code> is a <code>oneof</code> with these types:</p>
 <div class="table-wrapper">
 <table>
 <thead>
-<tr><th style="text-align: left">Argument / Flag</th><th style="text-align: left">Required</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr>
+<tr><th style="text-align: left">Type</th><th style="text-align: left">Proto Field</th><th style="text-align: left">Description</th></tr>
 </thead>
 <tbody>
-<tr><td style="text-align: left"><code>&lt;QUERY&gt;</code></td><td style="text-align: left">Yes</td><td style="text-align: left">—</td><td style="text-align: left">Query string in Laurus Query DSL</td></tr>
-<tr><td style="text-align: left"><code>--limit &lt;N&gt;</code></td><td style="text-align: left">No</td><td style="text-align: left"><code>10</code></td><td style="text-align: left">Maximum number of results</td></tr>
-<tr><td style="text-align: left"><code>--offset &lt;N&gt;</code></td><td style="text-align: left">No</td><td style="text-align: left"><code>0</code></td><td style="text-align: left">Number of results to skip</td></tr>
+<tr><td style="text-align: left">Null</td><td style="text-align: left"><code>null_value</code></td><td style="text-align: left">Null value</td></tr>
+<tr><td style="text-align: left">Boolean</td><td style="text-align: left"><code>bool_value</code></td><td style="text-align: left">Boolean value</td></tr>
+<tr><td style="text-align: left">Integer</td><td style="text-align: left"><code>int64_value</code></td><td style="text-align: left">64-bit integer</td></tr>
+<tr><td style="text-align: left">Float</td><td style="text-align: left"><code>float64_value</code></td><td style="text-align: left">64-bit floating point</td></tr>
+<tr><td style="text-align: left">Text</td><td style="text-align: left"><code>text_value</code></td><td style="text-align: left">UTF-8 string</td></tr>
+<tr><td style="text-align: left">Bytes</td><td style="text-align: left"><code>bytes_value</code></td><td style="text-align: left">Raw bytes</td></tr>
+<tr><td style="text-align: left">Vector</td><td style="text-align: left"><code>vector_value</code></td><td style="text-align: left"><code>VectorValue</code> (list of floats)</td></tr>
+<tr><td style="text-align: left">DateTime</td><td style="text-align: left"><code>datetime_value</code></td><td style="text-align: left">Unix microseconds (UTC)</td></tr>
+<tr><td style="text-align: left">Geo</td><td style="text-align: left"><code>geo_value</code></td><td style="text-align: left"><code>GeoPoint</code> (latitude, longitude)</td></tr>
 </tbody>
 </table>
 </div>
-<p><strong>Query syntax examples:</strong></p>
-<pre><code class="language-bash"># Term query
-laurus search "body:rust"
-
-# Phrase query
-laurus search 'body:"machine learning"'
-
-# Boolean query
-laurus search "+body:programming -body:python"
-
-# Fuzzy query (typo tolerance)
-laurus search "body:programing~2"
-
-# Wildcard query
-laurus search "title:intro*"
-
-# Range query
-laurus search "price:[10 TO 50]"
+<h3 id="adddocument"><a class="header" href="#adddocument"><code>AddDocument</code></a></h3>
+<p>Add a document. Unlike <code>PutDocument</code>, this does not replace existing documents with the same ID — multiple documents can share an ID (chunking pattern).</p>
+<pre><code class="language-protobuf">rpc AddDocument(AddDocumentRequest) returns (AddDocumentResponse);
 </code></pre>
-<p><strong>Table output example:</strong></p>
-<pre><code class="language-text">╭──────┬────────┬─────────────────────────────────────────╮
-│ ID   │ Score  │ Fields                                  │
-├──────┼────────┼─────────────────────────────────────────┤
-│ doc1 │ 0.8532 │ body: Rust is a systems..., title: Intr │
-│ doc3 │ 0.4210 │ body: JavaScript powers..., title: Web  │
-╰──────┴────────┴─────────────────────────────────────────╯
+<p>Request fields are the same as <code>PutDocument</code>.</p>
+<h3 id="getdocuments"><a class="header" href="#getdocuments"><code>GetDocuments</code></a></h3>
+<p>Retrieve all documents matching the given external ID.</p>
+<pre><code class="language-protobuf">rpc GetDocuments(GetDocumentsRequest) returns (GetDocumentsResponse);
 </code></pre>
-<p><strong>JSON output example:</strong></p>
-<pre><code class="language-bash">laurus --format json search "body:rust" --limit 5
+<p><strong>Request fields:</strong></p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Field</th><th style="text-align: left">Type</th><th style="text-align: left">Required</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>id</code></td><td style="text-align: left"><code>string</code></td><td style="text-align: left">Yes</td><td style="text-align: left">External document ID</td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>Response fields:</strong></p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Field</th><th style="text-align: left">Type</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>documents</code></td><td style="text-align: left"><code>repeated Document</code></td><td style="text-align: left">Matching documents</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="deletedocuments"><a class="header" href="#deletedocuments"><code>DeleteDocuments</code></a></h3>
+<p>Delete all documents matching the given external ID.</p>
+<pre><code class="language-protobuf">rpc DeleteDocuments(DeleteDocumentsRequest) returns (DeleteDocumentsResponse);
 </code></pre>
-<pre><code class="language-json">[
-  {
-    "id": "doc1",
-    "score": 0.8532,
-    "document": {
-      "title": "Introduction to Rust",
-      "body": "Rust is a systems programming language."
-    }
+<h3 id="commit"><a class="header" href="#commit"><code>Commit</code></a></h3>
+<p>Commit pending changes (additions and deletions) to the index. Changes are not visible to search until committed.</p>
+<pre><code class="language-protobuf">rpc Commit(CommitRequest) returns (CommitResponse);
+</code></pre>
+<hr>
+<h2 id="searchservice"><a class="header" href="#searchservice">SearchService</a></h2>
+<h3 id="search"><a class="header" href="#search"><code>Search</code></a></h3>
+<p>Execute a search query and return results as a single response.</p>
+<pre><code class="language-protobuf">rpc Search(SearchRequest) returns (SearchResponse);
+</code></pre>
+<h3 id="searchstream"><a class="header" href="#searchstream"><code>SearchStream</code></a></h3>
+<p>Execute a search query and stream results back one at a time.</p>
+<pre><code class="language-protobuf">rpc SearchStream(SearchRequest) returns (stream SearchResult);
+</code></pre>
+<h3 id="searchrequest-fields"><a class="header" href="#searchrequest-fields">SearchRequest Fields</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Field</th><th style="text-align: left">Type</th><th style="text-align: left">Required</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>query</code></td><td style="text-align: left"><code>string</code></td><td style="text-align: left">No</td><td style="text-align: left">Lexical search query in <a href="../concepts/query_dsl.html">Query DSL</a></td></tr>
+<tr><td style="text-align: left"><code>query_vectors</code></td><td style="text-align: left"><code>repeated QueryVector</code></td><td style="text-align: left">No</td><td style="text-align: left">Vector search queries</td></tr>
+<tr><td style="text-align: left"><code>limit</code></td><td style="text-align: left"><code>uint32</code></td><td style="text-align: left">No</td><td style="text-align: left">Maximum number of results (default: engine default)</td></tr>
+<tr><td style="text-align: left"><code>offset</code></td><td style="text-align: left"><code>uint32</code></td><td style="text-align: left">No</td><td style="text-align: left">Number of results to skip</td></tr>
+<tr><td style="text-align: left"><code>fusion</code></td><td style="text-align: left"><code>FusionAlgorithm</code></td><td style="text-align: left">No</td><td style="text-align: left">Fusion algorithm for hybrid search</td></tr>
+<tr><td style="text-align: left"><code>lexical_params</code></td><td style="text-align: left"><code>LexicalParams</code></td><td style="text-align: left">No</td><td style="text-align: left">Lexical search parameters</td></tr>
+<tr><td style="text-align: left"><code>vector_params</code></td><td style="text-align: left"><code>VectorParams</code></td><td style="text-align: left">No</td><td style="text-align: left">Vector search parameters</td></tr>
+<tr><td style="text-align: left"><code>field_boosts</code></td><td style="text-align: left"><code>map&lt;string, float&gt;</code></td><td style="text-align: left">No</td><td style="text-align: left">Per-field score boosting</td></tr>
+</tbody>
+</table>
+</div>
+<p>At least one of <code>query</code> or <code>query_vectors</code> must be provided.</p>
+<h3 id="queryvector"><a class="header" href="#queryvector">QueryVector</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Field</th><th style="text-align: left">Type</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>vector</code></td><td style="text-align: left"><code>repeated float</code></td><td style="text-align: left">Query vector</td></tr>
+<tr><td style="text-align: left"><code>weight</code></td><td style="text-align: left"><code>float</code></td><td style="text-align: left">Weight for this vector (default: 1.0)</td></tr>
+<tr><td style="text-align: left"><code>fields</code></td><td style="text-align: left"><code>repeated string</code></td><td style="text-align: left">Target vector fields (empty = all)</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="fusionalgorithm"><a class="header" href="#fusionalgorithm">FusionAlgorithm</a></h3>
+<p>A <code>oneof</code> with two options:</p>
+<ul>
+<li><strong>RRF</strong> (Reciprocal Rank Fusion): <code>k</code> parameter (default: 60)</li>
+<li><strong>WeightedSum</strong>: <code>lexical_weight</code> and <code>vector_weight</code></li>
+</ul>
+<h3 id="lexicalparams"><a class="header" href="#lexicalparams">LexicalParams</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Field</th><th style="text-align: left">Type</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>min_score</code></td><td style="text-align: left"><code>float</code></td><td style="text-align: left">Minimum score threshold</td></tr>
+<tr><td style="text-align: left"><code>timeout_ms</code></td><td style="text-align: left"><code>uint64</code></td><td style="text-align: left">Search timeout in milliseconds</td></tr>
+<tr><td style="text-align: left"><code>parallel</code></td><td style="text-align: left"><code>bool</code></td><td style="text-align: left">Enable parallel search</td></tr>
+<tr><td style="text-align: left"><code>sort_by</code></td><td style="text-align: left"><code>SortSpec</code></td><td style="text-align: left">Sort by a field instead of score</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="vectorparams"><a class="header" href="#vectorparams">VectorParams</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Field</th><th style="text-align: left">Type</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>fields</code></td><td style="text-align: left"><code>repeated string</code></td><td style="text-align: left">Target vector fields</td></tr>
+<tr><td style="text-align: left"><code>score_mode</code></td><td style="text-align: left"><code>VectorScoreMode</code></td><td style="text-align: left"><code>WEIGHTED_SUM</code>, <code>MAX_SIM</code>, or <code>LATE_INTERACTION</code></td></tr>
+<tr><td style="text-align: left"><code>overfetch</code></td><td style="text-align: left"><code>float</code></td><td style="text-align: left">Overfetch factor (default: 2.0)</td></tr>
+<tr><td style="text-align: left"><code>min_score</code></td><td style="text-align: left"><code>float</code></td><td style="text-align: left">Minimum score threshold</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="searchresult"><a class="header" href="#searchresult">SearchResult</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Field</th><th style="text-align: left">Type</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>id</code></td><td style="text-align: left"><code>string</code></td><td style="text-align: left">External document ID</td></tr>
+<tr><td style="text-align: left"><code>score</code></td><td style="text-align: left"><code>float</code></td><td style="text-align: left">Relevance score</td></tr>
+<tr><td style="text-align: left"><code>document</code></td><td style="text-align: left"><code>Document</code></td><td style="text-align: left">Document content</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="example"><a class="header" href="#example">Example</a></h3>
+<pre><code class="language-json">{
+  "query": "body:rust",
+  "query_vectors": [
+    {"vector": [0.1, 0.2, 0.3], "weight": 1.0}
+  ],
+  "limit": 10,
+  "fusion": {
+    "rrf": {"k": 60}
+  },
+  "field_boosts": {
+    "title": 2.0
   }
-]
+}
 </code></pre>
 <hr>
-<h2 id="repl"><a class="header" href="#repl"><code>repl</code></a></h2>
-<p>Start an interactive REPL session. See <a href="repl.html">REPL</a> for details.</p>
-<pre><code class="language-bash">laurus repl
-</code></pre>
-<hr>
-<h2 id="serve"><a class="header" href="#serve"><code>serve</code></a></h2>
-<p>Start the gRPC server. See <a href="../server/overview.html">Server Overview</a> for full documentation.</p>
-<pre><code class="language-bash">laurus serve [OPTIONS]
-</code></pre>
-<p><strong>Options:</strong></p>
+<h2 id="error-handling"><a class="header" href="#error-handling">Error Handling</a></h2>
+<p>gRPC errors are returned as standard <code>Status</code> codes:</p>
 <div class="table-wrapper">
 <table>
 <thead>
-<tr><th style="text-align: left">Option</th><th style="text-align: left">Short</th><th style="text-align: left">Env Variable</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr>
+<tr><th style="text-align: left">Laurus Error</th><th style="text-align: left">gRPC Status</th><th style="text-align: left">When</th></tr>
 </thead>
 <tbody>
-<tr><td style="text-align: left"><code>--config &lt;PATH&gt;</code></td><td style="text-align: left"><code>-c</code></td><td style="text-align: left"><code>LAURUS_CONFIG</code></td><td style="text-align: left">—</td><td style="text-align: left">Path to a TOML configuration file</td></tr>
-<tr><td style="text-align: left"><code>--host &lt;HOST&gt;</code></td><td style="text-align: left"><code>-H</code></td><td style="text-align: left"><code>LAURUS_HOST</code></td><td style="text-align: left"><code>0.0.0.0</code></td><td style="text-align: left">Listen address</td></tr>
-<tr><td style="text-align: left"><code>--port &lt;PORT&gt;</code></td><td style="text-align: left"><code>-p</code></td><td style="text-align: left"><code>LAURUS_PORT</code></td><td style="text-align: left"><code>50051</code></td><td style="text-align: left">Listen port</td></tr>
-<tr><td style="text-align: left"><code>--http-port &lt;PORT&gt;</code></td><td style="text-align: left">–</td><td style="text-align: left"><code>LAURUS_HTTP_PORT</code></td><td style="text-align: left">–</td><td style="text-align: left">HTTP Gateway port (enables HTTP gateway when set)</td></tr>
-<tr><td style="text-align: left"><code>--log-level &lt;LEVEL&gt;</code></td><td style="text-align: left"><code>-l</code></td><td style="text-align: left"><code>LAURUS_LOG_LEVEL</code></td><td style="text-align: left"><code>info</code></td><td style="text-align: left">Log level (<code>trace</code>, <code>debug</code>, <code>info</code>, <code>warn</code>, <code>error</code>)</td></tr>
+<tr><td style="text-align: left">Schema / Query / Field / JSON</td><td style="text-align: left"><code>INVALID_ARGUMENT</code></td><td style="text-align: left">Malformed request or schema</td></tr>
+<tr><td style="text-align: left">No index open</td><td style="text-align: left"><code>FAILED_PRECONDITION</code></td><td style="text-align: left">RPC called before <code>CreateIndex</code></td></tr>
+<tr><td style="text-align: left">Index already exists</td><td style="text-align: left"><code>ALREADY_EXISTS</code></td><td style="text-align: left"><code>CreateIndex</code> called twice</td></tr>
+<tr><td style="text-align: left">Not implemented</td><td style="text-align: left"><code>UNIMPLEMENTED</code></td><td style="text-align: left">Feature not yet supported</td></tr>
+<tr><td style="text-align: left">Internal errors</td><td style="text-align: left"><code>INTERNAL</code></td><td style="text-align: left">I/O, storage, or unexpected errors</td></tr>
 </tbody>
 </table>
 </div>
-<p><strong>Example:</strong></p>
-<pre><code class="language-bash"># Start with defaults (port 50051)
-laurus --data-dir ./my_index serve
-
-# Custom port and log level
-laurus serve --port 8080 --log-level debug
-
-# Use a configuration file
-laurus serve --config config.toml
-
-# Use environment variables
-LAURUS_DATA_DIR=./my_index LAURUS_PORT=8080 laurus serve
-</code></pre>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="../cli/installation.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../server/configuration.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
-                            <a rel="next prefetch" href="../cli/schema_format.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="../server/http_gateway.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                             </a>
 
@@ -507,11 +516,11 @@ LAURUS_DATA_DIR=./my_index LAURUS_PORT=8080 laurus serve
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="../cli/installation.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="../server/configuration.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 
-                    <a rel="next prefetch" href="../cli/schema_format.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="../server/http_gateway.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                     </a>
             </nav>

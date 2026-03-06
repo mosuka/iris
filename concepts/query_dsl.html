@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Error Handling - Laurus Documentation</title>
+        <title>Query DSL - Laurus Documentation</title>
 
 
         <!-- Custom HTML head -->
@@ -35,10 +35,10 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-f39bba3e.js";
+            window.path_to_searchindex_js = "../searchindex-674b4e1e.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-f13dbb35.js"></script>
+        <script src="../toc-072c2e71.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -177,197 +177,261 @@
 
                 <div id="mdbook-content" class="content">
                     <main>
-                        <h1 id="error-handling"><a class="header" href="#error-handling">Error Handling</a></h1>
-<p>Laurus uses a unified error type for all operations. Understanding the error system helps you write robust applications that handle failures gracefully.</p>
-<h2 id="lauruserror"><a class="header" href="#lauruserror">LaurusError</a></h2>
-<p>All Laurus operations return <code>Result&lt;T&gt;</code>, which is an alias for <code>std::result::Result&lt;T, LaurusError&gt;</code>.</p>
-<p><code>LaurusError</code> is an enum with variants for each category of failure:</p>
+                        <h1 id="query-dsl"><a class="header" href="#query-dsl">Query DSL</a></h1>
+<p>Laurus provides a unified query DSL (Domain Specific Language) that allows lexical (keyword) and vector (semantic) search in a single query string. The <code>UnifiedQueryParser</code> splits the input into lexical and vector portions and delegates to the appropriate sub-parser.</p>
+<h2 id="overview"><a class="header" href="#overview">Overview</a></h2>
+<pre><code class="language-text">title:hello AND content:~"cute kitten"^0.8
+|--- lexical --|    |--- vector --------|
+</code></pre>
+<p>The <code>~"</code> pattern distinguishes vector clauses from lexical clauses. Everything else is treated as a lexical query.</p>
+<h2 id="lexical-query-syntax"><a class="header" href="#lexical-query-syntax">Lexical Query Syntax</a></h2>
+<p>Lexical queries search the inverted index using exact or approximate keyword matching.</p>
+<h3 id="term-query"><a class="header" href="#term-query">Term Query</a></h3>
+<p>Match a single term against a field (or the default field):</p>
+<pre><code class="language-text">hello
+title:hello
+</code></pre>
+<h3 id="boolean-operators"><a class="header" href="#boolean-operators">Boolean Operators</a></h3>
+<p>Combine clauses with <code>AND</code> and <code>OR</code> (case-insensitive):</p>
+<pre><code class="language-text">title:hello AND body:world
+title:hello OR title:goodbye
+</code></pre>
+<p>Space-separated clauses without an explicit operator use implicit boolean (behaves like OR with scoring).</p>
+<h3 id="required--prohibited-clauses"><a class="header" href="#required--prohibited-clauses">Required / Prohibited Clauses</a></h3>
+<p>Use <code>+</code> (must match) and <code>-</code> (must not match):</p>
+<pre><code class="language-text">+title:hello -title:goodbye
+</code></pre>
+<h3 id="phrase-query"><a class="header" href="#phrase-query">Phrase Query</a></h3>
+<p>Match an exact phrase using double quotes. Optional proximity (<code>~N</code>) allows N words between terms:</p>
+<pre><code class="language-text">"hello world"
+"hello world"~2
+</code></pre>
+<h3 id="fuzzy-query"><a class="header" href="#fuzzy-query">Fuzzy Query</a></h3>
+<p>Approximate matching with edit distance. Append <code>~</code> and optionally the maximum edit distance:</p>
+<pre><code class="language-text">roam~
+roam~2
+</code></pre>
+<h3 id="wildcard-query"><a class="header" href="#wildcard-query">Wildcard Query</a></h3>
+<p>Use <code>?</code> (single character) and <code>*</code> (zero or more characters):</p>
+<pre><code class="language-text">te?t
+test*
+</code></pre>
+<h3 id="range-query"><a class="header" href="#range-query">Range Query</a></h3>
+<p>Inclusive <code>[]</code> or exclusive <code>{}</code> ranges, useful for numeric and date fields:</p>
+<pre><code class="language-text">price:[100 TO 500]
+date:{2024-01-01 TO 2024-12-31}
+price:[* TO 100]
+</code></pre>
+<h3 id="boost"><a class="header" href="#boost">Boost</a></h3>
+<p>Increase the weight of a clause with <code>^</code>:</p>
+<pre><code class="language-text">title:hello^2
+"important phrase"^1.5
+</code></pre>
+<h3 id="grouping"><a class="header" href="#grouping">Grouping</a></h3>
+<p>Use parentheses for sub-expressions:</p>
+<pre><code class="language-text">(title:hello OR title:hi) AND body:world
+</code></pre>
+<h3 id="lexical-peg-grammar"><a class="header" href="#lexical-peg-grammar">Lexical PEG Grammar</a></h3>
+<p>The full lexical grammar (<a href="https://github.com/mosuka/laurus/blob/main/laurus/src/lexical/query/parser.pest">parser.pest</a>):</p>
+<pre><code class="language-pest">query          = { SOI ~ boolean_query ~ EOI }
+boolean_query  = { clause ~ (boolean_op ~ clause | clause)* }
+clause         = { required_clause | prohibited_clause | sub_clause }
+required_clause   = { "+" ~ sub_clause }
+prohibited_clause = { "-" ~ sub_clause }
+sub_clause     = { grouped_query | field_query | term_query }
+grouped_query  = { "(" ~ boolean_query ~ ")" ~ boost? }
+boolean_op     = { ^"AND" | ^"OR" }
+field_query    = { field ~ ":" ~ field_value }
+field_value    = { range_query | phrase_query | fuzzy_term
+                 | wildcard_term | simple_term }
+phrase_query   = { "\"" ~ phrase_content ~ "\"" ~ proximity? ~ boost? }
+proximity      = { "~" ~ number }
+fuzzy_term     = { term ~ "~" ~ fuzziness? ~ boost? }
+wildcard_term  = { wildcard_pattern ~ boost? }
+simple_term    = { term ~ boost? }
+boost          = { "^" ~ boost_value }
+</code></pre>
+<h2 id="vector-query-syntax"><a class="header" href="#vector-query-syntax">Vector Query Syntax</a></h2>
+<p>Vector queries embed text into vectors at parse time and perform similarity search.</p>
+<h3 id="basic-syntax"><a class="header" href="#basic-syntax">Basic Syntax</a></h3>
+<pre><code class="language-text">field:~"text"
+field:~"text"^weight
+</code></pre>
 <div class="table-wrapper">
 <table>
 <thead>
-<tr><th style="text-align: left">Variant</th><th style="text-align: left">Description</th><th style="text-align: left">Common Causes</th></tr>
+<tr><th style="text-align: left">Element</th><th style="text-align: center">Required</th><th style="text-align: left">Description</th><th style="text-align: left">Example</th></tr>
 </thead>
 <tbody>
-<tr><td style="text-align: left"><code>Io</code></td><td style="text-align: left">I/O errors</td><td style="text-align: left">File not found, permission denied, disk full</td></tr>
-<tr><td style="text-align: left"><code>Index</code></td><td style="text-align: left">Index operation errors</td><td style="text-align: left">Corrupt index, segment read failure</td></tr>
-<tr><td style="text-align: left"><code>Schema</code></td><td style="text-align: left">Schema-related errors</td><td style="text-align: left">Unknown field name, type mismatch</td></tr>
-<tr><td style="text-align: left"><code>Analysis</code></td><td style="text-align: left">Text analysis errors</td><td style="text-align: left">Tokenizer failure, invalid filter config</td></tr>
-<tr><td style="text-align: left"><code>Query</code></td><td style="text-align: left">Query parsing/execution errors</td><td style="text-align: left">Malformed Query DSL, unknown field in query</td></tr>
-<tr><td style="text-align: left"><code>Storage</code></td><td style="text-align: left">Storage backend errors</td><td style="text-align: left">Failed to open storage, write failure</td></tr>
-<tr><td style="text-align: left"><code>Field</code></td><td style="text-align: left">Field definition errors</td><td style="text-align: left">Invalid field options, duplicate field name</td></tr>
-<tr><td style="text-align: left"><code>Json</code></td><td style="text-align: left">JSON serialization errors</td><td style="text-align: left">Malformed document JSON</td></tr>
-<tr><td style="text-align: left"><code>InvalidOperation</code></td><td style="text-align: left">Invalid operation</td><td style="text-align: left">Searching before commit, double close</td></tr>
-<tr><td style="text-align: left"><code>ResourceExhausted</code></td><td style="text-align: left">Resource limits exceeded</td><td style="text-align: left">Out of memory, too many open files</td></tr>
-<tr><td style="text-align: left"><code>SerializationError</code></td><td style="text-align: left">Binary serialization errors</td><td style="text-align: left">Corrupt data on disk</td></tr>
-<tr><td style="text-align: left"><code>OperationCancelled</code></td><td style="text-align: left">Operation was cancelled</td><td style="text-align: left">Timeout, user cancellation</td></tr>
-<tr><td style="text-align: left"><code>NotImplemented</code></td><td style="text-align: left">Feature not available</td><td style="text-align: left">Unimplemented operation</td></tr>
-<tr><td style="text-align: left"><code>Other</code></td><td style="text-align: left">Generic errors</td><td style="text-align: left">Timeout, invalid config, invalid argument</td></tr>
+<tr><td style="text-align: left"><code>field:</code></td><td style="text-align: center">No</td><td style="text-align: left">Target vector field name</td><td style="text-align: left"><code>content:</code></td></tr>
+<tr><td style="text-align: left"><code>~</code></td><td style="text-align: center"><strong>Yes</strong></td><td style="text-align: left">Vector query marker</td><td style="text-align: left"></td></tr>
+<tr><td style="text-align: left"><code>"text"</code></td><td style="text-align: center"><strong>Yes</strong></td><td style="text-align: left">Text to embed</td><td style="text-align: left"><code>"cute kitten"</code></td></tr>
+<tr><td style="text-align: left"><code>^weight</code></td><td style="text-align: center">No</td><td style="text-align: left">Score weight (default: 1.0)</td><td style="text-align: left"><code>^0.8</code></td></tr>
 </tbody>
 </table>
 </div>
-<h2 id="basic-error-handling"><a class="header" href="#basic-error-handling">Basic Error Handling</a></h2>
-<h3 id="using-the--operator"><a class="header" href="#using-the--operator">Using the <code>?</code> Operator</a></h3>
-<p>The simplest approach — propagate errors to the caller:</p>
+<h3 id="vector-query-examples"><a class="header" href="#vector-query-examples">Vector Query Examples</a></h3>
+<pre><code class="language-text"># Single field
+content:~"cute kitten"
+
+# With boost weight
+content:~"cute kitten"^0.8
+
+# Default field (when configured)
+~"cute kitten"
+
+# Multiple clauses
+content:~"cats" image:~"dogs"^0.5
+
+# Nested field name (dot notation)
+metadata.embedding:~"text"
+</code></pre>
+<h3 id="multiple-clauses"><a class="header" href="#multiple-clauses">Multiple Clauses</a></h3>
+<p>Multiple vector clauses are space-separated. All clauses are executed and their scores are combined using the <code>score_mode</code> (default: <code>WeightedSum</code>):</p>
+<pre><code class="language-text">content:~"cats" image:~"dogs"^0.5
+</code></pre>
+<p>This produces:</p>
+<pre><code class="language-text">score = similarity("cats", content) * 1.0
+      + similarity("dogs", image)   * 0.5
+</code></pre>
+<p>There are no <code>AND</code>/<code>OR</code> operators in the vector DSL. Vector search is inherently a ranking operation, and the weight (<code>^</code>) controls the contribution of each clause.</p>
+<h3 id="score-modes"><a class="header" href="#score-modes">Score Modes</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Mode</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>WeightedSum</code> (default)</td><td style="text-align: left">Sum of (similarity * weight) across all clauses</td></tr>
+<tr><td style="text-align: left"><code>MaxSim</code></td><td style="text-align: left">Maximum similarity score across clauses</td></tr>
+<tr><td style="text-align: left"><code>LateInteraction</code></td><td style="text-align: left">Late interaction scoring</td></tr>
+</tbody>
+</table>
+</div>
+<p>Score mode cannot be set from DSL syntax. Use the Rust API to override:</p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use laurus::{Engine, Result};
-
-async fn index_documents(engine: &amp;Engine) -&gt; Result&lt;()&gt; {
-    let doc = laurus::Document::builder()
-        .add_text("title", "Rust Programming")
-        .build();
-
-    engine.put_document("doc1", doc).await?;
-    engine.commit().await?;
-    Ok(())
-}
+</span>let mut request = parser.parse(r#"content:~"cats" image:~"dogs""#).await?;
+request.score_mode = VectorScoreMode::MaxSim;
 <span class="boring">}</span></code></pre>
-<h3 id="matching-on-error-variants"><a class="header" href="#matching-on-error-variants">Matching on Error Variants</a></h3>
-<p>When you need different behavior for different error types:</p>
+<h3 id="vector-peg-grammar"><a class="header" href="#vector-peg-grammar">Vector PEG Grammar</a></h3>
+<p>The full vector grammar (<a href="https://github.com/mosuka/laurus/blob/main/laurus/src/vector/query/parser.pest">parser.pest</a>):</p>
+<pre><code class="language-pest">query          = { SOI ~ vector_clause+ ~ EOI }
+vector_clause  = { field_prefix? ~ "~" ~ quoted_text ~ boost? }
+field_prefix   = { field_name ~ ":" }
+field_name     = @{ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_" | ".")* }
+quoted_text    = ${ "\"" ~ inner_text ~ "\"" }
+inner_text     = @{ (!("\"") ~ ANY)* }
+boost          = { "^" ~ float_value }
+float_value    = @{ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)? }
+</code></pre>
+<h2 id="unified-hybrid-query-syntax"><a class="header" href="#unified-hybrid-query-syntax">Unified (Hybrid) Query Syntax</a></h2>
+<p>The <code>UnifiedQueryParser</code> allows mixing lexical and vector clauses freely in a single query string:</p>
+<pre><code class="language-text">title:hello content:~"cute kitten"^0.8
+</code></pre>
+<h3 id="how-it-works"><a class="header" href="#how-it-works">How It Works</a></h3>
+<ol>
+<li><strong>Split</strong>: Vector clauses (matching <code>field:~"text"^boost</code> pattern) are extracted via regex.</li>
+<li><strong>Delegate</strong>: Vector portion goes to <code>VectorQueryParser</code>, remainder goes to lexical <code>QueryParser</code>.</li>
+<li><strong>Fuse</strong>: If both lexical and vector results exist, they are combined using a fusion algorithm.</li>
+</ol>
+<h3 id="disambiguation"><a class="header" href="#disambiguation">Disambiguation</a></h3>
+<p>The <code>~"</code> pattern unambiguously identifies vector clauses because in lexical syntax, <code>~</code> only appears <em>after</em> a term or phrase (e.g., <code>roam~2</code>, <code>"hello world"~10</code>), never before a quote.</p>
+<h3 id="fusion-algorithms"><a class="header" href="#fusion-algorithms">Fusion Algorithms</a></h3>
+<p>When a query contains both lexical and vector clauses, results are fused:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Algorithm</th><th style="text-align: left">Formula</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><strong>RRF</strong> (default)</td><td style="text-align: left"><code>score = sum(1 / (k + rank))</code></td><td style="text-align: left">Reciprocal Rank Fusion. Robust to different score distributions. Default k=60.</td></tr>
+<tr><td style="text-align: left"><strong>WeightedSum</strong></td><td style="text-align: left"><code>score = lexical * a + vector * b</code></td><td style="text-align: left">Linear combination with configurable weights.</td></tr>
+</tbody>
+</table>
+</div>
+<blockquote>
+<p><strong>Note</strong>: The fusion algorithm cannot be specified in the DSL syntax. It is configured when constructing the <code>UnifiedQueryParser</code> via <code>.with_fusion()</code>. The default is RRF (k=60). See <a href="#custom-fusion">Custom Fusion</a> for a code example.</p>
+</blockquote>
+<h3 id="unified-query-examples"><a class="header" href="#unified-query-examples">Unified Query Examples</a></h3>
+<pre><code class="language-text"># Lexical only — no fusion
+title:hello AND body:world
+
+# Vector only — no fusion
+content:~"cute kitten"
+
+# Hybrid — fusion applied automatically
+title:hello content:~"cute kitten"
+
+# Hybrid with boolean operators
+title:hello AND category:animal content:~"cute kitten"^0.8
+
+# Multiple vector clauses + lexical
+category:animal content:~"cats" image:~"dogs"^0.5
+
+# Default fields (when configured)
+hello ~"cats"
+</code></pre>
+<h2 id="code-examples"><a class="header" href="#code-examples">Code Examples</a></h2>
+<h3 id="lexical-search-with-dsl"><a class="header" href="#lexical-search-with-dsl">Lexical Search with DSL</a></h3>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use laurus::{Engine, LaurusError};
+</span>use std::sync::Arc;
+use laurus::analysis::analyzer::standard::StandardAnalyzer;
+use laurus::lexical::query::QueryParser;
 
-async fn safe_search(engine: &amp;Engine, query: &amp;str) {
-    match engine.search(/* request */).await {
-        Ok(results) =&gt; {
-            for result in results {
-                println!("{}: {}", result.id, result.score);
-            }
-        }
-        Err(LaurusError::Query(msg)) =&gt; {
-            eprintln!("Invalid query syntax: {}", msg);
-        }
-        Err(LaurusError::Io(e)) =&gt; {
-            eprintln!("Storage I/O error: {}", e);
-        }
-        Err(e) =&gt; {
-            eprintln!("Unexpected error: {}", e);
-        }
-    }
-}
+let analyzer = Arc::new(StandardAnalyzer::new()?);
+let parser = QueryParser::new(analyzer)
+    .with_default_field("title");
+
+let query = parser.parse("title:hello AND body:world")?;
 <span class="boring">}</span></code></pre>
-<h3 id="checking-error-types-with-downcast"><a class="header" href="#checking-error-types-with-downcast">Checking Error Types with <code>downcast</code></a></h3>
-<p>Since <code>LaurusError</code> implements <code>std::error::Error</code>, you can use standard error handling patterns:</p>
+<h3 id="vector-search-with-dsl"><a class="header" href="#vector-search-with-dsl">Vector Search with DSL</a></h3>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use laurus::LaurusError;
+</span>use std::sync::Arc;
+use laurus::vector::query::VectorQueryParser;
 
-fn is_retriable(error: &amp;LaurusError) -&gt; bool {
-    matches!(error, LaurusError::Io(_) | LaurusError::ResourceExhausted(_))
-}
-<span class="boring">}</span></code></pre>
-<h2 id="common-error-scenarios"><a class="header" href="#common-error-scenarios">Common Error Scenarios</a></h2>
-<h3 id="schema-mismatch"><a class="header" href="#schema-mismatch">Schema Mismatch</a></h3>
-<p>Adding a document with fields that don’t match the schema:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>// Schema has "title" (Text) and "year" (Integer)
-let doc = Document::builder()
-    .add_text("title", "Hello")
-    .add_text("unknown_field", "this field is not in schema")
-    .build();
+let parser = VectorQueryParser::new(embedder)
+    .with_default_field("content");
 
-// Fields not in the schema are silently ignored during indexing.
-// No error is raised — only schema-defined fields are processed.
+let request = parser.parse(r#"content:~"cute kitten"^0.8"#).await?;
 <span class="boring">}</span></code></pre>
-<h3 id="query-parsing-errors"><a class="header" href="#query-parsing-errors">Query Parsing Errors</a></h3>
-<p>Invalid Query DSL syntax returns a <code>Query</code> error:</p>
+<h3 id="hybrid-search-with-unified-dsl"><a class="header" href="#hybrid-search-with-unified-dsl">Hybrid Search with Unified DSL</a></h3>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>use laurus::engine::query::UnifiedQueryParser;
 
-let parser = UnifiedQueryParser::new();
-match parser.parse("title:\"unclosed phrase") {
-    Ok(request) =&gt; { /* ... */ }
-    Err(LaurusError::Query(msg)) =&gt; {
-        // msg contains details about the parse failure
-        eprintln!("Bad query: {}", msg);
-    }
-    Err(e) =&gt; { /* other errors */ }
-}
+let unified = UnifiedQueryParser::new(lexical_parser, vector_parser);
+
+let request = unified.parse(
+    r#"title:hello content:~"cute kitten"^0.8"#
+).await?;
+// request.lexical_search_request  -&gt; Some(...)  — lexical query
+// request.vector_search_request   -&gt; Some(...)  — vector query
+// request.fusion_algorithm        -&gt; Some(RRF)  — fusion algorithm
 <span class="boring">}</span></code></pre>
-<h3 id="storage-io-errors"><a class="header" href="#storage-io-errors">Storage I/O Errors</a></h3>
-<p>File-based storage may encounter I/O errors:</p>
+<h3 id="custom-fusion"><a class="header" href="#custom-fusion">Custom Fusion</a></h3>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use laurus::storage::{StorageConfig, StorageFactory};
+</span>use laurus::engine::search::FusionAlgorithm;
 
-match StorageFactory::open(StorageConfig::File {
-    path: "/nonexistent/path".into(),
-    loading_mode: Default::default(),
-}) {
-    Ok(storage) =&gt; { /* ... */ }
-    Err(LaurusError::Io(e)) =&gt; {
-        eprintln!("Cannot open storage: {}", e);
-    }
-    Err(e) =&gt; { /* other errors */ }
-}
+let unified = UnifiedQueryParser::new(lexical_parser, vector_parser)
+    .with_fusion(FusionAlgorithm::WeightedSum {
+        lexical_weight: 0.3,
+        vector_weight: 0.7,
+    });
 <span class="boring">}</span></code></pre>
-<h2 id="convenience-constructors"><a class="header" href="#convenience-constructors">Convenience Constructors</a></h2>
-<p><code>LaurusError</code> provides factory methods for creating errors in custom implementations:</p>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th style="text-align: left">Method</th><th style="text-align: left">Creates</th></tr>
-</thead>
-<tbody>
-<tr><td style="text-align: left"><code>LaurusError::index(msg)</code></td><td style="text-align: left"><code>Index</code> variant</td></tr>
-<tr><td style="text-align: left"><code>LaurusError::schema(msg)</code></td><td style="text-align: left"><code>Schema</code> variant</td></tr>
-<tr><td style="text-align: left"><code>LaurusError::analysis(msg)</code></td><td style="text-align: left"><code>Analysis</code> variant</td></tr>
-<tr><td style="text-align: left"><code>LaurusError::query(msg)</code></td><td style="text-align: left"><code>Query</code> variant</td></tr>
-<tr><td style="text-align: left"><code>LaurusError::storage(msg)</code></td><td style="text-align: left"><code>Storage</code> variant</td></tr>
-<tr><td style="text-align: left"><code>LaurusError::field(msg)</code></td><td style="text-align: left"><code>Field</code> variant</td></tr>
-<tr><td style="text-align: left"><code>LaurusError::other(msg)</code></td><td style="text-align: left"><code>Other</code> variant</td></tr>
-<tr><td style="text-align: left"><code>LaurusError::cancelled(msg)</code></td><td style="text-align: left"><code>OperationCancelled</code> variant</td></tr>
-<tr><td style="text-align: left"><code>LaurusError::invalid_argument(msg)</code></td><td style="text-align: left"><code>Other</code> with “Invalid argument” prefix</td></tr>
-<tr><td style="text-align: left"><code>LaurusError::invalid_config(msg)</code></td><td style="text-align: left"><code>Other</code> with “Invalid configuration” prefix</td></tr>
-<tr><td style="text-align: left"><code>LaurusError::not_found(msg)</code></td><td style="text-align: left"><code>Other</code> with “Not found” prefix</td></tr>
-<tr><td style="text-align: left"><code>LaurusError::timeout(msg)</code></td><td style="text-align: left"><code>Other</code> with “Timeout” prefix</td></tr>
-</tbody>
-</table>
-</div>
-<p>These are useful when implementing custom <a href="extensibility.html">Analyzer, Embedder, or Storage</a> traits:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use laurus::{LaurusError, Result};
-
-fn validate_dimension(dim: usize) -&gt; Result&lt;()&gt; {
-    if dim == 0 {
-        return Err(LaurusError::invalid_argument("dimension must be &gt; 0"));
-    }
-    Ok(())
-}
-<span class="boring">}</span></code></pre>
-<h2 id="automatic-conversions"><a class="header" href="#automatic-conversions">Automatic Conversions</a></h2>
-<p><code>LaurusError</code> implements <code>From</code> for common error types, so they convert automatically with <code>?</code>:</p>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th style="text-align: left">Source Type</th><th style="text-align: left">Target Variant</th></tr>
-</thead>
-<tbody>
-<tr><td style="text-align: left"><code>std::io::Error</code></td><td style="text-align: left"><code>LaurusError::Io</code></td></tr>
-<tr><td style="text-align: left"><code>serde_json::Error</code></td><td style="text-align: left"><code>LaurusError::Json</code></td></tr>
-<tr><td style="text-align: left"><code>anyhow::Error</code></td><td style="text-align: left"><code>LaurusError::Anyhow</code></td></tr>
-</tbody>
-</table>
-</div>
-<h2 id="next-steps"><a class="header" href="#next-steps">Next Steps</a></h2>
-<ul>
-<li><a href="extensibility.html">Extensibility</a> — implement custom traits with proper error handling</li>
-<li><a href="../api_reference.html">API Reference</a> — full method signatures and return types</li>
-</ul>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="../advanced/deletions.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../concepts/search/hybrid_search.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
-                            <a rel="next prefetch" href="../advanced/extensibility.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="../laurus/overview.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                             </a>
 
@@ -377,11 +441,11 @@ fn validate_dimension(dim: usize) -&gt; Result&lt;()&gt; {
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="../advanced/deletions.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="../concepts/search/hybrid_search.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 
-                    <a rel="next prefetch" href="../advanced/extensibility.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="../laurus/overview.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                     </a>
             </nav>

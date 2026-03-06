@@ -35,10 +35,10 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-f39bba3e.js";
+            window.path_to_searchindex_js = "../searchindex-674b4e1e.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-f13dbb35.js"></script>
+        <script src="../toc-072c2e71.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -354,6 +354,22 @@ let request = VectorSearchRequestBuilder::new()
 let request = vector_parser.parse(r#"text_vec:~"systems programming""#).await?;
 <span class="boring">}</span></code></pre>
 <p>Both approaches embed the query text using the same embedder that was used at index time, ensuring consistent vector spaces.</p>
+<h2 id="feature-flags-summary"><a class="header" href="#feature-flags-summary">Feature Flags Summary</a></h2>
+<p>Each embedder requires a specific feature flag to be enabled in <code>Cargo.toml</code>:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Embedder</th><th style="text-align: left">Feature Flag</th><th style="text-align: left">Dependencies</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>CandleBertEmbedder</code></td><td style="text-align: left"><code>embeddings-candle</code></td><td style="text-align: left">candle-core, candle-nn, candle-transformers, hf-hub, tokenizers</td></tr>
+<tr><td style="text-align: left"><code>OpenAIEmbedder</code></td><td style="text-align: left"><code>embeddings-openai</code></td><td style="text-align: left">reqwest</td></tr>
+<tr><td style="text-align: left"><code>CandleClipEmbedder</code></td><td style="text-align: left"><code>embeddings-multimodal</code></td><td style="text-align: left">image + embeddings-candle</td></tr>
+<tr><td style="text-align: left"><code>PrecomputedEmbedder</code></td><td style="text-align: left"><em>(none – always available)</em></td><td style="text-align: left">–</td></tr>
+</tbody>
+</table>
+</div>
+<p>The <code>embeddings-all</code> feature enables all embedding features at once. See <a href="../development/feature_flags.html">Feature Flags</a> for details.</p>
 <h2 id="choosing-an-embedder"><a class="header" href="#choosing-an-embedder">Choosing an Embedder</a></h2>
 <div class="table-wrapper">
 <table>

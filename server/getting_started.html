@@ -35,10 +35,10 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-f39bba3e.js";
+            window.path_to_searchindex_js = "../searchindex-674b4e1e.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-f13dbb35.js"></script>
+        <script src="../toc-072c2e71.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -189,10 +189,10 @@
 <tr><th style="text-align: left">Option</th><th style="text-align: left">Short</th><th style="text-align: left">Env Variable</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr>
 </thead>
 <tbody>
-<tr><td style="text-align: left"><code>--config &lt;PATH&gt;</code></td><td style="text-align: left"><code>-c</code></td><td style="text-align: left"><code>LAURUS_CONFIG</code></td><td style="text-align: left">—</td><td style="text-align: left">Path to a TOML configuration file</td></tr>
+<tr><td style="text-align: left"><code>--config &lt;PATH&gt;</code></td><td style="text-align: left"><code>-c</code></td><td style="text-align: left"><code>LAURUS_CONFIG</code></td><td style="text-align: left">–</td><td style="text-align: left">Path to a TOML configuration file</td></tr>
 <tr><td style="text-align: left"><code>--host &lt;HOST&gt;</code></td><td style="text-align: left"><code>-H</code></td><td style="text-align: left"><code>LAURUS_HOST</code></td><td style="text-align: left"><code>0.0.0.0</code></td><td style="text-align: left">Listen address</td></tr>
 <tr><td style="text-align: left"><code>--port &lt;PORT&gt;</code></td><td style="text-align: left"><code>-p</code></td><td style="text-align: left"><code>LAURUS_PORT</code></td><td style="text-align: left"><code>50051</code></td><td style="text-align: left">Listen port</td></tr>
-<tr><td style="text-align: left"><code>--http-port &lt;PORT&gt;</code></td><td style="text-align: left">—</td><td style="text-align: left"><code>LAURUS_HTTP_PORT</code></td><td style="text-align: left">—</td><td style="text-align: left">HTTP Gateway port (enables HTTP gateway when set)</td></tr>
+<tr><td style="text-align: left"><code>--http-port &lt;PORT&gt;</code></td><td style="text-align: left">–</td><td style="text-align: left"><code>LAURUS_HTTP_PORT</code></td><td style="text-align: left">–</td><td style="text-align: left">HTTP Gateway port (enables HTTP gateway when set)</td></tr>
 <tr><td style="text-align: left"><code>--log-level &lt;LEVEL&gt;</code></td><td style="text-align: left"><code>-l</code></td><td style="text-align: left"><code>LAURUS_LOG_LEVEL</code></td><td style="text-align: left"><code>info</code></td><td style="text-align: left">Log level (<code>trace</code>, <code>debug</code>, <code>info</code>, <code>warn</code>, <code>error</code>)</td></tr>
 </tbody>
 </table>
@@ -208,34 +208,14 @@ export LAURUS_LOG_LEVEL=debug
 laurus serve
 </code></pre>
 <h3 id="startup-behavior"><a class="header" href="#startup-behavior">Startup Behavior</a></h3>
-<p>On startup, the server attempts to open an existing index at the configured data directory. If no index exists, the server starts without one — you can create an index later via the <code>CreateIndex</code> RPC.</p>
-<h2 id="configuration-file"><a class="header" href="#configuration-file">Configuration File</a></h2>
-<p>You can use a TOML configuration file instead of (or in addition to) command-line options:</p>
+<p>On startup, the server attempts to open an existing index at the configured data directory. If no index exists, the server starts without one – you can create an index later via the <code>CreateIndex</code> RPC.</p>
+<h2 id="configuration"><a class="header" href="#configuration">Configuration</a></h2>
+<p>You can use a TOML configuration file instead of (or in addition to) command-line options. See <a href="configuration.html">Configuration</a> for the full reference.</p>
 <pre><code class="language-bash">laurus serve --config config.toml
 </code></pre>
-<h3 id="format"><a class="header" href="#format">Format</a></h3>
-<pre><code class="language-toml">[server]
-host = "0.0.0.0"
-port = 50051
-http_port = 8080  # Optional: enables HTTP Gateway
-
-[index]
-data_dir = "./laurus_data"
-
-[log]
-level = "info"
-</code></pre>
-<h3 id="priority"><a class="header" href="#priority">Priority</a></h3>
-<p>Settings are resolved in the following order (highest priority first):</p>
-<pre><code class="language-text">CLI arguments &gt; Environment variables &gt; Config file &gt; Defaults
-</code></pre>
-<p>For example, if <code>config.toml</code> sets <code>port = 50051</code>, the environment variable <code>LAURUS_PORT=4567</code> is set, and <code>--port 1234</code> is passed on the command line:</p>
-<pre><code class="language-bash">LAURUS_PORT=4567 laurus serve --config config.toml --port 1234
-# → Listens on port 1234 (CLI argument wins)
-</code></pre>
-<p>If the CLI argument is omitted:</p>
-<pre><code class="language-bash">LAURUS_PORT=4567 laurus serve --config config.toml
-# → Listens on port 4567 (environment variable wins over config file)
+<h2 id="http-gateway"><a class="header" href="#http-gateway">HTTP Gateway</a></h2>
+<p>When <code>--http-port</code> is set, an HTTP/JSON gateway starts alongside the gRPC server. See <a href="http_gateway.html">HTTP Gateway</a> for the full endpoint reference and examples.</p>
+<pre><code class="language-bash">laurus serve --http-port 8080
 </code></pre>
 <h2 id="graceful-shutdown"><a class="header" href="#graceful-shutdown">Graceful Shutdown</a></h2>
 <p>When the server receives a shutdown signal (Ctrl+C / SIGINT), it automatically:</p>
@@ -244,84 +224,6 @@ level = "info"
 <li>Commits any pending changes to the index</li>
 <li>Exits cleanly</li>
 </ol>
-<h2 id="http-gateway"><a class="header" href="#http-gateway">HTTP Gateway</a></h2>
-<p>When <code>http_port</code> is set, an HTTP/JSON gateway starts alongside the gRPC server. The gateway proxies HTTP requests to the gRPC server internally:</p>
-<pre><code class="language-text">User Request (HTTP/JSON) → gRPC Gateway (axum) → gRPC Server (tonic) → Engine
-</code></pre>
-<p>If <code>http_port</code> is omitted, only the gRPC server starts (default behavior).</p>
-<h3 id="starting-with-http-gateway"><a class="header" href="#starting-with-http-gateway">Starting with HTTP Gateway</a></h3>
-<pre><code class="language-bash"># Via CLI
-laurus serve --http-port 8080
-
-# Via config file (set http_port in [server] section)
-laurus serve --config config.toml
-
-# Via environment variable
-LAURUS_HTTP_PORT=8080 laurus serve
-</code></pre>
-<h3 id="http-api-endpoints"><a class="header" href="#http-api-endpoints">HTTP API Endpoints</a></h3>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th style="text-align: left">Method</th><th style="text-align: left">Path</th><th style="text-align: left">gRPC Method</th></tr>
-</thead>
-<tbody>
-<tr><td style="text-align: left">GET</td><td style="text-align: left"><code>/v1/health</code></td><td style="text-align: left"><code>HealthService/Check</code></td></tr>
-<tr><td style="text-align: left">POST</td><td style="text-align: left"><code>/v1/index</code></td><td style="text-align: left"><code>IndexService/CreateIndex</code></td></tr>
-<tr><td style="text-align: left">GET</td><td style="text-align: left"><code>/v1/index</code></td><td style="text-align: left"><code>IndexService/GetIndex</code></td></tr>
-<tr><td style="text-align: left">GET</td><td style="text-align: left"><code>/v1/schema</code></td><td style="text-align: left"><code>IndexService/GetSchema</code></td></tr>
-<tr><td style="text-align: left">PUT</td><td style="text-align: left"><code>/v1/documents/:id</code></td><td style="text-align: left"><code>DocumentService/PutDocument</code></td></tr>
-<tr><td style="text-align: left">POST</td><td style="text-align: left"><code>/v1/documents/:id</code></td><td style="text-align: left"><code>DocumentService/AddDocument</code></td></tr>
-<tr><td style="text-align: left">GET</td><td style="text-align: left"><code>/v1/documents/:id</code></td><td style="text-align: left"><code>DocumentService/GetDocuments</code></td></tr>
-<tr><td style="text-align: left">DELETE</td><td style="text-align: left"><code>/v1/documents/:id</code></td><td style="text-align: left"><code>DocumentService/DeleteDocuments</code></td></tr>
-<tr><td style="text-align: left">POST</td><td style="text-align: left"><code>/v1/commit</code></td><td style="text-align: left"><code>DocumentService/Commit</code></td></tr>
-<tr><td style="text-align: left">POST</td><td style="text-align: left"><code>/v1/search</code></td><td style="text-align: left"><code>SearchService/Search</code></td></tr>
-<tr><td style="text-align: left">POST</td><td style="text-align: left"><code>/v1/search/stream</code></td><td style="text-align: left"><code>SearchService/SearchStream</code> (SSE)</td></tr>
-</tbody>
-</table>
-</div>
-<h3 id="http-api-examples"><a class="header" href="#http-api-examples">HTTP API Examples</a></h3>
-<pre><code class="language-bash"># Health check
-curl http://localhost:8080/v1/health
-
-# Create an index
-curl -X POST http://localhost:8080/v1/index \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "schema": {
-      "fields": {
-        "title": {"text": {"indexed": true, "stored": true}},
-        "body": {"text": {"indexed": true, "stored": true}}
-      },
-      "default_fields": ["title", "body"]
-    }
-  }'
-
-# Add a document
-curl -X POST http://localhost:8080/v1/documents/doc1 \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "document": {
-      "fields": {
-        "title": "Hello World",
-        "body": "This is a test document."
-      }
-    }
-  }'
-
-# Commit
-curl -X POST http://localhost:8080/v1/commit
-
-# Search
-curl -X POST http://localhost:8080/v1/search \
-  -H 'Content-Type: application/json' \
-  -d '{"query": "body:test", "limit": 10}'
-
-# Streaming search (SSE)
-curl -N -X POST http://localhost:8080/v1/search/stream \
-  -H 'Content-Type: application/json' \
-  -d '{"query": "body:test", "limit": 10}'
-</code></pre>
 <h2 id="connecting-via-grpc"><a class="header" href="#connecting-via-grpc">Connecting via gRPC</a></h2>
 <p>Any gRPC client can connect to the server. For quick testing, <a href="https://github.com/fullstorydev/grpcurl">grpcurl</a> is useful:</p>
 <pre><code class="language-bash"># Health check
@@ -356,16 +258,17 @@ grpcurl -plaintext localhost:50051 laurus.v1.DocumentService/Commit
 grpcurl -plaintext -d '{"query": "body:test", "limit": 10}' \
   localhost:50051 laurus.v1.SearchService/Search
 </code></pre>
+<p>See <a href="grpc_api.html">gRPC API Reference</a> for the full API documentation.</p>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="../server.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../server/overview.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
-                            <a rel="next prefetch" href="../server/api.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="../server/configuration.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                             </a>
 
@@ -375,11 +278,11 @@ grpcurl -plaintext -d '{"query": "body:test", "limit": 10}' \
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="../server.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="../server/overview.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 
-                    <a rel="next prefetch" href="../server/api.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="../server/configuration.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                     </a>
             </nav>

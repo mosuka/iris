@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Lexical Search - Laurus Documentation</title>
+        <title>Indexing - Laurus Documentation</title>
 
 
         <!-- Custom HTML head -->
@@ -35,10 +35,10 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-f39bba3e.js";
+            window.path_to_searchindex_js = "../searchindex-674b4e1e.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-f13dbb35.js"></script>
+        <script src="../toc-072c2e71.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -177,279 +177,35 @@
 
                 <div id="mdbook-content" class="content">
                     <main>
-                        <h1 id="lexical-search"><a class="header" href="#lexical-search">Lexical Search</a></h1>
-<p>Lexical search finds documents by matching keywords against an inverted index. Laurus provides a rich set of query types that cover exact matching, phrase matching, fuzzy matching, and more.</p>
-<h2 id="basic-usage"><a class="header" href="#basic-usage">Basic Usage</a></h2>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use laurus::{SearchRequestBuilder, LexicalSearchRequest};
-use laurus::lexical::TermQuery;
-
-let request = SearchRequestBuilder::new()
-    .lexical_search_request(
-        LexicalSearchRequest::new(
-            Box::new(TermQuery::new("body", "rust"))
-        )
-    )
-    .limit(10)
-    .build();
-
-let results = engine.search(request).await?;
-<span class="boring">}</span></code></pre>
-<h2 id="query-types"><a class="header" href="#query-types">Query Types</a></h2>
-<h3 id="termquery"><a class="header" href="#termquery">TermQuery</a></h3>
-<p>Matches documents containing an exact term in a specific field.</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use laurus::lexical::TermQuery;
-
-// Find documents where "body" contains the term "rust"
-let query = TermQuery::new("body", "rust");
-<span class="boring">}</span></code></pre>
-<blockquote>
-<p><strong>Note:</strong> Terms are matched after analysis. If the field uses <code>StandardAnalyzer</code>, both the indexed text and the query term are lowercased, so <code>TermQuery::new("body", "rust")</code> will match “Rust” in the original text.</p>
-</blockquote>
-<h3 id="phrasequery"><a class="header" href="#phrasequery">PhraseQuery</a></h3>
-<p>Matches documents containing an exact sequence of terms.</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use laurus::lexical::query::phrase::PhraseQuery;
-
-// Find documents containing the exact phrase "machine learning"
-let query = PhraseQuery::new("body", vec!["machine".to_string(), "learning".to_string()]);
-
-// Or use the convenience method from a phrase string:
-let query = PhraseQuery::from_phrase("body", "machine learning");
-<span class="boring">}</span></code></pre>
-<p>Phrase queries require term positions to be stored (the default for <code>TextOption</code>).</p>
-<h3 id="booleanquery"><a class="header" href="#booleanquery">BooleanQuery</a></h3>
-<p>Combines multiple queries with boolean logic.</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use laurus::lexical::query::boolean::{BooleanQuery, BooleanQueryBuilder, Occur};
-
-let query = BooleanQueryBuilder::new()
-    .must(Box::new(TermQuery::new("body", "rust")))       // AND
-    .must(Box::new(TermQuery::new("body", "programming"))) // AND
-    .must_not(Box::new(TermQuery::new("body", "python")))  // NOT
-    .build();
-<span class="boring">}</span></code></pre>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th style="text-align: left">Occur</th><th style="text-align: left">Meaning</th><th style="text-align: left">DSL Equivalent</th></tr>
-</thead>
-<tbody>
-<tr><td style="text-align: left"><code>Must</code></td><td style="text-align: left">Document MUST match</td><td style="text-align: left"><code>+term</code> or <code>AND</code></td></tr>
-<tr><td style="text-align: left"><code>Should</code></td><td style="text-align: left">Document SHOULD match (boosts score)</td><td style="text-align: left"><code>term</code> or <code>OR</code></td></tr>
-<tr><td style="text-align: left"><code>MustNot</code></td><td style="text-align: left">Document MUST NOT match</td><td style="text-align: left"><code>-term</code> or <code>NOT</code></td></tr>
-<tr><td style="text-align: left"><code>Filter</code></td><td style="text-align: left">MUST match, but does not affect score</td><td style="text-align: left">(no DSL equivalent)</td></tr>
-</tbody>
-</table>
-</div>
-<h3 id="fuzzyquery"><a class="header" href="#fuzzyquery">FuzzyQuery</a></h3>
-<p>Matches terms within a specified edit distance (Levenshtein distance).</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use laurus::lexical::query::fuzzy::FuzzyQuery;
-
-// Find documents matching "programing" within edit distance 2
-// This will match "programming", "programing", etc.
-let query = FuzzyQuery::new("body", "programing");  // default max_edits = 2
-<span class="boring">}</span></code></pre>
-<h3 id="wildcardquery"><a class="header" href="#wildcardquery">WildcardQuery</a></h3>
-<p>Matches terms using wildcard patterns.</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use laurus::lexical::query::wildcard::WildcardQuery;
-
-// '?' matches exactly one character, '*' matches zero or more
-let query = WildcardQuery::new("filename", "*.pdf")?;
-let query = WildcardQuery::new("body", "pro*")?;
-let query = WildcardQuery::new("body", "col?r")?;  // matches "color" and "colour"
-<span class="boring">}</span></code></pre>
-<h3 id="prefixquery"><a class="header" href="#prefixquery">PrefixQuery</a></h3>
-<p>Matches documents containing terms that start with a specific prefix.</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use laurus::lexical::query::prefix::PrefixQuery;
-
-// Find documents where "body" contains terms starting with "pro"
-// This matches "programming", "program", "production", etc.
-let query = PrefixQuery::new("body", "pro");
-<span class="boring">}</span></code></pre>
-<h3 id="regexpquery"><a class="header" href="#regexpquery">RegexpQuery</a></h3>
-<p>Matches documents containing terms that match a regular expression pattern.</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use laurus::lexical::query::regexp::RegexpQuery;
-
-// Find documents where "body" contains terms matching the regex
-let query = RegexpQuery::new("body", "^pro.*ing$")?;
-
-// Match version-like patterns
-let query = RegexpQuery::new("version", r"^v\d+\.\d+")?;
-<span class="boring">}</span></code></pre>
-<blockquote>
-<p><strong>Note:</strong> <code>RegexpQuery::new()</code> returns <code>Result</code> because the regex pattern is validated at construction time. Invalid patterns will produce an error.</p>
-</blockquote>
-<h3 id="numericrangequery"><a class="header" href="#numericrangequery">NumericRangeQuery</a></h3>
-<p>Matches documents with numeric field values within a range.</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use laurus::lexical::NumericRangeQuery;
-use laurus::lexical::core::field::NumericType;
-
-// Find documents where "price" is between 10.0 and 100.0 (inclusive)
-let query = NumericRangeQuery::new(
-    "price",
-    NumericType::Float,
-    Some(10.0),   // min
-    Some(100.0),  // max
-    true,         // include min
-    true,         // include max
-);
-
-// Open-ended range: price &gt;= 50
-let query = NumericRangeQuery::new(
-    "price",
-    NumericType::Float,
-    Some(50.0),
-    None,     // no upper bound
-    true,
-    false,
-);
-<span class="boring">}</span></code></pre>
-<h3 id="geoquery"><a class="header" href="#geoquery">GeoQuery</a></h3>
-<p>Matches documents by geographic location.</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use laurus::lexical::query::geo::GeoQuery;
-
-// Find documents within 10km of Tokyo Station (35.6812, 139.7671)
-let query = GeoQuery::within_radius("location", 35.6812, 139.7671, 10.0)?; // radius in kilometers
-
-// Find documents within a bounding box (min_lat, min_lon, max_lat, max_lon)
-let query = GeoQuery::within_bounding_box(
-    "location",
-    35.0, 139.0,  // min (lat, lon)
-    36.0, 140.0,  // max (lat, lon)
-)?;
-<span class="boring">}</span></code></pre>
-<h3 id="spanquery"><a class="header" href="#spanquery">SpanQuery</a></h3>
-<p>Matches terms based on their proximity within a document. Use <code>SpanTermQuery</code> and <code>SpanNearQuery</code> to build proximity queries:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use laurus::lexical::query::span::{SpanQuery, SpanTermQuery, SpanNearQuery};
-
-// Find documents where "quick" appears near "fox" (within 3 positions)
-let query = SpanNearQuery::new(
-    "body",
-    vec![
-        Box::new(SpanTermQuery::new("body", "quick")) as Box&lt;dyn SpanQuery&gt;,
-        Box::new(SpanTermQuery::new("body", "fox")) as Box&lt;dyn SpanQuery&gt;,
-    ],
-    3,    // slop (max distance between terms)
-    true, // in_order (terms must appear in order)
-);
-<span class="boring">}</span></code></pre>
-<h2 id="scoring"><a class="header" href="#scoring">Scoring</a></h2>
-<p>Lexical search results are scored using <strong>BM25</strong>. The score reflects how relevant a document is to the query:</p>
+                        <h1 id="indexing"><a class="header" href="#indexing">Indexing</a></h1>
+<p>This section explains how Laurus stores and organizes data internally. Understanding the indexing layer will help you choose the right field types and tune performance.</p>
+<h2 id="topics"><a class="header" href="#topics">Topics</a></h2>
+<h3 id="lexical-indexing"><a class="header" href="#lexical-indexing"><a href="indexing/lexical_indexing.html">Lexical Indexing</a></a></h3>
+<p>How text, numeric, and geographic fields are indexed using an inverted index. Covers:</p>
 <ul>
-<li>Higher term frequency in the document increases the score</li>
-<li>Rarer terms across the index increase the score</li>
-<li>Shorter documents are boosted relative to longer ones</li>
+<li>The inverted index structure (term dictionary, posting lists)</li>
+<li>BKD trees for numeric range queries</li>
+<li>Segment files and their formats</li>
+<li>BM25 scoring</li>
 </ul>
-<h3 id="field-boosts"><a class="header" href="#field-boosts">Field Boosts</a></h3>
-<p>You can boost specific fields to influence relevance:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use laurus::LexicalSearchRequest;
-
-let mut request = LexicalSearchRequest::new(Box::new(query));
-request.field_boosts.insert("title".to_string(), 2.0);  // title matches count double
-request.field_boosts.insert("body".to_string(), 1.0);
-<span class="boring">}</span></code></pre>
-<h2 id="lexicalsearchrequest-options"><a class="header" href="#lexicalsearchrequest-options">LexicalSearchRequest Options</a></h2>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th style="text-align: left">Option</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr>
-</thead>
-<tbody>
-<tr><td style="text-align: left"><code>query</code></td><td style="text-align: left">(required)</td><td style="text-align: left">The query to execute</td></tr>
-<tr><td style="text-align: left"><code>limit</code></td><td style="text-align: left">10</td><td style="text-align: left">Maximum number of results</td></tr>
-<tr><td style="text-align: left"><code>load_documents</code></td><td style="text-align: left">true</td><td style="text-align: left">Whether to load full document content</td></tr>
-<tr><td style="text-align: left"><code>min_score</code></td><td style="text-align: left">0.0</td><td style="text-align: left">Minimum score threshold</td></tr>
-<tr><td style="text-align: left"><code>timeout_ms</code></td><td style="text-align: left">None</td><td style="text-align: left">Search timeout in milliseconds</td></tr>
-<tr><td style="text-align: left"><code>parallel</code></td><td style="text-align: left">false</td><td style="text-align: left">Enable parallel search across segments</td></tr>
-<tr><td style="text-align: left"><code>sort_by</code></td><td style="text-align: left"><code>Score</code></td><td style="text-align: left">Sort by relevance score, or by a field (<code>asc</code> / <code>desc</code>)</td></tr>
-<tr><td style="text-align: left"><code>field_boosts</code></td><td style="text-align: left">empty</td><td style="text-align: left">Per-field score multipliers</td></tr>
-</tbody>
-</table>
-</div>
-<h3 id="builder-methods"><a class="header" href="#builder-methods">Builder Methods</a></h3>
-<p><code>LexicalSearchRequest</code> supports a builder-style API for setting options:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use laurus::LexicalSearchRequest;
-use laurus::lexical::TermQuery;
-
-let request = LexicalSearchRequest::new(Box::new(TermQuery::new("body", "rust")))
-    .limit(20)
-    .min_score(0.5)
-    .timeout_ms(5000)
-    .parallel(true)
-    .sort_by_field_desc("date")
-    .with_field_boost("title", 2.0)
-    .with_field_boost("body", 1.0);
-<span class="boring">}</span></code></pre>
-<h2 id="using-the-query-dsl"><a class="header" href="#using-the-query-dsl">Using the Query DSL</a></h2>
-<p>Instead of building queries programmatically, you can use the text-based Query DSL:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use laurus::lexical::QueryParser;
-use laurus::analysis::analyzer::standard::StandardAnalyzer;
-use std::sync::Arc;
-
-let analyzer = Arc::new(StandardAnalyzer::default());
-let parser = QueryParser::new(analyzer).with_default_field("body");
-
-// Simple term
-let query = parser.parse("rust")?;
-
-// Boolean
-let query = parser.parse("rust AND programming")?;
-
-// Phrase
-let query = parser.parse("\"machine learning\"")?;
-
-// Field-specific
-let query = parser.parse("title:rust AND body:programming")?;
-
-// Fuzzy
-let query = parser.parse("programing~2")?;
-
-// Range
-let query = parser.parse("year:[2020 TO 2024]")?;
-<span class="boring">}</span></code></pre>
-<p>See <a href="../advanced/query_dsl.html">Query DSL</a> for the complete syntax reference.</p>
-<h2 id="next-steps"><a class="header" href="#next-steps">Next Steps</a></h2>
+<h3 id="vector-indexing"><a class="header" href="#vector-indexing"><a href="indexing/vector_indexing.html">Vector Indexing</a></a></h3>
+<p>How vector fields are indexed for approximate nearest neighbor search. Covers:</p>
 <ul>
-<li>Semantic similarity search: <a href="vector_search.html">Vector Search</a></li>
-<li>Combine lexical + vector: <a href="hybrid_search.html">Hybrid Search</a></li>
-<li>Full DSL syntax reference: <a href="../advanced/query_dsl.html">Query DSL</a></li>
+<li>Index types: Flat, HNSW, IVF</li>
+<li>Parameter tuning (m, ef_construction, n_clusters, n_probe)</li>
+<li>Distance metrics (Cosine, Euclidean, DotProduct)</li>
+<li>Quantization (SQ8, PQ)</li>
 </ul>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="../search.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../concepts/storage.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
-                            <a rel="next prefetch" href="../search/vector_search.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="../concepts/indexing/lexical_indexing.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                             </a>
 
@@ -459,11 +215,11 @@ let query = parser.parse("year:[2020 TO 2024]")?;
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="../search.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="../concepts/storage.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 
-                    <a rel="next prefetch" href="../search/vector_search.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="../concepts/indexing/lexical_indexing.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                     </a>
             </nav>

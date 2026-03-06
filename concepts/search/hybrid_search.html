@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Lexical Indexing - Laurus Documentation</title>
+        <title>Hybrid Search - Laurus Documentation</title>
 
 
         <!-- Custom HTML head -->
@@ -12,33 +12,33 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="theme-color" content="#ffffff">
 
-        <link rel="icon" href="../favicon-de23e50b.svg">
-        <link rel="shortcut icon" href="../favicon-8114d1fc.png">
-        <link rel="stylesheet" href="../css/variables-8adf115d.css">
-        <link rel="stylesheet" href="../css/general-2459343d.css">
-        <link rel="stylesheet" href="../css/chrome-ae938929.css">
-        <link rel="stylesheet" href="../css/print-9e4910d8.css" media="print">
+        <link rel="icon" href="../../favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="../../favicon-8114d1fc.png">
+        <link rel="stylesheet" href="../../css/variables-8adf115d.css">
+        <link rel="stylesheet" href="../../css/general-2459343d.css">
+        <link rel="stylesheet" href="../../css/chrome-ae938929.css">
+        <link rel="stylesheet" href="../../css/print-9e4910d8.css" media="print">
 
         <!-- Fonts -->
-        <link rel="stylesheet" href="../fonts/fonts-9644e21d.css">
+        <link rel="stylesheet" href="../../fonts/fonts-9644e21d.css">
 
         <!-- Highlight.js Stylesheets -->
-        <link rel="stylesheet" id="mdbook-highlight-css" href="../highlight-493f70e1.css">
-        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="../tomorrow-night-4c0ae647.css">
-        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="../ayu-highlight-3fdfc3ac.css">
+        <link rel="stylesheet" id="mdbook-highlight-css" href="../../highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="../../tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="../../ayu-highlight-3fdfc3ac.css">
 
         <!-- Custom theme stylesheets -->
 
 
         <!-- Provide site root and default themes to javascript -->
         <script>
-            const path_to_root = "../";
+            const path_to_root = "../../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-f39bba3e.js";
+            window.path_to_searchindex_js = "../../searchindex-674b4e1e.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-f13dbb35.js"></script>
+        <script src="../../toc-072c2e71.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -105,7 +105,7 @@
             <!-- populated by js -->
             <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
             <noscript>
-                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
+                <iframe class="sidebar-iframe-outer" src="../../toc.html"></iframe>
             </noscript>
             <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
                 <div class="sidebar-resize-indicator"></div>
@@ -140,7 +140,7 @@
                     <h1 class="menu-title">Laurus Documentation</h1>
 
                     <div class="right-buttons">
-                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                        <a href="../../print.html" title="Print this book" aria-label="Print this book">
                             <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
                         </a>
                         <a href="https://github.com/mosuka/laurus" title="Git repository" aria-label="Git repository">
@@ -177,192 +177,287 @@
 
                 <div id="mdbook-content" class="content">
                     <main>
-                        <h1 id="lexical-indexing"><a class="header" href="#lexical-indexing">Lexical Indexing</a></h1>
-<p>Lexical indexing powers keyword-based search. When a document’s text field is indexed, Laurus builds an <strong>inverted index</strong> — a data structure that maps terms to the documents containing them.</p>
-<h2 id="how-lexical-indexing-works"><a class="header" href="#how-lexical-indexing-works">How Lexical Indexing Works</a></h2>
+                        <h1 id="hybrid-search"><a class="header" href="#hybrid-search">Hybrid Search</a></h1>
+<p>Hybrid search combines <strong>lexical search</strong> (keyword matching) with <strong>vector search</strong> (semantic similarity) to deliver results that are both precise and semantically relevant. This is Laurus’s most powerful search mode.</p>
+<h2 id="why-hybrid-search"><a class="header" href="#why-hybrid-search">Why Hybrid Search?</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Search Type</th><th style="text-align: left">Strengths</th><th style="text-align: left">Weaknesses</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><strong>Lexical only</strong></td><td style="text-align: left">Exact keyword matching, handles rare terms well</td><td style="text-align: left">Misses synonyms and paraphrases</td></tr>
+<tr><td style="text-align: left"><strong>Vector only</strong></td><td style="text-align: left">Understands meaning, handles synonyms</td><td style="text-align: left">May miss exact keywords, less precise</td></tr>
+<tr><td style="text-align: left"><strong>Hybrid</strong></td><td style="text-align: left">Best of both worlds</td><td style="text-align: left">Slightly more complex to configure</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="how-it-works"><a class="header" href="#how-it-works">How It Works</a></h2>
 <pre><code class="language-mermaid">sequenceDiagram
-    participant Doc as Document
-    participant Analyzer
-    participant Writer as IndexWriter
-    participant Seg as Segment
+    participant User
+    participant Engine
+    participant Lexical as LexicalStore
+    participant Vector as VectorStore
+    participant Fusion
 
-    Doc-&gt;&gt;Analyzer: "The quick brown fox"
-    Analyzer-&gt;&gt;Analyzer: Tokenize + Filter
-    Analyzer--&gt;&gt;Writer: ["quick", "brown", "fox"]
-    Writer-&gt;&gt;Writer: Buffer in memory
-    Writer-&gt;&gt;Seg: Flush to segment on commit()
-</code></pre>
-<h3 id="step-by-step"><a class="header" href="#step-by-step">Step by Step</a></h3>
-<ol>
-<li><strong>Analyze</strong>: The text passes through the configured analyzer (tokenizer + filters), producing a stream of normalized terms</li>
-<li><strong>Buffer</strong>: Terms are stored in an in-memory write buffer, organized by field</li>
-<li><strong>Commit</strong>: On <code>commit()</code>, the buffer is flushed to a new segment on storage</li>
-</ol>
-<h2 id="the-inverted-index"><a class="header" href="#the-inverted-index">The Inverted Index</a></h2>
-<p>An inverted index is essentially a map from terms to document lists:</p>
-<pre><code class="language-mermaid">graph LR
-    subgraph "Term Dictionary"
-        T1["'brown'"]
-        T2["'fox'"]
-        T3["'quick'"]
-        T4["'rust'"]
+    User-&gt;&gt;Engine: SearchRequest\n(lexical + vector)
+
+    par Execute in parallel
+        Engine-&gt;&gt;Lexical: BM25 keyword search
+        Lexical--&gt;&gt;Engine: Ranked hits (by relevance)
+    and
+        Engine-&gt;&gt;Vector: ANN similarity search
+        Vector--&gt;&gt;Engine: Ranked hits (by distance)
     end
 
-    subgraph "Posting Lists"
-        P1["doc_1, doc_3"]
-        P2["doc_1"]
-        P3["doc_1, doc_2"]
-        P4["doc_2, doc_3"]
-    end
+    Engine-&gt;&gt;Fusion: Merge two result sets
+    Note over Fusion: RRF or WeightedSum
+    Fusion--&gt;&gt;Engine: Unified ranked list
+    Engine--&gt;&gt;User: Vec of SearchResult
+</code></pre>
+<h2 id="basic-usage"><a class="header" href="#basic-usage">Basic Usage</a></h2>
+<h3 id="builder-api"><a class="header" href="#builder-api">Builder API</a></h3>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use laurus::{SearchRequestBuilder, LexicalSearchRequest, FusionAlgorithm};
+use laurus::lexical::TermQuery;
+use laurus::vector::VectorSearchRequestBuilder;
 
-    T1 --&gt; P1
-    T2 --&gt; P2
-    T3 --&gt; P3
-    T4 --&gt; P4
+let request = SearchRequestBuilder::new()
+    // Lexical component
+    .lexical_search_request(
+        LexicalSearchRequest::new(
+            Box::new(TermQuery::new("body", "rust"))
+        )
+    )
+    // Vector component
+    .vector_search_request(
+        VectorSearchRequestBuilder::new()
+            .add_text("text_vec", "systems programming")
+            .build()
+    )
+    // Fusion algorithm
+    .fusion_algorithm(FusionAlgorithm::RRF { k: 60.0 })
+    .limit(10)
+    .build();
+
+let results = engine.search(request).await?;
+<span class="boring">}</span></code></pre>
+<h3 id="query-dsl"><a class="header" href="#query-dsl">Query DSL</a></h3>
+<p>Mix lexical and vector clauses in a single query string:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use laurus::UnifiedQueryParser;
+use laurus::lexical::QueryParser;
+use laurus::vector::VectorQueryParser;
+
+let unified = UnifiedQueryParser::new(
+    QueryParser::new(analyzer).with_default_field("body"),
+    VectorQueryParser::new(embedder),
+);
+
+// Lexical + vector in one query
+let request = unified.parse(r#"body:rust text_vec:~"systems programming""#).await?;
+let results = engine.search(request).await?;
+<span class="boring">}</span></code></pre>
+<p>The <code>~"..."</code> syntax identifies vector clauses. Everything else is parsed as lexical.</p>
+<h2 id="fusion-algorithms"><a class="header" href="#fusion-algorithms">Fusion Algorithms</a></h2>
+<p>When both lexical and vector results exist, they must be merged into a single ranked list. Laurus supports two fusion algorithms:</p>
+<h3 id="rrf-reciprocal-rank-fusion"><a class="header" href="#rrf-reciprocal-rank-fusion">RRF (Reciprocal Rank Fusion)</a></h3>
+<p>The default algorithm. Combines results based on their rank positions rather than raw scores.</p>
+<pre><code class="language-text">score(doc) = sum( 1 / (k + rank_i) )
 </code></pre>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th style="text-align: left">Component</th><th style="text-align: left">Description</th></tr>
-</thead>
-<tbody>
-<tr><td style="text-align: left"><strong>Term Dictionary</strong></td><td style="text-align: left">Sorted list of all unique terms in the index; supports fast prefix lookup</td></tr>
-<tr><td style="text-align: left"><strong>Posting Lists</strong></td><td style="text-align: left">For each term, a list of document IDs and metadata (term frequency, positions)</td></tr>
-<tr><td style="text-align: left"><strong>Doc Values</strong></td><td style="text-align: left">Column-oriented storage for sort/filter operations on numeric and date fields</td></tr>
-</tbody>
-</table>
-</div>
-<h3 id="posting-list-contents"><a class="header" href="#posting-list-contents">Posting List Contents</a></h3>
-<p>Each entry in a posting list contains:</p>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th style="text-align: left">Field</th><th style="text-align: left">Description</th></tr>
-</thead>
-<tbody>
-<tr><td style="text-align: left">Document ID</td><td style="text-align: left">Internal <code>u64</code> identifier</td></tr>
-<tr><td style="text-align: left">Term Frequency</td><td style="text-align: left">How many times the term appears in this document</td></tr>
-<tr><td style="text-align: left">Positions (optional)</td><td style="text-align: left">Where in the document the term appears (needed for phrase queries)</td></tr>
-<tr><td style="text-align: left">Weight</td><td style="text-align: left">Score weight for this posting</td></tr>
-</tbody>
-</table>
-</div>
-<h2 id="numeric-and-date-fields"><a class="header" href="#numeric-and-date-fields">Numeric and Date Fields</a></h2>
-<p>Integer, float, and datetime fields are indexed using a <strong>BKD tree</strong> — a space-partitioning data structure optimized for range queries:</p>
-<pre><code class="language-mermaid">graph TB
-    Root["BKD Root"]
-    Root --&gt; L["values &lt; 50"]
-    Root --&gt; R["values &gt;= 50"]
-    L --&gt; LL["values &lt; 25"]
-    L --&gt; LR["25 &lt;= values &lt; 50"]
-    R --&gt; RL["50 &lt;= values &lt; 75"]
-    R --&gt; RR["values &gt;= 75"]
-</code></pre>
-<p>BKD trees allow efficient evaluation of range queries like <code>price:[10 TO 100]</code> or <code>date:[2024-01-01 TO 2024-12-31]</code>.</p>
-<h2 id="geo-fields"><a class="header" href="#geo-fields">Geo Fields</a></h2>
-<p>Geographic fields store latitude/longitude pairs. They are indexed using a spatial data structure that supports:</p>
+<p>Where <code>rank_i</code> is the position of the document in each result list, and <code>k</code> is a smoothing parameter (default 60).</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use laurus::FusionAlgorithm;
+
+let fusion = FusionAlgorithm::RRF { k: 60.0 };
+<span class="boring">}</span></code></pre>
+<p><strong>Advantages:</strong></p>
 <ul>
-<li><strong>Radius queries</strong>: find all points within N kilometers of a center point</li>
-<li><strong>Bounding box queries</strong>: find all points within a rectangular area</li>
+<li>Robust to different score distributions between lexical and vector results</li>
+<li>No need to tune weights</li>
+<li>Works well out of the box</li>
 </ul>
-<h2 id="segments"><a class="header" href="#segments">Segments</a></h2>
-<p>The lexical index is organized into <strong>segments</strong>. Each segment is an immutable, self-contained mini-index:</p>
-<pre><code class="language-mermaid">graph TB
-    LI["Lexical Index"]
-    LI --&gt; S1["Segment 0"]
-    LI --&gt; S2["Segment 1"]
-    LI --&gt; S3["Segment 2"]
-
-    S1 --- F1[".dict (terms)"]
-    S1 --- F2[".post (postings)"]
-    S1 --- F3[".bkd (numerics)"]
-    S1 --- F4[".docs (doc store)"]
-    S1 --- F5[".dv (doc values)"]
-    S1 --- F6[".meta (metadata)"]
-    S1 --- F7[".lens (field lengths)"]
+<h3 id="weightedsum"><a class="header" href="#weightedsum">WeightedSum</a></h3>
+<p>Linearly combines normalized lexical and vector scores:</p>
+<pre><code class="language-text">score(doc) = lexical_weight * lexical_score + vector_weight * vector_score
 </code></pre>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use laurus::FusionAlgorithm;
+
+let fusion = FusionAlgorithm::WeightedSum {
+    lexical_weight: 0.3,
+    vector_weight: 0.7,
+};
+<span class="boring">}</span></code></pre>
+<p><strong>When to use:</strong></p>
+<ul>
+<li>When you want explicit control over the balance between lexical and vector relevance</li>
+<li>When you know one signal is more important than the other</li>
+</ul>
+<h2 id="searchrequest-options"><a class="header" href="#searchrequest-options">SearchRequest Options</a></h2>
 <div class="table-wrapper">
 <table>
 <thead>
-<tr><th style="text-align: left">File Extension</th><th style="text-align: left">Contents</th></tr>
+<tr><th style="text-align: left">Option</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr>
 </thead>
 <tbody>
-<tr><td style="text-align: left"><code>.dict</code></td><td style="text-align: left">Term dictionary (sorted terms + metadata offsets)</td></tr>
-<tr><td style="text-align: left"><code>.post</code></td><td style="text-align: left">Posting lists (document IDs, term frequencies, positions)</td></tr>
-<tr><td style="text-align: left"><code>.bkd</code></td><td style="text-align: left">BKD tree data for numeric and date fields</td></tr>
-<tr><td style="text-align: left"><code>.docs</code></td><td style="text-align: left">Stored field values (the original document content)</td></tr>
-<tr><td style="text-align: left"><code>.dv</code></td><td style="text-align: left">Doc values for sorting and filtering</td></tr>
-<tr><td style="text-align: left"><code>.meta</code></td><td style="text-align: left">Segment metadata (doc count, term count, etc.)</td></tr>
-<tr><td style="text-align: left"><code>.lens</code></td><td style="text-align: left">Field length norms (for BM25 scoring)</td></tr>
+<tr><td style="text-align: left"><code>lexical_search_request</code></td><td style="text-align: left">None</td><td style="text-align: left">Lexical query component</td></tr>
+<tr><td style="text-align: left"><code>vector_search_request</code></td><td style="text-align: left">None</td><td style="text-align: left">Vector query component</td></tr>
+<tr><td style="text-align: left"><code>filter_query</code></td><td style="text-align: left">None</td><td style="text-align: left">Pre-filter using a lexical query (restricts both lexical and vector results)</td></tr>
+<tr><td style="text-align: left"><code>fusion_algorithm</code></td><td style="text-align: left"><code>None</code> (uses <code>RRF { k: 60.0 }</code> when both results exist)</td><td style="text-align: left">How to merge lexical and vector results</td></tr>
+<tr><td style="text-align: left"><code>limit</code></td><td style="text-align: left">10</td><td style="text-align: left">Maximum number of results to return</td></tr>
+<tr><td style="text-align: left"><code>offset</code></td><td style="text-align: left">0</td><td style="text-align: left">Number of results to skip (for pagination)</td></tr>
 </tbody>
 </table>
 </div>
-<h3 id="segment-lifecycle"><a class="header" href="#segment-lifecycle">Segment Lifecycle</a></h3>
+<h2 id="searchresult"><a class="header" href="#searchresult">SearchResult</a></h2>
+<p>Each result contains:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Field</th><th style="text-align: left">Type</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>id</code></td><td style="text-align: left"><code>String</code></td><td style="text-align: left">External document ID</td></tr>
+<tr><td style="text-align: left"><code>score</code></td><td style="text-align: left"><code>f32</code></td><td style="text-align: left">Fused relevance score</td></tr>
+<tr><td style="text-align: left"><code>document</code></td><td style="text-align: left"><code>Option&lt;Document&gt;</code></td><td style="text-align: left">Full document content (if loaded)</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="filtered-hybrid-search"><a class="header" href="#filtered-hybrid-search">Filtered Hybrid Search</a></h2>
+<p>Apply a filter to restrict both lexical and vector results:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let request = SearchRequestBuilder::new()
+    .lexical_search_request(
+        LexicalSearchRequest::new(Box::new(TermQuery::new("body", "rust")))
+    )
+    .vector_search_request(
+        VectorSearchRequestBuilder::new()
+            .add_text("text_vec", "systems programming")
+            .build()
+    )
+    // Only search within "tutorial" category
+    .filter_query(Box::new(TermQuery::new("category", "tutorial")))
+    .fusion_algorithm(FusionAlgorithm::RRF { k: 60.0 })
+    .limit(10)
+    .build();
+<span class="boring">}</span></code></pre>
+<h3 id="how-filtering-works"><a class="header" href="#how-filtering-works">How Filtering Works</a></h3>
 <ol>
-<li><strong>Create</strong>: A new segment is created each time <code>commit()</code> is called</li>
-<li><strong>Search</strong>: All segments are searched in parallel and results are merged</li>
-<li><strong>Merge</strong>: Periodically, multiple small segments are merged into larger ones to improve query performance</li>
-<li><strong>Delete</strong>: When a document is deleted, its ID is added to a deletion bitmap rather than physically removed (see <a href="../advanced/deletions.html">Deletions &amp; Compaction</a>)</li>
+<li>The filter query runs on the lexical index to produce a set of allowed document IDs</li>
+<li>For lexical search: the filter is combined with the user query as a boolean AND</li>
+<li>For vector search: the allowed IDs are passed to restrict the ANN search</li>
 </ol>
-<h2 id="bm25-scoring"><a class="header" href="#bm25-scoring">BM25 Scoring</a></h2>
-<p>Laurus uses the BM25 algorithm to score lexical search results. BM25 considers:</p>
-<ul>
-<li><strong>Term Frequency (TF)</strong>: how often the term appears in the document (more = better, with diminishing returns)</li>
-<li><strong>Inverse Document Frequency (IDF)</strong>: how rare the term is across all documents (rarer = more important)</li>
-<li><strong>Field Length Normalization</strong>: shorter fields are boosted relative to longer ones</li>
-</ul>
-<p>The formula:</p>
-<pre><code>score(q, d) = IDF(q) * (TF(q, d) * (k1 + 1)) / (TF(q, d) + k1 * (1 - b + b * |d| / avgdl))
-</code></pre>
-<p>Where <code>k1 = 1.2</code> and <code>b = 0.75</code> are the default tuning parameters.</p>
-<h2 id="simd-optimization"><a class="header" href="#simd-optimization">SIMD Optimization</a></h2>
-<p>Vector distance calculations leverage SIMD (Single Instruction, Multiple Data) instructions when available, providing significant speedups for similarity computations in vector search.</p>
-<h2 id="code-example"><a class="header" href="#code-example">Code Example</a></h2>
+<h2 id="pagination"><a class="header" href="#pagination">Pagination</a></h2>
+<p>Use <code>offset</code> and <code>limit</code> for pagination:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Page 1: results 0-9
+let page1 = SearchRequestBuilder::new()
+    .lexical_search_request(/* ... */)
+    .vector_search_request(/* ... */)
+    .offset(0)
+    .limit(10)
+    .build();
+
+// Page 2: results 10-19
+let page2 = SearchRequestBuilder::new()
+    .lexical_search_request(/* ... */)
+    .vector_search_request(/* ... */)
+    .offset(10)
+    .limit(10)
+    .build();
+<span class="boring">}</span></code></pre>
+<h2 id="complete-example"><a class="header" href="#complete-example">Complete Example</a></h2>
 <pre class="playground"><code class="language-rust">use std::sync::Arc;
-use laurus::{Document, Engine, Schema};
-use laurus::lexical::TextOption;
+use laurus::{
+    Document, Engine, Schema, SearchRequestBuilder,
+    LexicalSearchRequest, FusionAlgorithm, PerFieldEmbedder,
+};
+use laurus::lexical::{TextOption, TermQuery};
 use laurus::lexical::core::field::IntegerOption;
+use laurus::vector::{HnswOption, VectorSearchRequestBuilder};
 use laurus::storage::memory::MemoryStorage;
 
 #[tokio::main]
 async fn main() -&gt; laurus::Result&lt;()&gt; {
     let storage = Arc::new(MemoryStorage::new(Default::default()));
+
+    // Schema with both lexical and vector fields
     let schema = Schema::builder()
         .add_text_field("title", TextOption::default())
         .add_text_field("body", TextOption::default())
+        .add_text_field("category", TextOption::default())
         .add_integer_field("year", IntegerOption::default())
+        .add_hnsw_field("body_vec", HnswOption {
+            dimension: 384,
+            ..Default::default()
+        })
         .build();
 
-    let engine = Engine::builder(storage, schema).build().await?;
+    // Configure analyzer and embedder (see Text Analysis and Embeddings docs)
+    // let analyzer = Arc::new(StandardAnalyzer::new()?);
+    // let embedder = Arc::new(CandleBertEmbedder::new("sentence-transformers/all-MiniLM-L6-v2")?);
+    let engine = Engine::builder(storage, schema)
+        // .analyzer(analyzer)
+        // .embedder(embedder)
+        .build()
+        .await?;
 
-    // Index documents
+    // Index documents with both text and vector fields
     engine.add_document("doc-1", Document::builder()
-        .add_text("title", "Rust Programming")
+        .add_text("title", "Rust Programming Guide")
         .add_text("body", "Rust is a systems programming language.")
+        .add_text("category", "programming")
         .add_integer("year", 2024)
+        .add_text("body_vec", "Rust is a systems programming language.")
         .build()
     ).await?;
-
-    // Commit to flush segments to storage
     engine.commit().await?;
+
+    // Hybrid search: keyword "rust" + semantic "systems language"
+    let results = engine.search(
+        SearchRequestBuilder::new()
+            .lexical_search_request(
+                LexicalSearchRequest::new(Box::new(TermQuery::new("body", "rust")))
+            )
+            .vector_search_request(
+                VectorSearchRequestBuilder::new()
+                    .add_text("body_vec", "systems language")
+                    .build()
+            )
+            .fusion_algorithm(FusionAlgorithm::RRF { k: 60.0 })
+            .limit(10)
+            .build()
+    ).await?;
+
+    for r in &amp;results {
+        println!("{}: score={:.4}", r.id, r.score);
+    }
 
     Ok(())
 }</code></pre>
 <h2 id="next-steps"><a class="header" href="#next-steps">Next Steps</a></h2>
 <ul>
-<li>Learn how vector indexes work: <a href="vector_indexing.html">Vector Indexing</a></li>
-<li>Run queries against the lexical index: <a href="../search/lexical_search.html">Lexical Search</a></li>
+<li>Full query syntax reference: <a href="../query_dsl.html">Query DSL</a></li>
+<li>Understand ID resolution: <a href="../../laurus/id_management.html">ID Management</a></li>
+<li>Data durability: <a href="../../laurus/persistence.html">Persistence &amp; WAL</a></li>
 </ul>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="../indexing.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../../concepts/search/vector_search.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
-                            <a rel="next prefetch" href="../indexing/vector_indexing.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="../../concepts/query_dsl.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                             </a>
 
@@ -372,11 +467,11 @@ async fn main() -&gt; laurus::Result&lt;()&gt; {
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="../indexing.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="../../concepts/search/vector_search.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 
-                    <a rel="next prefetch" href="../indexing/vector_indexing.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="../../concepts/query_dsl.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                     </a>
             </nav>
@@ -396,17 +491,17 @@ async fn main() -&gt; laurus::Result&lt;()&gt; {
         </script>
 
 
-        <script src="../elasticlunr-ef4e11c1.min.js"></script>
-        <script src="../mark-09e88c2c.min.js"></script>
-        <script src="../searcher-c2a407aa.js"></script>
+        <script src="../../elasticlunr-ef4e11c1.min.js"></script>
+        <script src="../../mark-09e88c2c.min.js"></script>
+        <script src="../../searcher-c2a407aa.js"></script>
 
-        <script src="../clipboard-1626706a.min.js"></script>
-        <script src="../highlight-abc7f01d.js"></script>
-        <script src="../book-a0b12cfe.js"></script>
+        <script src="../../clipboard-1626706a.min.js"></script>
+        <script src="../../highlight-abc7f01d.js"></script>
+        <script src="../../book-a0b12cfe.js"></script>
 
         <!-- Custom JS scripts -->
-        <script src="../mermaid-9a6dd17b.min.js"></script>
-        <script src="../mermaid-init-ddddd38b.js"></script>
+        <script src="../../mermaid-9a6dd17b.min.js"></script>
+        <script src="../../mermaid-init-ddddd38b.js"></script>
 
 
 

@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Commands - Laurus Documentation</title>
+        <title>Configuration - Laurus Documentation</title>
 
 
         <!-- Custom HTML head -->
@@ -177,327 +177,147 @@
 
                 <div id="mdbook-content" class="content">
                     <main>
-                        <h1 id="command-reference"><a class="header" href="#command-reference">Command Reference</a></h1>
-<h2 id="global-options"><a class="header" href="#global-options">Global Options</a></h2>
-<p>Every command accepts these options:</p>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th style="text-align: left">Option</th><th style="text-align: left">Environment Variable</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr>
-</thead>
-<tbody>
-<tr><td style="text-align: left"><code>--data-dir &lt;PATH&gt;</code></td><td style="text-align: left"><code>LAURUS_DATA_DIR</code></td><td style="text-align: left"><code>./laurus_data</code></td><td style="text-align: left">Path to the index data directory</td></tr>
-<tr><td style="text-align: left"><code>--format &lt;FORMAT&gt;</code></td><td style="text-align: left">—</td><td style="text-align: left"><code>table</code></td><td style="text-align: left">Output format: <code>table</code> or <code>json</code></td></tr>
-</tbody>
-</table>
-</div>
-<pre><code class="language-bash"># Example: use JSON output with a custom data directory
-laurus --data-dir /var/data/my_index --format json search "title:rust"
+                        <h1 id="configuration"><a class="header" href="#configuration">Configuration</a></h1>
+<p>The laurus-server can be configured through CLI arguments, environment variables, and a TOML configuration file.</p>
+<h2 id="configuration-priority"><a class="header" href="#configuration-priority">Configuration Priority</a></h2>
+<p>Settings are resolved in the following order (highest priority first):</p>
+<pre><code class="language-text">CLI arguments &gt; Environment variables &gt; Config file &gt; Defaults
 </code></pre>
-<hr>
-<h2 id="create--create-a-resource"><a class="header" href="#create--create-a-resource"><code>create</code> — Create a Resource</a></h2>
-<h3 id="create-index"><a class="header" href="#create-index"><code>create index</code></a></h3>
-<p>Create a new index from a schema TOML file.</p>
-<pre><code class="language-bash">laurus create index --schema &lt;FILE&gt;
-</code></pre>
-<p><strong>Arguments:</strong></p>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th style="text-align: left">Flag</th><th style="text-align: left">Required</th><th style="text-align: left">Description</th></tr>
-</thead>
-<tbody>
-<tr><td style="text-align: left"><code>--schema &lt;FILE&gt;</code></td><td style="text-align: left">Yes</td><td style="text-align: left">Path to a TOML file defining the index schema</td></tr>
-</tbody>
-</table>
-</div>
-<p><strong>Schema file format:</strong></p>
-<p>The schema file follows the same structure as the <code>Schema</code> type in the Laurus library. See <a href="schema_format.html">Schema Format Reference</a> for full details. Example:</p>
-<pre><code class="language-toml">default_fields = ["title", "body"]
+<p>For example:</p>
+<pre><code class="language-bash"># CLI argument wins over environment variable and config file
+LAURUS_PORT=4567 laurus serve --config config.toml --port 1234
+# -&gt; Listens on port 1234
 
-[fields.title.Text]
-stored = true
-indexed = true
+# Environment variable wins over config file
+LAURUS_PORT=4567 laurus serve --config config.toml
+# -&gt; Listens on port 4567
 
-[fields.body.Text]
-stored = true
-indexed = true
-
-[fields.category.Text]
-stored = true
-indexed = true
-</code></pre>
-<p><strong>Example:</strong></p>
-<pre><code class="language-bash">laurus --data-dir ./my_index create index --schema schema.toml
-# Index created at ./my_index.
-</code></pre>
-<blockquote>
-<p><strong>Note:</strong> An error is returned if the index already exists. Delete the data directory to recreate.</p>
-</blockquote>
-<h3 id="create-schema"><a class="header" href="#create-schema"><code>create schema</code></a></h3>
-<p>Interactively generate a schema TOML file through a guided wizard.</p>
-<pre><code class="language-bash">laurus create schema [--output &lt;FILE&gt;]
-</code></pre>
-<p><strong>Arguments:</strong></p>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th style="text-align: left">Flag</th><th style="text-align: left">Required</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr>
-</thead>
-<tbody>
-<tr><td style="text-align: left"><code>--output &lt;FILE&gt;</code></td><td style="text-align: left">No</td><td style="text-align: left"><code>schema.toml</code></td><td style="text-align: left">Output file path for the generated schema</td></tr>
-</tbody>
-</table>
-</div>
-<p>The wizard guides you through:</p>
-<ol>
-<li><strong>Field definition</strong> — Enter a field name, select the type, and configure type-specific options</li>
-<li><strong>Repeat</strong> — Add as many fields as needed</li>
-<li><strong>Default fields</strong> — Select which lexical fields to use as default search fields</li>
-<li><strong>Preview</strong> — Review the generated TOML before saving</li>
-<li><strong>Save</strong> — Write the schema file</li>
-</ol>
-<p><strong>Supported field types:</strong></p>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th style="text-align: left">Type</th><th style="text-align: left">Category</th><th style="text-align: left">Options</th></tr>
-</thead>
-<tbody>
-<tr><td style="text-align: left"><code>Text</code></td><td style="text-align: left">Lexical</td><td style="text-align: left"><code>indexed</code>, <code>stored</code>, <code>term_vectors</code></td></tr>
-<tr><td style="text-align: left"><code>Integer</code></td><td style="text-align: left">Lexical</td><td style="text-align: left"><code>indexed</code>, <code>stored</code></td></tr>
-<tr><td style="text-align: left"><code>Float</code></td><td style="text-align: left">Lexical</td><td style="text-align: left"><code>indexed</code>, <code>stored</code></td></tr>
-<tr><td style="text-align: left"><code>Boolean</code></td><td style="text-align: left">Lexical</td><td style="text-align: left"><code>indexed</code>, <code>stored</code></td></tr>
-<tr><td style="text-align: left"><code>DateTime</code></td><td style="text-align: left">Lexical</td><td style="text-align: left"><code>indexed</code>, <code>stored</code></td></tr>
-<tr><td style="text-align: left"><code>Geo</code></td><td style="text-align: left">Lexical</td><td style="text-align: left"><code>indexed</code>, <code>stored</code></td></tr>
-<tr><td style="text-align: left"><code>Bytes</code></td><td style="text-align: left">Lexical</td><td style="text-align: left"><code>stored</code></td></tr>
-<tr><td style="text-align: left"><code>Hnsw</code></td><td style="text-align: left">Vector</td><td style="text-align: left"><code>dimension</code>, <code>distance</code>, <code>m</code>, <code>ef_construction</code></td></tr>
-<tr><td style="text-align: left"><code>Flat</code></td><td style="text-align: left">Vector</td><td style="text-align: left"><code>dimension</code>, <code>distance</code></td></tr>
-<tr><td style="text-align: left"><code>Ivf</code></td><td style="text-align: left">Vector</td><td style="text-align: left"><code>dimension</code>, <code>distance</code>, <code>n_clusters</code>, <code>n_probe</code></td></tr>
-</tbody>
-</table>
-</div>
-<p><strong>Example:</strong></p>
-<pre><code class="language-bash"># Generate schema.toml interactively
-laurus create schema
-
-# Specify output path
-laurus create schema --output my_schema.toml
-
-# Then create an index from the generated schema
-laurus create index --schema schema.toml
-</code></pre>
-<hr>
-<h2 id="get--get-a-resource"><a class="header" href="#get--get-a-resource"><code>get</code> — Get a Resource</a></h2>
-<h3 id="get-index"><a class="header" href="#get-index"><code>get index</code></a></h3>
-<p>Display statistics about the index.</p>
-<pre><code class="language-bash">laurus get index
-</code></pre>
-<p><strong>Table output example:</strong></p>
-<pre><code class="language-text">Document count: 42
-
-Vector fields:
-╭──────────┬─────────┬───────────╮
-│ Field    │ Vectors │ Dimension │
-├──────────┼─────────┼───────────┤
-│ text_vec │ 42      │ 384       │
-╰──────────┴─────────┴───────────╯
-</code></pre>
-<p><strong>JSON output example:</strong></p>
-<pre><code class="language-bash">laurus --format json get index
-</code></pre>
-<pre><code class="language-json">{
-  "document_count": 42,
-  "fields": {
-    "text_vec": {
-      "vector_count": 42,
-      "dimension": 384
-    }
-  }
-}
-</code></pre>
-<h3 id="get-doc"><a class="header" href="#get-doc"><code>get doc</code></a></h3>
-<p>Retrieve a document (and all its chunks) by external ID.</p>
-<pre><code class="language-bash">laurus get doc --id &lt;ID&gt;
-</code></pre>
-<p><strong>Table output example:</strong></p>
-<pre><code class="language-text">╭──────┬─────────────────────────────────────────╮
-│ ID   │ Fields                                  │
-├──────┼─────────────────────────────────────────┤
-│ doc1 │ body: This is a test, title: Hello World │
-╰──────┴─────────────────────────────────────────╯
-</code></pre>
-<p><strong>JSON output example:</strong></p>
-<pre><code class="language-bash">laurus --format json get doc --id doc1
-</code></pre>
-<pre><code class="language-json">[
-  {
-    "id": "doc1",
-    "document": {
-      "title": "Hello World",
-      "body": "This is a test document."
-    }
-  }
-]
-</code></pre>
-<hr>
-<h2 id="add--add-a-resource"><a class="header" href="#add--add-a-resource"><code>add</code> — Add a Resource</a></h2>
-<h3 id="add-doc"><a class="header" href="#add-doc"><code>add doc</code></a></h3>
-<p>Add a document to the index. Documents are not searchable until <code>commit</code> is called.</p>
-<pre><code class="language-bash">laurus add doc --id &lt;ID&gt; --data &lt;JSON&gt;
-</code></pre>
-<p><strong>Arguments:</strong></p>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th style="text-align: left">Flag</th><th style="text-align: left">Required</th><th style="text-align: left">Description</th></tr>
-</thead>
-<tbody>
-<tr><td style="text-align: left"><code>--id &lt;ID&gt;</code></td><td style="text-align: left">Yes</td><td style="text-align: left">External document ID (string)</td></tr>
-<tr><td style="text-align: left"><code>--data &lt;JSON&gt;</code></td><td style="text-align: left">Yes</td><td style="text-align: left">Document fields as a JSON string</td></tr>
-</tbody>
-</table>
-</div>
-<p>The JSON format is a flat object mapping field names to values:</p>
-<pre><code class="language-json">{
-  "title": "Introduction to Rust",
-  "body": "Rust is a systems programming language.",
-  "category": "programming"
-}
-</code></pre>
-<p><strong>Example:</strong></p>
-<pre><code class="language-bash">laurus add doc --id doc1 --data '{"title":"Hello World","body":"This is a test document."}'
-# Document 'doc1' added. Run 'commit' to persist changes.
-</code></pre>
-<blockquote>
-<p><strong>Tip:</strong> Multiple documents can share the same external ID (chunking pattern). Use <code>add doc</code> for each chunk.</p>
-</blockquote>
-<hr>
-<h2 id="delete--delete-a-resource"><a class="header" href="#delete--delete-a-resource"><code>delete</code> — Delete a Resource</a></h2>
-<h3 id="delete-doc"><a class="header" href="#delete-doc"><code>delete doc</code></a></h3>
-<p>Delete a document (and all its chunks) by external ID.</p>
-<pre><code class="language-bash">laurus delete doc --id &lt;ID&gt;
-</code></pre>
-<p><strong>Example:</strong></p>
-<pre><code class="language-bash">laurus delete doc --id doc1
-# Document 'doc1' deleted. Run 'commit' to persist changes.
-</code></pre>
-<hr>
-<h2 id="commit"><a class="header" href="#commit"><code>commit</code></a></h2>
-<p>Commit pending changes (additions and deletions) to the index. Until committed, changes are not visible to search.</p>
-<pre><code class="language-bash">laurus commit
-</code></pre>
-<p><strong>Example:</strong></p>
-<pre><code class="language-bash">laurus --data-dir ./my_index commit
-# Changes committed successfully.
-</code></pre>
-<hr>
-<h2 id="search"><a class="header" href="#search"><code>search</code></a></h2>
-<p>Execute a search query using the <a href="../concepts/query_dsl.html">Query DSL</a>.</p>
-<pre><code class="language-bash">laurus search &lt;QUERY&gt; [--limit &lt;N&gt;] [--offset &lt;N&gt;]
-</code></pre>
-<p><strong>Arguments:</strong></p>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th style="text-align: left">Argument / Flag</th><th style="text-align: left">Required</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr>
-</thead>
-<tbody>
-<tr><td style="text-align: left"><code>&lt;QUERY&gt;</code></td><td style="text-align: left">Yes</td><td style="text-align: left">—</td><td style="text-align: left">Query string in Laurus Query DSL</td></tr>
-<tr><td style="text-align: left"><code>--limit &lt;N&gt;</code></td><td style="text-align: left">No</td><td style="text-align: left"><code>10</code></td><td style="text-align: left">Maximum number of results</td></tr>
-<tr><td style="text-align: left"><code>--offset &lt;N&gt;</code></td><td style="text-align: left">No</td><td style="text-align: left"><code>0</code></td><td style="text-align: left">Number of results to skip</td></tr>
-</tbody>
-</table>
-</div>
-<p><strong>Query syntax examples:</strong></p>
-<pre><code class="language-bash"># Term query
-laurus search "body:rust"
-
-# Phrase query
-laurus search 'body:"machine learning"'
-
-# Boolean query
-laurus search "+body:programming -body:python"
-
-# Fuzzy query (typo tolerance)
-laurus search "body:programing~2"
-
-# Wildcard query
-laurus search "title:intro*"
-
-# Range query
-laurus search "price:[10 TO 50]"
-</code></pre>
-<p><strong>Table output example:</strong></p>
-<pre><code class="language-text">╭──────┬────────┬─────────────────────────────────────────╮
-│ ID   │ Score  │ Fields                                  │
-├──────┼────────┼─────────────────────────────────────────┤
-│ doc1 │ 0.8532 │ body: Rust is a systems..., title: Intr │
-│ doc3 │ 0.4210 │ body: JavaScript powers..., title: Web  │
-╰──────┴────────┴─────────────────────────────────────────╯
-</code></pre>
-<p><strong>JSON output example:</strong></p>
-<pre><code class="language-bash">laurus --format json search "body:rust" --limit 5
-</code></pre>
-<pre><code class="language-json">[
-  {
-    "id": "doc1",
-    "score": 0.8532,
-    "document": {
-      "title": "Introduction to Rust",
-      "body": "Rust is a systems programming language."
-    }
-  }
-]
-</code></pre>
-<hr>
-<h2 id="repl"><a class="header" href="#repl"><code>repl</code></a></h2>
-<p>Start an interactive REPL session. See <a href="repl.html">REPL</a> for details.</p>
-<pre><code class="language-bash">laurus repl
-</code></pre>
-<hr>
-<h2 id="serve"><a class="header" href="#serve"><code>serve</code></a></h2>
-<p>Start the gRPC server. See <a href="../server/overview.html">Server Overview</a> for full documentation.</p>
-<pre><code class="language-bash">laurus serve [OPTIONS]
-</code></pre>
-<p><strong>Options:</strong></p>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th style="text-align: left">Option</th><th style="text-align: left">Short</th><th style="text-align: left">Env Variable</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr>
-</thead>
-<tbody>
-<tr><td style="text-align: left"><code>--config &lt;PATH&gt;</code></td><td style="text-align: left"><code>-c</code></td><td style="text-align: left"><code>LAURUS_CONFIG</code></td><td style="text-align: left">—</td><td style="text-align: left">Path to a TOML configuration file</td></tr>
-<tr><td style="text-align: left"><code>--host &lt;HOST&gt;</code></td><td style="text-align: left"><code>-H</code></td><td style="text-align: left"><code>LAURUS_HOST</code></td><td style="text-align: left"><code>0.0.0.0</code></td><td style="text-align: left">Listen address</td></tr>
-<tr><td style="text-align: left"><code>--port &lt;PORT&gt;</code></td><td style="text-align: left"><code>-p</code></td><td style="text-align: left"><code>LAURUS_PORT</code></td><td style="text-align: left"><code>50051</code></td><td style="text-align: left">Listen port</td></tr>
-<tr><td style="text-align: left"><code>--http-port &lt;PORT&gt;</code></td><td style="text-align: left">–</td><td style="text-align: left"><code>LAURUS_HTTP_PORT</code></td><td style="text-align: left">–</td><td style="text-align: left">HTTP Gateway port (enables HTTP gateway when set)</td></tr>
-<tr><td style="text-align: left"><code>--log-level &lt;LEVEL&gt;</code></td><td style="text-align: left"><code>-l</code></td><td style="text-align: left"><code>LAURUS_LOG_LEVEL</code></td><td style="text-align: left"><code>info</code></td><td style="text-align: left">Log level (<code>trace</code>, <code>debug</code>, <code>info</code>, <code>warn</code>, <code>error</code>)</td></tr>
-</tbody>
-</table>
-</div>
-<p><strong>Example:</strong></p>
-<pre><code class="language-bash"># Start with defaults (port 50051)
-laurus --data-dir ./my_index serve
-
-# Custom port and log level
-laurus serve --port 8080 --log-level debug
-
-# Use a configuration file
+# Config file value is used when no CLI argument or env var is set
 laurus serve --config config.toml
+# -&gt; Uses port from config.toml (or default 50051 if not set)
+</code></pre>
+<h2 id="toml-configuration-file"><a class="header" href="#toml-configuration-file">TOML Configuration File</a></h2>
+<h3 id="format"><a class="header" href="#format">Format</a></h3>
+<pre><code class="language-toml">[server]
+host = "0.0.0.0"
+port = 50051
+http_port = 8080  # Optional: enables HTTP Gateway
 
-# Use environment variables
-LAURUS_DATA_DIR=./my_index LAURUS_PORT=8080 laurus serve
+[index]
+data_dir = "./laurus_data"
+
+[log]
+level = "info"
+</code></pre>
+<h3 id="field-reference"><a class="header" href="#field-reference">Field Reference</a></h3>
+<h4 id="server-section"><a class="header" href="#server-section"><code>[server]</code> Section</a></h4>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Field</th><th style="text-align: left">Type</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>host</code></td><td style="text-align: left">String</td><td style="text-align: left"><code>"0.0.0.0"</code></td><td style="text-align: left">Listen address for the gRPC server</td></tr>
+<tr><td style="text-align: left"><code>port</code></td><td style="text-align: left">Integer</td><td style="text-align: left"><code>50051</code></td><td style="text-align: left">Listen port for the gRPC server</td></tr>
+<tr><td style="text-align: left"><code>http_port</code></td><td style="text-align: left">Integer</td><td style="text-align: left">–</td><td style="text-align: left">HTTP Gateway port. When set, the HTTP/JSON gateway starts alongside gRPC.</td></tr>
+</tbody>
+</table>
+</div>
+<h4 id="index-section"><a class="header" href="#index-section"><code>[index]</code> Section</a></h4>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Field</th><th style="text-align: left">Type</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>data_dir</code></td><td style="text-align: left">String</td><td style="text-align: left"><code>"./laurus_data"</code></td><td style="text-align: left">Path to the index data directory</td></tr>
+</tbody>
+</table>
+</div>
+<h4 id="log-section"><a class="header" href="#log-section"><code>[log]</code> Section</a></h4>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Field</th><th style="text-align: left">Type</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>level</code></td><td style="text-align: left">String</td><td style="text-align: left"><code>"info"</code></td><td style="text-align: left">Log level: <code>trace</code>, <code>debug</code>, <code>info</code>, <code>warn</code>, <code>error</code></td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="environment-variables"><a class="header" href="#environment-variables">Environment Variables</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Variable</th><th style="text-align: left">Maps To</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>LAURUS_HOST</code></td><td style="text-align: left"><code>server.host</code></td><td style="text-align: left">Listen address</td></tr>
+<tr><td style="text-align: left"><code>LAURUS_PORT</code></td><td style="text-align: left"><code>server.port</code></td><td style="text-align: left">gRPC listen port</td></tr>
+<tr><td style="text-align: left"><code>LAURUS_HTTP_PORT</code></td><td style="text-align: left"><code>server.http_port</code></td><td style="text-align: left">HTTP Gateway port</td></tr>
+<tr><td style="text-align: left"><code>LAURUS_DATA_DIR</code></td><td style="text-align: left"><code>index.data_dir</code></td><td style="text-align: left">Index data directory</td></tr>
+<tr><td style="text-align: left"><code>LAURUS_LOG_LEVEL</code></td><td style="text-align: left"><code>log.level</code></td><td style="text-align: left">Log level</td></tr>
+<tr><td style="text-align: left"><code>LAURUS_CONFIG</code></td><td style="text-align: left">–</td><td style="text-align: left">Path to TOML config file</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="cli-arguments"><a class="header" href="#cli-arguments">CLI Arguments</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Option</th><th style="text-align: left">Short</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>--config &lt;PATH&gt;</code></td><td style="text-align: left"><code>-c</code></td><td style="text-align: left">–</td><td style="text-align: left">Path to TOML configuration file</td></tr>
+<tr><td style="text-align: left"><code>--host &lt;HOST&gt;</code></td><td style="text-align: left"><code>-H</code></td><td style="text-align: left"><code>0.0.0.0</code></td><td style="text-align: left">Listen address</td></tr>
+<tr><td style="text-align: left"><code>--port &lt;PORT&gt;</code></td><td style="text-align: left"><code>-p</code></td><td style="text-align: left"><code>50051</code></td><td style="text-align: left">gRPC listen port</td></tr>
+<tr><td style="text-align: left"><code>--http-port &lt;PORT&gt;</code></td><td style="text-align: left">–</td><td style="text-align: left">–</td><td style="text-align: left">HTTP Gateway port</td></tr>
+<tr><td style="text-align: left"><code>--log-level &lt;LEVEL&gt;</code></td><td style="text-align: left"><code>-l</code></td><td style="text-align: left"><code>info</code></td><td style="text-align: left">Log level</td></tr>
+<tr><td style="text-align: left"><code>--data-dir &lt;PATH&gt;</code></td><td style="text-align: left">–</td><td style="text-align: left"><code>./laurus_data</code></td><td style="text-align: left">Index data directory (global option)</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="common-configurations"><a class="header" href="#common-configurations">Common Configurations</a></h2>
+<h3 id="development-grpc-only"><a class="header" href="#development-grpc-only">Development (gRPC only)</a></h3>
+<pre><code class="language-toml">[server]
+host = "127.0.0.1"
+port = 50051
+
+[index]
+data_dir = "./dev_data"
+
+[log]
+level = "debug"
+</code></pre>
+<h3 id="production-grpc--http-gateway"><a class="header" href="#production-grpc--http-gateway">Production (gRPC + HTTP Gateway)</a></h3>
+<pre><code class="language-toml">[server]
+host = "0.0.0.0"
+port = 50051
+http_port = 8080
+
+[index]
+data_dir = "/var/lib/laurus/data"
+
+[log]
+level = "info"
+</code></pre>
+<h3 id="minimal-environment-variables-only"><a class="header" href="#minimal-environment-variables-only">Minimal (environment variables only)</a></h3>
+<pre><code class="language-bash">export LAURUS_DATA_DIR=/var/lib/laurus/data
+export LAURUS_PORT=50051
+export LAURUS_HTTP_PORT=8080
+export LAURUS_LOG_LEVEL=info
+laurus serve
 </code></pre>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="../cli/installation.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../server/getting_started.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
-                            <a rel="next prefetch" href="../cli/schema_format.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="../server/grpc_api.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                             </a>
 
@@ -507,11 +327,11 @@ LAURUS_DATA_DIR=./my_index LAURUS_PORT=8080 laurus serve
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="../cli/installation.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="../server/getting_started.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 
-                    <a rel="next prefetch" href="../cli/schema_format.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="../server/grpc_api.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                     </a>
             </nav>

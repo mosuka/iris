@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Commands - Laurus Documentation</title>
+        <title>Lexical Search - Laurus Documentation</title>
 
 
         <!-- Custom HTML head -->
@@ -12,33 +12,33 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="theme-color" content="#ffffff">
 
-        <link rel="icon" href="../favicon-de23e50b.svg">
-        <link rel="shortcut icon" href="../favicon-8114d1fc.png">
-        <link rel="stylesheet" href="../css/variables-8adf115d.css">
-        <link rel="stylesheet" href="../css/general-2459343d.css">
-        <link rel="stylesheet" href="../css/chrome-ae938929.css">
-        <link rel="stylesheet" href="../css/print-9e4910d8.css" media="print">
+        <link rel="icon" href="../../favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="../../favicon-8114d1fc.png">
+        <link rel="stylesheet" href="../../css/variables-8adf115d.css">
+        <link rel="stylesheet" href="../../css/general-2459343d.css">
+        <link rel="stylesheet" href="../../css/chrome-ae938929.css">
+        <link rel="stylesheet" href="../../css/print-9e4910d8.css" media="print">
 
         <!-- Fonts -->
-        <link rel="stylesheet" href="../fonts/fonts-9644e21d.css">
+        <link rel="stylesheet" href="../../fonts/fonts-9644e21d.css">
 
         <!-- Highlight.js Stylesheets -->
-        <link rel="stylesheet" id="mdbook-highlight-css" href="../highlight-493f70e1.css">
-        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="../tomorrow-night-4c0ae647.css">
-        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="../ayu-highlight-3fdfc3ac.css">
+        <link rel="stylesheet" id="mdbook-highlight-css" href="../../highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="../../tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="../../ayu-highlight-3fdfc3ac.css">
 
         <!-- Custom theme stylesheets -->
 
 
         <!-- Provide site root and default themes to javascript -->
         <script>
-            const path_to_root = "../";
+            const path_to_root = "../../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-674b4e1e.js";
+            window.path_to_searchindex_js = "../../searchindex-674b4e1e.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-072c2e71.js"></script>
+        <script src="../../toc-072c2e71.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -105,7 +105,7 @@
             <!-- populated by js -->
             <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
             <noscript>
-                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
+                <iframe class="sidebar-iframe-outer" src="../../toc.html"></iframe>
             </noscript>
             <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
                 <div class="sidebar-resize-indicator"></div>
@@ -140,7 +140,7 @@
                     <h1 class="menu-title">Laurus Documentation</h1>
 
                     <div class="right-buttons">
-                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                        <a href="../../print.html" title="Print this book" aria-label="Print this book">
                             <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
                         </a>
                         <a href="https://github.com/mosuka/laurus" title="Git repository" aria-label="Git repository">
@@ -177,327 +177,279 @@
 
                 <div id="mdbook-content" class="content">
                     <main>
-                        <h1 id="command-reference"><a class="header" href="#command-reference">Command Reference</a></h1>
-<h2 id="global-options"><a class="header" href="#global-options">Global Options</a></h2>
-<p>Every command accepts these options:</p>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th style="text-align: left">Option</th><th style="text-align: left">Environment Variable</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr>
-</thead>
-<tbody>
-<tr><td style="text-align: left"><code>--data-dir &lt;PATH&gt;</code></td><td style="text-align: left"><code>LAURUS_DATA_DIR</code></td><td style="text-align: left"><code>./laurus_data</code></td><td style="text-align: left">Path to the index data directory</td></tr>
-<tr><td style="text-align: left"><code>--format &lt;FORMAT&gt;</code></td><td style="text-align: left">—</td><td style="text-align: left"><code>table</code></td><td style="text-align: left">Output format: <code>table</code> or <code>json</code></td></tr>
-</tbody>
-</table>
-</div>
-<pre><code class="language-bash"># Example: use JSON output with a custom data directory
-laurus --data-dir /var/data/my_index --format json search "title:rust"
-</code></pre>
-<hr>
-<h2 id="create--create-a-resource"><a class="header" href="#create--create-a-resource"><code>create</code> — Create a Resource</a></h2>
-<h3 id="create-index"><a class="header" href="#create-index"><code>create index</code></a></h3>
-<p>Create a new index from a schema TOML file.</p>
-<pre><code class="language-bash">laurus create index --schema &lt;FILE&gt;
-</code></pre>
-<p><strong>Arguments:</strong></p>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th style="text-align: left">Flag</th><th style="text-align: left">Required</th><th style="text-align: left">Description</th></tr>
-</thead>
-<tbody>
-<tr><td style="text-align: left"><code>--schema &lt;FILE&gt;</code></td><td style="text-align: left">Yes</td><td style="text-align: left">Path to a TOML file defining the index schema</td></tr>
-</tbody>
-</table>
-</div>
-<p><strong>Schema file format:</strong></p>
-<p>The schema file follows the same structure as the <code>Schema</code> type in the Laurus library. See <a href="schema_format.html">Schema Format Reference</a> for full details. Example:</p>
-<pre><code class="language-toml">default_fields = ["title", "body"]
+                        <h1 id="lexical-search"><a class="header" href="#lexical-search">Lexical Search</a></h1>
+<p>Lexical search finds documents by matching keywords against an inverted index. Laurus provides a rich set of query types that cover exact matching, phrase matching, fuzzy matching, and more.</p>
+<h2 id="basic-usage"><a class="header" href="#basic-usage">Basic Usage</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use laurus::{SearchRequestBuilder, LexicalSearchRequest};
+use laurus::lexical::TermQuery;
 
-[fields.title.Text]
-stored = true
-indexed = true
+let request = SearchRequestBuilder::new()
+    .lexical_search_request(
+        LexicalSearchRequest::new(
+            Box::new(TermQuery::new("body", "rust"))
+        )
+    )
+    .limit(10)
+    .build();
 
-[fields.body.Text]
-stored = true
-indexed = true
+let results = engine.search(request).await?;
+<span class="boring">}</span></code></pre>
+<h2 id="query-types"><a class="header" href="#query-types">Query Types</a></h2>
+<h3 id="termquery"><a class="header" href="#termquery">TermQuery</a></h3>
+<p>Matches documents containing an exact term in a specific field.</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use laurus::lexical::TermQuery;
 
-[fields.category.Text]
-stored = true
-indexed = true
-</code></pre>
-<p><strong>Example:</strong></p>
-<pre><code class="language-bash">laurus --data-dir ./my_index create index --schema schema.toml
-# Index created at ./my_index.
-</code></pre>
+// Find documents where "body" contains the term "rust"
+let query = TermQuery::new("body", "rust");
+<span class="boring">}</span></code></pre>
 <blockquote>
-<p><strong>Note:</strong> An error is returned if the index already exists. Delete the data directory to recreate.</p>
+<p><strong>Note:</strong> Terms are matched after analysis. If the field uses <code>StandardAnalyzer</code>, both the indexed text and the query term are lowercased, so <code>TermQuery::new("body", "rust")</code> will match “Rust” in the original text.</p>
 </blockquote>
-<h3 id="create-schema"><a class="header" href="#create-schema"><code>create schema</code></a></h3>
-<p>Interactively generate a schema TOML file through a guided wizard.</p>
-<pre><code class="language-bash">laurus create schema [--output &lt;FILE&gt;]
-</code></pre>
-<p><strong>Arguments:</strong></p>
+<h3 id="phrasequery"><a class="header" href="#phrasequery">PhraseQuery</a></h3>
+<p>Matches documents containing an exact sequence of terms.</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use laurus::lexical::query::phrase::PhraseQuery;
+
+// Find documents containing the exact phrase "machine learning"
+let query = PhraseQuery::new("body", vec!["machine".to_string(), "learning".to_string()]);
+
+// Or use the convenience method from a phrase string:
+let query = PhraseQuery::from_phrase("body", "machine learning");
+<span class="boring">}</span></code></pre>
+<p>Phrase queries require term positions to be stored (the default for <code>TextOption</code>).</p>
+<h3 id="booleanquery"><a class="header" href="#booleanquery">BooleanQuery</a></h3>
+<p>Combines multiple queries with boolean logic.</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use laurus::lexical::query::boolean::{BooleanQuery, BooleanQueryBuilder, Occur};
+
+let query = BooleanQueryBuilder::new()
+    .must(Box::new(TermQuery::new("body", "rust")))       // AND
+    .must(Box::new(TermQuery::new("body", "programming"))) // AND
+    .must_not(Box::new(TermQuery::new("body", "python")))  // NOT
+    .build();
+<span class="boring">}</span></code></pre>
 <div class="table-wrapper">
 <table>
 <thead>
-<tr><th style="text-align: left">Flag</th><th style="text-align: left">Required</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr>
+<tr><th style="text-align: left">Occur</th><th style="text-align: left">Meaning</th><th style="text-align: left">DSL Equivalent</th></tr>
 </thead>
 <tbody>
-<tr><td style="text-align: left"><code>--output &lt;FILE&gt;</code></td><td style="text-align: left">No</td><td style="text-align: left"><code>schema.toml</code></td><td style="text-align: left">Output file path for the generated schema</td></tr>
+<tr><td style="text-align: left"><code>Must</code></td><td style="text-align: left">Document MUST match</td><td style="text-align: left"><code>+term</code> or <code>AND</code></td></tr>
+<tr><td style="text-align: left"><code>Should</code></td><td style="text-align: left">Document SHOULD match (boosts score)</td><td style="text-align: left"><code>term</code> or <code>OR</code></td></tr>
+<tr><td style="text-align: left"><code>MustNot</code></td><td style="text-align: left">Document MUST NOT match</td><td style="text-align: left"><code>-term</code> or <code>NOT</code></td></tr>
+<tr><td style="text-align: left"><code>Filter</code></td><td style="text-align: left">MUST match, but does not affect score</td><td style="text-align: left">(no DSL equivalent)</td></tr>
 </tbody>
 </table>
 </div>
-<p>The wizard guides you through:</p>
-<ol>
-<li><strong>Field definition</strong> — Enter a field name, select the type, and configure type-specific options</li>
-<li><strong>Repeat</strong> — Add as many fields as needed</li>
-<li><strong>Default fields</strong> — Select which lexical fields to use as default search fields</li>
-<li><strong>Preview</strong> — Review the generated TOML before saving</li>
-<li><strong>Save</strong> — Write the schema file</li>
-</ol>
-<p><strong>Supported field types:</strong></p>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th style="text-align: left">Type</th><th style="text-align: left">Category</th><th style="text-align: left">Options</th></tr>
-</thead>
-<tbody>
-<tr><td style="text-align: left"><code>Text</code></td><td style="text-align: left">Lexical</td><td style="text-align: left"><code>indexed</code>, <code>stored</code>, <code>term_vectors</code></td></tr>
-<tr><td style="text-align: left"><code>Integer</code></td><td style="text-align: left">Lexical</td><td style="text-align: left"><code>indexed</code>, <code>stored</code></td></tr>
-<tr><td style="text-align: left"><code>Float</code></td><td style="text-align: left">Lexical</td><td style="text-align: left"><code>indexed</code>, <code>stored</code></td></tr>
-<tr><td style="text-align: left"><code>Boolean</code></td><td style="text-align: left">Lexical</td><td style="text-align: left"><code>indexed</code>, <code>stored</code></td></tr>
-<tr><td style="text-align: left"><code>DateTime</code></td><td style="text-align: left">Lexical</td><td style="text-align: left"><code>indexed</code>, <code>stored</code></td></tr>
-<tr><td style="text-align: left"><code>Geo</code></td><td style="text-align: left">Lexical</td><td style="text-align: left"><code>indexed</code>, <code>stored</code></td></tr>
-<tr><td style="text-align: left"><code>Bytes</code></td><td style="text-align: left">Lexical</td><td style="text-align: left"><code>stored</code></td></tr>
-<tr><td style="text-align: left"><code>Hnsw</code></td><td style="text-align: left">Vector</td><td style="text-align: left"><code>dimension</code>, <code>distance</code>, <code>m</code>, <code>ef_construction</code></td></tr>
-<tr><td style="text-align: left"><code>Flat</code></td><td style="text-align: left">Vector</td><td style="text-align: left"><code>dimension</code>, <code>distance</code></td></tr>
-<tr><td style="text-align: left"><code>Ivf</code></td><td style="text-align: left">Vector</td><td style="text-align: left"><code>dimension</code>, <code>distance</code>, <code>n_clusters</code>, <code>n_probe</code></td></tr>
-</tbody>
-</table>
-</div>
-<p><strong>Example:</strong></p>
-<pre><code class="language-bash"># Generate schema.toml interactively
-laurus create schema
+<h3 id="fuzzyquery"><a class="header" href="#fuzzyquery">FuzzyQuery</a></h3>
+<p>Matches terms within a specified edit distance (Levenshtein distance).</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use laurus::lexical::query::fuzzy::FuzzyQuery;
 
-# Specify output path
-laurus create schema --output my_schema.toml
+// Find documents matching "programing" within edit distance 2
+// This will match "programming", "programing", etc.
+let query = FuzzyQuery::new("body", "programing");  // default max_edits = 2
+<span class="boring">}</span></code></pre>
+<h3 id="wildcardquery"><a class="header" href="#wildcardquery">WildcardQuery</a></h3>
+<p>Matches terms using wildcard patterns.</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use laurus::lexical::query::wildcard::WildcardQuery;
 
-# Then create an index from the generated schema
-laurus create index --schema schema.toml
-</code></pre>
-<hr>
-<h2 id="get--get-a-resource"><a class="header" href="#get--get-a-resource"><code>get</code> — Get a Resource</a></h2>
-<h3 id="get-index"><a class="header" href="#get-index"><code>get index</code></a></h3>
-<p>Display statistics about the index.</p>
-<pre><code class="language-bash">laurus get index
-</code></pre>
-<p><strong>Table output example:</strong></p>
-<pre><code class="language-text">Document count: 42
+// '?' matches exactly one character, '*' matches zero or more
+let query = WildcardQuery::new("filename", "*.pdf")?;
+let query = WildcardQuery::new("body", "pro*")?;
+let query = WildcardQuery::new("body", "col?r")?;  // matches "color" and "colour"
+<span class="boring">}</span></code></pre>
+<h3 id="prefixquery"><a class="header" href="#prefixquery">PrefixQuery</a></h3>
+<p>Matches documents containing terms that start with a specific prefix.</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use laurus::lexical::query::prefix::PrefixQuery;
 
-Vector fields:
-╭──────────┬─────────┬───────────╮
-│ Field    │ Vectors │ Dimension │
-├──────────┼─────────┼───────────┤
-│ text_vec │ 42      │ 384       │
-╰──────────┴─────────┴───────────╯
-</code></pre>
-<p><strong>JSON output example:</strong></p>
-<pre><code class="language-bash">laurus --format json get index
-</code></pre>
-<pre><code class="language-json">{
-  "document_count": 42,
-  "fields": {
-    "text_vec": {
-      "vector_count": 42,
-      "dimension": 384
-    }
-  }
-}
-</code></pre>
-<h3 id="get-doc"><a class="header" href="#get-doc"><code>get doc</code></a></h3>
-<p>Retrieve a document (and all its chunks) by external ID.</p>
-<pre><code class="language-bash">laurus get doc --id &lt;ID&gt;
-</code></pre>
-<p><strong>Table output example:</strong></p>
-<pre><code class="language-text">╭──────┬─────────────────────────────────────────╮
-│ ID   │ Fields                                  │
-├──────┼─────────────────────────────────────────┤
-│ doc1 │ body: This is a test, title: Hello World │
-╰──────┴─────────────────────────────────────────╯
-</code></pre>
-<p><strong>JSON output example:</strong></p>
-<pre><code class="language-bash">laurus --format json get doc --id doc1
-</code></pre>
-<pre><code class="language-json">[
-  {
-    "id": "doc1",
-    "document": {
-      "title": "Hello World",
-      "body": "This is a test document."
-    }
-  }
-]
-</code></pre>
-<hr>
-<h2 id="add--add-a-resource"><a class="header" href="#add--add-a-resource"><code>add</code> — Add a Resource</a></h2>
-<h3 id="add-doc"><a class="header" href="#add-doc"><code>add doc</code></a></h3>
-<p>Add a document to the index. Documents are not searchable until <code>commit</code> is called.</p>
-<pre><code class="language-bash">laurus add doc --id &lt;ID&gt; --data &lt;JSON&gt;
-</code></pre>
-<p><strong>Arguments:</strong></p>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th style="text-align: left">Flag</th><th style="text-align: left">Required</th><th style="text-align: left">Description</th></tr>
-</thead>
-<tbody>
-<tr><td style="text-align: left"><code>--id &lt;ID&gt;</code></td><td style="text-align: left">Yes</td><td style="text-align: left">External document ID (string)</td></tr>
-<tr><td style="text-align: left"><code>--data &lt;JSON&gt;</code></td><td style="text-align: left">Yes</td><td style="text-align: left">Document fields as a JSON string</td></tr>
-</tbody>
-</table>
-</div>
-<p>The JSON format is a flat object mapping field names to values:</p>
-<pre><code class="language-json">{
-  "title": "Introduction to Rust",
-  "body": "Rust is a systems programming language.",
-  "category": "programming"
-}
-</code></pre>
-<p><strong>Example:</strong></p>
-<pre><code class="language-bash">laurus add doc --id doc1 --data '{"title":"Hello World","body":"This is a test document."}'
-# Document 'doc1' added. Run 'commit' to persist changes.
-</code></pre>
+// Find documents where "body" contains terms starting with "pro"
+// This matches "programming", "program", "production", etc.
+let query = PrefixQuery::new("body", "pro");
+<span class="boring">}</span></code></pre>
+<h3 id="regexpquery"><a class="header" href="#regexpquery">RegexpQuery</a></h3>
+<p>Matches documents containing terms that match a regular expression pattern.</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use laurus::lexical::query::regexp::RegexpQuery;
+
+// Find documents where "body" contains terms matching the regex
+let query = RegexpQuery::new("body", "^pro.*ing$")?;
+
+// Match version-like patterns
+let query = RegexpQuery::new("version", r"^v\d+\.\d+")?;
+<span class="boring">}</span></code></pre>
 <blockquote>
-<p><strong>Tip:</strong> Multiple documents can share the same external ID (chunking pattern). Use <code>add doc</code> for each chunk.</p>
+<p><strong>Note:</strong> <code>RegexpQuery::new()</code> returns <code>Result</code> because the regex pattern is validated at construction time. Invalid patterns will produce an error.</p>
 </blockquote>
-<hr>
-<h2 id="delete--delete-a-resource"><a class="header" href="#delete--delete-a-resource"><code>delete</code> — Delete a Resource</a></h2>
-<h3 id="delete-doc"><a class="header" href="#delete-doc"><code>delete doc</code></a></h3>
-<p>Delete a document (and all its chunks) by external ID.</p>
-<pre><code class="language-bash">laurus delete doc --id &lt;ID&gt;
-</code></pre>
-<p><strong>Example:</strong></p>
-<pre><code class="language-bash">laurus delete doc --id doc1
-# Document 'doc1' deleted. Run 'commit' to persist changes.
-</code></pre>
-<hr>
-<h2 id="commit"><a class="header" href="#commit"><code>commit</code></a></h2>
-<p>Commit pending changes (additions and deletions) to the index. Until committed, changes are not visible to search.</p>
-<pre><code class="language-bash">laurus commit
-</code></pre>
-<p><strong>Example:</strong></p>
-<pre><code class="language-bash">laurus --data-dir ./my_index commit
-# Changes committed successfully.
-</code></pre>
-<hr>
-<h2 id="search"><a class="header" href="#search"><code>search</code></a></h2>
-<p>Execute a search query using the <a href="../concepts/query_dsl.html">Query DSL</a>.</p>
-<pre><code class="language-bash">laurus search &lt;QUERY&gt; [--limit &lt;N&gt;] [--offset &lt;N&gt;]
-</code></pre>
-<p><strong>Arguments:</strong></p>
+<h3 id="numericrangequery"><a class="header" href="#numericrangequery">NumericRangeQuery</a></h3>
+<p>Matches documents with numeric field values within a range.</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use laurus::lexical::NumericRangeQuery;
+use laurus::lexical::core::field::NumericType;
+
+// Find documents where "price" is between 10.0 and 100.0 (inclusive)
+let query = NumericRangeQuery::new(
+    "price",
+    NumericType::Float,
+    Some(10.0),   // min
+    Some(100.0),  // max
+    true,         // include min
+    true,         // include max
+);
+
+// Open-ended range: price &gt;= 50
+let query = NumericRangeQuery::new(
+    "price",
+    NumericType::Float,
+    Some(50.0),
+    None,     // no upper bound
+    true,
+    false,
+);
+<span class="boring">}</span></code></pre>
+<h3 id="geoquery"><a class="header" href="#geoquery">GeoQuery</a></h3>
+<p>Matches documents by geographic location.</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use laurus::lexical::query::geo::GeoQuery;
+
+// Find documents within 10km of Tokyo Station (35.6812, 139.7671)
+let query = GeoQuery::within_radius("location", 35.6812, 139.7671, 10.0)?; // radius in kilometers
+
+// Find documents within a bounding box (min_lat, min_lon, max_lat, max_lon)
+let query = GeoQuery::within_bounding_box(
+    "location",
+    35.0, 139.0,  // min (lat, lon)
+    36.0, 140.0,  // max (lat, lon)
+)?;
+<span class="boring">}</span></code></pre>
+<h3 id="spanquery"><a class="header" href="#spanquery">SpanQuery</a></h3>
+<p>Matches terms based on their proximity within a document. Use <code>SpanTermQuery</code> and <code>SpanNearQuery</code> to build proximity queries:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use laurus::lexical::query::span::{SpanQuery, SpanTermQuery, SpanNearQuery};
+
+// Find documents where "quick" appears near "fox" (within 3 positions)
+let query = SpanNearQuery::new(
+    "body",
+    vec![
+        Box::new(SpanTermQuery::new("body", "quick")) as Box&lt;dyn SpanQuery&gt;,
+        Box::new(SpanTermQuery::new("body", "fox")) as Box&lt;dyn SpanQuery&gt;,
+    ],
+    3,    // slop (max distance between terms)
+    true, // in_order (terms must appear in order)
+);
+<span class="boring">}</span></code></pre>
+<h2 id="scoring"><a class="header" href="#scoring">Scoring</a></h2>
+<p>Lexical search results are scored using <strong>BM25</strong>. The score reflects how relevant a document is to the query:</p>
+<ul>
+<li>Higher term frequency in the document increases the score</li>
+<li>Rarer terms across the index increase the score</li>
+<li>Shorter documents are boosted relative to longer ones</li>
+</ul>
+<h3 id="field-boosts"><a class="header" href="#field-boosts">Field Boosts</a></h3>
+<p>You can boost specific fields to influence relevance:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use laurus::LexicalSearchRequest;
+
+let mut request = LexicalSearchRequest::new(Box::new(query));
+request.field_boosts.insert("title".to_string(), 2.0);  // title matches count double
+request.field_boosts.insert("body".to_string(), 1.0);
+<span class="boring">}</span></code></pre>
+<h2 id="lexicalsearchrequest-options"><a class="header" href="#lexicalsearchrequest-options">LexicalSearchRequest Options</a></h2>
 <div class="table-wrapper">
 <table>
 <thead>
-<tr><th style="text-align: left">Argument / Flag</th><th style="text-align: left">Required</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr>
+<tr><th style="text-align: left">Option</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr>
 </thead>
 <tbody>
-<tr><td style="text-align: left"><code>&lt;QUERY&gt;</code></td><td style="text-align: left">Yes</td><td style="text-align: left">—</td><td style="text-align: left">Query string in Laurus Query DSL</td></tr>
-<tr><td style="text-align: left"><code>--limit &lt;N&gt;</code></td><td style="text-align: left">No</td><td style="text-align: left"><code>10</code></td><td style="text-align: left">Maximum number of results</td></tr>
-<tr><td style="text-align: left"><code>--offset &lt;N&gt;</code></td><td style="text-align: left">No</td><td style="text-align: left"><code>0</code></td><td style="text-align: left">Number of results to skip</td></tr>
+<tr><td style="text-align: left"><code>query</code></td><td style="text-align: left">(required)</td><td style="text-align: left">The query to execute</td></tr>
+<tr><td style="text-align: left"><code>limit</code></td><td style="text-align: left">10</td><td style="text-align: left">Maximum number of results</td></tr>
+<tr><td style="text-align: left"><code>load_documents</code></td><td style="text-align: left">true</td><td style="text-align: left">Whether to load full document content</td></tr>
+<tr><td style="text-align: left"><code>min_score</code></td><td style="text-align: left">0.0</td><td style="text-align: left">Minimum score threshold</td></tr>
+<tr><td style="text-align: left"><code>timeout_ms</code></td><td style="text-align: left">None</td><td style="text-align: left">Search timeout in milliseconds</td></tr>
+<tr><td style="text-align: left"><code>parallel</code></td><td style="text-align: left">false</td><td style="text-align: left">Enable parallel search across segments</td></tr>
+<tr><td style="text-align: left"><code>sort_by</code></td><td style="text-align: left"><code>Score</code></td><td style="text-align: left">Sort by relevance score, or by a field (<code>asc</code> / <code>desc</code>)</td></tr>
+<tr><td style="text-align: left"><code>field_boosts</code></td><td style="text-align: left">empty</td><td style="text-align: left">Per-field score multipliers</td></tr>
 </tbody>
 </table>
 </div>
-<p><strong>Query syntax examples:</strong></p>
-<pre><code class="language-bash"># Term query
-laurus search "body:rust"
+<h3 id="builder-methods"><a class="header" href="#builder-methods">Builder Methods</a></h3>
+<p><code>LexicalSearchRequest</code> supports a builder-style API for setting options:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use laurus::LexicalSearchRequest;
+use laurus::lexical::TermQuery;
 
-# Phrase query
-laurus search 'body:"machine learning"'
+let request = LexicalSearchRequest::new(Box::new(TermQuery::new("body", "rust")))
+    .limit(20)
+    .min_score(0.5)
+    .timeout_ms(5000)
+    .parallel(true)
+    .sort_by_field_desc("date")
+    .with_field_boost("title", 2.0)
+    .with_field_boost("body", 1.0);
+<span class="boring">}</span></code></pre>
+<h2 id="using-the-query-dsl"><a class="header" href="#using-the-query-dsl">Using the Query DSL</a></h2>
+<p>Instead of building queries programmatically, you can use the text-based Query DSL:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use laurus::lexical::QueryParser;
+use laurus::analysis::analyzer::standard::StandardAnalyzer;
+use std::sync::Arc;
 
-# Boolean query
-laurus search "+body:programming -body:python"
+let analyzer = Arc::new(StandardAnalyzer::default());
+let parser = QueryParser::new(analyzer).with_default_field("body");
 
-# Fuzzy query (typo tolerance)
-laurus search "body:programing~2"
+// Simple term
+let query = parser.parse("rust")?;
 
-# Wildcard query
-laurus search "title:intro*"
+// Boolean
+let query = parser.parse("rust AND programming")?;
 
-# Range query
-laurus search "price:[10 TO 50]"
-</code></pre>
-<p><strong>Table output example:</strong></p>
-<pre><code class="language-text">╭──────┬────────┬─────────────────────────────────────────╮
-│ ID   │ Score  │ Fields                                  │
-├──────┼────────┼─────────────────────────────────────────┤
-│ doc1 │ 0.8532 │ body: Rust is a systems..., title: Intr │
-│ doc3 │ 0.4210 │ body: JavaScript powers..., title: Web  │
-╰──────┴────────┴─────────────────────────────────────────╯
-</code></pre>
-<p><strong>JSON output example:</strong></p>
-<pre><code class="language-bash">laurus --format json search "body:rust" --limit 5
-</code></pre>
-<pre><code class="language-json">[
-  {
-    "id": "doc1",
-    "score": 0.8532,
-    "document": {
-      "title": "Introduction to Rust",
-      "body": "Rust is a systems programming language."
-    }
-  }
-]
-</code></pre>
-<hr>
-<h2 id="repl"><a class="header" href="#repl"><code>repl</code></a></h2>
-<p>Start an interactive REPL session. See <a href="repl.html">REPL</a> for details.</p>
-<pre><code class="language-bash">laurus repl
-</code></pre>
-<hr>
-<h2 id="serve"><a class="header" href="#serve"><code>serve</code></a></h2>
-<p>Start the gRPC server. See <a href="../server/overview.html">Server Overview</a> for full documentation.</p>
-<pre><code class="language-bash">laurus serve [OPTIONS]
-</code></pre>
-<p><strong>Options:</strong></p>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th style="text-align: left">Option</th><th style="text-align: left">Short</th><th style="text-align: left">Env Variable</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr>
-</thead>
-<tbody>
-<tr><td style="text-align: left"><code>--config &lt;PATH&gt;</code></td><td style="text-align: left"><code>-c</code></td><td style="text-align: left"><code>LAURUS_CONFIG</code></td><td style="text-align: left">—</td><td style="text-align: left">Path to a TOML configuration file</td></tr>
-<tr><td style="text-align: left"><code>--host &lt;HOST&gt;</code></td><td style="text-align: left"><code>-H</code></td><td style="text-align: left"><code>LAURUS_HOST</code></td><td style="text-align: left"><code>0.0.0.0</code></td><td style="text-align: left">Listen address</td></tr>
-<tr><td style="text-align: left"><code>--port &lt;PORT&gt;</code></td><td style="text-align: left"><code>-p</code></td><td style="text-align: left"><code>LAURUS_PORT</code></td><td style="text-align: left"><code>50051</code></td><td style="text-align: left">Listen port</td></tr>
-<tr><td style="text-align: left"><code>--http-port &lt;PORT&gt;</code></td><td style="text-align: left">–</td><td style="text-align: left"><code>LAURUS_HTTP_PORT</code></td><td style="text-align: left">–</td><td style="text-align: left">HTTP Gateway port (enables HTTP gateway when set)</td></tr>
-<tr><td style="text-align: left"><code>--log-level &lt;LEVEL&gt;</code></td><td style="text-align: left"><code>-l</code></td><td style="text-align: left"><code>LAURUS_LOG_LEVEL</code></td><td style="text-align: left"><code>info</code></td><td style="text-align: left">Log level (<code>trace</code>, <code>debug</code>, <code>info</code>, <code>warn</code>, <code>error</code>)</td></tr>
-</tbody>
-</table>
-</div>
-<p><strong>Example:</strong></p>
-<pre><code class="language-bash"># Start with defaults (port 50051)
-laurus --data-dir ./my_index serve
+// Phrase
+let query = parser.parse("\"machine learning\"")?;
 
-# Custom port and log level
-laurus serve --port 8080 --log-level debug
+// Field-specific
+let query = parser.parse("title:rust AND body:programming")?;
 
-# Use a configuration file
-laurus serve --config config.toml
+// Fuzzy
+let query = parser.parse("programing~2")?;
 
-# Use environment variables
-LAURUS_DATA_DIR=./my_index LAURUS_PORT=8080 laurus serve
-</code></pre>
+// Range
+let query = parser.parse("year:[2020 TO 2024]")?;
+<span class="boring">}</span></code></pre>
+<p>See <a href="../query_dsl.html">Query DSL</a> for the complete syntax reference.</p>
+<h2 id="next-steps"><a class="header" href="#next-steps">Next Steps</a></h2>
+<ul>
+<li>Semantic similarity search: <a href="vector_search.html">Vector Search</a></li>
+<li>Combine lexical + vector: <a href="hybrid_search.html">Hybrid Search</a></li>
+<li>Full DSL syntax reference: <a href="../query_dsl.html">Query DSL</a></li>
+</ul>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="../cli/installation.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../../concepts/search.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
-                            <a rel="next prefetch" href="../cli/schema_format.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="../../concepts/search/vector_search.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                             </a>
 
@@ -507,11 +459,11 @@ LAURUS_DATA_DIR=./my_index LAURUS_PORT=8080 laurus serve
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="../cli/installation.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="../../concepts/search.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 
-                    <a rel="next prefetch" href="../cli/schema_format.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="../../concepts/search/vector_search.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                     </a>
             </nav>
@@ -531,17 +483,17 @@ LAURUS_DATA_DIR=./my_index LAURUS_PORT=8080 laurus serve
         </script>
 
 
-        <script src="../elasticlunr-ef4e11c1.min.js"></script>
-        <script src="../mark-09e88c2c.min.js"></script>
-        <script src="../searcher-c2a407aa.js"></script>
+        <script src="../../elasticlunr-ef4e11c1.min.js"></script>
+        <script src="../../mark-09e88c2c.min.js"></script>
+        <script src="../../searcher-c2a407aa.js"></script>
 
-        <script src="../clipboard-1626706a.min.js"></script>
-        <script src="../highlight-abc7f01d.js"></script>
-        <script src="../book-a0b12cfe.js"></script>
+        <script src="../../clipboard-1626706a.min.js"></script>
+        <script src="../../highlight-abc7f01d.js"></script>
+        <script src="../../book-a0b12cfe.js"></script>
 
         <!-- Custom JS scripts -->
-        <script src="../mermaid-9a6dd17b.min.js"></script>
-        <script src="../mermaid-init-ddddd38b.js"></script>
+        <script src="../../mermaid-9a6dd17b.min.js"></script>
+        <script src="../../mermaid-init-ddddd38b.js"></script>
 
 
 

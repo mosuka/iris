@@ -35,10 +35,10 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-f39bba3e.js";
+            window.path_to_searchindex_js = "../searchindex-674b4e1e.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-f13dbb35.js"></script>
+        <script src="../toc-072c2e71.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -291,6 +291,30 @@ let storage = StorageFactory::create(
 </code></pre>
 <p>When the lexical store writes a key <code>segments/seg-001.dict</code>, it is actually stored as <code>lexical/segments/seg-001.dict</code> in the underlying backend. This ensures no key collisions between components.</p>
 <p>You do not need to create <code>PrefixedStorage</code> yourself — the <code>EngineBuilder</code> handles this automatically.</p>
+<h2 id="columnstorage"><a class="header" href="#columnstorage">ColumnStorage</a></h2>
+<p>In addition to the primary storage backends, Laurus provides a <code>ColumnStorage</code> layer for fast field-level access. This is used internally for operations like faceting, sorting, and aggregation, where accessing individual field values without deserializing entire documents is important.</p>
+<h3 id="columnvalue"><a class="header" href="#columnvalue">ColumnValue</a></h3>
+<p><code>ColumnValue</code> represents a single stored column value:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Variant</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>String(String)</code></td><td style="text-align: left">UTF-8 text</td></tr>
+<tr><td style="text-align: left"><code>I32(i32)</code></td><td style="text-align: left">32-bit signed integer</td></tr>
+<tr><td style="text-align: left"><code>I64(i64)</code></td><td style="text-align: left">64-bit signed integer</td></tr>
+<tr><td style="text-align: left"><code>U32(u32)</code></td><td style="text-align: left">32-bit unsigned integer</td></tr>
+<tr><td style="text-align: left"><code>U64(u64)</code></td><td style="text-align: left">64-bit unsigned integer</td></tr>
+<tr><td style="text-align: left"><code>F32(f32)</code></td><td style="text-align: left">32-bit floating point</td></tr>
+<tr><td style="text-align: left"><code>F64(f64)</code></td><td style="text-align: left">64-bit floating point</td></tr>
+<tr><td style="text-align: left"><code>Bool(bool)</code></td><td style="text-align: left">Boolean</td></tr>
+<tr><td style="text-align: left"><code>DateTime(i64)</code></td><td style="text-align: left">Unix timestamp (seconds)</td></tr>
+<tr><td style="text-align: left"><code>Null</code></td><td style="text-align: left">Absent value</td></tr>
+</tbody>
+</table>
+</div>
+<p>ColumnStorage is managed internally by the Engine – you do not need to interact with it directly.</p>
 <h2 id="choosing-a-backend"><a class="header" href="#choosing-a-backend">Choosing a Backend</a></h2>
 <div class="table-wrapper">
 <table>
@@ -315,8 +339,8 @@ let storage = StorageFactory::create(
 </ul>
 <h2 id="next-steps"><a class="header" href="#next-steps">Next Steps</a></h2>
 <ul>
-<li>Learn how the lexical index works: <a href="../indexing/lexical_indexing.html">Lexical Indexing</a></li>
-<li>Learn how the vector index works: <a href="../indexing/vector_indexing.html">Vector Indexing</a></li>
+<li>Learn how the lexical index works: <a href="indexing/lexical_indexing.html">Lexical Indexing</a></li>
+<li>Learn how the vector index works: <a href="indexing/vector_indexing.html">Vector Indexing</a></li>
 </ul>
 
                     </main>
@@ -327,7 +351,7 @@ let storage = StorageFactory::create(
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
-                            <a rel="next prefetch" href="../indexing.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="../concepts/indexing.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                             </a>
 
@@ -341,7 +365,7 @@ let storage = StorageFactory::create(
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 
-                    <a rel="next prefetch" href="../indexing.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="../concepts/indexing.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                     </a>
             </nav>
