@@ -114,6 +114,29 @@ When the lexical store writes a key `segments/seg-001.dict`, it is actually stor
 
 You do not need to create `PrefixedStorage` yourself — the `EngineBuilder` handles this automatically.
 
+## ColumnStorage
+
+In addition to the primary storage backends, Laurus provides a `ColumnStorage` layer for fast field-level access. This is used internally for operations like faceting, sorting, and aggregation, where accessing individual field values without deserializing entire documents is important.
+
+### ColumnValue
+
+`ColumnValue` represents a single stored column value:
+
+| Variant | Description |
+| :--- | :--- |
+| `String(String)` | UTF-8 text |
+| `I32(i32)` | 32-bit signed integer |
+| `I64(i64)` | 64-bit signed integer |
+| `U32(u32)` | 32-bit unsigned integer |
+| `U64(u64)` | 64-bit unsigned integer |
+| `F32(f32)` | 32-bit floating point |
+| `F64(f64)` | 64-bit floating point |
+| `Bool(bool)` | Boolean |
+| `DateTime(i64)` | Unix timestamp (seconds) |
+| `Null` | Absent value |
+
+ColumnStorage is managed internally by the Engine -- you do not need to interact with it directly.
+
 ## Choosing a Backend
 
 | Factor | MemoryStorage | FileStorage | FileStorage (mmap) |
@@ -133,5 +156,5 @@ You do not need to create `PrefixedStorage` yourself — the `EngineBuilder` han
 
 ## Next Steps
 
-- Learn how the lexical index works: [Lexical Indexing](../indexing/lexical_indexing.md)
-- Learn how the vector index works: [Vector Indexing](../indexing/vector_indexing.md)
+- Learn how the lexical index works: [Lexical Indexing](indexing/lexical_indexing.md)
+- Learn how the vector index works: [Vector Indexing](indexing/vector_indexing.md)

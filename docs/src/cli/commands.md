@@ -268,7 +268,7 @@ laurus --data-dir ./my_index commit
 
 ## `search`
 
-Execute a search query using the [Query DSL](../advanced/query_dsl.md).
+Execute a search query using the [Query DSL](../concepts/query_dsl.md).
 
 ```bash
 laurus search <QUERY> [--limit <N>] [--offset <N>]
@@ -348,7 +348,7 @@ laurus repl
 
 ## `serve`
 
-Start the gRPC server. See [gRPC Server](../server.md) for full documentation.
+Start the gRPC server. See [Server Overview](../server/overview.md) for full documentation.
 
 ```bash
 laurus serve [OPTIONS]
@@ -361,6 +361,7 @@ laurus serve [OPTIONS]
 | `--config <PATH>` | `-c` | `LAURUS_CONFIG` | — | Path to a TOML configuration file |
 | `--host <HOST>` | `-H` | `LAURUS_HOST` | `0.0.0.0` | Listen address |
 | `--port <PORT>` | `-p` | `LAURUS_PORT` | `50051` | Listen port |
+| `--http-port <PORT>` | -- | `LAURUS_HTTP_PORT` | -- | HTTP Gateway port (enables HTTP gateway when set) |
 | `--log-level <LEVEL>` | `-l` | `LAURUS_LOG_LEVEL` | `info` | Log level (`trace`, `debug`, `info`, `warn`, `error`) |
 
 **Example:**

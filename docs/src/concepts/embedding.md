@@ -180,6 +180,19 @@ let request = vector_parser.parse(r#"text_vec:~"systems programming""#).await?;
 
 Both approaches embed the query text using the same embedder that was used at index time, ensuring consistent vector spaces.
 
+## Feature Flags Summary
+
+Each embedder requires a specific feature flag to be enabled in `Cargo.toml`:
+
+| Embedder | Feature Flag | Dependencies |
+| :--- | :--- | :--- |
+| `CandleBertEmbedder` | `embeddings-candle` | candle-core, candle-nn, candle-transformers, hf-hub, tokenizers |
+| `OpenAIEmbedder` | `embeddings-openai` | reqwest |
+| `CandleClipEmbedder` | `embeddings-multimodal` | image + embeddings-candle |
+| `PrecomputedEmbedder` | *(none -- always available)* | -- |
+
+The `embeddings-all` feature enables all embedding features at once. See [Feature Flags](../development/feature_flags.md) for details.
+
 ## Choosing an Embedder
 
 | Scenario | Recommended Embedder |

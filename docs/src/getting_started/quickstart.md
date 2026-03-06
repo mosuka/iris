@@ -188,5 +188,5 @@ async fn main() -> Result<()> {
 
 - Learn how the Engine works internally: [Architecture](../architecture.md)
 - Understand Schema and field types: [Schema & Fields](../concepts/schema_and_fields.md)
-- Add vector search: [Vector Search](../search/vector_search.md)
-- Combine lexical + vector: [Hybrid Search](../search/hybrid_search.md)
+- Add vector search: [Vector Search](../concepts/search/vector_search.md)
+- Combine lexical + vector: [Hybrid Search](../concepts/search/hybrid_search.md)
