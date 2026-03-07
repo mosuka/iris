@@ -1,0 +1,381 @@
+# コマンドリファレンス
+
+## グローバルオプション
+
+すべてのコマンドで以下のオプションが使用できます:
+
+| オプション | 環境変数 | デフォルト | 説明 |
+| :--- | :--- | :--- | :--- |
+| `--data-dir <PATH>` | `LAURUS_DATA_DIR` | `./laurus_data` | インデックスデータディレクトリのパス |
+| `--format <FORMAT>` | — | `table` | 出力形式: `table` または `json` |
+
+```bash
+# 例: カスタムデータディレクトリで JSON 出力を使用
+laurus --data-dir /var/data/my_index --format json search "title:rust"
+```
+
+---
+
+## `create` — リソースの作成
+
+### `create index`
+
+スキーマ TOML ファイルから新しいインデックスを作成します。
+
+```bash
+laurus create index --schema <FILE>
+```
+
+**引数:**
+
+| フラグ | 必須 | 説明 |
+| :--- | :--- | :--- |
+| `--schema <FILE>` | はい | インデックススキーマを定義する TOML ファイルのパス |
+
+**スキーマファイルの形式:**
+
+スキーマファイルは Laurus ライブラリの `Schema` 型と同じ構造に従います。詳細は[スキーマフォーマットリファレンス](schema_format.md)を参照してください。例:
+
+```toml
+default_fields = ["title", "body"]
+
+[fields.title.Text]
+stored = true
+indexed = true
+
+[fields.body.Text]
+stored = true
+indexed = true
+
+[fields.category.Text]
+stored = true
+indexed = true
+```
+
+**例:**
+
+```bash
+laurus --data-dir ./my_index create index --schema schema.toml
+# Index created at ./my_index.
+```
+
+> **注意:** インデックスが既に存在する場合はエラーが返されます。再作成するにはデータディレクトリを削除してください。
+
+### `create schema`
+
+対話式ウィザードを通じてスキーマ TOML ファイルを生成します。
+
+```bash
+laurus create schema [--output <FILE>]
+```
+
+**引数:**
+
+| フラグ | 必須 | デフォルト | 説明 |
+| :--- | :--- | :--- | :--- |
+| `--output <FILE>` | いいえ | `schema.toml` | 生成されるスキーマの出力ファイルパス |
+
+ウィザードは以下の手順で進みます:
+
+1. **フィールド定義** — フィールド名を入力し、型を選択し、型固有のオプションを設定
+2. **繰り返し** — 必要な数だけフィールドを追加
+3. **デフォルトフィールド** — デフォルトの検索対象とする Lexical フィールドを選択
+4. **プレビュー** — 保存前に生成された TOML を確認
+5. **保存** — スキーマファイルを書き出し
+
+**サポートされるフィールド型:**
+
+| 型 | カテゴリ | オプション |
+| :--- | :--- | :--- |
+| `Text` | Lexical | `indexed`, `stored`, `term_vectors` |
+| `Integer` | Lexical | `indexed`, `stored` |
+| `Float` | Lexical | `indexed`, `stored` |
+| `Boolean` | Lexical | `indexed`, `stored` |
+| `DateTime` | Lexical | `indexed`, `stored` |
+| `Geo` | Lexical | `indexed`, `stored` |
+| `Bytes` | Lexical | `stored` |
+| `Hnsw` | Vector | `dimension`, `distance`, `m`, `ef_construction` |
+| `Flat` | Vector | `dimension`, `distance` |
+| `Ivf` | Vector | `dimension`, `distance`, `n_clusters`, `n_probe` |
+
+**例:**
+
+```bash
+# schema.toml を対話的に生成
+laurus create schema
+
+# 出力パスを指定
+laurus create schema --output my_schema.toml
+
+# 生成されたスキーマからインデックスを作成
+laurus create index --schema schema.toml
+```
+
+---
+
+## `get` — リソースの取得
+
+### `get index`
+
+インデックスの統計情報を表示します。
+
+```bash
+laurus get index
+```
+
+**テーブル出力の例:**
+
+```text
+Document count: 42
+
+Vector fields:
+╭──────────┬─────────┬───────────╮
+│ Field    │ Vectors │ Dimension │
+├──────────┼─────────┼───────────┤
+│ text_vec │ 42      │ 384       │
+╰──────────┴─────────┴───────────╯
+```
+
+**JSON 出力の例:**
+
+```bash
+laurus --format json get index
+```
+
+```json
+{
+  "document_count": 42,
+  "fields": {
+    "text_vec": {
+      "vector_count": 42,
+      "dimension": 384
+    }
+  }
+}
+```
+
+### `get doc`
+
+外部 ID でドキュメント（およびすべてのチャンク）を取得します。
+
+```bash
+laurus get doc --id <ID>
+```
+
+**テーブル出力の例:**
+
+```text
+╭──────┬─────────────────────────────────────────╮
+│ ID   │ Fields                                  │
+├──────┼─────────────────────────────────────────┤
+│ doc1 │ body: This is a test, title: Hello World │
+╰──────┴─────────────────────────────────────────╯
+```
+
+**JSON 出力の例:**
+
+```bash
+laurus --format json get doc --id doc1
+```
+
+```json
+[
+  {
+    "id": "doc1",
+    "document": {
+      "title": "Hello World",
+      "body": "This is a test document."
+    }
+  }
+]
+```
+
+---
+
+## `add` — リソースの追加
+
+### `add doc`
+
+インデックスにドキュメントを追加します。ドキュメントは `commit` を実行するまで検索対象になりません。
+
+```bash
+laurus add doc --id <ID> --data <JSON>
+```
+
+**引数:**
+
+| フラグ | 必須 | 説明 |
+| :--- | :--- | :--- |
+| `--id <ID>` | はい | 外部ドキュメント ID（文字列） |
+| `--data <JSON>` | はい | JSON 文字列としてのドキュメントフィールド |
+
+JSON フォーマットはフィールド名と値を対応付けたフラットなオブジェクトです:
+
+```json
+{
+  "title": "Introduction to Rust",
+  "body": "Rust is a systems programming language.",
+  "category": "programming"
+}
+```
+
+**例:**
+
+```bash
+laurus add doc --id doc1 --data '{"title":"Hello World","body":"This is a test document."}'
+# Document 'doc1' added. Run 'commit' to persist changes.
+```
+
+> **ヒント:** 複数のドキュメントが同じ外部 ID を共有できます（チャンキングパターン）。各チャンクに対して `add doc` を使用してください。
+
+---
+
+## `delete` — リソースの削除
+
+### `delete doc`
+
+外部 ID でドキュメント（およびすべてのチャンク）を削除します。
+
+```bash
+laurus delete doc --id <ID>
+```
+
+**例:**
+
+```bash
+laurus delete doc --id doc1
+# Document 'doc1' deleted. Run 'commit' to persist changes.
+```
+
+---
+
+## `commit`
+
+保留中の変更（追加と削除）をインデックスにコミットします。コミットするまで、変更は検索に反映されません。
+
+```bash
+laurus commit
+```
+
+**例:**
+
+```bash
+laurus --data-dir ./my_index commit
+# Changes committed successfully.
+```
+
+---
+
+## `search`
+
+[Query DSL](../concepts/query_dsl.md) を使用して検索クエリを実行します。
+
+```bash
+laurus search <QUERY> [--limit <N>] [--offset <N>]
+```
+
+**引数:**
+
+| 引数 / フラグ | 必須 | デフォルト | 説明 |
+| :--- | :--- | :--- | :--- |
+| `<QUERY>` | はい | — | Laurus Query DSL によるクエリ文字列 |
+| `--limit <N>` | いいえ | `10` | 最大結果件数 |
+| `--offset <N>` | いいえ | `0` | スキップする結果件数 |
+
+**クエリ構文の例:**
+
+```bash
+# Term クエリ
+laurus search "body:rust"
+
+# Phrase クエリ
+laurus search 'body:"machine learning"'
+
+# Boolean クエリ
+laurus search "+body:programming -body:python"
+
+# Fuzzy クエリ（タイポ許容）
+laurus search "body:programing~2"
+
+# Wildcard クエリ
+laurus search "title:intro*"
+
+# Range クエリ
+laurus search "price:[10 TO 50]"
+```
+
+**テーブル出力の例:**
+
+```text
+╭──────┬────────┬─────────────────────────────────────────╮
+│ ID   │ Score  │ Fields                                  │
+├──────┼────────┼─────────────────────────────────────────┤
+│ doc1 │ 0.8532 │ body: Rust is a systems..., title: Intr │
+│ doc3 │ 0.4210 │ body: JavaScript powers..., title: Web  │
+╰──────┴────────┴─────────────────────────────────────────╯
+```
+
+**JSON 出力の例:**
+
+```bash
+laurus --format json search "body:rust" --limit 5
+```
+
+```json
+[
+  {
+    "id": "doc1",
+    "score": 0.8532,
+    "document": {
+      "title": "Introduction to Rust",
+      "body": "Rust is a systems programming language."
+    }
+  }
+]
+```
+
+---
+
+## `repl`
+
+対話型 REPL セッションを開始します。詳細は [REPL](repl.md) を参照してください。
+
+```bash
+laurus repl
+```
+
+---
+
+## `serve`
+
+gRPC サーバーを起動します。詳細なドキュメントは[サーバー概要](../server/overview.md)を参照してください。
+
+```bash
+laurus serve [OPTIONS]
+```
+
+**オプション:**
+
+| オプション | 短縮形 | 環境変数 | デフォルト | 説明 |
+| :--- | :--- | :--- | :--- | :--- |
+| `--config <PATH>` | `-c` | `LAURUS_CONFIG` | — | TOML 設定ファイルのパス |
+| `--host <HOST>` | `-H` | `LAURUS_HOST` | `0.0.0.0` | リッスンアドレス |
+| `--port <PORT>` | `-p` | `LAURUS_PORT` | `50051` | リッスンポート |
+| `--http-port <PORT>` | -- | `LAURUS_HTTP_PORT` | -- | HTTP Gateway ポート（設定時に HTTP Gateway を有効化） |
+| `--log-level <LEVEL>` | `-l` | `LAURUS_LOG_LEVEL` | `info` | ログレベル（`trace`, `debug`, `info`, `warn`, `error`） |
+
+**例:**
+
+```bash
+# デフォルト設定で起動（ポート 50051）
+laurus --data-dir ./my_index serve
+
+# カスタムポートとログレベル
+laurus serve --port 8080 --log-level debug
+
+# 設定ファイルを使用
+laurus serve --config config.toml
+
+# 環境変数を使用
+LAURUS_DATA_DIR=./my_index LAURUS_PORT=8080 laurus serve
+```

@@ -1,0 +1,312 @@
+# Query DSL
+
+Laurus は統合 Query DSL（Domain Specific Language）を提供しており、Lexical（キーワード）検索と Vector（意味的）検索を単一のクエリ文字列で記述できます。`UnifiedQueryParser` は入力を Lexical 部分と Vector 部分に分割し、適切なサブパーサーに委譲します。
+
+## 概要
+
+```text
+title:hello AND content:~"cute kitten"^0.8
+|--- lexical --|    |--- vector --------|
+```
+
+`~"` パターンが Vector 句を Lexical 句と区別します。それ以外はすべて Lexical クエリとして扱われます。
+
+## Lexical クエリ構文
+
+Lexical クエリは、完全一致または近似のキーワードマッチングを使用して転置インデックスを検索します。
+
+### Term クエリ
+
+フィールド（またはデフォルトフィールド）に対して単一のタームをマッチングします。
+
+```text
+hello
+title:hello
+```
+
+### ブーリアン演算子
+
+`AND` と `OR`（大文字小文字を区別しない）で句を結合します。
+
+```text
+title:hello AND body:world
+title:hello OR title:goodbye
+```
+
+明示的な演算子なしでスペース区切りされた句は、暗黙的なブーリアン（スコアリング付きの OR として動作）を使用します。
+
+### 必須 / 禁止句
+
+`+`（必ずマッチ）と `-`（マッチ禁止）を使用します。
+
+```text
++title:hello -title:goodbye
+```
+
+### フレーズクエリ
+
+ダブルクォートを使用して正確なフレーズをマッチングします。オプションの近接度（`~N`）で、ターム間に N 語を許可します。
+
+```text
+"hello world"
+"hello world"~2
+```
+
+### ファジークエリ
+
+編集距離を使用した近似マッチング。`~` に続けてオプションで最大編集距離を指定します。
+
+```text
+roam~
+roam~2
+```
+
+### ワイルドカードクエリ
+
+`?`（1 文字）と `*`（0 文字以上）を使用します。
+
+```text
+te?t
+test*
+```
+
+### 範囲クエリ
+
+包含的な `[]` または排他的な `{}` の範囲指定。数値フィールドや日付フィールドに有用です。
+
+```text
+price:[100 TO 500]
+date:{2024-01-01 TO 2024-12-31}
+price:[* TO 100]
+```
+
+### ブースト
+
+`^` で句のウェイトを増加させます。
+
+```text
+title:hello^2
+"important phrase"^1.5
+```
+
+### グルーピング
+
+括弧でサブ式を囲みます。
+
+```text
+(title:hello OR title:hi) AND body:world
+```
+
+### Lexical PEG 文法
+
+完全な Lexical 文法（[parser.pest](https://github.com/mosuka/laurus/blob/main/laurus/src/lexical/query/parser.pest)）:
+
+```pest
+query          = { SOI ~ boolean_query ~ EOI }
+boolean_query  = { clause ~ (boolean_op ~ clause | clause)* }
+clause         = { required_clause | prohibited_clause | sub_clause }
+required_clause   = { "+" ~ sub_clause }
+prohibited_clause = { "-" ~ sub_clause }
+sub_clause     = { grouped_query | field_query | term_query }
+grouped_query  = { "(" ~ boolean_query ~ ")" ~ boost? }
+boolean_op     = { ^"AND" | ^"OR" }
+field_query    = { field ~ ":" ~ field_value }
+field_value    = { range_query | phrase_query | fuzzy_term
+                 | wildcard_term | simple_term }
+phrase_query   = { "\"" ~ phrase_content ~ "\"" ~ proximity? ~ boost? }
+proximity      = { "~" ~ number }
+fuzzy_term     = { term ~ "~" ~ fuzziness? ~ boost? }
+wildcard_term  = { wildcard_pattern ~ boost? }
+simple_term    = { term ~ boost? }
+boost          = { "^" ~ boost_value }
+```
+
+## Vector クエリ構文
+
+Vector クエリは、解析時にテキストをベクトルにエンベディングし、類似性検索を実行します。
+
+### 基本構文
+
+```text
+field:~"text"
+field:~"text"^weight
+```
+
+| 要素 | 必須 | 説明 | 例 |
+| :--- | :---: | :--- | :--- |
+| `field:` | いいえ | 対象のベクトルフィールド名 | `content:` |
+| `~` | **はい** | Vector クエリマーカー | |
+| `"text"` | **はい** | エンベディングするテキスト | `"cute kitten"` |
+| `^weight` | いいえ | スコアウェイト（デフォルト: 1.0） | `^0.8` |
+
+### Vector クエリの例
+
+```text
+# Single field
+content:~"cute kitten"
+
+# With boost weight
+content:~"cute kitten"^0.8
+
+# Default field (when configured)
+~"cute kitten"
+
+# Multiple clauses
+content:~"cats" image:~"dogs"^0.5
+
+# Nested field name (dot notation)
+metadata.embedding:~"text"
+```
+
+### 複数句
+
+複数の Vector 句はスペースで区切ります。すべての句が実行され、スコアは `score_mode`（デフォルト: `WeightedSum`）を使用して結合されます。
+
+```text
+content:~"cats" image:~"dogs"^0.5
+```
+
+この場合のスコア計算:
+
+```text
+score = similarity("cats", content) * 1.0
+      + similarity("dogs", image)   * 0.5
+```
+
+Vector DSL には `AND`/`OR` 演算子はありません。Vector 検索は本質的にランキング操作であり、ウェイト（`^`）が各句の寄与度を制御します。
+
+### スコアモード
+
+| モード | 説明 |
+| :--- | :--- |
+| `WeightedSum`（デフォルト） | すべてのクエリ句にわたる（類似度 * ウェイト）の合計 |
+| `MaxSim` | クエリ句間の最大類似度スコア |
+| `LateInteraction` | Late Interaction スコアリング |
+
+スコアモードは DSL 構文からは設定できません。Rust API を使用してオーバーライドします。
+
+```rust
+let mut request = parser.parse(r#"content:~"cats" image:~"dogs""#).await?;
+request.score_mode = VectorScoreMode::MaxSim;
+```
+
+### Vector PEG 文法
+
+完全な Vector 文法（[parser.pest](https://github.com/mosuka/laurus/blob/main/laurus/src/vector/query/parser.pest)）:
+
+```pest
+query          = { SOI ~ vector_clause+ ~ EOI }
+vector_clause  = { field_prefix? ~ "~" ~ quoted_text ~ boost? }
+field_prefix   = { field_name ~ ":" }
+field_name     = @{ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_" | ".")* }
+quoted_text    = ${ "\"" ~ inner_text ~ "\"" }
+inner_text     = @{ (!("\"") ~ ANY)* }
+boost          = { "^" ~ float_value }
+float_value    = @{ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)? }
+```
+
+## 統合（ハイブリッド）クエリ構文
+
+`UnifiedQueryParser` を使用すると、単一のクエリ文字列内で Lexical 句と Vector 句を自由に混在させることができます。
+
+```text
+title:hello content:~"cute kitten"^0.8
+```
+
+### 仕組み
+
+1. **分割（Split）**: Vector 句（`field:~"text"^boost` パターンに一致）が正規表現で抽出される
+2. **委譲（Delegate）**: Vector 部分は `VectorQueryParser` に、残りは Lexical の `QueryParser` に渡される
+3. **フュージョン（Fuse）**: Lexical と Vector の両方の結果が存在する場合、フュージョンアルゴリズムで結合される
+
+### 曖昧性の解消
+
+`~"` パターンは Vector 句を明確に識別します。Lexical 構文では、`~` はターム或いはフレーズの**後**にのみ出現し（例: `roam~2`、`"hello world"~10`）、クォートの前には出現しないためです。
+
+### フュージョンアルゴリズム
+
+クエリに Lexical 句と Vector 句の両方が含まれる場合、結果はフュージョンされます。
+
+| アルゴリズム | 計算式 | 説明 |
+| :--- | :--- | :--- |
+| **RRF**（デフォルト） | `score = sum(1 / (k + rank))` | Reciprocal Rank Fusion。異なるスコア分布に対してロバスト。デフォルト k=60。 |
+| **WeightedSum** | `score = lexical * a + vector * b` | 設定可能なウェイトによる線形結合。 |
+
+> **注意**: フュージョンアルゴリズムは DSL 構文では指定できません。`UnifiedQueryParser` の構築時に `.with_fusion()` で設定します。デフォルトは RRF（k=60）です。コード例は[カスタムフュージョン](#カスタムフュージョン)を参照してください。
+
+### 統合クエリの例
+
+```text
+# Lexical only — no fusion
+title:hello AND body:world
+
+# Vector only — no fusion
+content:~"cute kitten"
+
+# Hybrid — fusion applied automatically
+title:hello content:~"cute kitten"
+
+# Hybrid with boolean operators
+title:hello AND category:animal content:~"cute kitten"^0.8
+
+# Multiple vector clauses + lexical
+category:animal content:~"cats" image:~"dogs"^0.5
+
+# Default fields (when configured)
+hello ~"cats"
+```
+
+## コード例
+
+### DSL による Lexical 検索
+
+```rust
+use std::sync::Arc;
+use laurus::analysis::analyzer::standard::StandardAnalyzer;
+use laurus::lexical::query::QueryParser;
+
+let analyzer = Arc::new(StandardAnalyzer::new()?);
+let parser = QueryParser::new(analyzer)
+    .with_default_field("title");
+
+let query = parser.parse("title:hello AND body:world")?;
+```
+
+### DSL による Vector 検索
+
+```rust
+use std::sync::Arc;
+use laurus::vector::query::VectorQueryParser;
+
+let parser = VectorQueryParser::new(embedder)
+    .with_default_field("content");
+
+let request = parser.parse(r#"content:~"cute kitten"^0.8"#).await?;
+```
+
+### 統合 DSL によるハイブリッド検索
+
+```rust
+use laurus::engine::query::UnifiedQueryParser;
+
+let unified = UnifiedQueryParser::new(lexical_parser, vector_parser);
+
+let request = unified.parse(
+    r#"title:hello content:~"cute kitten"^0.8"#
+).await?;
+// request.lexical_search_request  -> Some(...)  — lexical query
+// request.vector_search_request   -> Some(...)  — vector query
+// request.fusion_algorithm        -> Some(RRF)  — fusion algorithm
+```
+
+### カスタムフュージョン
+
+```rust
+use laurus::engine::search::FusionAlgorithm;
+
+let unified = UnifiedQueryParser::new(lexical_parser, vector_parser)
+    .with_fusion(FusionAlgorithm::WeightedSum {
+        lexical_weight: 0.3,
+        vector_weight: 0.7,
+    });
+```
