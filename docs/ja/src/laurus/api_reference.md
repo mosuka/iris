@@ -1,0 +1,210 @@
+# APIリファレンス
+
+このページでは、Laurusの最も重要な型とメソッドのクイックリファレンスを提供します。完全な詳細については、Rustdocを生成してください。
+
+```bash
+cargo doc --open
+```
+
+## Engine
+
+すべてのインデキシングと検索操作を統合する中心的なコーディネーターです。
+
+| メソッド | 説明 |
+| :--- | :--- |
+| `Engine::builder(storage, schema)` | `EngineBuilder` を作成 |
+| `engine.put_document(id, doc).await?` | ドキュメントのUpsert（IDが存在する場合は置き換え） |
+| `engine.add_document(id, doc).await?` | ドキュメントをチャンクとして追加（複数のチャンクが同一IDを共有可能） |
+| `engine.delete_documents(id).await?` | 外部IDによるすべてのドキュメント/チャンクの削除 |
+| `engine.get_documents(id).await?` | 外部IDによるすべてのドキュメント/チャンクの取得 |
+| `engine.search(request).await?` | 検索リクエストの実行 |
+| `engine.commit().await?` | 保留中のすべての変更をストレージにフラッシュ |
+| `engine.stats()?` | インデックス統計の取得 |
+
+> **`put_document` と `add_document` の違い:** `put_document` はUpsertを実行します。同じ外部IDのドキュメントが既に存在する場合、削除して置き換えます。`add_document` は常に追加し、複数のドキュメントチャンクが同じ外部IDを共有できます。詳細は [Schema & Fields -- ドキュメントのインデキシング](concepts/schema_and_fields.md#indexing-documents) を参照してください。
+
+### EngineBuilder
+
+| メソッド | 説明 |
+| :--- | :--- |
+| `EngineBuilder::new(storage, schema)` | StorageとSchemaでBuilderを作成 |
+| `.analyzer(Arc<dyn Analyzer>)` | テキストAnalyzerを設定（デフォルト: `StandardAnalyzer`） |
+| `.embedder(Arc<dyn Embedder>)` | ベクトルEmbedderを設定（オプション） |
+| `.build().await?` | `Engine` を構築 |
+
+## Schema
+
+ドキュメント構造を定義します。
+
+| メソッド | 説明 |
+| :--- | :--- |
+| `Schema::builder()` | `SchemaBuilder` を作成 |
+
+### SchemaBuilder
+
+| メソッド | 説明 |
+| :--- | :--- |
+| `.add_text_field(name, TextOption)` | 全文検索フィールドを追加 |
+| `.add_integer_field(name, IntegerOption)` | 整数フィールドを追加 |
+| `.add_float_field(name, FloatOption)` | 浮動小数点フィールドを追加 |
+| `.add_boolean_field(name, BooleanOption)` | 真偽値フィールドを追加 |
+| `.add_datetime_field(name, DateTimeOption)` | 日時フィールドを追加 |
+| `.add_geo_field(name, GeoOption)` | 地理フィールドを追加 |
+| `.add_bytes_field(name, BytesOption)` | バイナリフィールドを追加 |
+| `.add_hnsw_field(name, HnswOption)` | HNSWベクトルフィールドを追加 |
+| `.add_flat_field(name, FlatOption)` | Flatベクトルフィールドを追加 |
+| `.add_ivf_field(name, IvfOption)` | IVFベクトルフィールドを追加 |
+| `.add_default_field(name)` | デフォルト検索フィールドを設定 |
+| `.build()` | `Schema` を構築 |
+
+## Document
+
+名前付きフィールド値のコレクションです。
+
+| メソッド | 説明 |
+| :--- | :--- |
+| `Document::builder()` | `DocumentBuilder` を作成 |
+| `doc.get(name)` | 名前でフィールド値を取得 |
+| `doc.has_field(name)` | フィールドが存在するか確認 |
+| `doc.field_names()` | すべてのフィールド名を取得 |
+
+### DocumentBuilder
+
+| メソッド | 説明 |
+| :--- | :--- |
+| `.add_text(name, value)` | テキストフィールドを追加 |
+| `.add_integer(name, value)` | 整数フィールドを追加 |
+| `.add_float(name, value)` | 浮動小数点フィールドを追加 |
+| `.add_boolean(name, value)` | 真偽値フィールドを追加 |
+| `.add_datetime(name, value)` | 日時フィールドを追加 |
+| `.add_vector(name, vec)` | 事前計算済みベクトルを追加 |
+| `.add_geo(name, lat, lon)` | 地理ポイントを追加 |
+| `.add_bytes(name, data)` | バイナリデータを追加 |
+| `.build()` | `Document` を構築 |
+
+## Search
+
+### SearchRequestBuilder
+
+| メソッド | 説明 |
+| :--- | :--- |
+| `SearchRequestBuilder::new()` | 新しいBuilderを作成 |
+| `.lexical_search_request(req)` | Lexical検索コンポーネントを設定 |
+| `.vector_search_request(req)` | Vector検索コンポーネントを設定 |
+| `.filter_query(query)` | プレフィルタクエリを設定 |
+| `.fusion_algorithm(algo)` | フュージョンアルゴリズムを設定（デフォルト: RRF） |
+| `.limit(n)` | 最大結果数（デフォルト: 10） |
+| `.offset(n)` | N件スキップ（デフォルト: 0） |
+| `.build()` | `SearchRequest` を構築 |
+
+### LexicalSearchRequest
+
+| メソッド | 説明 |
+| :--- | :--- |
+| `LexicalSearchRequest::new(query)` | クエリで作成 |
+| `LexicalSearchRequest::from_dsl(query_str)` | DSLクエリ文字列から作成 |
+| `.limit(n)` | 最大結果数 |
+| `.load_documents(bool)` | ドキュメント内容をロードするかどうか |
+| `.min_score(f32)` | 最小スコアしきい値 |
+| `.timeout_ms(u64)` | 検索タイムアウト（ミリ秒） |
+| `.parallel(bool)` | 並列検索を有効化 |
+| `.sort_by_field_asc(field)` | フィールドで昇順ソート |
+| `.sort_by_field_desc(field)` | フィールドで降順ソート |
+| `.sort_by_score()` | 関連度スコアでソート（デフォルト） |
+| `.with_field_boost(field, boost)` | フィールドレベルのブーストを追加 |
+
+### VectorSearchRequestBuilder
+
+| メソッド | 説明 |
+| :--- | :--- |
+| `VectorSearchRequestBuilder::new()` | 新しいBuilderを作成 |
+| `.add_text(field, text)` | フィールドのテキストクエリを追加 |
+| `.add_vector(field, vector)` | 事前計算済みクエリベクトルを追加 |
+| `.add_bytes(field, bytes, mime)` | バイナリペイロードを追加（マルチモーダル用） |
+| `.limit(n)` | 最大結果数 |
+| `.score_mode(VectorScoreMode)` | スコア結合モード（WeightedSum、MaxSim） |
+| `.min_score(f32)` | 最小スコアしきい値 |
+| `.field(name)` | 検索を特定のフィールドに制限 |
+| `.build()` | リクエストを構築 |
+
+### SearchResult
+
+| フィールド | 型 | 説明 |
+| :--- | :--- | :--- |
+| `id` | `String` | 外部ドキュメントID |
+| `score` | `f32` | 関連度スコア |
+| `document` | `Option<Document>` | ドキュメント内容（ロードされた場合） |
+
+### FusionAlgorithm
+
+| バリアント | 説明 |
+| :--- | :--- |
+| `RRF { k: f64 }` | Reciprocal Rank Fusion（デフォルト k=60.0） |
+| `WeightedSum { lexical_weight, vector_weight }` | スコアの線形結合 |
+
+## クエリタイプ（Lexical）
+
+| クエリ | 説明 | 例 |
+| :--- | :--- | :--- |
+| `TermQuery::new(field, term)` | 完全一致 | `TermQuery::new("body", "rust")` |
+| `PhraseQuery::new(field, terms)` | フレーズ一致 | `PhraseQuery::new("body", vec!["machine".into(), "learning".into()])` |
+| `BooleanQueryBuilder::new()` | ブール結合 | `.must(q1).should(q2).must_not(q3).build()` |
+| `FuzzyQuery::new(field, term)` | あいまい一致（デフォルト max_edits=2） | `FuzzyQuery::new("body", "programing").max_edits(1)` |
+| `WildcardQuery::new(field, pattern)` | ワイルドカード | `WildcardQuery::new("file", "*.pdf")` |
+| `NumericRangeQuery::new(...)` | 数値範囲 | [Lexical Search](search/lexical_search.md) を参照 |
+| `GeoQuery::within_radius(...)` | 地理半径 | [Lexical Search](search/lexical_search.md) を参照 |
+| `SpanNearQuery::new(...)` | 近接 | [Lexical Search](search/lexical_search.md) を参照 |
+| `PrefixQuery::new(field, prefix)` | 前方一致 | `PrefixQuery::new("body", "pro")` |
+| `RegexpQuery::new(field, pattern)?` | 正規表現一致 | `RegexpQuery::new("body", "^pro.*ing$")?` |
+
+## クエリパーサー
+
+| パーサー | 説明 |
+| :--- | :--- |
+| `QueryParser::new(analyzer)` | Lexical DSLクエリをパース |
+| `VectorQueryParser::new(embedder)` | Vector DSLクエリをパース |
+| `UnifiedQueryParser::new(lexical, vector)` | ハイブリッドDSLクエリをパース |
+
+## Analyzer
+
+| 型 | 説明 |
+| :--- | :--- |
+| `StandardAnalyzer` | RegexTokenizer + 小文字化 + ストップワード |
+| `SimpleAnalyzer` | トークン化のみ（フィルタリングなし） |
+| `EnglishAnalyzer` | RegexTokenizer + 小文字化 + 英語ストップワード |
+| `JapaneseAnalyzer` | 日本語形態素解析 |
+| `KeywordAnalyzer` | トークン化なし（完全一致） |
+| `PipelineAnalyzer` | カスタムTokenizer + フィルタチェーン |
+| `PerFieldAnalyzer` | フィールドごとのAnalyzerディスパッチ |
+
+## Embedder
+
+| 型 | Feature Flag | 説明 |
+| :--- | :--- | :--- |
+| `CandleBertEmbedder` | `embeddings-candle` | ローカルBERTモデル |
+| `OpenAIEmbedder` | `embeddings-openai` | OpenAI API |
+| `CandleClipEmbedder` | `embeddings-multimodal` | ローカルCLIPモデル |
+| `PrecomputedEmbedder` | *(デフォルト)* | 事前計算済みベクトル |
+| `PerFieldEmbedder` | *(デフォルト)* | フィールドごとのEmbedderディスパッチ |
+
+## Storage
+
+| 型 | 説明 |
+| :--- | :--- |
+| `MemoryStorage` | インメモリ（非永続） |
+| `FileStorage` | ファイルシステムベース（メモリマップドI/O用の `use_mmap` をサポート） |
+| `StorageFactory::create(config)` | 設定から作成 |
+
+## DataValue
+
+| バリアント | Rust型 |
+| :--- | :--- |
+| `DataValue::Null` | -- |
+| `DataValue::Bool(bool)` | `bool` |
+| `DataValue::Int64(i64)` | `i64` |
+| `DataValue::Float64(f64)` | `f64` |
+| `DataValue::Text(String)` | `String` |
+| `DataValue::Bytes(Vec<u8>, Option<String>)` | `(data, mime_type)` |
+| `DataValue::Vector(Vec<f32>)` | `Vec<f32>` |
+| `DataValue::DateTime(DateTime<Utc>)` | `chrono::DateTime<Utc>` |
+| `DataValue::Geo(f64, f64)` | `(latitude, longitude)` |

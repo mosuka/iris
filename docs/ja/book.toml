@@ -1,0 +1,24 @@
+[book]
+authors = ["Minoru Osuka"]
+language = "ja"
+src = "src"
+title = "Laurus ドキュメント"
+description = "Laurus - Rust製高速ハイブリッド検索ライブラリのドキュメント"
+
+[build]
+build-dir = "../../target/docs/ja"
+
+[output.html]
+default-theme = "light"
+preferred-dark-theme = "navy"
+git-repository-url = "https://github.com/mosuka/laurus"
+edit-url-template = "https://github.com/mosuka/laurus/edit/main/docs/ja/{path}"
+no-section-label = false
+additional-js = ["mermaid.min.js", "mermaid-init.js"]
+
+[output.html.fold]
+enable = true
+level = 1
+
+[output.html.search]
+enable = true
