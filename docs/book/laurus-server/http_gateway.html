@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Server Overview - Laurus Documentation</title>
+        <title>HTTP Gateway - Laurus Documentation</title>
 
 
         <!-- Custom HTML head -->
@@ -178,58 +178,143 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="server-overview"><a class="header" href="#server-overview">Server Overview</a></h1>
-<p>The <code>laurus-server</code> crate provides a gRPC server with an optional HTTP/JSON gateway for the Laurus search engine. It keeps the engine resident in memory, eliminating per-command startup overhead.</p>
-<h2 id="features"><a class="header" href="#features">Features</a></h2>
-<ul>
-<li><strong>Persistent engine</strong> -- The index stays open across requests; no WAL replay on every call</li>
-<li><strong>Full gRPC API</strong> -- Index management, document CRUD, commit, and search (unary + streaming)</li>
-<li><strong>HTTP Gateway</strong> -- Optional HTTP/JSON gateway alongside gRPC for REST-style access</li>
-<li><strong>Health checking</strong> -- Standard health check endpoint for load balancers and orchestrators</li>
-<li><strong>Graceful shutdown</strong> -- Pending changes are committed automatically on Ctrl+C / SIGINT</li>
-<li><strong>TOML configuration</strong> -- Optional config file with CLI and environment variable overrides</li>
-</ul>
-<h2 id="architecture"><a class="header" href="#architecture">Architecture</a></h2>
-<pre><code class="language-mermaid">graph LR
-    subgraph "laurus-server"
-        GW["HTTP Gateway\n(axum)"]
-        GRPC["gRPC Server\n(tonic)"]
-        ENG["Engine\n(Arc&amp;lt;RwLock&amp;gt;)"]
-    end
-
-    Client1["HTTP Client"] --&gt; GW
-    Client2["gRPC Client"] --&gt; GRPC
-    GW --&gt; GRPC
-    GRPC --&gt; ENG
+                        <h1 id="http-gateway"><a class="header" href="#http-gateway">HTTP Gateway</a></h1>
+<p>The HTTP Gateway provides a RESTful HTTP/JSON interface to the Laurus search engine. It runs alongside the gRPC server and proxies requests internally:</p>
+<pre><code class="language-text">Client (HTTP/JSON) --&gt; HTTP Gateway (axum) --&gt; gRPC Server (tonic) --&gt; Engine
 </code></pre>
-<p>The gRPC server always runs. The HTTP Gateway is optional and proxies HTTP/JSON requests to the gRPC server internally.</p>
-<h2 id="quick-start"><a class="header" href="#quick-start">Quick Start</a></h2>
-<pre><code class="language-bash"># Start with default settings (gRPC on port 50051)
-laurus serve
-
-# Start with HTTP Gateway
+<h2 id="enabling-the-http-gateway"><a class="header" href="#enabling-the-http-gateway">Enabling the HTTP Gateway</a></h2>
+<p>The gateway starts when <code>http_port</code> is configured:</p>
+<pre><code class="language-bash"># Via CLI argument
 laurus serve --http-port 8080
 
-# Start with a configuration file
+# Via environment variable
+LAURUS_HTTP_PORT=8080 laurus serve
+
+# Via config file
 laurus serve --config config.toml
+# (set http_port in [server] section)
 </code></pre>
-<h2 id="sections"><a class="header" href="#sections">Sections</a></h2>
-<ul>
-<li><a href="getting_started.html">Getting Started</a> -- Startup options and first steps</li>
-<li><a href="configuration.html">Configuration</a> -- TOML configuration, environment variables, and priority</li>
-<li><a href="grpc_api.html">gRPC API Reference</a> -- Full API documentation for all services and RPCs</li>
-<li><a href="http_gateway.html">HTTP Gateway</a> -- HTTP/JSON endpoint reference</li>
-</ul>
+<p>If <code>http_port</code> is not set, only the gRPC server starts.</p>
+<h2 id="endpoints"><a class="header" href="#endpoints">Endpoints</a></h2>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Method</th><th style="text-align: left">Path</th><th style="text-align: left">gRPC Method</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: left">GET</td><td style="text-align: left"><code>/v1/health</code></td><td style="text-align: left"><code>HealthService/Check</code></td><td style="text-align: left">Health check</td></tr>
+<tr><td style="text-align: left">POST</td><td style="text-align: left"><code>/v1/index</code></td><td style="text-align: left"><code>IndexService/CreateIndex</code></td><td style="text-align: left">Create a new index</td></tr>
+<tr><td style="text-align: left">GET</td><td style="text-align: left"><code>/v1/index</code></td><td style="text-align: left"><code>IndexService/GetIndex</code></td><td style="text-align: left">Get index statistics</td></tr>
+<tr><td style="text-align: left">GET</td><td style="text-align: left"><code>/v1/schema</code></td><td style="text-align: left"><code>IndexService/GetSchema</code></td><td style="text-align: left">Get the index schema</td></tr>
+<tr><td style="text-align: left">PUT</td><td style="text-align: left"><code>/v1/documents/:id</code></td><td style="text-align: left"><code>DocumentService/PutDocument</code></td><td style="text-align: left">Upsert a document</td></tr>
+<tr><td style="text-align: left">POST</td><td style="text-align: left"><code>/v1/documents/:id</code></td><td style="text-align: left"><code>DocumentService/AddDocument</code></td><td style="text-align: left">Add a document (chunk)</td></tr>
+<tr><td style="text-align: left">GET</td><td style="text-align: left"><code>/v1/documents/:id</code></td><td style="text-align: left"><code>DocumentService/GetDocuments</code></td><td style="text-align: left">Get documents by ID</td></tr>
+<tr><td style="text-align: left">DELETE</td><td style="text-align: left"><code>/v1/documents/:id</code></td><td style="text-align: left"><code>DocumentService/DeleteDocuments</code></td><td style="text-align: left">Delete documents by ID</td></tr>
+<tr><td style="text-align: left">POST</td><td style="text-align: left"><code>/v1/commit</code></td><td style="text-align: left"><code>DocumentService/Commit</code></td><td style="text-align: left">Commit pending changes</td></tr>
+<tr><td style="text-align: left">POST</td><td style="text-align: left"><code>/v1/search</code></td><td style="text-align: left"><code>SearchService/Search</code></td><td style="text-align: left">Search (unary)</td></tr>
+<tr><td style="text-align: left">POST</td><td style="text-align: left"><code>/v1/search/stream</code></td><td style="text-align: left"><code>SearchService/SearchStream</code></td><td style="text-align: left">Search (Server-Sent Events)</td></tr>
+</tbody></table>
+</div>
+<h2 id="api-examples"><a class="header" href="#api-examples">API Examples</a></h2>
+<h3 id="health-check"><a class="header" href="#health-check">Health Check</a></h3>
+<pre><code class="language-bash">curl http://localhost:8080/v1/health
+</code></pre>
+<h3 id="create-an-index"><a class="header" href="#create-an-index">Create an Index</a></h3>
+<pre><code class="language-bash">curl -X POST http://localhost:8080/v1/index \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "schema": {
+      "fields": {
+        "title": {"text": {"indexed": true, "stored": true, "term_vectors": true}},
+        "body": {"text": {"indexed": true, "stored": true, "term_vectors": true}}
+      },
+      "default_fields": ["title", "body"]
+    }
+  }'
+</code></pre>
+<h3 id="get-index-statistics"><a class="header" href="#get-index-statistics">Get Index Statistics</a></h3>
+<pre><code class="language-bash">curl http://localhost:8080/v1/index
+</code></pre>
+<h3 id="get-schema"><a class="header" href="#get-schema">Get Schema</a></h3>
+<pre><code class="language-bash">curl http://localhost:8080/v1/schema
+</code></pre>
+<h3 id="upsert-a-document-put"><a class="header" href="#upsert-a-document-put">Upsert a Document (PUT)</a></h3>
+<p>Replaces the document if it already exists:</p>
+<pre><code class="language-bash">curl -X PUT http://localhost:8080/v1/documents/doc1 \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "document": {
+      "fields": {
+        "title": "Hello World",
+        "body": "This is a test document."
+      }
+    }
+  }'
+</code></pre>
+<h3 id="add-a-document-post"><a class="header" href="#add-a-document-post">Add a Document (POST)</a></h3>
+<p>Adds a new chunk without replacing existing documents with the same ID:</p>
+<pre><code class="language-bash">curl -X POST http://localhost:8080/v1/documents/doc1 \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "document": {
+      "fields": {
+        "title": "Hello World",
+        "body": "This is a test document."
+      }
+    }
+  }'
+</code></pre>
+<h3 id="get-documents"><a class="header" href="#get-documents">Get Documents</a></h3>
+<pre><code class="language-bash">curl http://localhost:8080/v1/documents/doc1
+</code></pre>
+<h3 id="delete-documents"><a class="header" href="#delete-documents">Delete Documents</a></h3>
+<pre><code class="language-bash">curl -X DELETE http://localhost:8080/v1/documents/doc1
+</code></pre>
+<h3 id="commit"><a class="header" href="#commit">Commit</a></h3>
+<pre><code class="language-bash">curl -X POST http://localhost:8080/v1/commit
+</code></pre>
+<h3 id="search"><a class="header" href="#search">Search</a></h3>
+<pre><code class="language-bash">curl -X POST http://localhost:8080/v1/search \
+  -H 'Content-Type: application/json' \
+  -d '{"query": "body:test", "limit": 10}'
+</code></pre>
+<h4 id="search-with-field-boosts"><a class="header" href="#search-with-field-boosts">Search with Field Boosts</a></h4>
+<pre><code class="language-bash">curl -X POST http://localhost:8080/v1/search \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "query": "rust programming",
+    "limit": 10,
+    "field_boosts": {"title": 2.0}
+  }'
+</code></pre>
+<h4 id="hybrid-search"><a class="header" href="#hybrid-search">Hybrid Search</a></h4>
+<pre><code class="language-bash">curl -X POST http://localhost:8080/v1/search \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "query": "body:rust",
+    "query_vectors": [{"vector": [0.1, 0.2, 0.3], "weight": 1.0}],
+    "limit": 10,
+    "fusion": {"rrf": {"k": 60}}
+  }'
+</code></pre>
+<h3 id="streaming-search-sse"><a class="header" href="#streaming-search-sse">Streaming Search (SSE)</a></h3>
+<p>The <code>/v1/search/stream</code> endpoint returns results as Server-Sent Events (SSE). Each result is sent as a separate event:</p>
+<pre><code class="language-bash">curl -N -X POST http://localhost:8080/v1/search/stream \
+  -H 'Content-Type: application/json' \
+  -d '{"query": "body:test", "limit": 10}'
+</code></pre>
+<p>The response is a stream of SSE events:</p>
+<pre><code class="language-text">data: {"id":"doc1","score":0.8532,"document":{...}}
+
+data: {"id":"doc2","score":0.4210,"document":{...}}
+</code></pre>
+<h2 id="requestresponse-format"><a class="header" href="#requestresponse-format">Request/Response Format</a></h2>
+<p>All request and response bodies use JSON. The JSON structure mirrors the gRPC protobuf messages. See <a href="grpc_api.html">gRPC API Reference</a> for the full message definitions.</p>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="../cli/repl.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../laurus-server/grpc_api.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <i class="fa fa-angle-left"></i>
                             </a>
 
-                            <a rel="next prefetch" href="../server/getting_started.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="../development/build_and_test.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <i class="fa fa-angle-right"></i>
                             </a>
 
@@ -239,11 +324,11 @@ laurus serve --config config.toml
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="../cli/repl.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="../laurus-server/grpc_api.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <i class="fa fa-angle-left"></i>
                     </a>
 
-                    <a rel="next prefetch" href="../server/getting_started.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="../development/build_and_test.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <i class="fa fa-angle-right"></i>
                     </a>
             </nav>

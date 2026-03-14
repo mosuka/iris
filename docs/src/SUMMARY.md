@@ -1,6 +1,7 @@
 # Summary
 
 - [Introduction](README.md)
+- [Architecture Overview](architecture.md)
 
 # Getting Started
 
@@ -8,7 +9,6 @@
   - [Installation](getting_started/installation.md)
   - [Quick Start](getting_started/quickstart.md)
   - [Examples](getting_started/examples.md)
-- [Architecture Overview](architecture.md)
 
 # Core Concepts
 
@@ -25,36 +25,38 @@
   - [Hybrid Search](concepts/search/hybrid_search.md)
 - [Query DSL](concepts/query_dsl.md)
 
-# laurus (Library)
+# laurus
 
-- [Library Overview](laurus/overview.md)
-- [Engine](laurus/engine.md)
-- [Scoring & Ranking](laurus/scoring.md)
-- [Faceting](laurus/faceting.md)
-- [Highlighting](laurus/highlighting.md)
-- [Spelling Correction](laurus/spelling_correction.md)
-- [ID Management](laurus/id_management.md)
-- [Persistence & WAL](laurus/persistence.md)
-- [Deletions & Compaction](laurus/deletions.md)
-- [Error Handling](laurus/error_handling.md)
-- [Extensibility](laurus/extensibility.md)
-- [API Reference](laurus/api_reference.md)
+- [Library Overview](laurus.md)
+  - [Engine](laurus/engine.md)
+  - [Scoring & Ranking](laurus/scoring.md)
+  - [Faceting](laurus/faceting.md)
+  - [Highlighting](laurus/highlighting.md)
+  - [Spelling Correction](laurus/spelling_correction.md)
+  - [ID Management](laurus/id_management.md)
+  - [Persistence & WAL](laurus/persistence.md)
+  - [Deletions & Compaction](laurus/deletions.md)
+  - [Error Handling](laurus/error_handling.md)
+  - [Extensibility](laurus/extensibility.md)
+  - [API Reference](laurus/api_reference.md)
 
-# laurus-cli (CLI)
+# laurus-cli
 
-- [CLI Overview](cli/overview.md)
-- [Installation](cli/installation.md)
-- [Commands](cli/commands.md)
-- [Schema Format](cli/schema_format.md)
-- [REPL](cli/repl.md)
+- [CLI Overview](laurus-cli.md)
+  - [Installation](laurus-cli/installation.md)
+  - [Hands-on Tutorial](laurus-cli/tutorial.md)
+  - [Commands](laurus-cli/commands.md)
+  - [Schema Format](laurus-cli/schema_format.md)
+  - [REPL](laurus-cli/repl.md)
 
-# laurus-server (Server)
+# laurus-server
 
-- [Server Overview](server/overview.md)
-- [Getting Started](server/getting_started.md)
-- [Configuration](server/configuration.md)
-- [gRPC API Reference](server/grpc_api.md)
-- [HTTP Gateway](server/http_gateway.md)
+- [Server Overview](laurus-server.md)
+  - [Getting Started](laurus-server/getting_started.md)
+  - [Hands-on Tutorial](laurus-server/tutorial.md)
+  - [Configuration](laurus-server/configuration.md)
+  - [gRPC API Reference](laurus-server/grpc_api.md)
+  - [HTTP Gateway](laurus-server/http_gateway.md)
 
 # Development Guide
 

@@ -348,34 +348,14 @@ laurus repl
 
 ## `serve`
 
-Start the gRPC server. See [Server Overview](../server/overview.md) for full documentation.
+Start the gRPC server (and optionally the HTTP Gateway).
 
 ```bash
 laurus serve [OPTIONS]
 ```
 
-**Options:**
+For startup options, configuration, and usage examples, see the [laurus-server documentation](../laurus-server.md):
 
-| Option | Short | Env Variable | Default | Description |
-| :--- | :--- | :--- | :--- | :--- |
-| `--config <PATH>` | `-c` | `LAURUS_CONFIG` | — | Path to a TOML configuration file |
-| `--host <HOST>` | `-H` | `LAURUS_HOST` | `0.0.0.0` | Listen address |
-| `--port <PORT>` | `-p` | `LAURUS_PORT` | `50051` | Listen port |
-| `--http-port <PORT>` | -- | `LAURUS_HTTP_PORT` | -- | HTTP Gateway port (enables HTTP gateway when set) |
-| `--log-level <LEVEL>` | `-l` | `LAURUS_LOG_LEVEL` | `info` | Log level (`trace`, `debug`, `info`, `warn`, `error`) |
-
-**Example:**
-
-```bash
-# Start with defaults (port 50051)
-laurus --data-dir ./my_index serve
-
-# Custom port and log level
-laurus serve --port 8080 --log-level debug
-
-# Use a configuration file
-laurus serve --config config.toml
-
-# Use environment variables
-LAURUS_DATA_DIR=./my_index LAURUS_PORT=8080 laurus serve
-```
+- [Getting Started](../laurus-server/getting_started.md) — startup options and gRPC connection examples
+- [Configuration](../laurus-server/configuration.md) — TOML config file, environment variables, and priority rules
+- [Hands-on Tutorial](../laurus-server/tutorial.md) — step-by-step walkthrough

@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>REPL - Laurus Documentation</title>
+        <title>CLI Overview - Laurus Documentation</title>
 
 
         <!-- Custom HTML head -->
@@ -12,34 +12,34 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="theme-color" content="#ffffff">
 
-        <link rel="icon" href="../favicon.svg">
-        <link rel="shortcut icon" href="../favicon.png">
-        <link rel="stylesheet" href="../css/variables.css">
-        <link rel="stylesheet" href="../css/general.css">
-        <link rel="stylesheet" href="../css/chrome.css">
-        <link rel="stylesheet" href="../css/print.css" media="print">
+        <link rel="icon" href="favicon.svg">
+        <link rel="shortcut icon" href="favicon.png">
+        <link rel="stylesheet" href="css/variables.css">
+        <link rel="stylesheet" href="css/general.css">
+        <link rel="stylesheet" href="css/chrome.css">
+        <link rel="stylesheet" href="css/print.css" media="print">
 
         <!-- Fonts -->
-        <link rel="stylesheet" href="../FontAwesome/css/font-awesome.css">
-        <link rel="stylesheet" href="../fonts/fonts.css">
+        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="fonts/fonts.css">
 
         <!-- Highlight.js Stylesheets -->
-        <link rel="stylesheet" id="highlight-css" href="../highlight.css">
-        <link rel="stylesheet" id="tomorrow-night-css" href="../tomorrow-night.css">
-        <link rel="stylesheet" id="ayu-highlight-css" href="../ayu-highlight.css">
+        <link rel="stylesheet" id="highlight-css" href="highlight.css">
+        <link rel="stylesheet" id="tomorrow-night-css" href="tomorrow-night.css">
+        <link rel="stylesheet" id="ayu-highlight-css" href="ayu-highlight.css">
 
         <!-- Custom theme stylesheets -->
 
 
         <!-- Provide site root and default themes to javascript -->
         <script>
-            const path_to_root = "../";
+            const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex.js";
+            window.path_to_searchindex_js = "searchindex.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc.js"></script>
+        <script src="toc.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -106,7 +106,7 @@
             <!-- populated by js -->
             <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
             <noscript>
-                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
+                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
             </noscript>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle">
                 <div class="sidebar-resize-indicator"></div>
@@ -141,7 +141,7 @@
                     <h1 class="menu-title">Laurus Documentation</h1>
 
                     <div class="right-buttons">
-                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
                             <i id="print-button" class="fa fa-print"></i>
                         </a>
                         <a href="https://github.com/mosuka/laurus" title="Git repository" aria-label="Git repository">
@@ -178,77 +178,53 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="repl-interactive-mode"><a class="header" href="#repl-interactive-mode">REPL (Interactive Mode)</a></h1>
-<p>The REPL provides an interactive session for exploring your index without typing the full <code>laurus</code> command each time.</p>
-<h2 id="starting-the-repl"><a class="header" href="#starting-the-repl">Starting the REPL</a></h2>
-<pre><code class="language-bash">laurus --data-dir ./my_index repl
-</code></pre>
-<pre><code class="language-text">Laurus REPL (type 'help' for commands, 'quit' to exit)
-laurus&gt;
-</code></pre>
-<p>The REPL opens the index at startup and keeps it loaded throughout the session.</p>
-<h2 id="available-commands"><a class="header" href="#available-commands">Available Commands</a></h2>
-<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Command</th><th style="text-align: left">Description</th></tr></thead><tbody>
-<tr><td style="text-align: left"><code>search &lt;query&gt;</code></td><td style="text-align: left">Search the index (returns up to 10 results)</td></tr>
-<tr><td style="text-align: left"><code>doc add &lt;id&gt; &lt;json&gt;</code></td><td style="text-align: left">Add a document</td></tr>
-<tr><td style="text-align: left"><code>doc get &lt;id&gt;</code></td><td style="text-align: left">Get a document by ID</td></tr>
-<tr><td style="text-align: left"><code>doc delete &lt;id&gt;</code></td><td style="text-align: left">Delete a document by ID</td></tr>
-<tr><td style="text-align: left"><code>commit</code></td><td style="text-align: left">Commit pending changes</td></tr>
-<tr><td style="text-align: left"><code>stats</code></td><td style="text-align: left">Show index statistics</td></tr>
-<tr><td style="text-align: left"><code>help</code></td><td style="text-align: left">Show available commands</td></tr>
-<tr><td style="text-align: left"><code>quit</code> / <code>exit</code></td><td style="text-align: left">Exit the REPL</td></tr>
-</tbody></table>
-</div>
-<p>The search command always returns up to 10 results. The limit is not currently configurable in the REPL.</p>
-<h2 id="usage-examples"><a class="header" href="#usage-examples">Usage Examples</a></h2>
-<h3 id="searching"><a class="header" href="#searching">Searching</a></h3>
-<pre><code class="language-text">laurus&gt; search body:rust
-╭──────┬────────┬────────────────────────────────────╮
-│ ID   │ Score  │ Fields                             │
-├──────┼────────┼────────────────────────────────────┤
-│ doc1 │ 0.8532 │ body: Rust is a systems..., title… │
-╰──────┴────────┴────────────────────────────────────╯
-</code></pre>
-<h3 id="adding-and-committing-documents"><a class="header" href="#adding-and-committing-documents">Adding and Committing Documents</a></h3>
-<pre><code class="language-text">laurus&gt; doc add doc4 {"title":"New Document","body":"Some content here."}
-Document 'doc4' added.
-laurus&gt; commit
-Changes committed.
-</code></pre>
-<h3 id="retrieving-documents"><a class="header" href="#retrieving-documents">Retrieving Documents</a></h3>
-<pre><code class="language-text">laurus&gt; doc get doc4
-╭──────┬───────────────────────────────────────────────╮
-│ ID   │ Fields                                        │
-├──────┼───────────────────────────────────────────────┤
-│ doc4 │ body: Some content here., title: New Document │
-╰──────┴───────────────────────────────────────────────╯
-</code></pre>
-<h3 id="deleting-documents"><a class="header" href="#deleting-documents">Deleting Documents</a></h3>
-<pre><code class="language-text">laurus&gt; doc delete doc4
-Document 'doc4' deleted.
-laurus&gt; commit
-Changes committed.
-</code></pre>
-<h3 id="viewing-statistics"><a class="header" href="#viewing-statistics">Viewing Statistics</a></h3>
-<pre><code class="language-text">laurus&gt; stats
-Document count: 3
-</code></pre>
+                        <h1 id="cli-overview"><a class="header" href="#cli-overview">CLI Overview</a></h1>
+<p>Laurus provides a command-line tool <code>laurus</code> that lets you create indexes, manage documents, and run search queries without writing code.</p>
 <h2 id="features"><a class="header" href="#features">Features</a></h2>
 <ul>
-<li><strong>Line editing</strong> — Arrow keys, Home/End, and standard readline shortcuts</li>
-<li><strong>History</strong> — Use Up/Down arrows to recall previous commands</li>
-<li><strong>Ctrl+C / Ctrl+D</strong> — Exit the REPL gracefully</li>
+<li><strong>Index management</strong> -- Create and inspect indexes from TOML schema files, with an interactive schema generator</li>
+<li><strong>Document CRUD</strong> -- Add, retrieve, and delete documents via JSON</li>
+<li><strong>Search</strong> -- Execute queries using the <a href="../concepts/query_dsl.html">Query DSL</a></li>
+<li><strong>Dual output</strong> -- Human-readable tables or machine-parseable JSON</li>
+<li><strong>Interactive REPL</strong> -- Explore your index in a live session</li>
+<li><strong>gRPC server</strong> -- Start a <a href="../server/overview.html">gRPC server</a> with <code>laurus serve</code></li>
+</ul>
+<h2 id="getting-started"><a class="header" href="#getting-started">Getting Started</a></h2>
+<pre><code class="language-bash"># Install
+cargo install laurus-cli
+
+# Generate a schema interactively
+laurus create schema
+
+# Create an index from the schema
+laurus --data-dir ./my_index create index --schema schema.toml
+
+# Add a document
+laurus --data-dir ./my_index add doc --id doc1 --data '{"title":"Hello","body":"World"}'
+
+# Commit changes
+laurus --data-dir ./my_index commit
+
+# Search
+laurus --data-dir ./my_index search "body:world"
+</code></pre>
+<p>See the sub-sections for detailed documentation:</p>
+<ul>
+<li><a href="installation.html">Installation</a> -- How to install the CLI</li>
+<li><a href="commands.html">Commands</a> -- Full command reference</li>
+<li><a href="schema_format.html">Schema Format</a> -- Schema TOML format reference</li>
+<li><a href="repl.html">REPL</a> -- Interactive mode</li>
 </ul>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="../cli/schema_format.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="laurus/api_reference.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <i class="fa fa-angle-left"></i>
                             </a>
 
-                            <a rel="next prefetch" href="../server/overview.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="laurus-cli/installation.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <i class="fa fa-angle-right"></i>
                             </a>
 
@@ -258,11 +234,11 @@ Document count: 3
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="../cli/schema_format.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="laurus/api_reference.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <i class="fa fa-angle-left"></i>
                     </a>
 
-                    <a rel="next prefetch" href="../server/overview.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="laurus-cli/installation.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <i class="fa fa-angle-right"></i>
                     </a>
             </nav>
@@ -277,17 +253,17 @@ Document count: 3
         </script>
 
 
-        <script src="../elasticlunr.min.js"></script>
-        <script src="../mark.min.js"></script>
-        <script src="../searcher.js"></script>
+        <script src="elasticlunr.min.js"></script>
+        <script src="mark.min.js"></script>
+        <script src="searcher.js"></script>
 
-        <script src="../clipboard.min.js"></script>
-        <script src="../highlight.js"></script>
-        <script src="../book.js"></script>
+        <script src="clipboard.min.js"></script>
+        <script src="highlight.js"></script>
+        <script src="book.js"></script>
 
         <!-- Custom JS scripts -->
-        <script src="../mermaid.min.js"></script>
-        <script src="../mermaid-init.js"></script>
+        <script src="mermaid.min.js"></script>
+        <script src="mermaid-init.js"></script>
 
 
 

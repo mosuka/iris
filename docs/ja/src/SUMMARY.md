@@ -1,6 +1,7 @@
 # Summary
 
 - [はじめに](README.md)
+- [アーキテクチャ概要](architecture.md)
 
 # Getting Started
 
@@ -8,7 +9,6 @@
   - [インストール](getting_started/installation.md)
   - [クイックスタート](getting_started/quickstart.md)
   - [サンプル](getting_started/examples.md)
-- [アーキテクチャ概要](architecture.md)
 
 # コアコンセプト
 
@@ -25,36 +25,38 @@
   - [ハイブリッド検索](concepts/search/hybrid_search.md)
 - [Query DSL](concepts/query_dsl.md)
 
-# laurus（ライブラリ）
+# laurus
 
-- [ライブラリ概要](laurus/overview.md)
-- [Engine](laurus/engine.md)
-- [スコアリングとランキング](laurus/scoring.md)
-- [ファセット](laurus/faceting.md)
-- [ハイライト](laurus/highlighting.md)
-- [スペル修正](laurus/spelling_correction.md)
-- [ID 管理](laurus/id_management.md)
-- [永続化と WAL](laurus/persistence.md)
-- [削除とコンパクション](laurus/deletions.md)
-- [エラーハンドリング](laurus/error_handling.md)
-- [拡張性](laurus/extensibility.md)
-- [API リファレンス](laurus/api_reference.md)
+- [ライブラリ概要](laurus.md)
+  - [Engine](laurus/engine.md)
+  - [スコアリングとランキング](laurus/scoring.md)
+  - [ファセット](laurus/faceting.md)
+  - [ハイライト](laurus/highlighting.md)
+  - [スペル修正](laurus/spelling_correction.md)
+  - [ID 管理](laurus/id_management.md)
+  - [永続化と WAL](laurus/persistence.md)
+  - [削除とコンパクション](laurus/deletions.md)
+  - [エラーハンドリング](laurus/error_handling.md)
+  - [拡張性](laurus/extensibility.md)
+  - [API リファレンス](laurus/api_reference.md)
 
-# laurus-cli（CLI）
+# laurus-cli
 
-- [CLI 概要](cli/overview.md)
-- [インストール](cli/installation.md)
-- [コマンド](cli/commands.md)
-- [スキーマフォーマット](cli/schema_format.md)
-- [REPL](cli/repl.md)
+- [CLI 概要](laurus-cli.md)
+  - [インストール](laurus-cli/installation.md)
+  - [ハンズオンチュートリアル](laurus-cli/tutorial.md)
+  - [コマンド](laurus-cli/commands.md)
+  - [スキーマフォーマット](laurus-cli/schema_format.md)
+  - [REPL](laurus-cli/repl.md)
 
-# laurus-server（サーバー）
+# laurus-server
 
-- [サーバー概要](server/overview.md)
-- [はじめに](server/getting_started.md)
-- [設定](server/configuration.md)
-- [gRPC API リファレンス](server/grpc_api.md)
-- [HTTP Gateway](server/http_gateway.md)
+- [サーバー概要](laurus-server.md)
+  - [はじめに](laurus-server/getting_started.md)
+  - [ハンズオンチュートリアル](laurus-server/tutorial.md)
+  - [設定](laurus-server/configuration.md)
+  - [gRPC API リファレンス](laurus-server/grpc_api.md)
+  - [HTTP Gateway](laurus-server/http_gateway.md)
 
 # 開発ガイド
 
