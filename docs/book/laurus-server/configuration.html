@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Getting Started - Laurus Documentation</title>
+        <title>Configuration - Laurus Documentation</title>
 
 
         <!-- Custom HTML head -->
@@ -178,92 +178,117 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="getting-started-with-the-grpc-server"><a class="header" href="#getting-started-with-the-grpc-server">Getting Started with the gRPC Server</a></h1>
-<h2 id="starting-the-server"><a class="header" href="#starting-the-server">Starting the Server</a></h2>
-<p>The gRPC server is started via the <code>serve</code> subcommand of the <code>laurus</code> CLI:</p>
-<pre><code class="language-bash">laurus serve [OPTIONS]
+                        <h1 id="configuration"><a class="header" href="#configuration">Configuration</a></h1>
+<p>The laurus-server can be configured through CLI arguments, environment variables, and a TOML configuration file.</p>
+<h2 id="configuration-priority"><a class="header" href="#configuration-priority">Configuration Priority</a></h2>
+<p>Settings are resolved in the following order (highest priority first):</p>
+<pre><code class="language-text">CLI arguments &gt; Environment variables &gt; Config file &gt; Defaults
 </code></pre>
-<h3 id="options"><a class="header" href="#options">Options</a></h3>
-<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Option</th><th style="text-align: left">Short</th><th style="text-align: left">Env Variable</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr></thead><tbody>
-<tr><td style="text-align: left"><code>--config &lt;PATH&gt;</code></td><td style="text-align: left"><code>-c</code></td><td style="text-align: left"><code>LAURUS_CONFIG</code></td><td style="text-align: left">--</td><td style="text-align: left">Path to a TOML configuration file</td></tr>
-<tr><td style="text-align: left"><code>--host &lt;HOST&gt;</code></td><td style="text-align: left"><code>-H</code></td><td style="text-align: left"><code>LAURUS_HOST</code></td><td style="text-align: left"><code>0.0.0.0</code></td><td style="text-align: left">Listen address</td></tr>
-<tr><td style="text-align: left"><code>--port &lt;PORT&gt;</code></td><td style="text-align: left"><code>-p</code></td><td style="text-align: left"><code>LAURUS_PORT</code></td><td style="text-align: left"><code>50051</code></td><td style="text-align: left">Listen port</td></tr>
-<tr><td style="text-align: left"><code>--http-port &lt;PORT&gt;</code></td><td style="text-align: left">--</td><td style="text-align: left"><code>LAURUS_HTTP_PORT</code></td><td style="text-align: left">--</td><td style="text-align: left">HTTP Gateway port (enables HTTP gateway when set)</td></tr>
-<tr><td style="text-align: left"><code>--log-level &lt;LEVEL&gt;</code></td><td style="text-align: left"><code>-l</code></td><td style="text-align: left"><code>LAURUS_LOG_LEVEL</code></td><td style="text-align: left"><code>info</code></td><td style="text-align: left">Log level (<code>trace</code>, <code>debug</code>, <code>info</code>, <code>warn</code>, <code>error</code>)</td></tr>
+<p>For example:</p>
+<pre><code class="language-bash"># CLI argument wins over environment variable and config file
+LAURUS_PORT=4567 laurus serve --config config.toml --port 1234
+# -&gt; Listens on port 1234
+
+# Environment variable wins over config file
+LAURUS_PORT=4567 laurus serve --config config.toml
+# -&gt; Listens on port 4567
+
+# Config file value is used when no CLI argument or env var is set
+laurus serve --config config.toml
+# -&gt; Uses port from config.toml (or default 50051 if not set)
+</code></pre>
+<h2 id="toml-configuration-file"><a class="header" href="#toml-configuration-file">TOML Configuration File</a></h2>
+<h3 id="format"><a class="header" href="#format">Format</a></h3>
+<pre><code class="language-toml">[server]
+host = "0.0.0.0"
+port = 50051
+http_port = 8080  # Optional: enables HTTP Gateway
+
+[index]
+data_dir = "./laurus_data"
+
+[log]
+level = "info"
+</code></pre>
+<h3 id="field-reference"><a class="header" href="#field-reference">Field Reference</a></h3>
+<h4 id="server-section"><a class="header" href="#server-section"><code>[server]</code> Section</a></h4>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Field</th><th style="text-align: left">Type</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>host</code></td><td style="text-align: left">String</td><td style="text-align: left"><code>"0.0.0.0"</code></td><td style="text-align: left">Listen address for the gRPC server</td></tr>
+<tr><td style="text-align: left"><code>port</code></td><td style="text-align: left">Integer</td><td style="text-align: left"><code>50051</code></td><td style="text-align: left">Listen port for the gRPC server</td></tr>
+<tr><td style="text-align: left"><code>http_port</code></td><td style="text-align: left">Integer</td><td style="text-align: left">--</td><td style="text-align: left">HTTP Gateway port. When set, the HTTP/JSON gateway starts alongside gRPC.</td></tr>
 </tbody></table>
 </div>
-<p>The global <code>--data-dir</code> option (env: <code>LAURUS_DATA_DIR</code>) specifies the index data directory:</p>
-<pre><code class="language-bash"># Using CLI arguments
-laurus --data-dir ./my_index serve --port 8080 --log-level debug
+<h4 id="index-section"><a class="header" href="#index-section"><code>[index]</code> Section</a></h4>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Field</th><th style="text-align: left">Type</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>data_dir</code></td><td style="text-align: left">String</td><td style="text-align: left"><code>"./laurus_data"</code></td><td style="text-align: left">Path to the index data directory</td></tr>
+</tbody></table>
+</div>
+<h4 id="log-section"><a class="header" href="#log-section"><code>[log]</code> Section</a></h4>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Field</th><th style="text-align: left">Type</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>level</code></td><td style="text-align: left">String</td><td style="text-align: left"><code>"info"</code></td><td style="text-align: left">Log level: <code>trace</code>, <code>debug</code>, <code>info</code>, <code>warn</code>, <code>error</code></td></tr>
+</tbody></table>
+</div>
+<h2 id="environment-variables"><a class="header" href="#environment-variables">Environment Variables</a></h2>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Variable</th><th style="text-align: left">Maps To</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>LAURUS_HOST</code></td><td style="text-align: left"><code>server.host</code></td><td style="text-align: left">Listen address</td></tr>
+<tr><td style="text-align: left"><code>LAURUS_PORT</code></td><td style="text-align: left"><code>server.port</code></td><td style="text-align: left">gRPC listen port</td></tr>
+<tr><td style="text-align: left"><code>LAURUS_HTTP_PORT</code></td><td style="text-align: left"><code>server.http_port</code></td><td style="text-align: left">HTTP Gateway port</td></tr>
+<tr><td style="text-align: left"><code>LAURUS_DATA_DIR</code></td><td style="text-align: left"><code>index.data_dir</code></td><td style="text-align: left">Index data directory</td></tr>
+<tr><td style="text-align: left"><code>LAURUS_LOG_LEVEL</code></td><td style="text-align: left"><code>log.level</code></td><td style="text-align: left">Log level</td></tr>
+<tr><td style="text-align: left"><code>LAURUS_CONFIG</code></td><td style="text-align: left">--</td><td style="text-align: left">Path to TOML config file</td></tr>
+</tbody></table>
+</div>
+<h2 id="cli-arguments"><a class="header" href="#cli-arguments">CLI Arguments</a></h2>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Option</th><th style="text-align: left">Short</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>--config &lt;PATH&gt;</code></td><td style="text-align: left"><code>-c</code></td><td style="text-align: left">--</td><td style="text-align: left">Path to TOML configuration file</td></tr>
+<tr><td style="text-align: left"><code>--host &lt;HOST&gt;</code></td><td style="text-align: left"><code>-H</code></td><td style="text-align: left"><code>0.0.0.0</code></td><td style="text-align: left">Listen address</td></tr>
+<tr><td style="text-align: left"><code>--port &lt;PORT&gt;</code></td><td style="text-align: left"><code>-p</code></td><td style="text-align: left"><code>50051</code></td><td style="text-align: left">gRPC listen port</td></tr>
+<tr><td style="text-align: left"><code>--http-port &lt;PORT&gt;</code></td><td style="text-align: left">--</td><td style="text-align: left">--</td><td style="text-align: left">HTTP Gateway port</td></tr>
+<tr><td style="text-align: left"><code>--log-level &lt;LEVEL&gt;</code></td><td style="text-align: left"><code>-l</code></td><td style="text-align: left"><code>info</code></td><td style="text-align: left">Log level</td></tr>
+<tr><td style="text-align: left"><code>--data-dir &lt;PATH&gt;</code></td><td style="text-align: left">--</td><td style="text-align: left"><code>./laurus_data</code></td><td style="text-align: left">Index data directory (global option)</td></tr>
+</tbody></table>
+</div>
+<h2 id="common-configurations"><a class="header" href="#common-configurations">Common Configurations</a></h2>
+<h3 id="development-grpc-only"><a class="header" href="#development-grpc-only">Development (gRPC only)</a></h3>
+<pre><code class="language-toml">[server]
+host = "127.0.0.1"
+port = 50051
 
-# Using environment variables
-export LAURUS_DATA_DIR=./my_index
-export LAURUS_PORT=8080
-export LAURUS_LOG_LEVEL=debug
+[index]
+data_dir = "./dev_data"
+
+[log]
+level = "debug"
+</code></pre>
+<h3 id="production-grpc--http-gateway"><a class="header" href="#production-grpc--http-gateway">Production (gRPC + HTTP Gateway)</a></h3>
+<pre><code class="language-toml">[server]
+host = "0.0.0.0"
+port = 50051
+http_port = 8080
+
+[index]
+data_dir = "/var/lib/laurus/data"
+
+[log]
+level = "info"
+</code></pre>
+<h3 id="minimal-environment-variables-only"><a class="header" href="#minimal-environment-variables-only">Minimal (environment variables only)</a></h3>
+<pre><code class="language-bash">export LAURUS_DATA_DIR=/var/lib/laurus/data
+export LAURUS_PORT=50051
+export LAURUS_HTTP_PORT=8080
+export LAURUS_LOG_LEVEL=info
 laurus serve
 </code></pre>
-<h3 id="startup-behavior"><a class="header" href="#startup-behavior">Startup Behavior</a></h3>
-<p>On startup, the server attempts to open an existing index at the configured data directory. If no index exists, the server starts without one -- you can create an index later via the <code>CreateIndex</code> RPC.</p>
-<h2 id="configuration"><a class="header" href="#configuration">Configuration</a></h2>
-<p>You can use a TOML configuration file instead of (or in addition to) command-line options. See <a href="configuration.html">Configuration</a> for the full reference.</p>
-<pre><code class="language-bash">laurus serve --config config.toml
-</code></pre>
-<h2 id="http-gateway"><a class="header" href="#http-gateway">HTTP Gateway</a></h2>
-<p>When <code>--http-port</code> is set, an HTTP/JSON gateway starts alongside the gRPC server. See <a href="http_gateway.html">HTTP Gateway</a> for the full endpoint reference and examples.</p>
-<pre><code class="language-bash">laurus serve --http-port 8080
-</code></pre>
-<h2 id="graceful-shutdown"><a class="header" href="#graceful-shutdown">Graceful Shutdown</a></h2>
-<p>When the server receives a shutdown signal (Ctrl+C / SIGINT), it automatically:</p>
-<ol>
-<li>Stops accepting new connections</li>
-<li>Commits any pending changes to the index</li>
-<li>Exits cleanly</li>
-</ol>
-<h2 id="connecting-via-grpc"><a class="header" href="#connecting-via-grpc">Connecting via gRPC</a></h2>
-<p>Any gRPC client can connect to the server. For quick testing, <a href="https://github.com/fullstorydev/grpcurl">grpcurl</a> is useful:</p>
-<pre><code class="language-bash"># Health check
-grpcurl -plaintext localhost:50051 laurus.v1.HealthService/Check
-
-# Create an index
-grpcurl -plaintext -d '{
-  "schema": {
-    "fields": {
-      "title": {"text": {"indexed": true, "stored": true, "term_vectors": true}},
-      "body": {"text": {"indexed": true, "stored": true, "term_vectors": true}}
-    },
-    "default_fields": ["title", "body"]
-  }
-}' localhost:50051 laurus.v1.IndexService/CreateIndex
-
-# Add a document
-grpcurl -plaintext -d '{
-  "id": "doc1",
-  "document": {
-    "fields": {
-      "title": {"text_value": "Hello World"},
-      "body": {"text_value": "This is a test document."}
-    }
-  }
-}' localhost:50051 laurus.v1.DocumentService/AddDocument
-
-# Commit
-grpcurl -plaintext localhost:50051 laurus.v1.DocumentService/Commit
-
-# Search
-grpcurl -plaintext -d '{"query": "body:test", "limit": 10}' \
-  localhost:50051 laurus.v1.SearchService/Search
-</code></pre>
-<p>See <a href="grpc_api.html">gRPC API Reference</a> for the full API documentation.</p>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="../server/overview.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../laurus-server/tutorial.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <i class="fa fa-angle-left"></i>
                             </a>
 
-                            <a rel="next prefetch" href="../server/configuration.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="../laurus-server/grpc_api.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <i class="fa fa-angle-right"></i>
                             </a>
 
@@ -273,11 +298,11 @@ grpcurl -plaintext -d '{"query": "body:test", "limit": 10}' \
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="../server/overview.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="../laurus-server/tutorial.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <i class="fa fa-angle-left"></i>
                     </a>
 
-                    <a rel="next prefetch" href="../server/configuration.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="../laurus-server/grpc_api.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <i class="fa fa-angle-right"></i>
                     </a>
             </nav>

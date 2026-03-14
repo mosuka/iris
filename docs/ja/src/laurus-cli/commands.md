@@ -348,34 +348,14 @@ laurus repl
 
 ## `serve`
 
-gRPC サーバーを起動します。詳細なドキュメントは[サーバー概要](../server/overview.md)を参照してください。
+gRPC サーバー（およびオプションで HTTP Gateway）を起動します。
 
 ```bash
 laurus serve [OPTIONS]
 ```
 
-**オプション:**
+起動オプション、設定、使用例については [laurus-server のドキュメント](../laurus-server.md)を参照してください:
 
-| オプション | 短縮形 | 環境変数 | デフォルト | 説明 |
-| :--- | :--- | :--- | :--- | :--- |
-| `--config <PATH>` | `-c` | `LAURUS_CONFIG` | — | TOML 設定ファイルのパス |
-| `--host <HOST>` | `-H` | `LAURUS_HOST` | `0.0.0.0` | リッスンアドレス |
-| `--port <PORT>` | `-p` | `LAURUS_PORT` | `50051` | リッスンポート |
-| `--http-port <PORT>` | -- | `LAURUS_HTTP_PORT` | -- | HTTP Gateway ポート（設定時に HTTP Gateway を有効化） |
-| `--log-level <LEVEL>` | `-l` | `LAURUS_LOG_LEVEL` | `info` | ログレベル（`trace`, `debug`, `info`, `warn`, `error`） |
-
-**例:**
-
-```bash
-# デフォルト設定で起動（ポート 50051）
-laurus --data-dir ./my_index serve
-
-# カスタムポートとログレベル
-laurus serve --port 8080 --log-level debug
-
-# 設定ファイルを使用
-laurus serve --config config.toml
-
-# 環境変数を使用
-LAURUS_DATA_DIR=./my_index LAURUS_PORT=8080 laurus serve
-```
+- [はじめに](../laurus-server/getting_started.md) — 起動オプションと gRPC 接続例
+- [設定](../laurus-server/configuration.md) — TOML 設定ファイル、環境変数、優先順位
+- [ハンズオンチュートリアル](../laurus-server/tutorial.md) — ステップバイステップの操作ガイド

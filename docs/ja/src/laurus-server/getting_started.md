@@ -97,4 +97,4 @@ grpcurl -plaintext -d '{"query": "body:test", "limit": 10}' \
   localhost:50051 laurus.v1.SearchService/Search
 ```
 
-詳細は [gRPC API リファレンス](grpc_api.md)を参照してください。
+詳細は [gRPC API リファレンス](grpc_api.md)を参照してください。HTTP Gateway を使ったステップバイステップの操作ガイドは[ハンズオンチュートリアル](tutorial.md)を参照してください。

@@ -284,6 +284,222 @@ async fn main() -&gt; Result&lt;()&gt; {
 }</code></pre></pre>
 <h2 id="license"><a class="header" href="#license">License</a></h2>
 <p>Laurus is dual-licensed under <a href="https://opensource.org/licenses/MIT">MIT</a> and <a href="https://www.apache.org/licenses/LICENSE-2.0">Apache 2.0</a>.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="architecture"><a class="header" href="#architecture">Architecture</a></h1>
+<p>This page explains how Laurus is structured internally. Understanding the architecture will help you make better decisions about schema design, analyzer selection, and search strategies.</p>
+<h2 id="project-structure"><a class="header" href="#project-structure">Project Structure</a></h2>
+<p>Laurus is organized as a Cargo workspace with three crates:</p>
+<pre><code class="language-mermaid">graph TB
+    CLI["laurus-cli\n(Binary Crate)\nCLI + REPL"]
+    SRV["laurus-server\n(Library + Binary)\ngRPC Server + HTTP Gateway"]
+    LIB["laurus\n(Library Crate)\nCore Search Engine"]
+
+    CLI --&gt; LIB
+    SRV --&gt; LIB
+</code></pre>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Crate</th><th style="text-align: left">Type</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: left"><strong>laurus</strong></td><td style="text-align: left">Library</td><td style="text-align: left">Core search engine -- lexical, vector, and hybrid search</td></tr>
+<tr><td style="text-align: left"><strong>laurus-cli</strong></td><td style="text-align: left">Binary</td><td style="text-align: left">Command-line interface for index management and search</td></tr>
+<tr><td style="text-align: left"><strong>laurus-server</strong></td><td style="text-align: left">Library + Binary</td><td style="text-align: left">gRPC server with optional HTTP/JSON gateway</td></tr>
+</tbody></table>
+</div>
+<p>For details on each crate, see:</p>
+<ul>
+<li><a href="laurus/overview.html">Library Overview</a></li>
+<li><a href="cli/overview.html">CLI Overview</a></li>
+<li><a href="server/overview.html">Server Overview</a></li>
+</ul>
+<h2 id="high-level-overview"><a class="header" href="#high-level-overview">High-Level Overview</a></h2>
+<p>Laurus is organized around a single <code>Engine</code> that coordinates four internal components:</p>
+<pre><code class="language-mermaid">graph TB
+    subgraph Engine
+        SCH["Schema"]
+        LS["LexicalStore\n(Inverted Index)"]
+        VS["VectorStore\n(HNSW / Flat / IVF)"]
+        DL["DocumentLog\n(WAL + Document Storage)"]
+    end
+
+    Storage["Storage (trait)\nMemory / File / File+Mmap"]
+
+    LS --- Storage
+    VS --- Storage
+    DL --- Storage
+</code></pre>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Component</th><th style="text-align: left">Responsibility</th></tr></thead><tbody>
+<tr><td style="text-align: left"><strong>Schema</strong></td><td style="text-align: left">Declares fields and their types; determines how each field is routed</td></tr>
+<tr><td style="text-align: left"><strong>LexicalStore</strong></td><td style="text-align: left">Inverted index for keyword search (BM25 scoring)</td></tr>
+<tr><td style="text-align: left"><strong>VectorStore</strong></td><td style="text-align: left">Vector index for similarity search (Flat, HNSW, or IVF)</td></tr>
+<tr><td style="text-align: left"><strong>DocumentLog</strong></td><td style="text-align: left">Write-ahead log (WAL) for durability + raw document storage</td></tr>
+</tbody></table>
+</div>
+<p>All three stores share a single <code>Storage</code> backend, isolated by key prefixes (<code>lexical/</code>, <code>vector/</code>, <code>documents/</code>).</p>
+<h2 id="engine-lifecycle"><a class="header" href="#engine-lifecycle">Engine Lifecycle</a></h2>
+<h3 id="building-an-engine"><a class="header" href="#building-an-engine">Building an Engine</a></h3>
+<p>The <code>EngineBuilder</code> assembles the engine from its parts:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let engine = Engine::builder(storage, schema)
+    .analyzer(analyzer)      // optional: for text fields
+    .embedder(embedder)      // optional: for vector fields
+    .build()
+    .await?;
+<span class="boring">}</span></code></pre></pre>
+<pre><code class="language-mermaid">sequenceDiagram
+    participant User
+    participant EngineBuilder
+    participant Engine
+
+    User-&gt;&gt;EngineBuilder: new(storage, schema)
+    User-&gt;&gt;EngineBuilder: .analyzer(analyzer)
+    User-&gt;&gt;EngineBuilder: .embedder(embedder)
+    User-&gt;&gt;EngineBuilder: .build().await
+    EngineBuilder-&gt;&gt;EngineBuilder: split_schema()
+    Note over EngineBuilder: Separate fields into\nLexicalIndexConfig\n+ VectorIndexConfig
+    EngineBuilder-&gt;&gt;Engine: Create LexicalStore
+    EngineBuilder-&gt;&gt;Engine: Create VectorStore
+    EngineBuilder-&gt;&gt;Engine: Create DocumentLog
+    EngineBuilder-&gt;&gt;Engine: Recover from WAL
+    EngineBuilder--&gt;&gt;User: Engine ready
+</code></pre>
+<p>During <code>build()</code>, the engine:</p>
+<ol>
+<li><strong>Splits the schema</strong> — lexical fields go to <code>LexicalIndexConfig</code>, vector fields go to <code>VectorIndexConfig</code></li>
+<li><strong>Creates prefixed storage</strong> — each component gets an isolated namespace (<code>lexical/</code>, <code>vector/</code>, <code>documents/</code>)</li>
+<li><strong>Initializes stores</strong> — <code>LexicalStore</code> and <code>VectorStore</code> are constructed with their configs</li>
+<li><strong>Recovers from WAL</strong> — replays any uncommitted operations from a previous session</li>
+</ol>
+<h3 id="schema-splitting"><a class="header" href="#schema-splitting">Schema Splitting</a></h3>
+<p>The <code>Schema</code> contains both lexical and vector fields. At build time, <code>split_schema()</code> separates them:</p>
+<pre><code class="language-mermaid">graph LR
+    S["Schema\ntitle: Text\nbody: Text\ncategory: Text\npage: Integer\ncontent_vec: HNSW"]
+
+    S --&gt; LC["LexicalIndexConfig\ntitle: TextOption\nbody: TextOption\ncategory: TextOption\npage: IntegerOption\n_id: KeywordAnalyzer"]
+
+    S --&gt; VC["VectorIndexConfig\ncontent_vec: HnswOption\n(dim=384, m=16, ef=200)"]
+</code></pre>
+<p>Key details:</p>
+<ul>
+<li>The reserved <code>_id</code> field is always added to the lexical config with <code>KeywordAnalyzer</code> (exact match)</li>
+<li>A <code>PerFieldAnalyzer</code> wraps per-field analyzer settings; if you pass a simple <code>StandardAnalyzer</code>, it becomes the default for all text fields</li>
+<li>A <code>PerFieldEmbedder</code> works the same way for vector fields</li>
+</ul>
+<h2 id="indexing-data-flow"><a class="header" href="#indexing-data-flow">Indexing Data Flow</a></h2>
+<p>When you call <code>engine.add_document(id, doc)</code>:</p>
+<pre><code class="language-mermaid">sequenceDiagram
+    participant User
+    participant Engine
+    participant WAL as DocumentLog (WAL)
+    participant Lexical as LexicalStore
+    participant Vector as VectorStore
+
+    User-&gt;&gt;Engine: add_document("doc-1", doc)
+    Engine-&gt;&gt;WAL: Append to WAL
+    Engine-&gt;&gt;Engine: Assign internal ID (u64)
+
+    loop For each field in document
+        alt Lexical field (text, integer, etc.)
+            Engine-&gt;&gt;Lexical: Analyze + index field
+        else Vector field
+            Engine-&gt;&gt;Vector: Embed + index field
+        end
+    end
+
+    Note over Engine: Document is buffered\nbut NOT yet searchable
+
+    User-&gt;&gt;Engine: commit()
+    Engine-&gt;&gt;Lexical: Flush segments to storage
+    Engine-&gt;&gt;Vector: Flush segments to storage
+    Engine-&gt;&gt;WAL: Truncate WAL
+    Note over Engine: Documents are\nnow searchable
+</code></pre>
+<p>Key points:</p>
+<ul>
+<li><strong>WAL-first</strong>: every write is logged before modifying in-memory structures</li>
+<li><strong>Dual indexing</strong>: each field is routed to either the lexical or vector store based on the schema</li>
+<li><strong>Commit required</strong>: documents become searchable only after <code>commit()</code></li>
+</ul>
+<h2 id="search-data-flow"><a class="header" href="#search-data-flow">Search Data Flow</a></h2>
+<p>When you call <code>engine.search(request)</code>:</p>
+<pre><code class="language-mermaid">sequenceDiagram
+    participant User
+    participant Engine
+    participant Lexical as LexicalStore
+    participant Vector as VectorStore
+    participant Fusion
+
+    User-&gt;&gt;Engine: search(request)
+
+    opt Filter query present
+        Engine-&gt;&gt;Lexical: Execute filter query
+        Lexical--&gt;&gt;Engine: Allowed document IDs
+    end
+
+    par Lexical search
+        Engine-&gt;&gt;Lexical: Execute lexical query
+        Lexical--&gt;&gt;Engine: Ranked hits (BM25)
+    and Vector search
+        Engine-&gt;&gt;Vector: Execute vector query
+        Vector--&gt;&gt;Engine: Ranked hits (similarity)
+    end
+
+    alt Both lexical and vector results
+        Engine-&gt;&gt;Fusion: Fuse results (RRF or WeightedSum)
+        Fusion--&gt;&gt;Engine: Merged ranked list
+    end
+
+    Engine-&gt;&gt;Engine: Apply offset + limit
+    Engine--&gt;&gt;User: Vec of SearchResult
+</code></pre>
+<p>The search pipeline has three stages:</p>
+<ol>
+<li><strong>Filter</strong> (optional) — execute a filter query on the lexical index to get a set of allowed document IDs</li>
+<li><strong>Search</strong> — run lexical and/or vector queries in parallel</li>
+<li><strong>Fusion</strong> — if both query types are present, merge results using RRF (default, k=60) or WeightedSum</li>
+</ol>
+<h2 id="storage-architecture"><a class="header" href="#storage-architecture">Storage Architecture</a></h2>
+<p>All components share a single <code>Storage</code> trait implementation, but use key prefixes to isolate their data:</p>
+<pre><code class="language-mermaid">graph TB
+    Engine --&gt; PS1["PrefixedStorage\nprefix: 'lexical/'"]
+    Engine --&gt; PS2["PrefixedStorage\nprefix: 'vector/'"]
+    Engine --&gt; PS3["PrefixedStorage\nprefix: 'documents/'"]
+
+    PS1 --&gt; S["Storage Backend\n(Memory / File / File+Mmap)"]
+    PS2 --&gt; S
+    PS3 --&gt; S
+</code></pre>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Backend</th><th style="text-align: left">Description</th><th style="text-align: left">Best For</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>MemoryStorage</code></td><td style="text-align: left">All data in memory</td><td style="text-align: left">Testing, small datasets, ephemeral use</td></tr>
+<tr><td style="text-align: left"><code>FileStorage</code></td><td style="text-align: left">Standard file I/O</td><td style="text-align: left">General production use</td></tr>
+<tr><td style="text-align: left"><code>FileStorage</code> (mmap)</td><td style="text-align: left">Memory-mapped files (<code>use_mmap = true</code>)</td><td style="text-align: left">Large datasets, read-heavy workloads</td></tr>
+</tbody></table>
+</div>
+<h2 id="per-field-dispatch"><a class="header" href="#per-field-dispatch">Per-Field Dispatch</a></h2>
+<p>When a <code>PerFieldAnalyzer</code> is provided, the engine dispatches analysis to field-specific analyzers. The same pattern applies to <code>PerFieldEmbedder</code>.</p>
+<pre><code class="language-mermaid">graph LR
+    PFA["PerFieldAnalyzer"]
+    PFA --&gt;|"title"| KA["KeywordAnalyzer"]
+    PFA --&gt;|"body"| SA["StandardAnalyzer"]
+    PFA --&gt;|"description"| JA["JapaneseAnalyzer"]
+    PFA --&gt;|"_id"| KA2["KeywordAnalyzer\n(always)"]
+    PFA --&gt;|other fields| DEF["Default Analyzer\n(StandardAnalyzer)"]
+</code></pre>
+<p>This allows different fields to use different analysis strategies within the same engine.</p>
+<h2 id="summary"><a class="header" href="#summary">Summary</a></h2>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Aspect</th><th style="text-align: left">Detail</th></tr></thead><tbody>
+<tr><td style="text-align: left"><strong>Core struct</strong></td><td style="text-align: left"><code>Engine</code> — coordinates all operations</td></tr>
+<tr><td style="text-align: left"><strong>Builder</strong></td><td style="text-align: left"><code>EngineBuilder</code> — assembles Engine from Storage + Schema + Analyzer + Embedder</td></tr>
+<tr><td style="text-align: left"><strong>Schema split</strong></td><td style="text-align: left">Lexical fields → <code>LexicalIndexConfig</code>, Vector fields → <code>VectorIndexConfig</code></td></tr>
+<tr><td style="text-align: left"><strong>Write path</strong></td><td style="text-align: left">WAL → in-memory buffers → <code>commit()</code> → persistent storage</td></tr>
+<tr><td style="text-align: left"><strong>Read path</strong></td><td style="text-align: left">Query → parallel lexical/vector search → fusion → ranked results</td></tr>
+<tr><td style="text-align: left"><strong>Storage isolation</strong></td><td style="text-align: left"><code>PrefixedStorage</code> with <code>lexical/</code>, <code>vector/</code>, <code>documents/</code> prefixes</td></tr>
+<tr><td style="text-align: left"><strong>Per-field dispatch</strong></td><td style="text-align: left"><code>PerFieldAnalyzer</code> and <code>PerFieldEmbedder</code> route to field-specific implementations</td></tr>
+</tbody></table>
+</div>
+<h2 id="next-steps"><a class="header" href="#next-steps">Next Steps</a></h2>
+<ul>
+<li>Understand field types and schema design: <a href="concepts/schema_and_fields.html">Schema &amp; Fields</a></li>
+<li>Learn about text analysis: <a href="concepts/analysis.html">Text Analysis</a></li>
+<li>Learn about embeddings: <a href="concepts/embedding.html">Embeddings</a></li>
+</ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="getting-started"><a class="header" href="#getting-started">Getting Started</a></h1>
 <p>Welcome to Laurus! This section will help you install the library and run your first search.</p>
 <h2 id="what-you-will-build"><a class="header" href="#what-you-will-build">What You Will Build</a></h2>
@@ -536,7 +752,7 @@ async fn main() -&gt; Result&lt;()&gt; {
 
     Ok(())
 }</code></pre></pre>
-<h2 id="next-steps"><a class="header" href="#next-steps">Next Steps</a></h2>
+<h2 id="next-steps-1"><a class="header" href="#next-steps-1">Next Steps</a></h2>
 <ul>
 <li>Learn how the Engine works internally: <a href="getting_started/../architecture.html">Architecture</a></li>
 <li>Understand Schema and field types: <a href="getting_started/../concepts/schema_and_fields.html">Schema &amp; Fields</a></li>
@@ -603,222 +819,6 @@ cargo run --example search_with_openai --features embeddings-openai
 <li><code>memory_storage()</code> -- Create an in-memory storage instance</li>
 <li><code>per_field_analyzer()</code> -- Create a <code>PerFieldAnalyzer</code> with <code>KeywordAnalyzer</code> for specific fields</li>
 <li><code>MockEmbedder</code> -- A mock <code>Embedder</code> implementation for testing vector search without a real model</li>
-</ul>
-<div style="break-before: page; page-break-before: always;"></div><h1 id="architecture"><a class="header" href="#architecture">Architecture</a></h1>
-<p>This page explains how Laurus is structured internally. Understanding the architecture will help you make better decisions about schema design, analyzer selection, and search strategies.</p>
-<h2 id="project-structure"><a class="header" href="#project-structure">Project Structure</a></h2>
-<p>Laurus is organized as a Cargo workspace with three crates:</p>
-<pre><code class="language-mermaid">graph TB
-    CLI["laurus-cli\n(Binary Crate)\nCLI + REPL"]
-    SRV["laurus-server\n(Library + Binary)\ngRPC Server + HTTP Gateway"]
-    LIB["laurus\n(Library Crate)\nCore Search Engine"]
-
-    CLI --&gt; LIB
-    SRV --&gt; LIB
-</code></pre>
-<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Crate</th><th style="text-align: left">Type</th><th style="text-align: left">Description</th></tr></thead><tbody>
-<tr><td style="text-align: left"><strong>laurus</strong></td><td style="text-align: left">Library</td><td style="text-align: left">Core search engine -- lexical, vector, and hybrid search</td></tr>
-<tr><td style="text-align: left"><strong>laurus-cli</strong></td><td style="text-align: left">Binary</td><td style="text-align: left">Command-line interface for index management and search</td></tr>
-<tr><td style="text-align: left"><strong>laurus-server</strong></td><td style="text-align: left">Library + Binary</td><td style="text-align: left">gRPC server with optional HTTP/JSON gateway</td></tr>
-</tbody></table>
-</div>
-<p>For details on each crate, see:</p>
-<ul>
-<li><a href="laurus/overview.html">Library Overview</a></li>
-<li><a href="cli/overview.html">CLI Overview</a></li>
-<li><a href="server/overview.html">Server Overview</a></li>
-</ul>
-<h2 id="high-level-overview"><a class="header" href="#high-level-overview">High-Level Overview</a></h2>
-<p>Laurus is organized around a single <code>Engine</code> that coordinates four internal components:</p>
-<pre><code class="language-mermaid">graph TB
-    subgraph Engine
-        SCH["Schema"]
-        LS["LexicalStore\n(Inverted Index)"]
-        VS["VectorStore\n(HNSW / Flat / IVF)"]
-        DL["DocumentLog\n(WAL + Document Storage)"]
-    end
-
-    Storage["Storage (trait)\nMemory / File / File+Mmap"]
-
-    LS --- Storage
-    VS --- Storage
-    DL --- Storage
-</code></pre>
-<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Component</th><th style="text-align: left">Responsibility</th></tr></thead><tbody>
-<tr><td style="text-align: left"><strong>Schema</strong></td><td style="text-align: left">Declares fields and their types; determines how each field is routed</td></tr>
-<tr><td style="text-align: left"><strong>LexicalStore</strong></td><td style="text-align: left">Inverted index for keyword search (BM25 scoring)</td></tr>
-<tr><td style="text-align: left"><strong>VectorStore</strong></td><td style="text-align: left">Vector index for similarity search (Flat, HNSW, or IVF)</td></tr>
-<tr><td style="text-align: left"><strong>DocumentLog</strong></td><td style="text-align: left">Write-ahead log (WAL) for durability + raw document storage</td></tr>
-</tbody></table>
-</div>
-<p>All three stores share a single <code>Storage</code> backend, isolated by key prefixes (<code>lexical/</code>, <code>vector/</code>, <code>documents/</code>).</p>
-<h2 id="engine-lifecycle"><a class="header" href="#engine-lifecycle">Engine Lifecycle</a></h2>
-<h3 id="building-an-engine"><a class="header" href="#building-an-engine">Building an Engine</a></h3>
-<p>The <code>EngineBuilder</code> assembles the engine from its parts:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>let engine = Engine::builder(storage, schema)
-    .analyzer(analyzer)      // optional: for text fields
-    .embedder(embedder)      // optional: for vector fields
-    .build()
-    .await?;
-<span class="boring">}</span></code></pre></pre>
-<pre><code class="language-mermaid">sequenceDiagram
-    participant User
-    participant EngineBuilder
-    participant Engine
-
-    User-&gt;&gt;EngineBuilder: new(storage, schema)
-    User-&gt;&gt;EngineBuilder: .analyzer(analyzer)
-    User-&gt;&gt;EngineBuilder: .embedder(embedder)
-    User-&gt;&gt;EngineBuilder: .build().await
-    EngineBuilder-&gt;&gt;EngineBuilder: split_schema()
-    Note over EngineBuilder: Separate fields into\nLexicalIndexConfig\n+ VectorIndexConfig
-    EngineBuilder-&gt;&gt;Engine: Create LexicalStore
-    EngineBuilder-&gt;&gt;Engine: Create VectorStore
-    EngineBuilder-&gt;&gt;Engine: Create DocumentLog
-    EngineBuilder-&gt;&gt;Engine: Recover from WAL
-    EngineBuilder--&gt;&gt;User: Engine ready
-</code></pre>
-<p>During <code>build()</code>, the engine:</p>
-<ol>
-<li><strong>Splits the schema</strong> — lexical fields go to <code>LexicalIndexConfig</code>, vector fields go to <code>VectorIndexConfig</code></li>
-<li><strong>Creates prefixed storage</strong> — each component gets an isolated namespace (<code>lexical/</code>, <code>vector/</code>, <code>documents/</code>)</li>
-<li><strong>Initializes stores</strong> — <code>LexicalStore</code> and <code>VectorStore</code> are constructed with their configs</li>
-<li><strong>Recovers from WAL</strong> — replays any uncommitted operations from a previous session</li>
-</ol>
-<h3 id="schema-splitting"><a class="header" href="#schema-splitting">Schema Splitting</a></h3>
-<p>The <code>Schema</code> contains both lexical and vector fields. At build time, <code>split_schema()</code> separates them:</p>
-<pre><code class="language-mermaid">graph LR
-    S["Schema\ntitle: Text\nbody: Text\ncategory: Text\npage: Integer\ncontent_vec: HNSW"]
-
-    S --&gt; LC["LexicalIndexConfig\ntitle: TextOption\nbody: TextOption\ncategory: TextOption\npage: IntegerOption\n_id: KeywordAnalyzer"]
-
-    S --&gt; VC["VectorIndexConfig\ncontent_vec: HnswOption\n(dim=384, m=16, ef=200)"]
-</code></pre>
-<p>Key details:</p>
-<ul>
-<li>The reserved <code>_id</code> field is always added to the lexical config with <code>KeywordAnalyzer</code> (exact match)</li>
-<li>A <code>PerFieldAnalyzer</code> wraps per-field analyzer settings; if you pass a simple <code>StandardAnalyzer</code>, it becomes the default for all text fields</li>
-<li>A <code>PerFieldEmbedder</code> works the same way for vector fields</li>
-</ul>
-<h2 id="indexing-data-flow"><a class="header" href="#indexing-data-flow">Indexing Data Flow</a></h2>
-<p>When you call <code>engine.add_document(id, doc)</code>:</p>
-<pre><code class="language-mermaid">sequenceDiagram
-    participant User
-    participant Engine
-    participant WAL as DocumentLog (WAL)
-    participant Lexical as LexicalStore
-    participant Vector as VectorStore
-
-    User-&gt;&gt;Engine: add_document("doc-1", doc)
-    Engine-&gt;&gt;WAL: Append to WAL
-    Engine-&gt;&gt;Engine: Assign internal ID (u64)
-
-    loop For each field in document
-        alt Lexical field (text, integer, etc.)
-            Engine-&gt;&gt;Lexical: Analyze + index field
-        else Vector field
-            Engine-&gt;&gt;Vector: Embed + index field
-        end
-    end
-
-    Note over Engine: Document is buffered\nbut NOT yet searchable
-
-    User-&gt;&gt;Engine: commit()
-    Engine-&gt;&gt;Lexical: Flush segments to storage
-    Engine-&gt;&gt;Vector: Flush segments to storage
-    Engine-&gt;&gt;WAL: Truncate WAL
-    Note over Engine: Documents are\nnow searchable
-</code></pre>
-<p>Key points:</p>
-<ul>
-<li><strong>WAL-first</strong>: every write is logged before modifying in-memory structures</li>
-<li><strong>Dual indexing</strong>: each field is routed to either the lexical or vector store based on the schema</li>
-<li><strong>Commit required</strong>: documents become searchable only after <code>commit()</code></li>
-</ul>
-<h2 id="search-data-flow"><a class="header" href="#search-data-flow">Search Data Flow</a></h2>
-<p>When you call <code>engine.search(request)</code>:</p>
-<pre><code class="language-mermaid">sequenceDiagram
-    participant User
-    participant Engine
-    participant Lexical as LexicalStore
-    participant Vector as VectorStore
-    participant Fusion
-
-    User-&gt;&gt;Engine: search(request)
-
-    opt Filter query present
-        Engine-&gt;&gt;Lexical: Execute filter query
-        Lexical--&gt;&gt;Engine: Allowed document IDs
-    end
-
-    par Lexical search
-        Engine-&gt;&gt;Lexical: Execute lexical query
-        Lexical--&gt;&gt;Engine: Ranked hits (BM25)
-    and Vector search
-        Engine-&gt;&gt;Vector: Execute vector query
-        Vector--&gt;&gt;Engine: Ranked hits (similarity)
-    end
-
-    alt Both lexical and vector results
-        Engine-&gt;&gt;Fusion: Fuse results (RRF or WeightedSum)
-        Fusion--&gt;&gt;Engine: Merged ranked list
-    end
-
-    Engine-&gt;&gt;Engine: Apply offset + limit
-    Engine--&gt;&gt;User: Vec of SearchResult
-</code></pre>
-<p>The search pipeline has three stages:</p>
-<ol>
-<li><strong>Filter</strong> (optional) — execute a filter query on the lexical index to get a set of allowed document IDs</li>
-<li><strong>Search</strong> — run lexical and/or vector queries in parallel</li>
-<li><strong>Fusion</strong> — if both query types are present, merge results using RRF (default, k=60) or WeightedSum</li>
-</ol>
-<h2 id="storage-architecture"><a class="header" href="#storage-architecture">Storage Architecture</a></h2>
-<p>All components share a single <code>Storage</code> trait implementation, but use key prefixes to isolate their data:</p>
-<pre><code class="language-mermaid">graph TB
-    Engine --&gt; PS1["PrefixedStorage\nprefix: 'lexical/'"]
-    Engine --&gt; PS2["PrefixedStorage\nprefix: 'vector/'"]
-    Engine --&gt; PS3["PrefixedStorage\nprefix: 'documents/'"]
-
-    PS1 --&gt; S["Storage Backend\n(Memory / File / File+Mmap)"]
-    PS2 --&gt; S
-    PS3 --&gt; S
-</code></pre>
-<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Backend</th><th style="text-align: left">Description</th><th style="text-align: left">Best For</th></tr></thead><tbody>
-<tr><td style="text-align: left"><code>MemoryStorage</code></td><td style="text-align: left">All data in memory</td><td style="text-align: left">Testing, small datasets, ephemeral use</td></tr>
-<tr><td style="text-align: left"><code>FileStorage</code></td><td style="text-align: left">Standard file I/O</td><td style="text-align: left">General production use</td></tr>
-<tr><td style="text-align: left"><code>FileStorage</code> (mmap)</td><td style="text-align: left">Memory-mapped files (<code>use_mmap = true</code>)</td><td style="text-align: left">Large datasets, read-heavy workloads</td></tr>
-</tbody></table>
-</div>
-<h2 id="per-field-dispatch"><a class="header" href="#per-field-dispatch">Per-Field Dispatch</a></h2>
-<p>When a <code>PerFieldAnalyzer</code> is provided, the engine dispatches analysis to field-specific analyzers. The same pattern applies to <code>PerFieldEmbedder</code>.</p>
-<pre><code class="language-mermaid">graph LR
-    PFA["PerFieldAnalyzer"]
-    PFA --&gt;|"title"| KA["KeywordAnalyzer"]
-    PFA --&gt;|"body"| SA["StandardAnalyzer"]
-    PFA --&gt;|"description"| JA["JapaneseAnalyzer"]
-    PFA --&gt;|"_id"| KA2["KeywordAnalyzer\n(always)"]
-    PFA --&gt;|other fields| DEF["Default Analyzer\n(StandardAnalyzer)"]
-</code></pre>
-<p>This allows different fields to use different analysis strategies within the same engine.</p>
-<h2 id="summary"><a class="header" href="#summary">Summary</a></h2>
-<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Aspect</th><th style="text-align: left">Detail</th></tr></thead><tbody>
-<tr><td style="text-align: left"><strong>Core struct</strong></td><td style="text-align: left"><code>Engine</code> — coordinates all operations</td></tr>
-<tr><td style="text-align: left"><strong>Builder</strong></td><td style="text-align: left"><code>EngineBuilder</code> — assembles Engine from Storage + Schema + Analyzer + Embedder</td></tr>
-<tr><td style="text-align: left"><strong>Schema split</strong></td><td style="text-align: left">Lexical fields → <code>LexicalIndexConfig</code>, Vector fields → <code>VectorIndexConfig</code></td></tr>
-<tr><td style="text-align: left"><strong>Write path</strong></td><td style="text-align: left">WAL → in-memory buffers → <code>commit()</code> → persistent storage</td></tr>
-<tr><td style="text-align: left"><strong>Read path</strong></td><td style="text-align: left">Query → parallel lexical/vector search → fusion → ranked results</td></tr>
-<tr><td style="text-align: left"><strong>Storage isolation</strong></td><td style="text-align: left"><code>PrefixedStorage</code> with <code>lexical/</code>, <code>vector/</code>, <code>documents/</code> prefixes</td></tr>
-<tr><td style="text-align: left"><strong>Per-field dispatch</strong></td><td style="text-align: left"><code>PerFieldAnalyzer</code> and <code>PerFieldEmbedder</code> route to field-specific implementations</td></tr>
-</tbody></table>
-</div>
-<h2 id="next-steps-1"><a class="header" href="#next-steps-1">Next Steps</a></h2>
-<ul>
-<li>Understand field types and schema design: <a href="concepts/schema_and_fields.html">Schema &amp; Fields</a></li>
-<li>Learn about text analysis: <a href="concepts/analysis.html">Text Analysis</a></li>
-<li>Learn about embeddings: <a href="concepts/embedding.html">Embeddings</a></li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="schema--fields"><a class="header" href="#schema--fields">Schema &amp; Fields</a></h1>
 <p>The <code>Schema</code> defines the structure of your documents — what fields exist and how each field is indexed. It is the single source of truth for the Engine.</p>
@@ -3086,17 +3086,17 @@ laurus = { version = "0.1.0", features = ["embeddings-all"] }
 </code></pre>
 <h2 id="sections"><a class="header" href="#sections">Sections</a></h2>
 <ul>
-<li><a href="laurus/engine.html">Engine</a> -- Engine and EngineBuilder internals</li>
-<li><a href="laurus/scoring.html">Scoring &amp; Ranking</a> -- BM25, TF-IDF, and vector similarity scoring</li>
-<li><a href="laurus/faceting.html">Faceting</a> -- Hierarchical facet search</li>
-<li><a href="laurus/highlighting.html">Highlighting</a> -- Search result highlighting</li>
-<li><a href="laurus/spelling_correction.html">Spelling Correction</a> -- Spelling suggestions and auto-correction</li>
-<li><a href="laurus/id_management.html">ID Management</a> -- Dual-tiered document identity</li>
-<li><a href="laurus/persistence.html">Persistence &amp; WAL</a> -- Write-ahead logging and durability</li>
-<li><a href="laurus/deletions.html">Deletions &amp; Compaction</a> -- Logical deletion and space reclamation</li>
-<li><a href="laurus/error_handling.html">Error Handling</a> -- LaurusError and Result types</li>
-<li><a href="laurus/extensibility.html">Extensibility</a> -- Custom analyzers, embedders, and storage backends</li>
-<li><a href="laurus/api_reference.html">API Reference</a> -- Key types and methods at a glance</li>
+<li><a href="engine.html">Engine</a> -- Engine and EngineBuilder internals</li>
+<li><a href="scoring.html">Scoring &amp; Ranking</a> -- BM25, TF-IDF, and vector similarity scoring</li>
+<li><a href="faceting.html">Faceting</a> -- Hierarchical facet search</li>
+<li><a href="highlighting.html">Highlighting</a> -- Search result highlighting</li>
+<li><a href="spelling_correction.html">Spelling Correction</a> -- Spelling suggestions and auto-correction</li>
+<li><a href="id_management.html">ID Management</a> -- Dual-tiered document identity</li>
+<li><a href="persistence.html">Persistence &amp; WAL</a> -- Write-ahead logging and durability</li>
+<li><a href="deletions.html">Deletions &amp; Compaction</a> -- Logical deletion and space reclamation</li>
+<li><a href="error_handling.html">Error Handling</a> -- LaurusError and Result types</li>
+<li><a href="extensibility.html">Extensibility</a> -- Custom analyzers, embedders, and storage backends</li>
+<li><a href="api_reference.html">API Reference</a> -- Key types and methods at a glance</li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="engine"><a class="header" href="#engine">Engine</a></h1>
 <p>The <code>Engine</code> is the central type in Laurus. It coordinates the lexical index, vector index, and document log behind a single async API.</p>
@@ -4442,10 +4442,10 @@ impl Storage for S3Storage {
 <ul>
 <li><strong>Index management</strong> -- Create and inspect indexes from TOML schema files, with an interactive schema generator</li>
 <li><strong>Document CRUD</strong> -- Add, retrieve, and delete documents via JSON</li>
-<li><strong>Search</strong> -- Execute queries using the <a href="cli/../concepts/query_dsl.html">Query DSL</a></li>
+<li><strong>Search</strong> -- Execute queries using the <a href="../concepts/query_dsl.html">Query DSL</a></li>
 <li><strong>Dual output</strong> -- Human-readable tables or machine-parseable JSON</li>
 <li><strong>Interactive REPL</strong> -- Explore your index in a live session</li>
-<li><strong>gRPC server</strong> -- Start a <a href="cli/../server/overview.html">gRPC server</a> with <code>laurus serve</code></li>
+<li><strong>gRPC server</strong> -- Start a <a href="../server/overview.html">gRPC server</a> with <code>laurus serve</code></li>
 </ul>
 <h2 id="getting-started-1"><a class="header" href="#getting-started-1">Getting Started</a></h2>
 <pre><code class="language-bash"># Install
@@ -4468,10 +4468,10 @@ laurus --data-dir ./my_index search "body:world"
 </code></pre>
 <p>See the sub-sections for detailed documentation:</p>
 <ul>
-<li><a href="cli/installation.html">Installation</a> -- How to install the CLI</li>
-<li><a href="cli/commands.html">Commands</a> -- Full command reference</li>
-<li><a href="cli/schema_format.html">Schema Format</a> -- Schema TOML format reference</li>
-<li><a href="cli/repl.html">REPL</a> -- Interactive mode</li>
+<li><a href="installation.html">Installation</a> -- How to install the CLI</li>
+<li><a href="commands.html">Commands</a> -- Full command reference</li>
+<li><a href="schema_format.html">Schema Format</a> -- Schema TOML format reference</li>
+<li><a href="repl.html">REPL</a> -- Interactive mode</li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="installation-1"><a class="header" href="#installation-1">Installation</a></h1>
 <h2 id="from-cratesio"><a class="header" href="#from-cratesio">From crates.io</a></h2>
@@ -4486,6 +4486,137 @@ cargo install --path laurus-cli
 <h2 id="verify"><a class="header" href="#verify">Verify</a></h2>
 <pre><code class="language-bash">laurus --version
 </code></pre>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="hands-on-tutorial"><a class="header" href="#hands-on-tutorial">Hands-on Tutorial</a></h1>
+<p>This tutorial walks you through a complete workflow using the laurus CLI: creating a schema, building an index, adding documents, searching, updating, deleting, and using the interactive REPL.</p>
+<h2 id="prerequisites-1"><a class="header" href="#prerequisites-1">Prerequisites</a></h2>
+<ul>
+<li>laurus CLI installed (see <a href="laurus-cli/installation.html">Installation</a>)</li>
+</ul>
+<h2 id="step-1-create-a-schema"><a class="header" href="#step-1-create-a-schema">Step 1: Create a Schema</a></h2>
+<p>First, create a schema file that defines your index structure. You can generate one interactively:</p>
+<pre><code class="language-bash">laurus create schema
+</code></pre>
+<p>The interactive wizard guides you through defining fields, their types, and options. For this tutorial, create a schema file manually instead:</p>
+<pre><code class="language-bash">cat &gt; schema.toml &lt;&lt; 'EOF'
+default_fields = ["title", "body"]
+
+[fields.title.Text]
+indexed = true
+stored = true
+term_vectors = false
+
+[fields.body.Text]
+indexed = true
+stored = true
+term_vectors = false
+
+[fields.category.Text]
+indexed = true
+stored = true
+term_vectors = false
+EOF
+</code></pre>
+<p>This defines three text fields. The <code>default_fields</code> setting means queries without a field prefix will search <code>title</code> and <code>body</code>.</p>
+<h2 id="step-2-create-an-index"><a class="header" href="#step-2-create-an-index">Step 2: Create an Index</a></h2>
+<p>Create an index using the schema:</p>
+<pre><code class="language-bash">laurus --data-dir ./tutorial_data create index --schema schema.toml
+</code></pre>
+<p>Verify the index was created:</p>
+<pre><code class="language-bash">laurus --data-dir ./tutorial_data get index
+</code></pre>
+<p>The output shows the document count is 0.</p>
+<h2 id="step-3-add-documents"><a class="header" href="#step-3-add-documents">Step 3: Add Documents</a></h2>
+<p>Add documents to the index. Each document needs an ID and a JSON object with field values:</p>
+<pre><code class="language-bash">laurus --data-dir ./tutorial_data add doc \
+  --id doc001 \
+  --data '{"title":"Introduction to Rust Programming","body":"Rust is a modern systems programming language that focuses on safety, speed, and concurrency.","category":"programming"}'
+</code></pre>
+<pre><code class="language-bash">laurus --data-dir ./tutorial_data add doc \
+  --id doc002 \
+  --data '{"title":"Web Development with Rust","body":"Building web applications with Rust has become increasingly popular. Frameworks like Actix and Rocket make it easy to create fast and secure web services.","category":"web-development"}'
+</code></pre>
+<pre><code class="language-bash">laurus --data-dir ./tutorial_data add doc \
+  --id doc003 \
+  --data '{"title":"Python for Data Science","body":"Python is the most popular language for data science and machine learning. Libraries like NumPy and Pandas provide powerful tools for data analysis.","category":"data-science"}'
+</code></pre>
+<h2 id="step-4-commit-changes"><a class="header" href="#step-4-commit-changes">Step 4: Commit Changes</a></h2>
+<p>Documents are not searchable until committed:</p>
+<pre><code class="language-bash">laurus --data-dir ./tutorial_data commit
+</code></pre>
+<h2 id="step-5-search-documents"><a class="header" href="#step-5-search-documents">Step 5: Search Documents</a></h2>
+<h3 id="basic-search"><a class="header" href="#basic-search">Basic Search</a></h3>
+<p>Search for documents containing "rust":</p>
+<pre><code class="language-bash">laurus --data-dir ./tutorial_data search "rust"
+</code></pre>
+<p>This searches the default fields (<code>title</code> and <code>body</code>). Results show <code>doc001</code> and <code>doc002</code>.</p>
+<h3 id="field-specific-search"><a class="header" href="#field-specific-search">Field-Specific Search</a></h3>
+<p>Search only in the <code>title</code> field:</p>
+<pre><code class="language-bash">laurus --data-dir ./tutorial_data search "title:python"
+</code></pre>
+<p>Only <code>doc003</code> is returned.</p>
+<h3 id="category-search"><a class="header" href="#category-search">Category Search</a></h3>
+<pre><code class="language-bash">laurus --data-dir ./tutorial_data search "category:programming"
+</code></pre>
+<p>Only <code>doc001</code> is returned.</p>
+<h3 id="boolean-queries"><a class="header" href="#boolean-queries">Boolean Queries</a></h3>
+<p>Combine conditions with <code>+</code> (must) and <code>-</code> (must not):</p>
+<pre><code class="language-bash">laurus --data-dir ./tutorial_data search "+body:rust -body:web"
+</code></pre>
+<p>Only <code>doc001</code> is returned (contains "rust" but not "web").</p>
+<h3 id="phrase-search"><a class="header" href="#phrase-search">Phrase Search</a></h3>
+<p>Search for an exact phrase:</p>
+<pre><code class="language-bash">laurus --data-dir ./tutorial_data search 'body:"data science"'
+</code></pre>
+<p>Only <code>doc003</code> is returned.</p>
+<h3 id="fuzzy-search"><a class="header" href="#fuzzy-search">Fuzzy Search</a></h3>
+<p>Search with typo tolerance using <code>~</code>:</p>
+<pre><code class="language-bash">laurus --data-dir ./tutorial_data search "body:programing~1"
+</code></pre>
+<p>Matches "programming" despite the typo.</p>
+<h3 id="json-output"><a class="header" href="#json-output">JSON Output</a></h3>
+<p>Get results in JSON format for programmatic use:</p>
+<pre><code class="language-bash">laurus --data-dir ./tutorial_data --format json search "rust"
+</code></pre>
+<h2 id="step-6-retrieve-a-document"><a class="header" href="#step-6-retrieve-a-document">Step 6: Retrieve a Document</a></h2>
+<p>Fetch a specific document by ID:</p>
+<pre><code class="language-bash">laurus --data-dir ./tutorial_data get doc --id doc001
+</code></pre>
+<h2 id="step-7-delete-a-document"><a class="header" href="#step-7-delete-a-document">Step 7: Delete a Document</a></h2>
+<p>Delete a document and commit the change:</p>
+<pre><code class="language-bash">laurus --data-dir ./tutorial_data delete doc --id doc003
+laurus --data-dir ./tutorial_data commit
+</code></pre>
+<p>Verify it was deleted:</p>
+<pre><code class="language-bash">laurus --data-dir ./tutorial_data search "python"
+</code></pre>
+<p>No results are returned.</p>
+<h2 id="step-8-use-the-repl"><a class="header" href="#step-8-use-the-repl">Step 8: Use the REPL</a></h2>
+<p>The REPL provides an interactive session for exploring your index:</p>
+<pre><code class="language-bash">laurus --data-dir ./tutorial_data repl
+</code></pre>
+<p>Try these commands in the REPL:</p>
+<pre><code class="language-text">&gt; stats
+&gt; search rust
+&gt; doc add doc004 {"title":"Go Programming","body":"Go is a statically typed language designed for simplicity and efficiency.","category":"programming"}
+&gt; commit
+&gt; search programming
+&gt; doc get doc004
+&gt; doc delete doc004
+&gt; commit
+&gt; quit
+</code></pre>
+<p>The REPL supports command history (Up/Down arrows) and line editing.</p>
+<h2 id="step-9-clean-up"><a class="header" href="#step-9-clean-up">Step 9: Clean Up</a></h2>
+<p>Remove the tutorial data:</p>
+<pre><code class="language-bash">rm -rf ./tutorial_data schema.toml
+</code></pre>
+<h2 id="next-steps-13"><a class="header" href="#next-steps-13">Next Steps</a></h2>
+<ul>
+<li>Learn about the <a href="laurus-cli/schema_format.html">Schema Format</a> for advanced field configurations</li>
+<li>See the full <a href="laurus-cli/commands.html">Commands</a> reference</li>
+<li>Explore the <a href="laurus-cli/repl.html">REPL</a> for interactive usage</li>
+<li>Try the <a href="laurus-cli/../laurus-server/tutorial.html">server tutorial</a> for gRPC/HTTP access</li>
+</ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="command-reference"><a class="header" href="#command-reference">Command Reference</a></h1>
 <h2 id="global-options"><a class="header" href="#global-options">Global Options</a></h2>
 <p>Every command accepts these options:</p>
@@ -4509,7 +4640,7 @@ laurus --data-dir /var/data/my_index --format json search "title:rust"
 </tbody></table>
 </div>
 <p><strong>Schema file format:</strong></p>
-<p>The schema file follows the same structure as the <code>Schema</code> type in the Laurus library. See <a href="cli/schema_format.html">Schema Format Reference</a> for full details. Example:</p>
+<p>The schema file follows the same structure as the <code>Schema</code> type in the Laurus library. See <a href="laurus-cli/schema_format.html">Schema Format Reference</a> for full details. Example:</p>
 <pre><code class="language-toml">default_fields = ["title", "body"]
 
 [fields.title.Text]
@@ -4672,7 +4803,7 @@ Vector fields:
 </code></pre>
 <hr />
 <h2 id="search-3"><a class="header" href="#search-3"><code>search</code></a></h2>
-<p>Execute a search query using the <a href="cli/../concepts/query_dsl.html">Query DSL</a>.</p>
+<p>Execute a search query using the <a href="laurus-cli/../concepts/query_dsl.html">Query DSL</a>.</p>
 <pre><code class="language-bash">laurus search &lt;QUERY&gt; [--limit &lt;N&gt;] [--offset &lt;N&gt;]
 </code></pre>
 <p><strong>Arguments:</strong></p>
@@ -4725,36 +4856,20 @@ laurus search "price:[10 TO 50]"
 </code></pre>
 <hr />
 <h2 id="repl"><a class="header" href="#repl"><code>repl</code></a></h2>
-<p>Start an interactive REPL session. See <a href="cli/repl.html">REPL</a> for details.</p>
+<p>Start an interactive REPL session. See <a href="laurus-cli/repl.html">REPL</a> for details.</p>
 <pre><code class="language-bash">laurus repl
 </code></pre>
 <hr />
 <h2 id="serve"><a class="header" href="#serve"><code>serve</code></a></h2>
-<p>Start the gRPC server. See <a href="cli/../server/overview.html">Server Overview</a> for full documentation.</p>
+<p>Start the gRPC server (and optionally the HTTP Gateway).</p>
 <pre><code class="language-bash">laurus serve [OPTIONS]
 </code></pre>
-<p><strong>Options:</strong></p>
-<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Option</th><th style="text-align: left">Short</th><th style="text-align: left">Env Variable</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr></thead><tbody>
-<tr><td style="text-align: left"><code>--config &lt;PATH&gt;</code></td><td style="text-align: left"><code>-c</code></td><td style="text-align: left"><code>LAURUS_CONFIG</code></td><td style="text-align: left">—</td><td style="text-align: left">Path to a TOML configuration file</td></tr>
-<tr><td style="text-align: left"><code>--host &lt;HOST&gt;</code></td><td style="text-align: left"><code>-H</code></td><td style="text-align: left"><code>LAURUS_HOST</code></td><td style="text-align: left"><code>0.0.0.0</code></td><td style="text-align: left">Listen address</td></tr>
-<tr><td style="text-align: left"><code>--port &lt;PORT&gt;</code></td><td style="text-align: left"><code>-p</code></td><td style="text-align: left"><code>LAURUS_PORT</code></td><td style="text-align: left"><code>50051</code></td><td style="text-align: left">Listen port</td></tr>
-<tr><td style="text-align: left"><code>--http-port &lt;PORT&gt;</code></td><td style="text-align: left">--</td><td style="text-align: left"><code>LAURUS_HTTP_PORT</code></td><td style="text-align: left">--</td><td style="text-align: left">HTTP Gateway port (enables HTTP gateway when set)</td></tr>
-<tr><td style="text-align: left"><code>--log-level &lt;LEVEL&gt;</code></td><td style="text-align: left"><code>-l</code></td><td style="text-align: left"><code>LAURUS_LOG_LEVEL</code></td><td style="text-align: left"><code>info</code></td><td style="text-align: left">Log level (<code>trace</code>, <code>debug</code>, <code>info</code>, <code>warn</code>, <code>error</code>)</td></tr>
-</tbody></table>
-</div>
-<p><strong>Example:</strong></p>
-<pre><code class="language-bash"># Start with defaults (port 50051)
-laurus --data-dir ./my_index serve
-
-# Custom port and log level
-laurus serve --port 8080 --log-level debug
-
-# Use a configuration file
-laurus serve --config config.toml
-
-# Use environment variables
-LAURUS_DATA_DIR=./my_index LAURUS_PORT=8080 laurus serve
-</code></pre>
+<p>For startup options, configuration, and usage examples, see the <a href="laurus-cli/../laurus-server.html">laurus-server documentation</a>:</p>
+<ul>
+<li><a href="laurus-cli/../laurus-server/getting_started.html">Getting Started</a> — startup options and gRPC connection examples</li>
+<li><a href="laurus-cli/../laurus-server/configuration.html">Configuration</a> — TOML config file, environment variables, and priority rules</li>
+<li><a href="laurus-cli/../laurus-server/tutorial.html">Hands-on Tutorial</a> — step-by-step walkthrough</li>
+</ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="schema-format-reference"><a class="header" href="#schema-format-reference">Schema Format Reference</a></h1>
 <p>The schema file defines the structure of your index — what fields exist, their types, and how they are indexed. Laurus uses TOML format for schema files.</p>
 <h2 id="overview-2"><a class="header" href="#overview-2">Overview</a></h2>
@@ -4767,7 +4882,7 @@ default_fields = ["title", "body"]
 # ... type-specific options
 </code></pre>
 <ul>
-<li><strong><code>default_fields</code></strong> — A list of field names used as default search targets by the <a href="cli/../concepts/query_dsl.html">Query DSL</a>. Only lexical fields (Text, Integer, Float, etc.) can be default fields. This key is optional and defaults to an empty list.</li>
+<li><strong><code>default_fields</code></strong> — A list of field names used as default search targets by the <a href="laurus-cli/../concepts/query_dsl.html">Query DSL</a>. Only lexical fields (Text, Integer, Float, etc.) can be default fields. This key is optional and defaults to an empty list.</li>
 <li><strong><code>fields</code></strong> — A map of field names to their typed configuration. Each field must specify exactly one field type.</li>
 </ul>
 <h2 id="field-naming"><a class="header" href="#field-naming">Field Naming</a></h2>
@@ -4869,11 +4984,11 @@ base_weight = 1.0
 </code></pre>
 <div class="table-wrapper"><table><thead><tr><th style="text-align: left">Option</th><th style="text-align: left">Type</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr></thead><tbody>
 <tr><td style="text-align: left"><code>dimension</code></td><td style="text-align: left"><code>integer</code></td><td style="text-align: left"><code>128</code></td><td style="text-align: left">Vector dimensionality (must match your embedding model)</td></tr>
-<tr><td style="text-align: left"><code>distance</code></td><td style="text-align: left"><code>string</code></td><td style="text-align: left"><code>"Cosine"</code></td><td style="text-align: left">Distance metric (see <a href="cli/schema_format.html#distance-metrics">Distance Metrics</a>)</td></tr>
+<tr><td style="text-align: left"><code>distance</code></td><td style="text-align: left"><code>string</code></td><td style="text-align: left"><code>"Cosine"</code></td><td style="text-align: left">Distance metric (see <a href="laurus-cli/schema_format.html#distance-metrics">Distance Metrics</a>)</td></tr>
 <tr><td style="text-align: left"><code>m</code></td><td style="text-align: left"><code>integer</code></td><td style="text-align: left"><code>16</code></td><td style="text-align: left">Max bi-directional connections per node. Higher = better recall, more memory</td></tr>
 <tr><td style="text-align: left"><code>ef_construction</code></td><td style="text-align: left"><code>integer</code></td><td style="text-align: left"><code>200</code></td><td style="text-align: left">Search width during index construction. Higher = better quality, slower build</td></tr>
 <tr><td style="text-align: left"><code>base_weight</code></td><td style="text-align: left"><code>float</code></td><td style="text-align: left"><code>1.0</code></td><td style="text-align: left">Scoring weight in hybrid search fusion</td></tr>
-<tr><td style="text-align: left"><code>quantizer</code></td><td style="text-align: left"><code>object</code></td><td style="text-align: left"><em>none</em></td><td style="text-align: left">Optional quantization method (see <a href="cli/schema_format.html#quantization">Quantization</a>)</td></tr>
+<tr><td style="text-align: left"><code>quantizer</code></td><td style="text-align: left"><code>object</code></td><td style="text-align: left"><em>none</em></td><td style="text-align: left">Optional quantization method (see <a href="laurus-cli/schema_format.html#quantization">Quantization</a>)</td></tr>
 </tbody></table>
 </div>
 <p><strong>Tuning guidelines:</strong></p>
@@ -4891,9 +5006,9 @@ base_weight = 1.0
 </code></pre>
 <div class="table-wrapper"><table><thead><tr><th style="text-align: left">Option</th><th style="text-align: left">Type</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr></thead><tbody>
 <tr><td style="text-align: left"><code>dimension</code></td><td style="text-align: left"><code>integer</code></td><td style="text-align: left"><code>128</code></td><td style="text-align: left">Vector dimensionality</td></tr>
-<tr><td style="text-align: left"><code>distance</code></td><td style="text-align: left"><code>string</code></td><td style="text-align: left"><code>"Cosine"</code></td><td style="text-align: left">Distance metric (see <a href="cli/schema_format.html#distance-metrics">Distance Metrics</a>)</td></tr>
+<tr><td style="text-align: left"><code>distance</code></td><td style="text-align: left"><code>string</code></td><td style="text-align: left"><code>"Cosine"</code></td><td style="text-align: left">Distance metric (see <a href="laurus-cli/schema_format.html#distance-metrics">Distance Metrics</a>)</td></tr>
 <tr><td style="text-align: left"><code>base_weight</code></td><td style="text-align: left"><code>float</code></td><td style="text-align: left"><code>1.0</code></td><td style="text-align: left">Scoring weight in hybrid search fusion</td></tr>
-<tr><td style="text-align: left"><code>quantizer</code></td><td style="text-align: left"><code>object</code></td><td style="text-align: left"><em>none</em></td><td style="text-align: left">Optional quantization method (see <a href="cli/schema_format.html#quantization">Quantization</a>)</td></tr>
+<tr><td style="text-align: left"><code>quantizer</code></td><td style="text-align: left"><code>object</code></td><td style="text-align: left"><em>none</em></td><td style="text-align: left">Optional quantization method (see <a href="laurus-cli/schema_format.html#quantization">Quantization</a>)</td></tr>
 </tbody></table>
 </div>
 <h4 id="ivf"><a class="header" href="#ivf">Ivf</a></h4>
@@ -4907,11 +5022,11 @@ base_weight = 1.0
 </code></pre>
 <div class="table-wrapper"><table><thead><tr><th style="text-align: left">Option</th><th style="text-align: left">Type</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr></thead><tbody>
 <tr><td style="text-align: left"><code>dimension</code></td><td style="text-align: left"><code>integer</code></td><td style="text-align: left"><em>(required)</em></td><td style="text-align: left">Vector dimensionality</td></tr>
-<tr><td style="text-align: left"><code>distance</code></td><td style="text-align: left"><code>string</code></td><td style="text-align: left"><code>"Cosine"</code></td><td style="text-align: left">Distance metric (see <a href="cli/schema_format.html#distance-metrics">Distance Metrics</a>)</td></tr>
+<tr><td style="text-align: left"><code>distance</code></td><td style="text-align: left"><code>string</code></td><td style="text-align: left"><code>"Cosine"</code></td><td style="text-align: left">Distance metric (see <a href="laurus-cli/schema_format.html#distance-metrics">Distance Metrics</a>)</td></tr>
 <tr><td style="text-align: left"><code>n_clusters</code></td><td style="text-align: left"><code>integer</code></td><td style="text-align: left"><code>100</code></td><td style="text-align: left">Number of clusters. More clusters = finer partitioning</td></tr>
 <tr><td style="text-align: left"><code>n_probe</code></td><td style="text-align: left"><code>integer</code></td><td style="text-align: left"><code>1</code></td><td style="text-align: left">Number of clusters to search at query time. Higher = better recall, slower</td></tr>
 <tr><td style="text-align: left"><code>base_weight</code></td><td style="text-align: left"><code>float</code></td><td style="text-align: left"><code>1.0</code></td><td style="text-align: left">Scoring weight in hybrid search fusion</td></tr>
-<tr><td style="text-align: left"><code>quantizer</code></td><td style="text-align: left"><code>object</code></td><td style="text-align: left"><em>none</em></td><td style="text-align: left">Optional quantization method (see <a href="cli/schema_format.html#quantization">Quantization</a>)</td></tr>
+<tr><td style="text-align: left"><code>quantizer</code></td><td style="text-align: left"><code>object</code></td><td style="text-align: left"><em>none</em></td><td style="text-align: left">Optional quantization method (see <a href="laurus-cli/schema_format.html#quantization">Quantization</a>)</td></tr>
 </tbody></table>
 </div>
 <blockquote>
@@ -5061,7 +5176,7 @@ distance = "Cosine"
 <pre><code class="language-bash">laurus create schema
 laurus create schema --output my_schema.toml
 </code></pre>
-<p>See <a href="cli/commands.html#create-schema"><code>create schema</code></a> for details.</p>
+<p>See <a href="laurus-cli/commands.html#create-schema"><code>create schema</code></a> for details.</p>
 <h2 id="using-a-schema"><a class="header" href="#using-a-schema">Using a Schema</a></h2>
 <p>Once you have a schema file, create an index from it:</p>
 <pre><code class="language-bash">laurus create index --schema schema.toml
@@ -5172,10 +5287,10 @@ laurus serve --config config.toml
 </code></pre>
 <h2 id="sections-1"><a class="header" href="#sections-1">Sections</a></h2>
 <ul>
-<li><a href="server/getting_started.html">Getting Started</a> -- Startup options and first steps</li>
-<li><a href="server/configuration.html">Configuration</a> -- TOML configuration, environment variables, and priority</li>
-<li><a href="server/grpc_api.html">gRPC API Reference</a> -- Full API documentation for all services and RPCs</li>
-<li><a href="server/http_gateway.html">HTTP Gateway</a> -- HTTP/JSON endpoint reference</li>
+<li><a href="getting_started.html">Getting Started</a> -- Startup options and first steps</li>
+<li><a href="configuration.html">Configuration</a> -- TOML configuration, environment variables, and priority</li>
+<li><a href="grpc_api.html">gRPC API Reference</a> -- Full API documentation for all services and RPCs</li>
+<li><a href="http_gateway.html">HTTP Gateway</a> -- HTTP/JSON endpoint reference</li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="getting-started-with-the-grpc-server"><a class="header" href="#getting-started-with-the-grpc-server">Getting Started with the gRPC Server</a></h1>
 <h2 id="starting-the-server"><a class="header" href="#starting-the-server">Starting the Server</a></h2>
@@ -5204,11 +5319,11 @@ laurus serve
 <h3 id="startup-behavior"><a class="header" href="#startup-behavior">Startup Behavior</a></h3>
 <p>On startup, the server attempts to open an existing index at the configured data directory. If no index exists, the server starts without one -- you can create an index later via the <code>CreateIndex</code> RPC.</p>
 <h2 id="configuration-1"><a class="header" href="#configuration-1">Configuration</a></h2>
-<p>You can use a TOML configuration file instead of (or in addition to) command-line options. See <a href="server/configuration.html">Configuration</a> for the full reference.</p>
+<p>You can use a TOML configuration file instead of (or in addition to) command-line options. See <a href="laurus-server/configuration.html">Configuration</a> for the full reference.</p>
 <pre><code class="language-bash">laurus serve --config config.toml
 </code></pre>
 <h2 id="http-gateway"><a class="header" href="#http-gateway">HTTP Gateway</a></h2>
-<p>When <code>--http-port</code> is set, an HTTP/JSON gateway starts alongside the gRPC server. See <a href="server/http_gateway.html">HTTP Gateway</a> for the full endpoint reference and examples.</p>
+<p>When <code>--http-port</code> is set, an HTTP/JSON gateway starts alongside the gRPC server. See <a href="laurus-server/http_gateway.html">HTTP Gateway</a> for the full endpoint reference and examples.</p>
 <pre><code class="language-bash">laurus serve --http-port 8080
 </code></pre>
 <h2 id="graceful-shutdown"><a class="header" href="#graceful-shutdown">Graceful Shutdown</a></h2>
@@ -5252,7 +5367,199 @@ grpcurl -plaintext localhost:50051 laurus.v1.DocumentService/Commit
 grpcurl -plaintext -d '{"query": "body:test", "limit": 10}' \
   localhost:50051 laurus.v1.SearchService/Search
 </code></pre>
-<p>See <a href="server/grpc_api.html">gRPC API Reference</a> for the full API documentation.</p>
+<p>See <a href="laurus-server/grpc_api.html">gRPC API Reference</a> for the full API documentation, or try the <a href="laurus-server/tutorial.html">Hands-on Tutorial</a> for a step-by-step walkthrough using the HTTP Gateway.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="hands-on-tutorial-1"><a class="header" href="#hands-on-tutorial-1">Hands-on Tutorial</a></h1>
+<p>This tutorial walks you through a complete workflow with laurus-server: starting the server, creating an index, adding documents, searching, updating, and deleting. All examples use <code>curl</code> via the HTTP Gateway.</p>
+<h2 id="prerequisites-2"><a class="header" href="#prerequisites-2">Prerequisites</a></h2>
+<ul>
+<li>laurus CLI installed (see <a href="laurus-server/../getting_started/installation.html">Installation</a>)</li>
+<li><code>curl</code> available on your system</li>
+</ul>
+<h2 id="step-1-start-the-server"><a class="header" href="#step-1-start-the-server">Step 1: Start the Server</a></h2>
+<p>Start laurus-server with the HTTP Gateway enabled:</p>
+<pre><code class="language-bash">laurus --data-dir ./tutorial_data serve --http-port 8080
+</code></pre>
+<p>You should see log output indicating the gRPC server (port 50051) and the HTTP Gateway (port 8080) have started.</p>
+<p>Verify the server is running:</p>
+<pre><code class="language-bash">curl http://localhost:8080/v1/health
+</code></pre>
+<p>Expected response:</p>
+<pre><code class="language-json">{"status":"SERVING_STATUS_SERVING"}
+</code></pre>
+<h2 id="step-2-create-an-index-1"><a class="header" href="#step-2-create-an-index-1">Step 2: Create an Index</a></h2>
+<p>Create an index with a schema that defines text fields for lexical search:</p>
+<pre><code class="language-bash">curl -X POST http://localhost:8080/v1/index \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "schema": {
+      "fields": {
+        "title": {"text": {"indexed": true, "stored": true, "term_vectors": false}},
+        "body": {"text": {"indexed": true, "stored": true, "term_vectors": false}},
+        "category": {"text": {"indexed": true, "stored": true, "term_vectors": false}}
+      },
+      "default_fields": ["title", "body"]
+    }
+  }'
+</code></pre>
+<p>This creates an index with three text fields. The <code>default_fields</code> setting means that queries without a field prefix will search both <code>title</code> and <code>body</code>.</p>
+<p>Verify the index was created:</p>
+<pre><code class="language-bash">curl http://localhost:8080/v1/index
+</code></pre>
+<p>Expected response:</p>
+<pre><code class="language-json">{"documentCount":"0","vectorFields":{}}
+</code></pre>
+<h2 id="step-3-add-documents-1"><a class="header" href="#step-3-add-documents-1">Step 3: Add Documents</a></h2>
+<p>Add a few documents to the index. Use <code>PUT</code> to upsert documents by ID:</p>
+<pre><code class="language-bash">curl -X PUT http://localhost:8080/v1/documents/doc001 \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "document": {
+      "fields": {
+        "title": "Introduction to Rust Programming",
+        "body": "Rust is a modern systems programming language that focuses on safety, speed, and concurrency.",
+        "category": "programming"
+      }
+    }
+  }'
+</code></pre>
+<pre><code class="language-bash">curl -X PUT http://localhost:8080/v1/documents/doc002 \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "document": {
+      "fields": {
+        "title": "Web Development with Rust",
+        "body": "Building web applications with Rust has become increasingly popular. Frameworks like Actix and Rocket make it easy to create fast and secure web services.",
+        "category": "web-development"
+      }
+    }
+  }'
+</code></pre>
+<pre><code class="language-bash">curl -X PUT http://localhost:8080/v1/documents/doc003 \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "document": {
+      "fields": {
+        "title": "Python for Data Science",
+        "body": "Python is the most popular language for data science and machine learning. Libraries like NumPy and Pandas provide powerful tools for data analysis.",
+        "category": "data-science"
+      }
+    }
+  }'
+</code></pre>
+<h2 id="step-4-commit-changes-1"><a class="header" href="#step-4-commit-changes-1">Step 4: Commit Changes</a></h2>
+<p>Documents are not searchable until committed. Commit the pending changes:</p>
+<pre><code class="language-bash">curl -X POST http://localhost:8080/v1/commit
+</code></pre>
+<h2 id="step-5-search-documents-1"><a class="header" href="#step-5-search-documents-1">Step 5: Search Documents</a></h2>
+<h3 id="basic-search-1"><a class="header" href="#basic-search-1">Basic Search</a></h3>
+<p>Search for documents containing "rust":</p>
+<pre><code class="language-bash">curl -X POST http://localhost:8080/v1/search \
+  -H 'Content-Type: application/json' \
+  -d '{"query": "rust", "limit": 10}'
+</code></pre>
+<p>This searches the default fields (<code>title</code> and <code>body</code>). Expected result: <code>doc001</code> and <code>doc002</code> are returned.</p>
+<h3 id="field-specific-search-1"><a class="header" href="#field-specific-search-1">Field-Specific Search</a></h3>
+<p>Search only in the <code>title</code> field:</p>
+<pre><code class="language-bash">curl -X POST http://localhost:8080/v1/search \
+  -H 'Content-Type: application/json' \
+  -d '{"query": "title:python", "limit": 10}'
+</code></pre>
+<p>Expected result: only <code>doc003</code> is returned.</p>
+<h3 id="search-by-category"><a class="header" href="#search-by-category">Search by Category</a></h3>
+<pre><code class="language-bash">curl -X POST http://localhost:8080/v1/search \
+  -H 'Content-Type: application/json' \
+  -d '{"query": "category:programming", "limit": 10}'
+</code></pre>
+<p>Expected result: only <code>doc001</code> is returned.</p>
+<h3 id="boolean-queries-1"><a class="header" href="#boolean-queries-1">Boolean Queries</a></h3>
+<p>Combine conditions with <code>AND</code>, <code>OR</code>, and <code>NOT</code>:</p>
+<pre><code class="language-bash">curl -X POST http://localhost:8080/v1/search \
+  -H 'Content-Type: application/json' \
+  -d '{"query": "rust AND web", "limit": 10}'
+</code></pre>
+<p>Expected result: only <code>doc002</code> is returned (contains both "rust" and "web").</p>
+<h3 id="field-boosting"><a class="header" href="#field-boosting">Field Boosting</a></h3>
+<p>Boost the <code>title</code> field to prioritize title matches:</p>
+<pre><code class="language-bash">curl -X POST http://localhost:8080/v1/search \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "query": "rust",
+    "limit": 10,
+    "field_boosts": {"title": 2.0}
+  }'
+</code></pre>
+<h2 id="step-6-retrieve-a-document-1"><a class="header" href="#step-6-retrieve-a-document-1">Step 6: Retrieve a Document</a></h2>
+<p>Fetch a specific document by its ID:</p>
+<pre><code class="language-bash">curl http://localhost:8080/v1/documents/doc001
+</code></pre>
+<p>Expected response:</p>
+<pre><code class="language-json">{
+  "documents": [
+    {
+      "fields": {
+        "title": "Introduction to Rust Programming",
+        "body": "Rust is a modern systems programming language that focuses on safety, speed, and concurrency.",
+        "category": "programming"
+      }
+    }
+  ]
+}
+</code></pre>
+<h2 id="step-7-update-a-document"><a class="header" href="#step-7-update-a-document">Step 7: Update a Document</a></h2>
+<p>Update a document by <code>PUT</code>-ing with the same ID. This replaces the entire document:</p>
+<pre><code class="language-bash">curl -X PUT http://localhost:8080/v1/documents/doc001 \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "document": {
+      "fields": {
+        "title": "Introduction to Rust Programming",
+        "body": "Rust is a modern systems programming language that focuses on safety, speed, and concurrency. It provides memory safety without garbage collection.",
+        "category": "programming"
+      }
+    }
+  }'
+</code></pre>
+<p>Commit and verify:</p>
+<pre><code class="language-bash">curl -X POST http://localhost:8080/v1/commit
+curl http://localhost:8080/v1/documents/doc001
+</code></pre>
+<p>The updated body text is now stored.</p>
+<h2 id="step-8-delete-a-document"><a class="header" href="#step-8-delete-a-document">Step 8: Delete a Document</a></h2>
+<p>Delete a document by its ID:</p>
+<pre><code class="language-bash">curl -X DELETE http://localhost:8080/v1/documents/doc003
+</code></pre>
+<p>Commit and verify:</p>
+<pre><code class="language-bash">curl -X POST http://localhost:8080/v1/commit
+</code></pre>
+<p>Confirm the document was deleted:</p>
+<pre><code class="language-bash">curl http://localhost:8080/v1/documents/doc003
+</code></pre>
+<p>Expected response:</p>
+<pre><code class="language-json">{"documents":[]}
+</code></pre>
+<p>Search results will no longer include the deleted document:</p>
+<pre><code class="language-bash">curl -X POST http://localhost:8080/v1/search \
+  -H 'Content-Type: application/json' \
+  -d '{"query": "python", "limit": 10}'
+</code></pre>
+<p>Expected result: no results returned.</p>
+<h2 id="step-9-check-index-statistics"><a class="header" href="#step-9-check-index-statistics">Step 9: Check Index Statistics</a></h2>
+<p>View the current index statistics:</p>
+<pre><code class="language-bash">curl http://localhost:8080/v1/index
+</code></pre>
+<p>The <code>documentCount</code> should reflect the remaining documents after the deletion.</p>
+<h2 id="step-10-clean-up"><a class="header" href="#step-10-clean-up">Step 10: Clean Up</a></h2>
+<p>Stop the server with <code>Ctrl+C</code>. The server performs a graceful shutdown, committing any pending changes before exiting.</p>
+<p>To remove the tutorial data:</p>
+<pre><code class="language-bash">rm -rf ./tutorial_data
+</code></pre>
+<h2 id="next-steps-14"><a class="header" href="#next-steps-14">Next Steps</a></h2>
+<ul>
+<li>Learn about <a href="laurus-server/../concepts/search/hybrid_search.html">vector search and hybrid search</a> for semantic similarity queries</li>
+<li>Explore the <a href="laurus-server/grpc_api.html">gRPC API Reference</a> for the full API specification</li>
+<li>Configure the server for production using <a href="laurus-server/configuration.html">Configuration</a></li>
+<li>Use <code>grpcurl</code> or a gRPC client library for programmatic access — see <a href="laurus-server/getting_started.html">Getting Started</a></li>
+</ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="configuration-2"><a class="header" href="#configuration-2">Configuration</a></h1>
 <p>The laurus-server can be configured through CLI arguments, environment variables, and a TOML configuration file.</p>
 <h2 id="configuration-priority"><a class="header" href="#configuration-priority">Configuration Priority</a></h2>
@@ -5505,7 +5812,7 @@ laurus serve
 </code></pre>
 <h3 id="searchrequest-fields"><a class="header" href="#searchrequest-fields">SearchRequest Fields</a></h3>
 <div class="table-wrapper"><table><thead><tr><th style="text-align: left">Field</th><th style="text-align: left">Type</th><th style="text-align: left">Required</th><th style="text-align: left">Description</th></tr></thead><tbody>
-<tr><td style="text-align: left"><code>query</code></td><td style="text-align: left"><code>string</code></td><td style="text-align: left">No</td><td style="text-align: left">Lexical search query in <a href="server/../concepts/query_dsl.html">Query DSL</a></td></tr>
+<tr><td style="text-align: left"><code>query</code></td><td style="text-align: left"><code>string</code></td><td style="text-align: left">No</td><td style="text-align: left">Lexical search query in <a href="laurus-server/../concepts/query_dsl.html">Query DSL</a></td></tr>
 <tr><td style="text-align: left"><code>query_vectors</code></td><td style="text-align: left"><code>repeated QueryVector</code></td><td style="text-align: left">No</td><td style="text-align: left">Vector search queries</td></tr>
 <tr><td style="text-align: left"><code>limit</code></td><td style="text-align: left"><code>uint32</code></td><td style="text-align: left">No</td><td style="text-align: left">Maximum number of results (default: engine default)</td></tr>
 <tr><td style="text-align: left"><code>offset</code></td><td style="text-align: left"><code>uint32</code></td><td style="text-align: left">No</td><td style="text-align: left">Number of results to skip</td></tr>
@@ -5703,9 +6010,9 @@ laurus serve --config config.toml
 data: {"id":"doc2","score":0.4210,"document":{...}}
 </code></pre>
 <h2 id="requestresponse-format"><a class="header" href="#requestresponse-format">Request/Response Format</a></h2>
-<p>All request and response bodies use JSON. The JSON structure mirrors the gRPC protobuf messages. See <a href="server/grpc_api.html">gRPC API Reference</a> for the full message definitions.</p>
+<p>All request and response bodies use JSON. The JSON structure mirrors the gRPC protobuf messages. See <a href="laurus-server/grpc_api.html">gRPC API Reference</a> for the full message definitions.</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="build--test"><a class="header" href="#build--test">Build &amp; Test</a></h1>
-<h2 id="prerequisites-1"><a class="header" href="#prerequisites-1">Prerequisites</a></h2>
+<h2 id="prerequisites-3"><a class="header" href="#prerequisites-3">Prerequisites</a></h2>
 <ul>
 <li><strong>Rust</strong> 1.85 or later (edition 2024)</li>
 <li><strong>Cargo</strong> (included with Rust)</li>
