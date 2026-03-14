@@ -4,11 +4,13 @@ The laurus-server can be configured through CLI arguments, environment variables
 
 ## Configuration Priority
 
-Settings are resolved in the following order (highest priority first):
+Server and index settings are resolved in the following order (highest priority first):
 
 ```text
 CLI arguments > Environment variables > Config file > Defaults
 ```
+
+Log verbosity is controlled exclusively by the `RUST_LOG` environment variable (default: `info`).
 
 For example:
 
@@ -38,10 +40,9 @@ http_port = 8080  # Optional: enables HTTP Gateway
 
 [index]
 data_dir = "./laurus_data"
-
-[log]
-level = "info"
 ```
+
+Log verbosity is controlled by the `RUST_LOG` environment variable (default: `info`), not through the config file.
 
 ### Field Reference
 
@@ -59,12 +60,6 @@ level = "info"
 | :--- | :--- | :--- | :--- |
 | `data_dir` | String | `"./laurus_data"` | Path to the index data directory |
 
-#### `[log]` Section
-
-| Field | Type | Default | Description |
-| :--- | :--- | :--- | :--- |
-| `level` | String | `"info"` | Log level: `trace`, `debug`, `info`, `warn`, `error` |
-
 ## Environment Variables
 
 | Variable | Maps To | Description |
@@ -73,7 +68,7 @@ level = "info"
 | `LAURUS_PORT` | `server.port` | gRPC listen port |
 | `LAURUS_HTTP_PORT` | `server.http_port` | HTTP Gateway port |
 | `LAURUS_DATA_DIR` | `index.data_dir` | Index data directory |
-| `LAURUS_LOG_LEVEL` | `log.level` | Log level |
+| `RUST_LOG` | -- | Log filter directive (e.g. `info`, `debug`, `laurus=debug,tonic=warn`) |
 | `LAURUS_CONFIG` | -- | Path to TOML config file |
 
 ## CLI Arguments
@@ -84,7 +79,6 @@ level = "info"
 | `--host <HOST>` | `-H` | `0.0.0.0` | Listen address |
 | `--port <PORT>` | `-p` | `50051` | gRPC listen port |
 | `--http-port <PORT>` | -- | -- | HTTP Gateway port |
-| `--log-level <LEVEL>` | `-l` | `info` | Log level |
 | `--data-dir <PATH>` | -- | `./laurus_data` | Index data directory (global option) |
 
 ## Common Configurations
@@ -98,9 +92,10 @@ port = 50051
 
 [index]
 data_dir = "./dev_data"
+```
 
-[log]
-level = "debug"
+```bash
+RUST_LOG=debug laurus serve --config config.toml
 ```
 
 ### Production (gRPC + HTTP Gateway)
@@ -113,9 +108,6 @@ http_port = 8080
 
 [index]
 data_dir = "/var/lib/laurus/data"
-
-[log]
-level = "info"
 ```
 
 ### Minimal (environment variables only)
@@ -124,6 +116,6 @@ level = "info"
 export LAURUS_DATA_DIR=/var/lib/laurus/data
 export LAURUS_PORT=50051
 export LAURUS_HTTP_PORT=8080
-export LAURUS_LOG_LEVEL=info
+export RUST_LOG=info
 laurus serve
 ```

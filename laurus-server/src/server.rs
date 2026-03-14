@@ -44,10 +44,11 @@ use crate::service::{
 /// Returns an error if the address cannot be parsed, the gRPC server fails to
 /// start, or the HTTP gateway listener cannot bind.
 pub async fn run(config: &Config) -> anyhow::Result<()> {
-    // Initialize tracing.
+    // Initialize tracing using the RUST_LOG environment variable.
+    // Falls back to "info" when RUST_LOG is not set.
     tracing_subscriber::fmt()
         .with_env_filter(
-            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(&config.log.level)),
+            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),
         )
         .init();
 
