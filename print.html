@@ -36,7 +36,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-96ca79e7.js";
+            window.path_to_searchindex_js = "searchindex-afcba294.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-8780f555.js"></script>
@@ -6055,18 +6055,19 @@ laurus serve --config config.toml
 <tr><td style="text-align: left"><code>--host &lt;HOST&gt;</code></td><td style="text-align: left"><code>-H</code></td><td style="text-align: left"><code>LAURUS_HOST</code></td><td style="text-align: left"><code>0.0.0.0</code></td><td style="text-align: left">Listen address</td></tr>
 <tr><td style="text-align: left"><code>--port &lt;PORT&gt;</code></td><td style="text-align: left"><code>-p</code></td><td style="text-align: left"><code>LAURUS_PORT</code></td><td style="text-align: left"><code>50051</code></td><td style="text-align: left">Listen port</td></tr>
 <tr><td style="text-align: left"><code>--http-port &lt;PORT&gt;</code></td><td style="text-align: left">–</td><td style="text-align: left"><code>LAURUS_HTTP_PORT</code></td><td style="text-align: left">–</td><td style="text-align: left">HTTP Gateway port (enables HTTP gateway when set)</td></tr>
-<tr><td style="text-align: left"><code>--log-level &lt;LEVEL&gt;</code></td><td style="text-align: left"><code>-l</code></td><td style="text-align: left"><code>LAURUS_LOG_LEVEL</code></td><td style="text-align: left"><code>info</code></td><td style="text-align: left">Log level (<code>trace</code>, <code>debug</code>, <code>info</code>, <code>warn</code>, <code>error</code>)</td></tr>
 </tbody>
 </table>
 </div>
+<p>Log verbosity is controlled by the standard <code>RUST_LOG</code> environment variable (default: <code>info</code>).
+See <a href="https://docs.rs/env_logger/latest/env_logger/#enabling-logging">env_logger syntax</a> for filter directives such as <code>RUST_LOG=laurus=debug,tonic=warn</code>.</p>
 <p>The global <code>--data-dir</code> option (env: <code>LAURUS_DATA_DIR</code>) specifies the index data directory:</p>
 <pre><code class="language-bash"># Using CLI arguments
-laurus --data-dir ./my_index serve --port 8080 --log-level debug
+laurus --data-dir ./my_index serve --port 8080
 
 # Using environment variables
 export LAURUS_DATA_DIR=./my_index
 export LAURUS_PORT=8080
-export LAURUS_LOG_LEVEL=debug
+export RUST_LOG=debug
 laurus serve
 </code></pre>
 <h3 id="startup-behavior"><a class="header" href="#startup-behavior">Startup Behavior</a></h3>
@@ -6318,9 +6319,10 @@ curl http://localhost:8080/v1/documents/doc001
 <h1 id="configuration-2"><a class="header" href="#configuration-2">Configuration</a></h1>
 <p>The laurus-server can be configured through CLI arguments, environment variables, and a TOML configuration file.</p>
 <h2 id="configuration-priority"><a class="header" href="#configuration-priority">Configuration Priority</a></h2>
-<p>Settings are resolved in the following order (highest priority first):</p>
+<p>Server and index settings are resolved in the following order (highest priority first):</p>
 <pre><code class="language-text">CLI arguments &gt; Environment variables &gt; Config file &gt; Defaults
 </code></pre>
+<p>Log verbosity is controlled exclusively by the <code>RUST_LOG</code> environment variable (default: <code>info</code>).</p>
 <p>For example:</p>
 <pre><code class="language-bash"># CLI argument wins over environment variable and config file
 LAURUS_PORT=4567 laurus serve --config config.toml --port 1234
@@ -6343,10 +6345,8 @@ http_port = 8080  # Optional: enables HTTP Gateway
 
 [index]
 data_dir = "./laurus_data"
-
-[log]
-level = "info"
 </code></pre>
+<p>Log verbosity is controlled by the <code>RUST_LOG</code> environment variable (default: <code>info</code>), not through the config file.</p>
 <h3 id="field-reference"><a class="header" href="#field-reference">Field Reference</a></h3>
 <h4 id="server-section"><a class="header" href="#server-section"><code>[server]</code> Section</a></h4>
 <div class="table-wrapper">
@@ -6372,17 +6372,6 @@ level = "info"
 </tbody>
 </table>
 </div>
-<h4 id="log-section"><a class="header" href="#log-section"><code>[log]</code> Section</a></h4>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th style="text-align: left">Field</th><th style="text-align: left">Type</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr>
-</thead>
-<tbody>
-<tr><td style="text-align: left"><code>level</code></td><td style="text-align: left">String</td><td style="text-align: left"><code>"info"</code></td><td style="text-align: left">Log level: <code>trace</code>, <code>debug</code>, <code>info</code>, <code>warn</code>, <code>error</code></td></tr>
-</tbody>
-</table>
-</div>
 <h2 id="environment-variables"><a class="header" href="#environment-variables">Environment Variables</a></h2>
 <div class="table-wrapper">
 <table>
@@ -6394,7 +6383,7 @@ level = "info"
 <tr><td style="text-align: left"><code>LAURUS_PORT</code></td><td style="text-align: left"><code>server.port</code></td><td style="text-align: left">gRPC listen port</td></tr>
 <tr><td style="text-align: left"><code>LAURUS_HTTP_PORT</code></td><td style="text-align: left"><code>server.http_port</code></td><td style="text-align: left">HTTP Gateway port</td></tr>
 <tr><td style="text-align: left"><code>LAURUS_DATA_DIR</code></td><td style="text-align: left"><code>index.data_dir</code></td><td style="text-align: left">Index data directory</td></tr>
-<tr><td style="text-align: left"><code>LAURUS_LOG_LEVEL</code></td><td style="text-align: left"><code>log.level</code></td><td style="text-align: left">Log level</td></tr>
+<tr><td style="text-align: left"><code>RUST_LOG</code></td><td style="text-align: left">–</td><td style="text-align: left">Log filter directive (e.g. <code>info</code>, <code>debug</code>, <code>laurus=debug,tonic=warn</code>)</td></tr>
 <tr><td style="text-align: left"><code>LAURUS_CONFIG</code></td><td style="text-align: left">–</td><td style="text-align: left">Path to TOML config file</td></tr>
 </tbody>
 </table>
@@ -6410,7 +6399,6 @@ level = "info"
 <tr><td style="text-align: left"><code>--host &lt;HOST&gt;</code></td><td style="text-align: left"><code>-H</code></td><td style="text-align: left"><code>0.0.0.0</code></td><td style="text-align: left">Listen address</td></tr>
 <tr><td style="text-align: left"><code>--port &lt;PORT&gt;</code></td><td style="text-align: left"><code>-p</code></td><td style="text-align: left"><code>50051</code></td><td style="text-align: left">gRPC listen port</td></tr>
 <tr><td style="text-align: left"><code>--http-port &lt;PORT&gt;</code></td><td style="text-align: left">–</td><td style="text-align: left">–</td><td style="text-align: left">HTTP Gateway port</td></tr>
-<tr><td style="text-align: left"><code>--log-level &lt;LEVEL&gt;</code></td><td style="text-align: left"><code>-l</code></td><td style="text-align: left"><code>info</code></td><td style="text-align: left">Log level</td></tr>
 <tr><td style="text-align: left"><code>--data-dir &lt;PATH&gt;</code></td><td style="text-align: left">–</td><td style="text-align: left"><code>./laurus_data</code></td><td style="text-align: left">Index data directory (global option)</td></tr>
 </tbody>
 </table>
@@ -6423,9 +6411,8 @@ port = 50051
 
 [index]
 data_dir = "./dev_data"
-
-[log]
-level = "debug"
+</code></pre>
+<pre><code class="language-bash">RUST_LOG=debug laurus serve --config config.toml
 </code></pre>
 <h3 id="production-grpc--http-gateway"><a class="header" href="#production-grpc--http-gateway">Production (gRPC + HTTP Gateway)</a></h3>
 <pre><code class="language-toml">[server]
@@ -6435,15 +6422,12 @@ http_port = 8080
 
 [index]
 data_dir = "/var/lib/laurus/data"
-
-[log]
-level = "info"
 </code></pre>
 <h3 id="minimal-environment-variables-only"><a class="header" href="#minimal-environment-variables-only">Minimal (environment variables only)</a></h3>
 <pre><code class="language-bash">export LAURUS_DATA_DIR=/var/lib/laurus/data
 export LAURUS_PORT=50051
 export LAURUS_HTTP_PORT=8080
-export LAURUS_LOG_LEVEL=info
+export RUST_LOG=info
 laurus serve
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div>
