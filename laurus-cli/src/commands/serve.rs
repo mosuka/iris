@@ -20,7 +20,7 @@ use crate::cli::ServeCommand;
 /// # Arguments
 ///
 /// * `cmd` - Parsed [`ServeCommand`] containing optional config path, host,
-///   port, HTTP port, and log level.
+///   port, and HTTP port.
 /// * `data_dir` - Path to the data directory holding the index.
 ///
 /// # Returns
@@ -48,9 +48,6 @@ pub async fn run(cmd: ServeCommand, data_dir: &Path) -> Result<()> {
     }
     if cmd.http_port.is_some() {
         config.server.http_port = cmd.http_port;
-    }
-    if let Some(log_level) = cmd.log_level {
-        config.log.level = log_level;
     }
     config.index.data_dir = data_dir.to_path_buf();
 

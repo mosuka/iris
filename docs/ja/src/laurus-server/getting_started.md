@@ -16,18 +16,20 @@ laurus serve [OPTIONS]
 | `--host <HOST>` | `-H` | `LAURUS_HOST` | `0.0.0.0` | リッスンアドレス |
 | `--port <PORT>` | `-p` | `LAURUS_PORT` | `50051` | リッスンポート |
 | `--http-port <PORT>` | -- | `LAURUS_HTTP_PORT` | -- | HTTP ゲートウェイポート（設定すると HTTP ゲートウェイが有効化） |
-| `--log-level <LEVEL>` | `-l` | `LAURUS_LOG_LEVEL` | `info` | ログレベル（`trace`, `debug`, `info`, `warn`, `error`） |
+
+ログの詳細度は標準の `RUST_LOG` 環境変数で制御します（デフォルト: `info`）。
+`RUST_LOG=laurus=debug,tonic=warn` のようなフィルタディレクティブの詳細は [env_logger の構文](https://docs.rs/env_logger/latest/env_logger/#enabling-logging)を参照してください。
 
 グローバルオプション `--data-dir`（環境変数: `LAURUS_DATA_DIR`）でインデックスデータのディレクトリを指定します。
 
 ```bash
 # CLI 引数を使用
-laurus --data-dir ./my_index serve --port 8080 --log-level debug
+laurus --data-dir ./my_index serve --port 8080
 
 # 環境変数を使用
 export LAURUS_DATA_DIR=./my_index
 export LAURUS_PORT=8080
-export LAURUS_LOG_LEVEL=debug
+export RUST_LOG=debug
 laurus serve
 ```
 

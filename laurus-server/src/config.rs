@@ -16,9 +16,6 @@ pub struct Config {
     /// Index storage settings (e.g. data directory path).
     #[serde(default)]
     pub index: IndexConfig,
-    /// Logging settings (e.g. log level filter).
-    #[serde(default)]
-    pub log: LogConfig,
 }
 
 /// Server network configuration.
@@ -62,23 +59,6 @@ impl Default for IndexConfig {
     }
 }
 
-/// Logging settings.
-#[derive(Debug, Deserialize)]
-pub struct LogConfig {
-    /// Tracing filter directive (e.g. `"info"`, `"debug"`, `"laurus_server=trace"`).
-    /// Defaults to `"info"`.
-    #[serde(default = "default_log_level")]
-    pub level: String,
-}
-
-impl Default for LogConfig {
-    fn default() -> Self {
-        Self {
-            level: default_log_level(),
-        }
-    }
-}
-
 fn default_host() -> String {
     "0.0.0.0".to_string()
 }
@@ -89,10 +69,6 @@ fn default_port() -> u16 {
 
 fn default_data_dir() -> PathBuf {
     PathBuf::from("./laurus_data")
-}
-
-fn default_log_level() -> String {
-    "info".to_string()
 }
 
 impl Config {

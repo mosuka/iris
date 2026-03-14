@@ -16,18 +16,20 @@ laurus serve [OPTIONS]
 | `--host <HOST>` | `-H` | `LAURUS_HOST` | `0.0.0.0` | Listen address |
 | `--port <PORT>` | `-p` | `LAURUS_PORT` | `50051` | Listen port |
 | `--http-port <PORT>` | -- | `LAURUS_HTTP_PORT` | -- | HTTP Gateway port (enables HTTP gateway when set) |
-| `--log-level <LEVEL>` | `-l` | `LAURUS_LOG_LEVEL` | `info` | Log level (`trace`, `debug`, `info`, `warn`, `error`) |
+
+Log verbosity is controlled by the standard `RUST_LOG` environment variable (default: `info`).
+See [env_logger syntax](https://docs.rs/env_logger/latest/env_logger/#enabling-logging) for filter directives such as `RUST_LOG=laurus=debug,tonic=warn`.
 
 The global `--data-dir` option (env: `LAURUS_DATA_DIR`) specifies the index data directory:
 
 ```bash
 # Using CLI arguments
-laurus --data-dir ./my_index serve --port 8080 --log-level debug
+laurus --data-dir ./my_index serve --port 8080
 
 # Using environment variables
 export LAURUS_DATA_DIR=./my_index
 export LAURUS_PORT=8080
-export LAURUS_LOG_LEVEL=debug
+export RUST_LOG=debug
 laurus serve
 ```
 

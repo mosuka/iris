@@ -147,8 +147,9 @@ pub enum DeleteResource {
 /// CLI arguments for the `serve` subcommand.
 ///
 /// Configures the gRPC server (and optional HTTP gateway) including
-/// listen address, ports, log level, and an optional TOML configuration
-/// file. Values can be supplied via CLI flags or environment variables.
+/// listen address, ports, and an optional TOML configuration file.
+/// Values can be supplied via CLI flags or environment variables.
+/// Use the `RUST_LOG` environment variable to control log verbosity.
 #[derive(Parser)]
 pub struct ServeCommand {
     /// Path to the configuration file (TOML).
@@ -166,10 +167,6 @@ pub struct ServeCommand {
     /// HTTP Gateway port. If set, starts an HTTP gateway alongside the gRPC server.
     #[arg(long = "http-port", env = "LAURUS_HTTP_PORT")]
     pub http_port: Option<u16>,
-
-    /// Log level (trace, debug, info, warn, error).
-    #[arg(short = 'l', long = "log-level", env = "LAURUS_LOG_LEVEL")]
-    pub log_level: Option<String>,
 }
 
 // --- Search ---
