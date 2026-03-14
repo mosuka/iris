@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Server Overview - Laurus Documentation</title>
+        <title>Commands - Laurus Documentation</title>
 
 
         <!-- Custom HTML head -->
@@ -35,10 +35,10 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-674b4e1e.js";
+            window.path_to_searchindex_js = "../searchindex-96ca79e7.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-072c2e71.js"></script>
+        <script src="../toc-8780f555.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -177,58 +177,305 @@
 
                 <div id="mdbook-content" class="content">
                     <main>
-                        <h1 id="server-overview"><a class="header" href="#server-overview">Server Overview</a></h1>
-<p>The <code>laurus-server</code> crate provides a gRPC server with an optional HTTP/JSON gateway for the Laurus search engine. It keeps the engine resident in memory, eliminating per-command startup overhead.</p>
-<h2 id="features"><a class="header" href="#features">Features</a></h2>
-<ul>
-<li><strong>Persistent engine</strong> – The index stays open across requests; no WAL replay on every call</li>
-<li><strong>Full gRPC API</strong> – Index management, document CRUD, commit, and search (unary + streaming)</li>
-<li><strong>HTTP Gateway</strong> – Optional HTTP/JSON gateway alongside gRPC for REST-style access</li>
-<li><strong>Health checking</strong> – Standard health check endpoint for load balancers and orchestrators</li>
-<li><strong>Graceful shutdown</strong> – Pending changes are committed automatically on Ctrl+C / SIGINT</li>
-<li><strong>TOML configuration</strong> – Optional config file with CLI and environment variable overrides</li>
-</ul>
-<h2 id="architecture"><a class="header" href="#architecture">Architecture</a></h2>
-<pre><code class="language-mermaid">graph LR
-    subgraph "laurus-server"
-        GW["HTTP Gateway\n(axum)"]
-        GRPC["gRPC Server\n(tonic)"]
-        ENG["Engine\n(Arc&amp;lt;RwLock&amp;gt;)"]
-    end
-
-    Client1["HTTP Client"] --&gt; GW
-    Client2["gRPC Client"] --&gt; GRPC
-    GW --&gt; GRPC
-    GRPC --&gt; ENG
+                        <h1 id="command-reference"><a class="header" href="#command-reference">Command Reference</a></h1>
+<h2 id="global-options"><a class="header" href="#global-options">Global Options</a></h2>
+<p>Every command accepts these options:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Option</th><th style="text-align: left">Environment Variable</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>--data-dir &lt;PATH&gt;</code></td><td style="text-align: left"><code>LAURUS_DATA_DIR</code></td><td style="text-align: left"><code>./laurus_data</code></td><td style="text-align: left">Path to the index data directory</td></tr>
+<tr><td style="text-align: left"><code>--format &lt;FORMAT&gt;</code></td><td style="text-align: left">—</td><td style="text-align: left"><code>table</code></td><td style="text-align: left">Output format: <code>table</code> or <code>json</code></td></tr>
+</tbody>
+</table>
+</div>
+<pre><code class="language-bash"># Example: use JSON output with a custom data directory
+laurus --data-dir /var/data/my_index --format json search "title:rust"
 </code></pre>
-<p>The gRPC server always runs. The HTTP Gateway is optional and proxies HTTP/JSON requests to the gRPC server internally.</p>
-<h2 id="quick-start"><a class="header" href="#quick-start">Quick Start</a></h2>
-<pre><code class="language-bash"># Start with default settings (gRPC on port 50051)
-laurus serve
-
-# Start with HTTP Gateway
-laurus serve --http-port 8080
-
-# Start with a configuration file
-laurus serve --config config.toml
+<hr>
+<h2 id="create--create-a-resource"><a class="header" href="#create--create-a-resource"><code>create</code> — Create a Resource</a></h2>
+<h3 id="create-index"><a class="header" href="#create-index"><code>create index</code></a></h3>
+<p>Create a new index from a schema TOML file.</p>
+<pre><code class="language-bash">laurus create index --schema &lt;FILE&gt;
 </code></pre>
-<h2 id="sections"><a class="header" href="#sections">Sections</a></h2>
+<p><strong>Arguments:</strong></p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Flag</th><th style="text-align: left">Required</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>--schema &lt;FILE&gt;</code></td><td style="text-align: left">Yes</td><td style="text-align: left">Path to a TOML file defining the index schema</td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>Schema file format:</strong></p>
+<p>The schema file follows the same structure as the <code>Schema</code> type in the Laurus library. See <a href="schema_format.html">Schema Format Reference</a> for full details. Example:</p>
+<pre><code class="language-toml">default_fields = ["title", "body"]
+
+[fields.title.Text]
+stored = true
+indexed = true
+
+[fields.body.Text]
+stored = true
+indexed = true
+
+[fields.category.Text]
+stored = true
+indexed = true
+</code></pre>
+<p><strong>Example:</strong></p>
+<pre><code class="language-bash">laurus --data-dir ./my_index create index --schema schema.toml
+# Index created at ./my_index.
+</code></pre>
+<blockquote>
+<p><strong>Note:</strong> An error is returned if the index already exists. Delete the data directory to recreate.</p>
+</blockquote>
+<h3 id="create-schema"><a class="header" href="#create-schema"><code>create schema</code></a></h3>
+<p>Interactively generate a schema TOML file through a guided wizard.</p>
+<pre><code class="language-bash">laurus create schema [--output &lt;FILE&gt;]
+</code></pre>
+<p><strong>Arguments:</strong></p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Flag</th><th style="text-align: left">Required</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>--output &lt;FILE&gt;</code></td><td style="text-align: left">No</td><td style="text-align: left"><code>schema.toml</code></td><td style="text-align: left">Output file path for the generated schema</td></tr>
+</tbody>
+</table>
+</div>
+<p>The wizard guides you through:</p>
+<ol>
+<li><strong>Field definition</strong> — Enter a field name, select the type, and configure type-specific options</li>
+<li><strong>Repeat</strong> — Add as many fields as needed</li>
+<li><strong>Default fields</strong> — Select which lexical fields to use as default search fields</li>
+<li><strong>Preview</strong> — Review the generated TOML before saving</li>
+<li><strong>Save</strong> — Write the schema file</li>
+</ol>
+<p><strong>Supported field types:</strong></p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Type</th><th style="text-align: left">Category</th><th style="text-align: left">Options</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>Text</code></td><td style="text-align: left">Lexical</td><td style="text-align: left"><code>indexed</code>, <code>stored</code>, <code>term_vectors</code></td></tr>
+<tr><td style="text-align: left"><code>Integer</code></td><td style="text-align: left">Lexical</td><td style="text-align: left"><code>indexed</code>, <code>stored</code></td></tr>
+<tr><td style="text-align: left"><code>Float</code></td><td style="text-align: left">Lexical</td><td style="text-align: left"><code>indexed</code>, <code>stored</code></td></tr>
+<tr><td style="text-align: left"><code>Boolean</code></td><td style="text-align: left">Lexical</td><td style="text-align: left"><code>indexed</code>, <code>stored</code></td></tr>
+<tr><td style="text-align: left"><code>DateTime</code></td><td style="text-align: left">Lexical</td><td style="text-align: left"><code>indexed</code>, <code>stored</code></td></tr>
+<tr><td style="text-align: left"><code>Geo</code></td><td style="text-align: left">Lexical</td><td style="text-align: left"><code>indexed</code>, <code>stored</code></td></tr>
+<tr><td style="text-align: left"><code>Bytes</code></td><td style="text-align: left">Lexical</td><td style="text-align: left"><code>stored</code></td></tr>
+<tr><td style="text-align: left"><code>Hnsw</code></td><td style="text-align: left">Vector</td><td style="text-align: left"><code>dimension</code>, <code>distance</code>, <code>m</code>, <code>ef_construction</code></td></tr>
+<tr><td style="text-align: left"><code>Flat</code></td><td style="text-align: left">Vector</td><td style="text-align: left"><code>dimension</code>, <code>distance</code></td></tr>
+<tr><td style="text-align: left"><code>Ivf</code></td><td style="text-align: left">Vector</td><td style="text-align: left"><code>dimension</code>, <code>distance</code>, <code>n_clusters</code>, <code>n_probe</code></td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>Example:</strong></p>
+<pre><code class="language-bash"># Generate schema.toml interactively
+laurus create schema
+
+# Specify output path
+laurus create schema --output my_schema.toml
+
+# Then create an index from the generated schema
+laurus create index --schema schema.toml
+</code></pre>
+<hr>
+<h2 id="get--get-a-resource"><a class="header" href="#get--get-a-resource"><code>get</code> — Get a Resource</a></h2>
+<h3 id="get-index"><a class="header" href="#get-index"><code>get index</code></a></h3>
+<p>Display statistics about the index.</p>
+<pre><code class="language-bash">laurus get index
+</code></pre>
+<p><strong>Table output example:</strong></p>
+<pre><code class="language-text">Document count: 42
+
+Vector fields:
+╭──────────┬─────────┬───────────╮
+│ Field    │ Vectors │ Dimension │
+├──────────┼─────────┼───────────┤
+│ text_vec │ 42      │ 384       │
+╰──────────┴─────────┴───────────╯
+</code></pre>
+<p><strong>JSON output example:</strong></p>
+<pre><code class="language-bash">laurus --format json get index
+</code></pre>
+<pre><code class="language-json">{
+  "document_count": 42,
+  "fields": {
+    "text_vec": {
+      "vector_count": 42,
+      "dimension": 384
+    }
+  }
+}
+</code></pre>
+<h3 id="get-doc"><a class="header" href="#get-doc"><code>get doc</code></a></h3>
+<p>Retrieve a document (and all its chunks) by external ID.</p>
+<pre><code class="language-bash">laurus get doc --id &lt;ID&gt;
+</code></pre>
+<p><strong>Table output example:</strong></p>
+<pre><code class="language-text">╭──────┬─────────────────────────────────────────╮
+│ ID   │ Fields                                  │
+├──────┼─────────────────────────────────────────┤
+│ doc1 │ body: This is a test, title: Hello World │
+╰──────┴─────────────────────────────────────────╯
+</code></pre>
+<p><strong>JSON output example:</strong></p>
+<pre><code class="language-bash">laurus --format json get doc --id doc1
+</code></pre>
+<pre><code class="language-json">[
+  {
+    "id": "doc1",
+    "document": {
+      "title": "Hello World",
+      "body": "This is a test document."
+    }
+  }
+]
+</code></pre>
+<hr>
+<h2 id="add--add-a-resource"><a class="header" href="#add--add-a-resource"><code>add</code> — Add a Resource</a></h2>
+<h3 id="add-doc"><a class="header" href="#add-doc"><code>add doc</code></a></h3>
+<p>Add a document to the index. Documents are not searchable until <code>commit</code> is called.</p>
+<pre><code class="language-bash">laurus add doc --id &lt;ID&gt; --data &lt;JSON&gt;
+</code></pre>
+<p><strong>Arguments:</strong></p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Flag</th><th style="text-align: left">Required</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>--id &lt;ID&gt;</code></td><td style="text-align: left">Yes</td><td style="text-align: left">External document ID (string)</td></tr>
+<tr><td style="text-align: left"><code>--data &lt;JSON&gt;</code></td><td style="text-align: left">Yes</td><td style="text-align: left">Document fields as a JSON string</td></tr>
+</tbody>
+</table>
+</div>
+<p>The JSON format is a flat object mapping field names to values:</p>
+<pre><code class="language-json">{
+  "title": "Introduction to Rust",
+  "body": "Rust is a systems programming language.",
+  "category": "programming"
+}
+</code></pre>
+<p><strong>Example:</strong></p>
+<pre><code class="language-bash">laurus add doc --id doc1 --data '{"title":"Hello World","body":"This is a test document."}'
+# Document 'doc1' added. Run 'commit' to persist changes.
+</code></pre>
+<blockquote>
+<p><strong>Tip:</strong> Multiple documents can share the same external ID (chunking pattern). Use <code>add doc</code> for each chunk.</p>
+</blockquote>
+<hr>
+<h2 id="delete--delete-a-resource"><a class="header" href="#delete--delete-a-resource"><code>delete</code> — Delete a Resource</a></h2>
+<h3 id="delete-doc"><a class="header" href="#delete-doc"><code>delete doc</code></a></h3>
+<p>Delete a document (and all its chunks) by external ID.</p>
+<pre><code class="language-bash">laurus delete doc --id &lt;ID&gt;
+</code></pre>
+<p><strong>Example:</strong></p>
+<pre><code class="language-bash">laurus delete doc --id doc1
+# Document 'doc1' deleted. Run 'commit' to persist changes.
+</code></pre>
+<hr>
+<h2 id="commit"><a class="header" href="#commit"><code>commit</code></a></h2>
+<p>Commit pending changes (additions and deletions) to the index. Until committed, changes are not visible to search.</p>
+<pre><code class="language-bash">laurus commit
+</code></pre>
+<p><strong>Example:</strong></p>
+<pre><code class="language-bash">laurus --data-dir ./my_index commit
+# Changes committed successfully.
+</code></pre>
+<hr>
+<h2 id="search"><a class="header" href="#search"><code>search</code></a></h2>
+<p>Execute a search query using the <a href="../concepts/query_dsl.html">Query DSL</a>.</p>
+<pre><code class="language-bash">laurus search &lt;QUERY&gt; [--limit &lt;N&gt;] [--offset &lt;N&gt;]
+</code></pre>
+<p><strong>Arguments:</strong></p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Argument / Flag</th><th style="text-align: left">Required</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>&lt;QUERY&gt;</code></td><td style="text-align: left">Yes</td><td style="text-align: left">—</td><td style="text-align: left">Query string in Laurus Query DSL</td></tr>
+<tr><td style="text-align: left"><code>--limit &lt;N&gt;</code></td><td style="text-align: left">No</td><td style="text-align: left"><code>10</code></td><td style="text-align: left">Maximum number of results</td></tr>
+<tr><td style="text-align: left"><code>--offset &lt;N&gt;</code></td><td style="text-align: left">No</td><td style="text-align: left"><code>0</code></td><td style="text-align: left">Number of results to skip</td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>Query syntax examples:</strong></p>
+<pre><code class="language-bash"># Term query
+laurus search "body:rust"
+
+# Phrase query
+laurus search 'body:"machine learning"'
+
+# Boolean query
+laurus search "+body:programming -body:python"
+
+# Fuzzy query (typo tolerance)
+laurus search "body:programing~2"
+
+# Wildcard query
+laurus search "title:intro*"
+
+# Range query
+laurus search "price:[10 TO 50]"
+</code></pre>
+<p><strong>Table output example:</strong></p>
+<pre><code class="language-text">╭──────┬────────┬─────────────────────────────────────────╮
+│ ID   │ Score  │ Fields                                  │
+├──────┼────────┼─────────────────────────────────────────┤
+│ doc1 │ 0.8532 │ body: Rust is a systems..., title: Intr │
+│ doc3 │ 0.4210 │ body: JavaScript powers..., title: Web  │
+╰──────┴────────┴─────────────────────────────────────────╯
+</code></pre>
+<p><strong>JSON output example:</strong></p>
+<pre><code class="language-bash">laurus --format json search "body:rust" --limit 5
+</code></pre>
+<pre><code class="language-json">[
+  {
+    "id": "doc1",
+    "score": 0.8532,
+    "document": {
+      "title": "Introduction to Rust",
+      "body": "Rust is a systems programming language."
+    }
+  }
+]
+</code></pre>
+<hr>
+<h2 id="repl"><a class="header" href="#repl"><code>repl</code></a></h2>
+<p>Start an interactive REPL session. See <a href="repl.html">REPL</a> for details.</p>
+<pre><code class="language-bash">laurus repl
+</code></pre>
+<hr>
+<h2 id="serve"><a class="header" href="#serve"><code>serve</code></a></h2>
+<p>Start the gRPC server (and optionally the HTTP Gateway).</p>
+<pre><code class="language-bash">laurus serve [OPTIONS]
+</code></pre>
+<p>For startup options, configuration, and usage examples, see the <a href="../laurus-server.html">laurus-server documentation</a>:</p>
 <ul>
-<li><a href="getting_started.html">Getting Started</a> – Startup options and first steps</li>
-<li><a href="configuration.html">Configuration</a> – TOML configuration, environment variables, and priority</li>
-<li><a href="grpc_api.html">gRPC API Reference</a> – Full API documentation for all services and RPCs</li>
-<li><a href="http_gateway.html">HTTP Gateway</a> – HTTP/JSON endpoint reference</li>
+<li><a href="../laurus-server/getting_started.html">Getting Started</a> — startup options and gRPC connection examples</li>
+<li><a href="../laurus-server/configuration.html">Configuration</a> — TOML config file, environment variables, and priority rules</li>
+<li><a href="../laurus-server/tutorial.html">Hands-on Tutorial</a> — step-by-step walkthrough</li>
 </ul>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="../cli/repl.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../laurus-cli/tutorial.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
-                            <a rel="next prefetch" href="../server/getting_started.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="../laurus-cli/schema_format.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                             </a>
 
@@ -238,11 +485,11 @@ laurus serve --config config.toml
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="../cli/repl.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="../laurus-cli/tutorial.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 
-                    <a rel="next prefetch" href="../server/getting_started.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="../laurus-cli/schema_format.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                     </a>
             </nav>

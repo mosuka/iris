@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Quick Start - Laurus Documentation</title>
+        <title>REPL - Laurus Documentation</title>
 
 
         <!-- Custom HTML head -->
@@ -177,199 +177,83 @@
 
                 <div id="mdbook-content" class="content">
                     <main>
-                        <h1 id="quick-start"><a class="header" href="#quick-start">Quick Start</a></h1>
-<p>This tutorial walks you through building a complete search engine in 5 steps. By the end, you will be able to index documents and search them by keyword.</p>
-<h2 id="step-1--create-storage"><a class="header" href="#step-1--create-storage">Step 1 — Create Storage</a></h2>
-<p>Storage determines where Laurus persists index data. For development and testing, use <code>MemoryStorage</code>:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use std::sync::Arc;
-use laurus::storage::memory::MemoryStorage;
-use laurus::Storage;
-
-let storage: Arc&lt;dyn Storage&gt; = Arc::new(
-    MemoryStorage::new(Default::default())
-);
-<span class="boring">}</span></code></pre>
-<blockquote>
-<p><strong>Tip:</strong> For production, consider <code>FileStorage</code> (with optional <code>use_mmap</code> for memory-mapped I/O). See <a href="../concepts/storage.html">Storage</a> for details.</p>
-</blockquote>
-<h2 id="step-2--define-a-schema"><a class="header" href="#step-2--define-a-schema">Step 2 — Define a Schema</a></h2>
-<p>A <code>Schema</code> declares the fields in your documents and how each field should be indexed:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use laurus::Schema;
-use laurus::lexical::TextOption;
-
-let schema = Schema::builder()
-    .add_text_field("title", TextOption::default())
-    .add_text_field("body", TextOption::default())
-    .add_default_field("body")  // used when no field is specified in a query
-    .build();
-<span class="boring">}</span></code></pre>
-<p>Each field has a type. Common types include:</p>
+                        <h1 id="repl-interactive-mode"><a class="header" href="#repl-interactive-mode">REPL (Interactive Mode)</a></h1>
+<p>The REPL provides an interactive session for exploring your index without typing the full <code>laurus</code> command each time.</p>
+<h2 id="starting-the-repl"><a class="header" href="#starting-the-repl">Starting the REPL</a></h2>
+<pre><code class="language-bash">laurus --data-dir ./my_index repl
+</code></pre>
+<pre><code class="language-text">Laurus REPL (type 'help' for commands, 'quit' to exit)
+laurus&gt;
+</code></pre>
+<p>The REPL opens the index at startup and keeps it loaded throughout the session.</p>
+<h2 id="available-commands"><a class="header" href="#available-commands">Available Commands</a></h2>
 <div class="table-wrapper">
 <table>
 <thead>
-<tr><th style="text-align: left">Method</th><th style="text-align: left">Field Type</th><th style="text-align: left">Example Values</th></tr>
+<tr><th style="text-align: left">Command</th><th style="text-align: left">Description</th></tr>
 </thead>
 <tbody>
-<tr><td style="text-align: left"><code>add_text_field</code></td><td style="text-align: left">Text (full-text searchable)</td><td style="text-align: left"><code>"Hello world"</code></td></tr>
-<tr><td style="text-align: left"><code>add_integer_field</code></td><td style="text-align: left">64-bit integer</td><td style="text-align: left"><code>42</code></td></tr>
-<tr><td style="text-align: left"><code>add_float_field</code></td><td style="text-align: left">64-bit float</td><td style="text-align: left"><code>3.14</code></td></tr>
-<tr><td style="text-align: left"><code>add_boolean_field</code></td><td style="text-align: left">Boolean</td><td style="text-align: left"><code>true</code> / <code>false</code></td></tr>
-<tr><td style="text-align: left"><code>add_datetime_field</code></td><td style="text-align: left">UTC datetime</td><td style="text-align: left"><code>2024-01-15T10:30:00Z</code></td></tr>
-<tr><td style="text-align: left"><code>add_hnsw_field</code></td><td style="text-align: left">Vector (HNSW index)</td><td style="text-align: left"><code>[0.1, 0.2, ...]</code></td></tr>
-<tr><td style="text-align: left"><code>add_flat_field</code></td><td style="text-align: left">Vector (Flat index)</td><td style="text-align: left"><code>[0.1, 0.2, ...]</code></td></tr>
+<tr><td style="text-align: left"><code>search &lt;query&gt;</code></td><td style="text-align: left">Search the index (returns up to 10 results)</td></tr>
+<tr><td style="text-align: left"><code>doc add &lt;id&gt; &lt;json&gt;</code></td><td style="text-align: left">Add a document</td></tr>
+<tr><td style="text-align: left"><code>doc get &lt;id&gt;</code></td><td style="text-align: left">Get a document by ID</td></tr>
+<tr><td style="text-align: left"><code>doc delete &lt;id&gt;</code></td><td style="text-align: left">Delete a document by ID</td></tr>
+<tr><td style="text-align: left"><code>commit</code></td><td style="text-align: left">Commit pending changes</td></tr>
+<tr><td style="text-align: left"><code>stats</code></td><td style="text-align: left">Show index statistics</td></tr>
+<tr><td style="text-align: left"><code>help</code></td><td style="text-align: left">Show available commands</td></tr>
+<tr><td style="text-align: left"><code>quit</code> / <code>exit</code></td><td style="text-align: left">Exit the REPL</td></tr>
 </tbody>
 </table>
 </div>
-<blockquote>
-<p>See <a href="../concepts/schema_and_fields.html">Schema &amp; Fields</a> for the full list.</p>
-</blockquote>
-<h2 id="step-3--build-an-engine"><a class="header" href="#step-3--build-an-engine">Step 3 — Build an Engine</a></h2>
-<p>The <code>Engine</code> ties storage, schema, and runtime components together:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use laurus::Engine;
-
-let engine = Engine::builder(storage, schema)
-    .build()
-    .await?;
-<span class="boring">}</span></code></pre>
-<p>When you only use text fields, the default <code>StandardAnalyzer</code> is used automatically. To customize analysis or add vector embeddings, see <a href="../architecture.html">Architecture</a>.</p>
-<h2 id="step-4--index-documents"><a class="header" href="#step-4--index-documents">Step 4 — Index Documents</a></h2>
-<p>Create documents with the <code>DocumentBuilder</code> and add them to the engine:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use laurus::Document;
-
-// Each document needs a unique external ID (string)
-let doc = Document::builder()
-    .add_text("title", "Introduction to Rust")
-    .add_text("body", "Rust is a systems programming language focused on safety and performance.")
-    .build();
-engine.add_document("doc-1", doc).await?;
-
-let doc = Document::builder()
-    .add_text("title", "Python for Data Science")
-    .add_text("body", "Python is widely used in machine learning and data analysis.")
-    .build();
-engine.add_document("doc-2", doc).await?;
-
-let doc = Document::builder()
-    .add_text("title", "Web Development with JavaScript")
-    .add_text("body", "JavaScript powers interactive web applications and server-side code with Node.js.")
-    .build();
-engine.add_document("doc-3", doc).await?;
-
-// Commit to make documents searchable
-engine.commit().await?;
-<span class="boring">}</span></code></pre>
-<blockquote>
-<p><strong>Important:</strong> Documents are not searchable until <code>commit()</code> is called.</p>
-</blockquote>
-<h2 id="step-5--search"><a class="header" href="#step-5--search">Step 5 — Search</a></h2>
-<p>Use <code>SearchRequestBuilder</code> with a query to search the index:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use laurus::{SearchRequestBuilder, LexicalSearchRequest};
-use laurus::lexical::TermQuery;
-
-// Search for "rust" in the "body" field
-let request = SearchRequestBuilder::new()
-    .lexical_search_request(
-        LexicalSearchRequest::new(
-            Box::new(TermQuery::new("body", "rust"))
-        )
-    )
-    .limit(10)
-    .build();
-
-let results = engine.search(request).await?;
-
-for result in &amp;results {
-    println!("ID: {}, Score: {:.4}", result.id, result.score);
-    if let Some(doc) = &amp;result.document {
-        if let Some(title) = doc.get("title") {
-            println!("  Title: {:?}", title);
-        }
-    }
-}
-<span class="boring">}</span></code></pre>
-<h2 id="complete-example"><a class="header" href="#complete-example">Complete Example</a></h2>
-<p>Here is the full program that you can copy, paste, and run:</p>
-<pre class="playground"><code class="language-rust">use std::sync::Arc;
-use laurus::{
-    Document, Engine, LexicalSearchRequest,
-    Result, Schema, SearchRequestBuilder,
-};
-use laurus::lexical::{TextOption, TermQuery};
-use laurus::storage::memory::MemoryStorage;
-
-#[tokio::main]
-async fn main() -&gt; Result&lt;()&gt; {
-    // 1. Storage
-    let storage = Arc::new(MemoryStorage::new(Default::default()));
-
-    // 2. Schema
-    let schema = Schema::builder()
-        .add_text_field("title", TextOption::default())
-        .add_text_field("body", TextOption::default())
-        .add_default_field("body")
-        .build();
-
-    // 3. Engine
-    let engine = Engine::builder(storage, schema).build().await?;
-
-    // 4. Index documents
-    for (id, title, body) in [
-        ("doc-1", "Introduction to Rust", "Rust is a systems programming language focused on safety."),
-        ("doc-2", "Python for Data Science", "Python is widely used in machine learning."),
-        ("doc-3", "Web Development", "JavaScript powers interactive web applications."),
-    ] {
-        let doc = Document::builder()
-            .add_text("title", title)
-            .add_text("body", body)
-            .build();
-        engine.add_document(id, doc).await?;
-    }
-    engine.commit().await?;
-
-    // 5. Search
-    let request = SearchRequestBuilder::new()
-        .lexical_search_request(
-            LexicalSearchRequest::new(
-                Box::new(TermQuery::new("body", "rust"))
-            )
-        )
-        .limit(10)
-        .build();
-
-    let results = engine.search(request).await?;
-    for r in &amp;results {
-        println!("{}: score={:.4}", r.id, r.score);
-    }
-
-    Ok(())
-}</code></pre>
-<h2 id="next-steps"><a class="header" href="#next-steps">Next Steps</a></h2>
+<p>The search command always returns up to 10 results. The limit is not currently configurable in the REPL.</p>
+<h2 id="usage-examples"><a class="header" href="#usage-examples">Usage Examples</a></h2>
+<h3 id="searching"><a class="header" href="#searching">Searching</a></h3>
+<pre><code class="language-text">laurus&gt; search body:rust
+╭──────┬────────┬────────────────────────────────────╮
+│ ID   │ Score  │ Fields                             │
+├──────┼────────┼────────────────────────────────────┤
+│ doc1 │ 0.8532 │ body: Rust is a systems..., title… │
+╰──────┴────────┴────────────────────────────────────╯
+</code></pre>
+<h3 id="adding-and-committing-documents"><a class="header" href="#adding-and-committing-documents">Adding and Committing Documents</a></h3>
+<pre><code class="language-text">laurus&gt; doc add doc4 {"title":"New Document","body":"Some content here."}
+Document 'doc4' added.
+laurus&gt; commit
+Changes committed.
+</code></pre>
+<h3 id="retrieving-documents"><a class="header" href="#retrieving-documents">Retrieving Documents</a></h3>
+<pre><code class="language-text">laurus&gt; doc get doc4
+╭──────┬───────────────────────────────────────────────╮
+│ ID   │ Fields                                        │
+├──────┼───────────────────────────────────────────────┤
+│ doc4 │ body: Some content here., title: New Document │
+╰──────┴───────────────────────────────────────────────╯
+</code></pre>
+<h3 id="deleting-documents"><a class="header" href="#deleting-documents">Deleting Documents</a></h3>
+<pre><code class="language-text">laurus&gt; doc delete doc4
+Document 'doc4' deleted.
+laurus&gt; commit
+Changes committed.
+</code></pre>
+<h3 id="viewing-statistics"><a class="header" href="#viewing-statistics">Viewing Statistics</a></h3>
+<pre><code class="language-text">laurus&gt; stats
+Document count: 3
+</code></pre>
+<h2 id="features"><a class="header" href="#features">Features</a></h2>
 <ul>
-<li>Learn how the Engine works internally: <a href="../architecture.html">Architecture</a></li>
-<li>Understand Schema and field types: <a href="../concepts/schema_and_fields.html">Schema &amp; Fields</a></li>
-<li>Add vector search: <a href="../concepts/search/vector_search.html">Vector Search</a></li>
-<li>Combine lexical + vector: <a href="../concepts/search/hybrid_search.html">Hybrid Search</a></li>
+<li><strong>Line editing</strong> — Arrow keys, Home/End, and standard readline shortcuts</li>
+<li><strong>History</strong> — Use Up/Down arrows to recall previous commands</li>
+<li><strong>Ctrl+C / Ctrl+D</strong> — Exit the REPL gracefully</li>
 </ul>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="../getting_started/installation.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../laurus-cli/schema_format.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
-                            <a rel="next prefetch" href="../getting_started/examples.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="../laurus-server.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                             </a>
 
@@ -379,11 +263,11 @@ async fn main() -&gt; Result&lt;()&gt; {
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="../getting_started/installation.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="../laurus-cli/schema_format.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 
-                    <a rel="next prefetch" href="../getting_started/examples.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="../laurus-server.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                     </a>
             </nav>
