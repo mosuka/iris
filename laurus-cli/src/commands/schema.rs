@@ -89,6 +89,8 @@ pub fn run(output: &Path) -> Result<()> {
     };
 
     let schema = Schema {
+        analyzers: std::collections::HashMap::new(),
+        embedders: std::collections::HashMap::new(),
         fields,
         default_fields,
     };
@@ -159,7 +161,7 @@ fn prompt_field_type_and_options() -> Result<FieldOption> {
     }
 }
 
-/// Prompt for TextOption (indexed, stored, term_vectors).
+/// Prompt for TextOption (indexed, stored, term_vectors, analyzer).
 fn prompt_text_option() -> Result<FieldOption> {
     let indexed = Confirm::new()
         .with_prompt("Indexed?")
@@ -174,10 +176,21 @@ fn prompt_text_option() -> Result<FieldOption> {
         .default(false)
         .interact()?;
 
+    let analyzer_choices = [
+        "standard", "keyword", "english", "japanese", "simple", "noop",
+    ];
+    let analyzer_idx = dialoguer::Select::new()
+        .with_prompt("Analyzer")
+        .items(analyzer_choices)
+        .default(0)
+        .interact()?;
+    let analyzer = Some(analyzer_choices[analyzer_idx].to_string());
+
     Ok(FieldOption::Text(TextOption {
         indexed,
         stored,
         term_vectors,
+        analyzer,
     }))
 }
 
@@ -253,6 +266,7 @@ fn prompt_hnsw_option() -> Result<FieldOption> {
         ef_construction,
         base_weight: 1.0,
         quantizer: None,
+        embedder: None,
     }))
 }
 
@@ -266,6 +280,7 @@ fn prompt_flat_option() -> Result<FieldOption> {
         distance,
         base_weight: 1.0,
         quantizer: None,
+        embedder: None,
     }))
 }
 
@@ -283,6 +298,7 @@ fn prompt_ivf_option() -> Result<FieldOption> {
         n_probe,
         base_weight: 1.0,
         quantizer: None,
+        embedder: None,
     }))
 }
 

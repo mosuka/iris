@@ -107,8 +107,7 @@ impl IvfIndex {
 
     /// Open an existing IVF index from storage.
     pub fn open(storage: Arc<dyn Storage>, name: &str, config: IvfIndexConfig) -> Result<Self> {
-        let metadata_file = format!("{}.json", name);
-        if !storage.file_exists(&metadata_file) {
+        if !storage.file_exists("metadata.json") {
             return Err(LaurusError::index("Index does not exist"));
         }
 
@@ -160,8 +159,7 @@ impl IvfIndex {
             .map_err(|e| LaurusError::index(format!("Failed to serialize metadata: {e}")))?;
         drop(metadata);
 
-        let metadata_file = format!("{}.json", self.name);
-        let mut output = self.storage.create_output(&metadata_file)?;
+        let mut output = self.storage.create_output("metadata.json")?;
         std::io::Write::write_all(&mut output, metadata_json.as_bytes())?;
         output.close()?;
 
@@ -169,9 +167,8 @@ impl IvfIndex {
     }
 
     /// Read metadata from storage.
-    fn read_metadata(storage: &dyn Storage, name: &str) -> Result<IndexMetadata> {
-        let metadata_file = format!("{}.json", name);
-        let input = storage.open_input(&metadata_file)?;
+    fn read_metadata(storage: &dyn Storage, _: &str) -> Result<IndexMetadata> {
+        let input = storage.open_input("metadata.json")?;
         let metadata: IndexMetadata = serde_json::from_reader(input)
             .map_err(|e| LaurusError::index(format!("Failed to deserialize metadata: {e}")))?;
         Ok(metadata)

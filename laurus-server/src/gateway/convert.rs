@@ -186,9 +186,41 @@ pub fn json_to_proto_schema(json: &Value) -> Result<v1::Schema, String> {
         })
         .unwrap_or_default();
 
+    let analyzers = json
+        .get("analyzers")
+        .and_then(|v| v.as_object())
+        .map(|obj| {
+            obj.iter()
+                .map(|(name, def_json)| {
+                    json_to_proto_analyzer_definition(def_json)
+                        .map(|def| (name.clone(), def))
+                        .map_err(|e| format!("analyzer \"{name}\": {e}"))
+                })
+                .collect::<Result<HashMap<_, _>, String>>()
+        })
+        .transpose()?
+        .unwrap_or_default();
+
+    let embedders = json
+        .get("embedders")
+        .and_then(|v| v.as_object())
+        .map(|obj| {
+            obj.iter()
+                .map(|(name, def_json)| {
+                    json_to_proto_embedder_definition(def_json)
+                        .map(|def| (name.clone(), def))
+                        .map_err(|e| format!("embedder \"{name}\": {e}"))
+                })
+                .collect::<Result<HashMap<_, _>, String>>()
+        })
+        .transpose()?
+        .unwrap_or_default();
+
     Ok(v1::Schema {
         fields,
         default_fields,
+        analyzers,
+        embedders,
     })
 }
 
@@ -199,10 +231,27 @@ pub fn proto_schema_to_json(schema: &v1::Schema) -> Value {
         .iter()
         .map(|(k, v)| (k.clone(), proto_field_option_to_json(v)))
         .collect();
-    json!({
+    let mut result = json!({
         "fields": fields,
         "default_fields": schema.default_fields,
-    })
+    });
+    if !schema.analyzers.is_empty() {
+        let analyzers: Map<String, Value> = schema
+            .analyzers
+            .iter()
+            .map(|(k, v)| (k.clone(), proto_analyzer_definition_to_json(v)))
+            .collect();
+        result["analyzers"] = Value::Object(analyzers);
+    }
+    if !schema.embedders.is_empty() {
+        let embedders: Map<String, Value> = schema
+            .embedders
+            .iter()
+            .map(|(k, v)| (k.clone(), proto_embedder_definition_to_json(v)))
+            .collect();
+        result["embedders"] = Value::Object(embedders);
+    }
+    result
 }
 
 // ---------------------------------------------------------------------------
@@ -224,6 +273,11 @@ fn json_to_proto_field_option(json: &Value) -> Result<v1::FieldOption, String> {
                 .get("term_vectors")
                 .and_then(|v| v.as_bool())
                 .unwrap_or(false),
+            analyzer: v
+                .get("analyzer")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string(),
         })
     } else if let Some(v) = obj.get("integer") {
         Opt::Integer(v1::IntegerOption {
@@ -272,13 +326,17 @@ fn json_to_proto_field_option(json: &Value) -> Result<v1::FieldOption, String> {
 fn proto_field_option_to_json(opt: &v1::FieldOption) -> Value {
     use v1::field_option::Option as Opt;
     match &opt.option {
-        Some(Opt::Text(v)) => json!({
-            "text": {
+        Some(Opt::Text(v)) => {
+            let mut text_obj = json!({
                 "indexed": v.indexed,
                 "stored": v.stored,
                 "term_vectors": v.term_vectors,
+            });
+            if !v.analyzer.is_empty() {
+                text_obj["analyzer"] = json!(v.analyzer);
             }
-        }),
+            json!({ "text": text_obj })
+        }
         Some(Opt::Integer(v)) => json!({
             "integer": { "indexed": v.indexed, "stored": v.stored }
         }),
@@ -379,6 +437,11 @@ fn json_to_hnsw_option(json: &Value) -> Result<v1::HnswOption, String> {
             .and_then(|v| v.as_f64())
             .unwrap_or(0.0) as f32,
         quantizer: json.get("quantizer").and_then(json_to_quantizer),
+        embedder: json
+            .get("embedder")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string(),
     })
 }
 
@@ -395,6 +458,11 @@ fn json_to_flat_option(json: &Value) -> Result<v1::FlatOption, String> {
             .and_then(|v| v.as_f64())
             .unwrap_or(0.0) as f32,
         quantizer: json.get("quantizer").and_then(json_to_quantizer),
+        embedder: json
+            .get("embedder")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string(),
     })
 }
 
@@ -413,6 +481,11 @@ fn json_to_ivf_option(json: &Value) -> Result<v1::IvfOption, String> {
             .and_then(|v| v.as_f64())
             .unwrap_or(0.0) as f32,
         quantizer: json.get("quantizer").and_then(json_to_quantizer),
+        embedder: json
+            .get("embedder")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string(),
     })
 }
 
@@ -427,6 +500,9 @@ fn hnsw_option_to_json(opt: &v1::HnswOption) -> Value {
     if let Some(q) = &opt.quantizer {
         obj["quantizer"] = quantizer_to_json(q);
     }
+    if !opt.embedder.is_empty() {
+        obj["embedder"] = json!(opt.embedder);
+    }
     obj
 }
 
@@ -438,6 +514,9 @@ fn flat_option_to_json(opt: &v1::FlatOption) -> Value {
     });
     if let Some(q) = &opt.quantizer {
         obj["quantizer"] = quantizer_to_json(q);
+    }
+    if !opt.embedder.is_empty() {
+        obj["embedder"] = json!(opt.embedder);
     }
     obj
 }
@@ -452,6 +531,9 @@ fn ivf_option_to_json(opt: &v1::IvfOption) -> Value {
     });
     if let Some(q) = &opt.quantizer {
         obj["quantizer"] = quantizer_to_json(q);
+    }
+    if !opt.embedder.is_empty() {
+        obj["embedder"] = json!(opt.embedder);
     }
     obj
 }
@@ -608,6 +690,171 @@ pub fn proto_search_result_to_json(result: &v1::SearchResult) -> Value {
     });
     if let Some(doc) = &result.document {
         obj["document"] = proto_document_to_json(doc);
+    }
+    obj
+}
+
+// ---------------------------------------------------------------------------
+// Analyzer definition conversion
+// ---------------------------------------------------------------------------
+
+fn json_to_proto_analyzer_definition(json: &Value) -> Result<v1::AnalyzerDefinition, String> {
+    let obj = json
+        .as_object()
+        .ok_or_else(|| "analyzer definition must be an object".to_string())?;
+
+    let tokenizer = obj
+        .get("tokenizer")
+        .ok_or("analyzer definition missing 'tokenizer'")?;
+    let tokenizer = json_to_proto_component(tokenizer)?;
+
+    let char_filters = obj
+        .get("char_filters")
+        .and_then(|v| v.as_array())
+        .map(|arr| {
+            arr.iter()
+                .map(json_to_proto_component)
+                .collect::<Result<Vec<_>, _>>()
+        })
+        .transpose()?
+        .unwrap_or_default();
+
+    let token_filters = obj
+        .get("token_filters")
+        .and_then(|v| v.as_array())
+        .map(|arr| {
+            arr.iter()
+                .map(json_to_proto_component)
+                .collect::<Result<Vec<_>, _>>()
+        })
+        .transpose()?
+        .unwrap_or_default();
+
+    Ok(v1::AnalyzerDefinition {
+        char_filters,
+        tokenizer: Some(tokenizer),
+        token_filters,
+    })
+}
+
+fn json_to_proto_component(json: &Value) -> Result<v1::ComponentConfig, String> {
+    let obj = json
+        .as_object()
+        .ok_or_else(|| "component config must be an object".to_string())?;
+    let type_name = obj
+        .get("type")
+        .and_then(|v| v.as_str())
+        .ok_or("component config missing 'type'")?
+        .to_string();
+
+    let mut params = HashMap::new();
+    for (k, v) in obj {
+        if k == "type" {
+            continue;
+        }
+        match v {
+            Value::String(s) => {
+                params.insert(k.clone(), s.clone());
+            }
+            Value::Bool(b) => {
+                params.insert(k.clone(), b.to_string());
+            }
+            Value::Number(n) => {
+                params.insert(k.clone(), n.to_string());
+            }
+            Value::Array(arr) => {
+                // Encode arrays as comma-separated strings.
+                let items: Vec<String> = arr
+                    .iter()
+                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                    .collect();
+                params.insert(k.clone(), items.join(","));
+            }
+            Value::Object(map) => {
+                // Encode nested objects as key=value entries with prefixed keys.
+                for (mk, mv) in map {
+                    if let Some(s) = mv.as_str() {
+                        params.insert(mk.clone(), s.to_string());
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    Ok(v1::ComponentConfig {
+        r#type: type_name,
+        params,
+    })
+}
+
+fn proto_analyzer_definition_to_json(def: &v1::AnalyzerDefinition) -> Value {
+    let mut obj = json!({});
+    if !def.char_filters.is_empty() {
+        let cfs: Vec<Value> = def
+            .char_filters
+            .iter()
+            .map(proto_component_to_json)
+            .collect();
+        obj["char_filters"] = json!(cfs);
+    }
+    if let Some(tok) = &def.tokenizer {
+        obj["tokenizer"] = proto_component_to_json(tok);
+    }
+    if !def.token_filters.is_empty() {
+        let tfs: Vec<Value> = def
+            .token_filters
+            .iter()
+            .map(proto_component_to_json)
+            .collect();
+        obj["token_filters"] = json!(tfs);
+    }
+    obj
+}
+
+fn proto_component_to_json(comp: &v1::ComponentConfig) -> Value {
+    let mut obj = json!({"type": comp.r#type});
+    for (k, v) in &comp.params {
+        obj[k] = json!(v);
+    }
+    obj
+}
+
+// ---------------------------------------------------------------------------
+// Embedder definition conversion
+// ---------------------------------------------------------------------------
+
+fn json_to_proto_embedder_definition(json: &Value) -> Result<v1::EmbedderConfig, String> {
+    let obj = json
+        .as_object()
+        .ok_or_else(|| "embedder definition must be an object".to_string())?;
+
+    let type_name = obj
+        .get("type")
+        .and_then(|v| v.as_str())
+        .ok_or("embedder definition missing 'type'")?
+        .to_string();
+
+    let mut params = HashMap::new();
+    for (k, v) in obj {
+        if k == "type" {
+            continue;
+        }
+        if let Some(s) = v.as_str() {
+            params.insert(k.clone(), s.to_string());
+        }
+    }
+
+    Ok(v1::EmbedderConfig {
+        r#type: type_name,
+        params,
+    })
+}
+
+fn proto_embedder_definition_to_json(def: &v1::EmbedderConfig) -> Value {
+    let mut obj = json!({"type": def.r#type});
+    for (k, v) in &def.params {
+        obj[k] = json!(v);
     }
     obj
 }

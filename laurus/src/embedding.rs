@@ -13,6 +13,9 @@ pub mod per_field;
 // Embedder for pre-computed vectors (analogous to NoOpAnalyzer)
 pub mod precomputed;
 
+// Embedder registry for creating embedders from schema definitions
+pub mod registry;
+
 // Candle implementation (requires feature flag)
 #[cfg(feature = "embeddings-candle")]
 pub mod candle_bert_embedder;

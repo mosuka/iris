@@ -83,7 +83,12 @@ pub use embedding::per_field::PerFieldEmbedder;
 pub use embedding::precomputed::PrecomputedEmbedder;
 pub use engine::Engine;
 pub use engine::EngineBuilder;
+pub use engine::EngineStats;
 pub use engine::query::UnifiedQueryParser;
+pub use engine::schema::analyzer::{
+    AnalyzerDefinition, CharFilterConfig, TokenFilterConfig, TokenizerConfig,
+};
+pub use engine::schema::embedder::EmbedderDefinition;
 pub use engine::schema::{FieldOption, Schema};
 pub use engine::search::{FusionAlgorithm, SearchRequest, SearchRequestBuilder, SearchResult};
 pub use error::{LaurusError, Result};

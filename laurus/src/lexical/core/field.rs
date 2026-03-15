@@ -108,6 +108,7 @@ impl<D: rkyv::rancor::Fallible + ?Sized>
 ///         indexed: true,
 ///         stored: true,
 ///         term_vectors: true,
+///         analyzer: None,
 ///     }),
 /// };
 /// ```
@@ -192,6 +193,12 @@ pub struct TextOption {
     /// Whether to store term vectors (enables highlighting, more-like-this).
     #[serde(default = "default_true")]
     pub term_vectors: bool,
+
+    /// Analyzer name for this field (e.g. `"standard"`, `"japanese"`).
+    /// When `None`, the engine's default analyzer is used.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[rkyv(with = rkyv::with::Skip)]
+    pub analyzer: Option<String>,
 }
 
 impl TextOption {
@@ -239,6 +246,25 @@ impl TextOption {
         self.term_vectors = term_vectors;
         self
     }
+
+    /// Sets the analyzer name for this field.
+    ///
+    /// When set, the engine constructs the corresponding analyzer for this
+    /// field instead of using the default. Supported names include
+    /// `"standard"`, `"keyword"`, `"english"`, `"japanese"`, `"simple"`,
+    /// and `"noop"`.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The analyzer name.
+    ///
+    /// # Returns
+    ///
+    /// The modified `TextOption` for method chaining.
+    pub fn analyzer(mut self, name: impl Into<String>) -> Self {
+        self.analyzer = Some(name.into());
+        self
+    }
 }
 
 impl Default for TextOption {
@@ -247,6 +273,7 @@ impl Default for TextOption {
             indexed: true,
             stored: true,
             term_vectors: false,
+            analyzer: None,
         }
     }
 }
@@ -474,6 +501,7 @@ impl GeoOption {
 ///     indexed: true,
 ///     stored: true,
 ///     term_vectors: true,
+///     analyzer: None,
 /// });
 ///
 /// // Bytes field (e.g. for binary data)

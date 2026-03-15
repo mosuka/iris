@@ -18,11 +18,9 @@ pub async fn check(State(mut state): State<GatewayState>) -> Result<Json<Value>,
         .map_err(|s| GatewayError(s).into_response())?;
 
     let status = response.into_inner().status;
-    let status_str = match v1::ServingStatus::try_from(status) {
-        Ok(v1::ServingStatus::Serving) => "SERVING",
-        Ok(v1::ServingStatus::NotServing) => "NOT_SERVING",
-        _ => "UNKNOWN",
-    };
+    let status_str = v1::ServingStatus::try_from(status)
+        .unwrap_or(v1::ServingStatus::Unknown)
+        .as_str_name();
 
     Ok(Json(json!({ "status": status_str })))
 }

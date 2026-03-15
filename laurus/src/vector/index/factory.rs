@@ -113,8 +113,7 @@ impl VectorIndexFactory {
         name: &str,
         config: VectorIndexTypeConfig,
     ) -> Result<Box<dyn VectorIndex>> {
-        let metadata_file = format!("{}.json", name);
-        if storage.file_exists(&metadata_file) {
+        if storage.file_exists("metadata.json") {
             Self::open(storage, name, config)
         } else {
             Self::create(storage, name, config)

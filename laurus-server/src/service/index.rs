@@ -69,7 +69,7 @@ impl IndexServiceTrait for IndexService {
         let stats = engine.stats().map_err(error::to_status)?;
 
         let vector_fields = stats
-            .fields
+            .vector_fields
             .iter()
             .map(|(name, fs)| {
                 (
@@ -83,7 +83,7 @@ impl IndexServiceTrait for IndexService {
             .collect();
 
         Ok(Response::new(GetIndexResponse {
-            document_count: stats.document_count as u64,
+            document_count: stats.document_count,
             vector_fields,
         }))
     }
