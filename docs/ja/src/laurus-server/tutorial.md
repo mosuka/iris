@@ -450,7 +450,7 @@ curl -X POST http://localhost:8080/v1/index \
 
 モデルは初回使用時に HuggingFace Hub から自動ダウンロードされます。`dimension`（384）はモデルの出力次元数と一致させる必要があります。
 
-ドキュメントを追加します。`embedding` フィールドには 384 次元のベクトルを事前計算して指定します:
+ドキュメントを追加します。`embedding` フィールドにはテキストを渡すだけで、エンベッダーが自動的にベクトルに変換します:
 
 ```bash
 curl -X PUT http://localhost:8080/v1/documents/doc001 \
@@ -460,17 +460,33 @@ curl -X PUT http://localhost:8080/v1/documents/doc001 \
       "fields": {
         "title": "Introduction to Rust Programming",
         "body": "Rust is a modern systems programming language.",
-        "embedding": [0.012, -0.034, 0.056, ...]
+        "embedding": "Rust is a modern systems programming language."
       }
     }
   }'
 ```
 
-コミットして検索します:
+```bash
+curl -X PUT http://localhost:8080/v1/documents/doc002 \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "document": {
+      "fields": {
+        "title": "Web Development with Rust",
+        "body": "Building web applications with Rust using Actix and Rocket.",
+        "embedding": "Building web applications with Rust using Actix and Rocket."
+      }
+    }
+  }'
+```
+
+コミットします:
 
 ```bash
 curl -X POST http://localhost:8080/v1/commit
 ```
+
+テキストクエリで lexical 検索、ベクトルクエリでセマンティック検索を同時に行います。検索時もテキストからベクトルへの変換が自動的に行われます:
 
 ```bash
 curl -X POST http://localhost:8080/v1/search \
@@ -479,7 +495,7 @@ curl -X POST http://localhost:8080/v1/search \
     "query": "systems programming",
     "query_vectors": [
       {
-        "vector": [0.011, -0.032, 0.055, ...],
+        "vector": "systems programming language",
         "fields": ["embedding"]
       }
     ],
@@ -487,6 +503,8 @@ curl -X POST http://localhost:8080/v1/search \
     "limit": 10
   }'
 ```
+
+`precomputed` エンベッダーではベクトルを直接渡す必要がありますが、`candle_bert` のようなテキスト対応エンベッダーを使うと、インデックス時も検索時もテキストを直接渡せます。
 
 ### OpenAI Embeddings の利用
 

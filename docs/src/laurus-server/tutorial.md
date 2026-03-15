@@ -444,7 +444,7 @@ curl -X POST http://localhost:8080/v1/index \
 
 The model is automatically downloaded from HuggingFace Hub on first use. The `dimension` (384) must match the model's output dimension.
 
-Add a document with a pre-computed 384-dimensional embedding vector:
+Add documents. Pass text to the `embedding` field — the embedder automatically converts it to a vector:
 
 ```bash
 curl -X PUT http://localhost:8080/v1/documents/doc001 \
@@ -454,17 +454,33 @@ curl -X PUT http://localhost:8080/v1/documents/doc001 \
       "fields": {
         "title": "Introduction to Rust Programming",
         "body": "Rust is a modern systems programming language.",
-        "embedding": [0.012, -0.034, 0.056, ...]
+        "embedding": "Rust is a modern systems programming language."
       }
     }
   }'
 ```
 
-Commit and search:
+```bash
+curl -X PUT http://localhost:8080/v1/documents/doc002 \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "document": {
+      "fields": {
+        "title": "Web Development with Rust",
+        "body": "Building web applications with Rust using Actix and Rocket.",
+        "embedding": "Building web applications with Rust using Actix and Rocket."
+      }
+    }
+  }'
+```
+
+Commit:
 
 ```bash
 curl -X POST http://localhost:8080/v1/commit
 ```
+
+Search with both lexical and semantic queries. The embedder also handles text-to-vector conversion at search time:
 
 ```bash
 curl -X POST http://localhost:8080/v1/search \
@@ -473,7 +489,7 @@ curl -X POST http://localhost:8080/v1/search \
     "query": "systems programming",
     "query_vectors": [
       {
-        "vector": [0.011, -0.032, 0.055, ...],
+        "vector": "systems programming language",
         "fields": ["embedding"]
       }
     ],
@@ -481,6 +497,8 @@ curl -X POST http://localhost:8080/v1/search \
     "limit": 10
   }'
 ```
+
+With the `precomputed` embedder you must pass raw vectors, but text-capable embedders like `candle_bert` accept text directly for both indexing and searching.
 
 ### Using OpenAI Embeddings
 
