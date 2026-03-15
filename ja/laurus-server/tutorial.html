@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-c7fecf81.js";
+            window.path_to_searchindex_js = "../searchindex-b903c893.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-e8a84d15.js"></script>
@@ -455,6 +455,9 @@ curl http://localhost:8080/v1/documents/doc001
   -d '{"query": "python", "limit": 10}'
 </code></pre>
 <p>結果は返されません。</p>
+<p>期待されるレスポンス:</p>
+<pre><code class="language-json">{"results":[]}
+</code></pre>
 <h2 id="step-9-インデックス統計の確認"><a class="header" href="#step-9-インデックス統計の確認">Step 9: インデックス統計の確認</a></h2>
 <p>現在のインデックス統計を確認します:</p>
 <pre><code class="language-bash">curl http://localhost:8080/v1/index
@@ -472,41 +475,96 @@ curl http://localhost:8080/v1/documents/doc001
 <pre><code class="language-bash">cargo build --release --features embeddings-candle
 </code></pre>
 <h3 id="bert-エンベッダーを使ったスキーマ"><a class="header" href="#bert-エンベッダーを使ったスキーマ">BERT エンベッダーを使ったスキーマ</a></h3>
-<pre><code class="language-json">{
-  "schema": {
-    "embedders": {
-      "bert": {
-        "type": "candle_bert",
-        "model": "sentence-transformers/all-MiniLM-L6-v2"
-      }
-    },
-    "fields": {
-      "title": {"text": {"indexed": true, "stored": true, "analyzer": "standard"}},
-      "body": {"text": {"indexed": true, "stored": true, "analyzer": "standard"}},
-      "embedding": {"hnsw": {"dimension": 384, "distance": "DISTANCE_METRIC_COSINE", "m": 16, "ef_construction": 200, "embedder": "bert"}}
-    },
-    "default_fields": ["title", "body"]
-  }
-}
+<p>インデックスを作成します:</p>
+<pre><code class="language-bash">curl -X POST http://localhost:8080/v1/index \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "schema": {
+      "embedders": {
+        "bert": {
+          "type": "candle_bert",
+          "model": "sentence-transformers/all-MiniLM-L6-v2"
+        }
+      },
+      "fields": {
+        "title": {"text": {"indexed": true, "stored": true, "analyzer": "standard"}},
+        "body": {"text": {"indexed": true, "stored": true, "analyzer": "standard"}},
+        "embedding": {"hnsw": {"dimension": 384, "distance": "DISTANCE_METRIC_COSINE", "m": 16, "ef_construction": 200, "embedder": "bert"}}
+      },
+      "default_fields": ["title", "body"]
+    }
+  }'
 </code></pre>
 <p>モデルは初回使用時に HuggingFace Hub から自動ダウンロードされます。<code>dimension</code>（384）はモデルの出力次元数と一致させる必要があります。</p>
+<p>ドキュメントを追加します。<code>embedding</code> フィールドにはテキストを渡すだけで、エンベッダーが自動的にベクトルに変換します:</p>
+<pre><code class="language-bash">curl -X PUT http://localhost:8080/v1/documents/doc001 \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "document": {
+      "fields": {
+        "title": "Introduction to Rust Programming",
+        "body": "Rust is a modern systems programming language.",
+        "embedding": "Rust is a modern systems programming language."
+      }
+    }
+  }'
+</code></pre>
+<pre><code class="language-bash">curl -X PUT http://localhost:8080/v1/documents/doc002 \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "document": {
+      "fields": {
+        "title": "Web Development with Rust",
+        "body": "Building web applications with Rust using Actix and Rocket.",
+        "embedding": "Building web applications with Rust using Actix and Rocket."
+      }
+    }
+  }'
+</code></pre>
+<p>コミットします:</p>
+<pre><code class="language-bash">curl -X POST http://localhost:8080/v1/commit
+</code></pre>
+<p>テキストクエリで lexical 検索、ベクトルクエリでセマンティック検索を同時に行います。検索時もテキストからベクトルへの変換が自動的に行われます:</p>
+<pre><code class="language-bash">curl -X POST http://localhost:8080/v1/search \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "query": "systems programming",
+    "query_vectors": [
+      {
+        "vector": "systems programming language",
+        "fields": ["embedding"]
+      }
+    ],
+    "fusion": {"rrf": {"k": 60.0}},
+    "limit": 10
+  }'
+</code></pre>
+<p><code>precomputed</code> エンベッダーではベクトルを直接渡す必要がありますが、<code>candle_bert</code> のようなテキスト対応エンベッダーを使うと、インデックス時も検索時もテキストを直接渡せます。</p>
 <h3 id="openai-embeddings-の利用"><a class="header" href="#openai-embeddings-の利用">OpenAI Embeddings の利用</a></h3>
 <p>OpenAI の Embedding API を使う場合は、<code>OPENAI_API_KEY</code> 環境変数を設定し、<code>embeddings-openai</code> フィーチャでビルドします:</p>
 <pre><code class="language-bash">cargo build --release --features embeddings-openai
 export OPENAI_API_KEY="sk-..."
 </code></pre>
-<pre><code class="language-json">{
-  "embedders": {
-    "openai": {
-      "type": "openai",
-      "model": "text-embedding-3-small"
+<p>インデックスを作成します:</p>
+<pre><code class="language-bash">curl -X POST http://localhost:8080/v1/index \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "schema": {
+      "embedders": {
+        "openai": {
+          "type": "openai",
+          "model": "text-embedding-3-small"
+        }
+      },
+      "fields": {
+        "title": {"text": {"indexed": true, "stored": true}},
+        "embedding": {"hnsw": {"dimension": 1536, "distance": "DISTANCE_METRIC_COSINE", "embedder": "openai"}}
+      },
+      "default_fields": ["title"]
     }
-  },
-  "fields": {
-    "embedding": {"hnsw": {"dimension": 1536, "distance": "DISTANCE_METRIC_COSINE", "embedder": "openai"}}
-  }
-}
+  }'
 </code></pre>
+<p><code>text-embedding-3-small</code> モデルは 1536 次元のベクトルを出力します。</p>
 <h3 id="利用可能な埋め込みモデル"><a class="header" href="#利用可能な埋め込みモデル">利用可能な埋め込みモデル</a></h3>
 <div class="table-wrapper">
 <table>

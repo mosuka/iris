@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-b6d239cf.js";
+            window.path_to_searchindex_js = "../searchindex-c7f86947.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-8780f555.js"></script>
@@ -469,41 +469,96 @@ curl http://localhost:8080/v1/documents/doc001
 <pre><code class="language-bash">cargo build --release --features embeddings-candle
 </code></pre>
 <h3 id="schema-with-bert-embedder"><a class="header" href="#schema-with-bert-embedder">Schema with BERT Embedder</a></h3>
-<pre><code class="language-json">{
-  "schema": {
-    "embedders": {
-      "bert": {
-        "type": "candle_bert",
-        "model": "sentence-transformers/all-MiniLM-L6-v2"
-      }
-    },
-    "fields": {
-      "title": {"text": {"indexed": true, "stored": true, "analyzer": "standard"}},
-      "body": {"text": {"indexed": true, "stored": true, "analyzer": "standard"}},
-      "embedding": {"hnsw": {"dimension": 384, "distance": "DISTANCE_METRIC_COSINE", "m": 16, "ef_construction": 200, "embedder": "bert"}}
-    },
-    "default_fields": ["title", "body"]
-  }
-}
+<p>Create an index:</p>
+<pre><code class="language-bash">curl -X POST http://localhost:8080/v1/index \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "schema": {
+      "embedders": {
+        "bert": {
+          "type": "candle_bert",
+          "model": "sentence-transformers/all-MiniLM-L6-v2"
+        }
+      },
+      "fields": {
+        "title": {"text": {"indexed": true, "stored": true, "analyzer": "standard"}},
+        "body": {"text": {"indexed": true, "stored": true, "analyzer": "standard"}},
+        "embedding": {"hnsw": {"dimension": 384, "distance": "DISTANCE_METRIC_COSINE", "m": 16, "ef_construction": 200, "embedder": "bert"}}
+      },
+      "default_fields": ["title", "body"]
+    }
+  }'
 </code></pre>
 <p>The model is automatically downloaded from HuggingFace Hub on first use. The <code>dimension</code> (384) must match the model’s output dimension.</p>
+<p>Add documents. Pass text to the <code>embedding</code> field — the embedder automatically converts it to a vector:</p>
+<pre><code class="language-bash">curl -X PUT http://localhost:8080/v1/documents/doc001 \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "document": {
+      "fields": {
+        "title": "Introduction to Rust Programming",
+        "body": "Rust is a modern systems programming language.",
+        "embedding": "Rust is a modern systems programming language."
+      }
+    }
+  }'
+</code></pre>
+<pre><code class="language-bash">curl -X PUT http://localhost:8080/v1/documents/doc002 \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "document": {
+      "fields": {
+        "title": "Web Development with Rust",
+        "body": "Building web applications with Rust using Actix and Rocket.",
+        "embedding": "Building web applications with Rust using Actix and Rocket."
+      }
+    }
+  }'
+</code></pre>
+<p>Commit:</p>
+<pre><code class="language-bash">curl -X POST http://localhost:8080/v1/commit
+</code></pre>
+<p>Search with both lexical and semantic queries. The embedder also handles text-to-vector conversion at search time:</p>
+<pre><code class="language-bash">curl -X POST http://localhost:8080/v1/search \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "query": "systems programming",
+    "query_vectors": [
+      {
+        "vector": "systems programming language",
+        "fields": ["embedding"]
+      }
+    ],
+    "fusion": {"rrf": {"k": 60.0}},
+    "limit": 10
+  }'
+</code></pre>
+<p>With the <code>precomputed</code> embedder you must pass raw vectors, but text-capable embedders like <code>candle_bert</code> accept text directly for both indexing and searching.</p>
 <h3 id="using-openai-embeddings"><a class="header" href="#using-openai-embeddings">Using OpenAI Embeddings</a></h3>
 <p>For OpenAI’s embedding API, set the <code>OPENAI_API_KEY</code> environment variable and build with the <code>embeddings-openai</code> feature:</p>
 <pre><code class="language-bash">cargo build --release --features embeddings-openai
 export OPENAI_API_KEY="sk-..."
 </code></pre>
-<pre><code class="language-json">{
-  "embedders": {
-    "openai": {
-      "type": "openai",
-      "model": "text-embedding-3-small"
+<p>Create an index:</p>
+<pre><code class="language-bash">curl -X POST http://localhost:8080/v1/index \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "schema": {
+      "embedders": {
+        "openai": {
+          "type": "openai",
+          "model": "text-embedding-3-small"
+        }
+      },
+      "fields": {
+        "title": {"text": {"indexed": true, "stored": true}},
+        "embedding": {"hnsw": {"dimension": 1536, "distance": "DISTANCE_METRIC_COSINE", "embedder": "openai"}}
+      },
+      "default_fields": ["title"]
     }
-  },
-  "fields": {
-    "embedding": {"hnsw": {"dimension": 1536, "distance": "DISTANCE_METRIC_COSINE", "embedder": "openai"}}
-  }
-}
+  }'
 </code></pre>
+<p>The <code>text-embedding-3-small</code> model outputs 1536-dimensional vectors.</p>
 <h3 id="available-embedding-models"><a class="header" href="#available-embedding-models">Available Embedding Models</a></h3>
 <div class="table-wrapper">
 <table>
