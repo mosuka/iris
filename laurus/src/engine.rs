@@ -336,8 +336,14 @@ impl Engine {
             Err(_) => std::collections::HashMap::new(),
         };
 
+        // doc_count includes deleted documents (soft-deleted, pending merge).
+        // Subtract deleted_count for the live document count.
+        let live_count = lexical_stats
+            .doc_count
+            .saturating_sub(lexical_stats.deleted_count);
+
         Ok(EngineStats {
-            document_count: lexical_stats.doc_count,
+            document_count: live_count,
             vector_fields,
         })
     }
