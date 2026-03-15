@@ -419,26 +419,86 @@ cargo build --release --features embeddings-candle
 
 ### Schema with BERT Embedder
 
-```json
-{
-  "schema": {
-    "embedders": {
-      "bert": {
-        "type": "candle_bert",
-        "model": "sentence-transformers/all-MiniLM-L6-v2"
-      }
-    },
-    "fields": {
-      "title": {"text": {"indexed": true, "stored": true, "analyzer": "standard"}},
-      "body": {"text": {"indexed": true, "stored": true, "analyzer": "standard"}},
-      "embedding": {"hnsw": {"dimension": 384, "distance": "DISTANCE_METRIC_COSINE", "m": 16, "ef_construction": 200, "embedder": "bert"}}
-    },
-    "default_fields": ["title", "body"]
-  }
-}
+Create an index:
+
+```bash
+curl -X POST http://localhost:8080/v1/index \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "schema": {
+      "embedders": {
+        "bert": {
+          "type": "candle_bert",
+          "model": "sentence-transformers/all-MiniLM-L6-v2"
+        }
+      },
+      "fields": {
+        "title": {"text": {"indexed": true, "stored": true, "analyzer": "standard"}},
+        "body": {"text": {"indexed": true, "stored": true, "analyzer": "standard"}},
+        "embedding": {"hnsw": {"dimension": 384, "distance": "DISTANCE_METRIC_COSINE", "m": 16, "ef_construction": 200, "embedder": "bert"}}
+      },
+      "default_fields": ["title", "body"]
+    }
+  }'
 ```
 
 The model is automatically downloaded from HuggingFace Hub on first use. The `dimension` (384) must match the model's output dimension.
+
+Add documents. Pass text to the `embedding` field — the embedder automatically converts it to a vector:
+
+```bash
+curl -X PUT http://localhost:8080/v1/documents/doc001 \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "document": {
+      "fields": {
+        "title": "Introduction to Rust Programming",
+        "body": "Rust is a modern systems programming language.",
+        "embedding": "Rust is a modern systems programming language."
+      }
+    }
+  }'
+```
+
+```bash
+curl -X PUT http://localhost:8080/v1/documents/doc002 \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "document": {
+      "fields": {
+        "title": "Web Development with Rust",
+        "body": "Building web applications with Rust using Actix and Rocket.",
+        "embedding": "Building web applications with Rust using Actix and Rocket."
+      }
+    }
+  }'
+```
+
+Commit:
+
+```bash
+curl -X POST http://localhost:8080/v1/commit
+```
+
+Search with both lexical and semantic queries. The embedder also handles text-to-vector conversion at search time:
+
+```bash
+curl -X POST http://localhost:8080/v1/search \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "query": "systems programming",
+    "query_vectors": [
+      {
+        "vector": "systems programming language",
+        "fields": ["embedding"]
+      }
+    ],
+    "fusion": {"rrf": {"k": 60.0}},
+    "limit": 10
+  }'
+```
+
+With the `precomputed` embedder you must pass raw vectors, but text-capable embedders like `candle_bert` accept text directly for both indexing and searching.
 
 ### Using OpenAI Embeddings
 
@@ -449,19 +509,29 @@ cargo build --release --features embeddings-openai
 export OPENAI_API_KEY="sk-..."
 ```
 
-```json
-{
-  "embedders": {
-    "openai": {
-      "type": "openai",
-      "model": "text-embedding-3-small"
+Create an index:
+
+```bash
+curl -X POST http://localhost:8080/v1/index \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "schema": {
+      "embedders": {
+        "openai": {
+          "type": "openai",
+          "model": "text-embedding-3-small"
+        }
+      },
+      "fields": {
+        "title": {"text": {"indexed": true, "stored": true}},
+        "embedding": {"hnsw": {"dimension": 1536, "distance": "DISTANCE_METRIC_COSINE", "embedder": "openai"}}
+      },
+      "default_fields": ["title"]
     }
-  },
-  "fields": {
-    "embedding": {"hnsw": {"dimension": 1536, "distance": "DISTANCE_METRIC_COSINE", "embedder": "openai"}}
-  }
-}
+  }'
 ```
+
+The `text-embedding-3-small` model outputs 1536-dimensional vectors.
 
 ### Available Embedding Models
 

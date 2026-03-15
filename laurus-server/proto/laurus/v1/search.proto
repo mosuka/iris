@@ -93,6 +93,8 @@ enum VectorScoreMode {
 
 message SearchResponse {
   repeated SearchResult results = 1;
+  // Total number of matching results (before limit/offset).
+  uint64 total_hits = 2;
 }
 
 message SearchResult {
