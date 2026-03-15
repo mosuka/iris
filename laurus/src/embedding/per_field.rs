@@ -224,9 +224,21 @@ impl Embedder for PerFieldEmbedder {
         self.default_embedder.embed_batch(inputs).await
     }
 
-    /// Returns the supported input types of the default embedder.
+    /// Returns the union of supported input types across the default
+    /// embedder and all field-specific embedders.
     fn supported_input_types(&self) -> Vec<EmbedInputType> {
-        self.default_embedder.supported_input_types()
+        use std::collections::HashSet;
+        let mut types: HashSet<EmbedInputType> = self
+            .default_embedder
+            .supported_input_types()
+            .into_iter()
+            .collect();
+        for emb in self.field_embedders.values() {
+            for t in emb.supported_input_types() {
+                types.insert(t);
+            }
+        }
+        types.into_iter().collect()
     }
 
     fn name(&self) -> &str {
