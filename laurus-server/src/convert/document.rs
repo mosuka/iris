@@ -10,10 +10,14 @@ use laurus::{DataValue, Document};
 use crate::proto::laurus::v1;
 
 /// Convert a laurus Document into a proto Document.
+///
+/// The internal `_id` system field is excluded from the output since it
+/// is already available as the `id` field on the enclosing message.
 pub fn to_proto(doc: &Document) -> v1::Document {
     let fields: HashMap<String, v1::Value> = doc
         .fields
         .iter()
+        .filter(|(k, _)| k.as_str() != "_id")
         .map(|(k, v)| (k.clone(), data_value_to_proto(v)))
         .collect();
     v1::Document { fields }

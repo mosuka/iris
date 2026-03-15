@@ -147,10 +147,15 @@ pub fn json_to_proto_document(json: &Value) -> Result<v1::Document, String> {
 }
 
 /// Converts a proto `Document` to a JSON value.
+///
+/// The internal `_id` system field is excluded from the output since it
+/// is already available as the top-level `id` in search results and
+/// document responses.
 pub fn proto_document_to_json(doc: &v1::Document) -> Value {
     let fields: Map<String, Value> = doc
         .fields
         .iter()
+        .filter(|(k, _)| k.as_str() != "_id")
         .map(|(k, v)| (k.clone(), proto_value_to_json(v)))
         .collect();
     json!({ "fields": fields })

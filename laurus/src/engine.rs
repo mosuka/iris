@@ -520,6 +520,10 @@ impl Engine {
         let mut lexical_builder =
             LexicalIndexConfig::builder().analyzer(Arc::new(per_field_analyzer));
 
+        if !schema.default_fields.is_empty() {
+            lexical_builder = lexical_builder.default_fields(schema.default_fields.clone());
+        }
+
         for (name, field_option) in &schema.fields {
             if let Some(lexical_opt) = field_option.to_lexical() {
                 lexical_builder = lexical_builder.add_field(name, lexical_opt);

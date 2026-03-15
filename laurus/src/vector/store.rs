@@ -417,15 +417,46 @@ impl VectorStore {
         searcher.count(request)
     }
 
-    /// Get index statistics.
+    /// Get index statistics including per-field vector counts.
+    ///
+    /// Returns a [`VectorStats`] containing the total document count and
+    /// per-field statistics (vector count and dimension) for each vector
+    /// field in the index. The dimension is derived from the actual vectors
+    /// stored for each field, falling back to the index-level dimension when
+    /// no vectors are present.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if obtaining the reader fails.
     pub fn stats(&self) -> Result<VectorStats> {
-        // Use the reader to get accurate vector count
         let reader = self.index.reader()?;
         let doc_count = reader.vector_count();
+        let index_dimension = reader.dimension();
+
+        let mut fields = std::collections::HashMap::new();
+        if let Ok(field_names) = reader.field_names() {
+            for name in field_names {
+                let vectors = reader.get_vectors_by_field(&name).unwrap_or_default();
+                let vector_count = vectors.len();
+                // Derive dimension from actual vectors; fall back to
+                // index-level dimension when no vectors exist for this field.
+                let dimension = vectors
+                    .first()
+                    .map(|(_, v)| v.data.len())
+                    .unwrap_or(index_dimension);
+                fields.insert(
+                    name,
+                    crate::vector::index::field::VectorFieldStats {
+                        vector_count,
+                        dimension,
+                    },
+                );
+            }
+        }
 
         Ok(VectorStats {
             document_count: doc_count,
-            fields: std::collections::HashMap::new(), // Simplified - no per-field stats
+            fields,
         })
     }
 
