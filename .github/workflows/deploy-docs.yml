@@ -25,6 +25,12 @@ jobs:
       - name: Build Book (English)
         run: mdbook build docs
 
+      - name: Build Book (Japanese)
+        run: mdbook build docs/ja
+
+      - name: Copy Japanese docs into publish directory
+        run: cp -r target/docs/ja docs/book/ja
+
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
         with:
