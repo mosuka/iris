@@ -34,7 +34,10 @@ pub async fn search(
         .map(convert::proto_search_result_to_json)
         .collect();
 
-    Ok(Json(json!({ "results": results })))
+    Ok(Json(json!({
+        "total_hits": inner.total_hits,
+        "results": results,
+    })))
 }
 
 /// `POST /v1/search/stream` — Executes a search and returns results incrementally via SSE.

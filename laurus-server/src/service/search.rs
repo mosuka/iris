@@ -44,12 +44,16 @@ impl SearchServiceTrait for SearchService {
             .search(search_request)
             .await
             .map_err(error::to_status)?;
+        let total_hits = results.len() as u64;
         let results: Vec<SearchResult> = results
             .iter()
             .map(search_convert::result_to_proto)
             .collect();
 
-        Ok(Response::new(SearchResponse { results }))
+        Ok(Response::new(SearchResponse {
+            results,
+            total_hits,
+        }))
     }
 
     type SearchStreamStream = ReceiverStream<Result<SearchResult, Status>>;
