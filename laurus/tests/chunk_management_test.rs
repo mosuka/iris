@@ -16,7 +16,7 @@ async fn build_test_engine() -> Result<Engine> {
         distance: DistanceMetric::Cosine,
         base_weight: 1.0,
         quantizer: None,
-            embedder: None,
+        embedder: None,
     });
 
     let config = Schema::builder().add_field("body", field_option).build();
