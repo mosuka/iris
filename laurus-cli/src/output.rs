@@ -7,8 +7,7 @@
 use std::collections::HashMap;
 
 use clap::ValueEnum;
-use laurus::vector::store::response::VectorStats;
-use laurus::{DataValue, Document, SearchResult};
+use laurus::{DataValue, Document, EngineStats, SearchResult};
 use serde_json::json;
 use tabled::settings::Style;
 use tabled::{Table, Tabled};
@@ -124,14 +123,14 @@ pub fn print_documents(id: &str, documents: &[Document], format: OutputFormat) {
 ///
 /// # Arguments
 ///
-/// * `stats` - [`VectorStats`] containing document count and per-field vector
+/// * `stats` - [`EngineStats`] containing document count and per-field vector
 ///   statistics.
 /// * `format` - The desired output format (table or JSON).
-pub fn print_stats(stats: &VectorStats, format: OutputFormat) {
+pub fn print_stats(stats: &EngineStats, format: OutputFormat) {
     match format {
         OutputFormat::Json => {
-            let fields_json: serde_json::Value = stats
-                .fields
+            let vector_fields_json: serde_json::Value = stats
+                .vector_fields
                 .iter()
                 .map(|(name, fs)| {
                     (
@@ -146,16 +145,16 @@ pub fn print_stats(stats: &VectorStats, format: OutputFormat) {
                 .into();
             let output = json!({
                 "document_count": stats.document_count,
-                "fields": fields_json,
+                "vector_fields": vector_fields_json,
             });
             println!("{}", serde_json::to_string_pretty(&output).unwrap());
         }
         OutputFormat::Table => {
             println!("Document count: {}", stats.document_count);
 
-            if !stats.fields.is_empty() {
+            if !stats.vector_fields.is_empty() {
                 let rows: Vec<FieldStatsRow> = stats
-                    .fields
+                    .vector_fields
                     .iter()
                     .map(|(name, fs)| FieldStatsRow {
                         field: name.clone(),

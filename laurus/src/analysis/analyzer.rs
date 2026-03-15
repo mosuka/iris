@@ -40,5 +40,6 @@ pub mod language;
 pub mod noop;
 pub mod per_field;
 pub mod pipeline;
+pub mod registry;
 pub mod simple;
 pub mod standard;

@@ -19,6 +19,25 @@ service IndexService {
 message Schema {
   map<string, FieldOption> fields = 1;
   repeated string default_fields = 2;
+  // Custom analyzer definitions, keyed by name.
+  map<string, AnalyzerDefinition> analyzers = 3;
+  // Embedder definitions, keyed by name.
+  map<string, EmbedderConfig> embedders = 4;
+}
+
+// A custom analyzer pipeline definition.
+message AnalyzerDefinition {
+  repeated ComponentConfig char_filters = 1;
+  ComponentConfig tokenizer = 2;
+  repeated ComponentConfig token_filters = 3;
+}
+
+// A generic component configuration (tokenizer, char filter, or token filter).
+message ComponentConfig {
+  // Component type name (e.g. "whitespace", "lowercase", "unicode_normalization").
+  string type = 1;
+  // Type-specific parameters as string key-value pairs.
+  map<string, string> params = 2;
 }
 
 // A field configuration, exactly one variant must be set.
@@ -43,6 +62,9 @@ message TextOption {
   bool indexed = 1;
   bool stored = 2;
   bool term_vectors = 3;
+  // Analyzer name (e.g. "standard", "keyword", "japanese").
+  // Empty string means use the engine default.
+  string analyzer = 4;
 }
 
 message IntegerOption {
@@ -103,6 +125,8 @@ message HnswOption {
   uint32 ef_construction = 4;
   float base_weight = 5;
   optional QuantizationConfig quantizer = 6;
+  // Embedder name (empty = no auto-embedding).
+  string embedder = 7;
 }
 
 message FlatOption {
@@ -110,6 +134,8 @@ message FlatOption {
   DistanceMetric distance = 2;
   float base_weight = 3;
   optional QuantizationConfig quantizer = 4;
+  // Embedder name (empty = no auto-embedding).
+  string embedder = 5;
 }
 
 message IvfOption {
@@ -119,6 +145,16 @@ message IvfOption {
   uint32 n_probe = 4;
   float base_weight = 5;
   optional QuantizationConfig quantizer = 6;
+  // Embedder name (empty = no auto-embedding).
+  string embedder = 7;
+}
+
+// An embedder configuration.
+message EmbedderConfig {
+  // Embedder type name (e.g. "precomputed", "candle_bert", "openai").
+  string type = 1;
+  // Type-specific parameters (e.g. "model" -> "sentence-transformers/all-MiniLM-L6-v2").
+  map<string, string> params = 2;
 }
 
 // ---- RPC messages ----

@@ -7,9 +7,10 @@
 use std::collections::HashMap;
 
 use laurus::{
-    BooleanOption, BytesOption, DateTimeOption, DistanceMetric, FieldOption, FlatOption,
-    FloatOption, GeoOption, HnswOption, IntegerOption, IvfOption, QuantizationMethod, Schema,
-    TextOption,
+    AnalyzerDefinition, BooleanOption, BytesOption, CharFilterConfig, DateTimeOption,
+    DistanceMetric, EmbedderDefinition, FieldOption, FlatOption, FloatOption, GeoOption,
+    HnswOption, IntegerOption, IvfOption, QuantizationMethod, Schema, TextOption,
+    TokenFilterConfig, TokenizerConfig,
 };
 
 use crate::proto::laurus::v1;
@@ -21,9 +22,21 @@ pub fn to_proto(schema: &Schema) -> v1::Schema {
         .iter()
         .map(|(k, v)| (k.clone(), field_option_to_proto(v)))
         .collect();
+    let analyzers = schema
+        .analyzers
+        .iter()
+        .map(|(k, v)| (k.clone(), analyzer_definition_to_proto(v)))
+        .collect();
+    let embedders = schema
+        .embedders
+        .iter()
+        .map(|(k, v)| (k.clone(), embedder_definition_to_proto(v)))
+        .collect();
     v1::Schema {
         fields,
         default_fields: schema.default_fields.clone(),
+        analyzers,
+        embedders,
     }
 }
 
@@ -35,7 +48,17 @@ pub fn from_proto(proto: &v1::Schema) -> Result<Schema, String> {
             .ok_or_else(|| format!("Field '{name}' has no option set"))?;
         fields.insert(name.clone(), option);
     }
+    let mut analyzers = HashMap::new();
+    for (name, ad) in &proto.analyzers {
+        analyzers.insert(name.clone(), analyzer_definition_from_proto(ad)?);
+    }
+    let mut embedders = HashMap::new();
+    for (name, ed) in &proto.embedders {
+        embedders.insert(name.clone(), embedder_definition_from_proto(ed)?);
+    }
     Ok(Schema {
+        analyzers,
+        embedders,
         fields,
         default_fields: proto.default_fields.clone(),
     })
@@ -48,6 +71,7 @@ fn field_option_to_proto(fo: &FieldOption) -> v1::FieldOption {
             indexed: o.indexed,
             stored: o.stored,
             term_vectors: o.term_vectors,
+            analyzer: o.analyzer.clone().unwrap_or_default(),
         })),
         FieldOption::Integer(o) => Some(Opt::Integer(v1::IntegerOption {
             indexed: o.indexed,
@@ -77,12 +101,14 @@ fn field_option_to_proto(fo: &FieldOption) -> v1::FieldOption {
             ef_construction: o.ef_construction as u32,
             base_weight: o.base_weight,
             quantizer: o.quantizer.map(|q| quantization_to_proto(&q)),
+            embedder: o.embedder.clone().unwrap_or_default(),
         })),
         FieldOption::Flat(o) => Some(Opt::Flat(v1::FlatOption {
             dimension: o.dimension as u32,
             distance: distance_to_proto(&o.distance) as i32,
             base_weight: o.base_weight,
             quantizer: o.quantizer.map(|q| quantization_to_proto(&q)),
+            embedder: o.embedder.clone().unwrap_or_default(),
         })),
         FieldOption::Ivf(o) => Some(Opt::Ivf(v1::IvfOption {
             dimension: o.dimension as u32,
@@ -91,6 +117,7 @@ fn field_option_to_proto(fo: &FieldOption) -> v1::FieldOption {
             n_probe: o.n_probe as u32,
             base_weight: o.base_weight,
             quantizer: o.quantizer.map(|q| quantization_to_proto(&q)),
+            embedder: o.embedder.clone().unwrap_or_default(),
         })),
     };
     v1::FieldOption { option }
@@ -103,6 +130,11 @@ fn field_option_from_proto(fo: &v1::FieldOption) -> Option<FieldOption> {
             indexed: o.indexed,
             stored: o.stored,
             term_vectors: o.term_vectors,
+            analyzer: if o.analyzer.is_empty() {
+                None
+            } else {
+                Some(o.analyzer.clone())
+            },
         })),
         Some(Opt::Integer(o)) => Some(FieldOption::Integer(IntegerOption {
             indexed: o.indexed,
@@ -132,12 +164,22 @@ fn field_option_from_proto(fo: &v1::FieldOption) -> Option<FieldOption> {
             ef_construction: o.ef_construction as usize,
             base_weight: o.base_weight,
             quantizer: o.quantizer.as_ref().map(quantization_from_proto),
+            embedder: if o.embedder.is_empty() {
+                None
+            } else {
+                Some(o.embedder.clone())
+            },
         })),
         Some(Opt::Flat(o)) => Some(FieldOption::Flat(FlatOption {
             dimension: o.dimension as usize,
             distance: distance_from_proto(o.distance),
             base_weight: o.base_weight,
             quantizer: o.quantizer.as_ref().map(quantization_from_proto),
+            embedder: if o.embedder.is_empty() {
+                None
+            } else {
+                Some(o.embedder.clone())
+            },
         })),
         Some(Opt::Ivf(o)) => Some(FieldOption::Ivf(IvfOption {
             dimension: o.dimension as usize,
@@ -146,6 +188,11 @@ fn field_option_from_proto(fo: &v1::FieldOption) -> Option<FieldOption> {
             n_probe: o.n_probe as usize,
             base_weight: o.base_weight,
             quantizer: o.quantizer.as_ref().map(quantization_from_proto),
+            embedder: if o.embedder.is_empty() {
+                None
+            } else {
+                Some(o.embedder.clone())
+            },
         })),
         None => None,
     }
@@ -199,5 +246,323 @@ fn quantization_from_proto(q: &v1::QuantizationConfig) -> QuantizationMethod {
             }
         }
         Err(_) => QuantizationMethod::None,
+    }
+}
+
+// ---- Analyzer definition conversion ----
+
+fn analyzer_definition_to_proto(def: &AnalyzerDefinition) -> v1::AnalyzerDefinition {
+    v1::AnalyzerDefinition {
+        char_filters: def.char_filters.iter().map(char_filter_to_proto).collect(),
+        tokenizer: Some(tokenizer_to_proto(&def.tokenizer)),
+        token_filters: def
+            .token_filters
+            .iter()
+            .map(token_filter_to_proto)
+            .collect(),
+    }
+}
+
+fn analyzer_definition_from_proto(
+    proto: &v1::AnalyzerDefinition,
+) -> Result<AnalyzerDefinition, String> {
+    let tokenizer = tokenizer_from_proto(
+        proto
+            .tokenizer
+            .as_ref()
+            .ok_or("AnalyzerDefinition missing tokenizer")?,
+    )?;
+    let char_filters = proto
+        .char_filters
+        .iter()
+        .map(char_filter_from_proto)
+        .collect::<Result<Vec<_>, _>>()?;
+    let token_filters = proto
+        .token_filters
+        .iter()
+        .map(token_filter_from_proto)
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(AnalyzerDefinition {
+        char_filters,
+        tokenizer,
+        token_filters,
+    })
+}
+
+fn tokenizer_to_proto(config: &TokenizerConfig) -> v1::ComponentConfig {
+    let (type_name, params) = match config {
+        TokenizerConfig::Whitespace => ("whitespace", HashMap::new()),
+        TokenizerConfig::UnicodeWord => ("unicode_word", HashMap::new()),
+        TokenizerConfig::Regex { pattern, gaps } => {
+            let mut p = HashMap::new();
+            p.insert("pattern".into(), pattern.clone());
+            if *gaps {
+                p.insert("gaps".into(), "true".into());
+            }
+            ("regex", p)
+        }
+        TokenizerConfig::Ngram { min_gram, max_gram } => {
+            let mut p = HashMap::new();
+            p.insert("min_gram".into(), min_gram.to_string());
+            p.insert("max_gram".into(), max_gram.to_string());
+            ("ngram", p)
+        }
+        TokenizerConfig::Lindera {
+            mode,
+            dict,
+            user_dict,
+        } => {
+            let mut p = HashMap::new();
+            p.insert("mode".into(), mode.clone());
+            p.insert("dict".into(), dict.clone());
+            if let Some(ud) = user_dict {
+                p.insert("user_dict".into(), ud.clone());
+            }
+            ("lindera", p)
+        }
+        TokenizerConfig::Whole => ("whole", HashMap::new()),
+    };
+    v1::ComponentConfig {
+        r#type: type_name.into(),
+        params,
+    }
+}
+
+fn tokenizer_from_proto(proto: &v1::ComponentConfig) -> Result<TokenizerConfig, String> {
+    match proto.r#type.as_str() {
+        "whitespace" => Ok(TokenizerConfig::Whitespace),
+        "unicode_word" => Ok(TokenizerConfig::UnicodeWord),
+        "regex" => Ok(TokenizerConfig::Regex {
+            pattern: proto
+                .params
+                .get("pattern")
+                .cloned()
+                .unwrap_or_else(|| r"\w+".into()),
+            gaps: proto.params.get("gaps").is_some_and(|v| v == "true"),
+        }),
+        "ngram" => {
+            let min_gram = proto
+                .params
+                .get("min_gram")
+                .ok_or("ngram: missing min_gram")?
+                .parse::<usize>()
+                .map_err(|e| format!("ngram: invalid min_gram: {e}"))?;
+            let max_gram = proto
+                .params
+                .get("max_gram")
+                .ok_or("ngram: missing max_gram")?
+                .parse::<usize>()
+                .map_err(|e| format!("ngram: invalid max_gram: {e}"))?;
+            Ok(TokenizerConfig::Ngram { min_gram, max_gram })
+        }
+        "lindera" => Ok(TokenizerConfig::Lindera {
+            mode: proto
+                .params
+                .get("mode")
+                .cloned()
+                .unwrap_or_else(|| "normal".into()),
+            dict: proto
+                .params
+                .get("dict")
+                .cloned()
+                .ok_or("lindera: missing dict")?,
+            user_dict: proto.params.get("user_dict").cloned(),
+        }),
+        "whole" => Ok(TokenizerConfig::Whole),
+        other => Err(format!("Unknown tokenizer type: {other}")),
+    }
+}
+
+fn char_filter_to_proto(config: &CharFilterConfig) -> v1::ComponentConfig {
+    let (type_name, params) = match config {
+        CharFilterConfig::UnicodeNormalization { form } => {
+            let mut p = HashMap::new();
+            p.insert("form".into(), form.clone());
+            ("unicode_normalization", p)
+        }
+        CharFilterConfig::PatternReplace {
+            pattern,
+            replacement,
+        } => {
+            let mut p = HashMap::new();
+            p.insert("pattern".into(), pattern.clone());
+            p.insert("replacement".into(), replacement.clone());
+            ("pattern_replace", p)
+        }
+        CharFilterConfig::Mapping { mapping } => {
+            // Encode mapping as key=value pairs in params.
+            let p: HashMap<String, String> = mapping.clone();
+            ("mapping", p)
+        }
+        CharFilterConfig::JapaneseIterationMark { kanji, kana } => {
+            let mut p = HashMap::new();
+            p.insert("kanji".into(), kanji.to_string());
+            p.insert("kana".into(), kana.to_string());
+            ("japanese_iteration_mark", p)
+        }
+    };
+    v1::ComponentConfig {
+        r#type: type_name.into(),
+        params,
+    }
+}
+
+fn char_filter_from_proto(proto: &v1::ComponentConfig) -> Result<CharFilterConfig, String> {
+    match proto.r#type.as_str() {
+        "unicode_normalization" => Ok(CharFilterConfig::UnicodeNormalization {
+            form: proto
+                .params
+                .get("form")
+                .cloned()
+                .unwrap_or_else(|| "nfkc".into()),
+        }),
+        "pattern_replace" => Ok(CharFilterConfig::PatternReplace {
+            pattern: proto
+                .params
+                .get("pattern")
+                .cloned()
+                .ok_or("pattern_replace: missing pattern")?,
+            replacement: proto.params.get("replacement").cloned().unwrap_or_default(),
+        }),
+        "mapping" => Ok(CharFilterConfig::Mapping {
+            mapping: proto.params.clone(),
+        }),
+        "japanese_iteration_mark" => Ok(CharFilterConfig::JapaneseIterationMark {
+            kanji: proto.params.get("kanji").is_none_or(|v| v != "false"),
+            kana: proto.params.get("kana").is_none_or(|v| v != "false"),
+        }),
+        other => Err(format!("Unknown char filter type: {other}")),
+    }
+}
+
+fn token_filter_to_proto(config: &TokenFilterConfig) -> v1::ComponentConfig {
+    let (type_name, params) = match config {
+        TokenFilterConfig::Lowercase => ("lowercase", HashMap::new()),
+        TokenFilterConfig::Stop { words } => {
+            let mut p = HashMap::new();
+            if let Some(word_list) = words {
+                p.insert("words".into(), word_list.join(","));
+            }
+            ("stop", p)
+        }
+        TokenFilterConfig::Stem { stem_type } => {
+            let mut p = HashMap::new();
+            if let Some(st) = stem_type {
+                p.insert("stem_type".into(), st.clone());
+            }
+            ("stem", p)
+        }
+        TokenFilterConfig::Boost { boost } => {
+            let mut p = HashMap::new();
+            p.insert("boost".into(), boost.to_string());
+            ("boost", p)
+        }
+        TokenFilterConfig::Limit { limit } => {
+            let mut p = HashMap::new();
+            p.insert("limit".into(), limit.to_string());
+            ("limit", p)
+        }
+        TokenFilterConfig::Strip => ("strip", HashMap::new()),
+        TokenFilterConfig::RemoveEmpty => ("remove_empty", HashMap::new()),
+        TokenFilterConfig::FlattenGraph => ("flatten_graph", HashMap::new()),
+    };
+    v1::ComponentConfig {
+        r#type: type_name.into(),
+        params,
+    }
+}
+
+fn token_filter_from_proto(proto: &v1::ComponentConfig) -> Result<TokenFilterConfig, String> {
+    match proto.r#type.as_str() {
+        "lowercase" => Ok(TokenFilterConfig::Lowercase),
+        "stop" => Ok(TokenFilterConfig::Stop {
+            words: proto.params.get("words").map(|w| {
+                w.split(',')
+                    .map(|s| s.trim().to_string())
+                    .collect::<Vec<_>>()
+            }),
+        }),
+        "stem" => Ok(TokenFilterConfig::Stem {
+            stem_type: proto.params.get("stem_type").cloned(),
+        }),
+        "boost" => {
+            let boost = proto
+                .params
+                .get("boost")
+                .ok_or("boost: missing boost")?
+                .parse::<f32>()
+                .map_err(|e| format!("boost: invalid value: {e}"))?;
+            Ok(TokenFilterConfig::Boost { boost })
+        }
+        "limit" => {
+            let limit = proto
+                .params
+                .get("limit")
+                .ok_or("limit: missing limit")?
+                .parse::<usize>()
+                .map_err(|e| format!("limit: invalid value: {e}"))?;
+            Ok(TokenFilterConfig::Limit { limit })
+        }
+        "strip" => Ok(TokenFilterConfig::Strip),
+        "remove_empty" => Ok(TokenFilterConfig::RemoveEmpty),
+        "flatten_graph" => Ok(TokenFilterConfig::FlattenGraph),
+        other => Err(format!("Unknown token filter type: {other}")),
+    }
+}
+
+// ---- Embedder definition conversion ----
+
+fn embedder_definition_to_proto(def: &EmbedderDefinition) -> v1::EmbedderConfig {
+    let (type_name, params) = match def {
+        EmbedderDefinition::Precomputed => ("precomputed", HashMap::new()),
+        EmbedderDefinition::CandleBert { model } => {
+            let mut p = HashMap::new();
+            p.insert("model".into(), model.clone());
+            ("candle_bert", p)
+        }
+        EmbedderDefinition::CandleClip { model } => {
+            let mut p = HashMap::new();
+            p.insert("model".into(), model.clone());
+            ("candle_clip", p)
+        }
+        EmbedderDefinition::Openai { model } => {
+            let mut p = HashMap::new();
+            p.insert("model".into(), model.clone());
+            ("openai", p)
+        }
+    };
+    v1::EmbedderConfig {
+        r#type: type_name.into(),
+        params,
+    }
+}
+
+fn embedder_definition_from_proto(
+    proto: &v1::EmbedderConfig,
+) -> Result<EmbedderDefinition, String> {
+    match proto.r#type.as_str() {
+        "precomputed" => Ok(EmbedderDefinition::Precomputed),
+        "candle_bert" => Ok(EmbedderDefinition::CandleBert {
+            model: proto
+                .params
+                .get("model")
+                .cloned()
+                .ok_or("candle_bert: missing model")?,
+        }),
+        "candle_clip" => Ok(EmbedderDefinition::CandleClip {
+            model: proto
+                .params
+                .get("model")
+                .cloned()
+                .ok_or("candle_clip: missing model")?,
+        }),
+        "openai" => Ok(EmbedderDefinition::Openai {
+            model: proto
+                .params
+                .get("model")
+                .cloned()
+                .ok_or("openai: missing model")?,
+        }),
+        other => Err(format!("Unknown embedder type: {other}")),
     }
 }

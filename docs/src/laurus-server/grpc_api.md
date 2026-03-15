@@ -60,7 +60,7 @@ Each `FieldOption` is a `oneof` with one of the following field types:
 
 | Lexical Fields | Vector Fields |
 | :--- | :--- |
-| `TextOption` (`indexed`, `stored`, `term_vectors`) | `HnswOption` (`dimension`, `distance`, `m`, `ef_construction`, `base_weight`, `quantizer`) |
+| `TextOption` (`indexed`, `stored`, `term_vectors`, `analyzer`) | `HnswOption` (`dimension`, `distance`, `m`, `ef_construction`, `base_weight`, `quantizer`) |
 | `IntegerOption` (`indexed`, `stored`) | `FlatOption` (`dimension`, `distance`, `base_weight`, `quantizer`) |
 | `FloatOption` (`indexed`, `stored`) | `IvfOption` (`dimension`, `distance`, `n_clusters`, `n_probe`, `base_weight`, `quantizer`) |
 | `BooleanOption` (`indexed`, `stored`) | |

@@ -1,5 +1,11 @@
+pub mod analyzer;
+pub mod embedder;
+
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+
+use self::analyzer::AnalyzerDefinition;
+use self::embedder::EmbedderDefinition;
 
 use crate::lexical::core::field::{
     BooleanOption, BytesOption, DateTimeOption, FloatOption, GeoOption, IntegerOption, TextOption,
@@ -8,11 +14,19 @@ use crate::vector::core::field::{FlatOption, HnswOption, IvfOption};
 
 /// Schema for the unified engine.
 ///
-/// Declares what fields exist and their index types (lexical or vector).
-/// Runtime configuration such as analyzers and embedders are provided
-/// separately via [`super::EngineBuilder`].
+/// Declares what fields exist, their index types (lexical or vector),
+/// and optional custom analyzer definitions. Custom analyzers are
+/// referenced by name from [`TextOption::analyzer`].
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Schema {
+    /// Custom analyzer definitions, keyed by name.
+    /// These can be referenced from text field `analyzer` settings.
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub analyzers: HashMap<String, AnalyzerDefinition>,
+    /// Embedder definitions, keyed by name.
+    /// These can be referenced from vector field `embedder` settings.
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub embedders: HashMap<String, EmbedderDefinition>,
     /// Options for each field.
     pub fields: HashMap<String, FieldOption>,
     /// Default fields for search.
@@ -23,6 +37,8 @@ pub struct Schema {
 impl Schema {
     pub fn new() -> Self {
         Self {
+            analyzers: HashMap::new(),
+            embedders: HashMap::new(),
             fields: HashMap::new(),
             default_fields: Vec::new(),
         }
@@ -103,6 +119,16 @@ impl FieldOption {
         }
     }
 
+    /// Returns the embedder name if this is a vector field with an embedder configured.
+    pub fn embedder_name(&self) -> Option<&str> {
+        match self {
+            Self::Hnsw(o) => o.embedder.as_deref(),
+            Self::Flat(o) => o.embedder.as_deref(),
+            Self::Ivf(o) => o.embedder.as_deref(),
+            _ => None,
+        }
+    }
+
     /// Converts to the lexical-subsystem's `FieldOption` if this is a lexical field.
     pub fn to_lexical(&self) -> Option<crate::lexical::core::field::FieldOption> {
         match self {
@@ -122,6 +148,8 @@ impl FieldOption {
 
 #[derive(Default)]
 pub struct SchemaBuilder {
+    analyzers: HashMap<String, AnalyzerDefinition>,
+    embedders: HashMap<String, EmbedderDefinition>,
     fields: HashMap<String, FieldOption>,
     default_fields: Vec<String>,
 }
@@ -191,8 +219,32 @@ impl SchemaBuilder {
         self
     }
 
+    /// Add a custom analyzer definition to the schema.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The analyzer name (referenced from `TextOption::analyzer`).
+    /// * `definition` - The analyzer definition.
+    pub fn add_analyzer(mut self, name: impl Into<String>, definition: AnalyzerDefinition) -> Self {
+        self.analyzers.insert(name.into(), definition);
+        self
+    }
+
+    /// Add an embedder definition to the schema.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The embedder name (referenced from vector field `embedder`).
+    /// * `definition` - The embedder definition.
+    pub fn add_embedder(mut self, name: impl Into<String>, definition: EmbedderDefinition) -> Self {
+        self.embedders.insert(name.into(), definition);
+        self
+    }
+
     pub fn build(self) -> Schema {
         Schema {
+            analyzers: self.analyzers,
+            embedders: self.embedders,
             fields: self.fields,
             default_fields: self.default_fields,
         }

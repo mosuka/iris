@@ -2,6 +2,7 @@ pub mod query;
 pub mod schema;
 pub mod search;
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::analysis::analyzer::analyzer::Analyzer;
@@ -21,6 +22,16 @@ use crate::vector::store::config::VectorIndexConfig;
 
 use self::schema::Schema;
 
+/// Combined statistics from both the lexical and vector stores.
+#[derive(Debug, Clone, Default)]
+pub struct EngineStats {
+    /// Total number of documents in the index (from the lexical store).
+    pub document_count: u64,
+    /// Per-field vector statistics, keyed by field name.
+    /// Empty when the schema contains no vector fields.
+    pub vector_fields: HashMap<String, crate::vector::index::field::VectorFieldStats>,
+}
+
 /// Unified Engine that manages both Lexical and Vector indices.
 ///
 /// This engine acts as a facade, coordinating document ingestion and search
@@ -37,7 +48,6 @@ pub struct Engine {
 }
 
 use crate::engine::search::{FusionAlgorithm, SearchResult};
-use std::collections::HashMap;
 
 impl Engine {
     /// Create a new Unified Engine with default analyzer and no embedder.
@@ -308,18 +318,54 @@ impl Engine {
         Ok(())
     }
 
-    /// Get index statistics.
+    /// Get combined index statistics from both the lexical and vector stores.
     ///
-    /// Returns [`VectorStats`](crate::vector::store::response::VectorStats)
-    /// containing the total `document_count` from the vector index. The
-    /// per-field `fields` map is currently always empty (per-field stats
-    /// are not yet aggregated). Lexical index statistics are not included.
+    /// Returns an [`EngineStats`] containing:
+    /// - `document_count` from the lexical index (authoritative source).
+    /// - Per-field vector statistics from the vector store (empty when no
+    ///   vector fields are defined in the schema).
     ///
     /// # Errors
     ///
-    /// Returns an error if acquiring the vector index reader fails.
-    pub fn stats(&self) -> Result<crate::vector::store::response::VectorStats> {
-        self.vector.stats()
+    /// Returns an error if the lexical index statistics cannot be retrieved.
+    pub fn stats(&self) -> Result<EngineStats> {
+        let lexical_stats = self.lexical.stats()?;
+
+        let vector_fields = match self.vector.stats() {
+            Ok(vs) => vs.fields,
+            Err(_) => std::collections::HashMap::new(),
+        };
+
+        Ok(EngineStats {
+            document_count: lexical_stats.doc_count,
+            vector_fields,
+        })
+    }
+
+    /// Resolve a [`LexicalSearchQuery`] into a concrete [`Query`] object.
+    ///
+    /// If the query is already an `Obj` variant, it is returned as-is.
+    /// If it is a `Dsl` string, it is parsed using the lexical store's
+    /// query parser (which includes the configured analyzer and default fields).
+    ///
+    /// # Arguments
+    ///
+    /// * `query` - The query to resolve.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the DSL string cannot be parsed.
+    fn resolve_query(
+        &self,
+        query: crate::lexical::search::searcher::LexicalSearchQuery,
+    ) -> Result<Box<dyn crate::lexical::query::Query>> {
+        match query {
+            crate::lexical::search::searcher::LexicalSearchQuery::Obj(q) => Ok(q),
+            crate::lexical::search::searcher::LexicalSearchQuery::Dsl(dsl) => {
+                let parser = self.lexical.query_parser()?;
+                parser.parse(&dsl)
+            }
+        }
     }
 
     /// Get all documents (including chunks) by external ID.
@@ -413,7 +459,7 @@ impl Engine {
     }
 
     /// Split the unified schema into specialized configs.
-    fn split_schema(
+    async fn split_schema(
         schema: &Schema,
         analyzer: Option<Arc<dyn Analyzer>>,
         embedder: Option<Arc<dyn Embedder>>,
@@ -426,7 +472,7 @@ impl Engine {
 
         // If the user passed a PerFieldAnalyzer, clone it and ensure _id uses KeywordAnalyzer.
         // Otherwise, wrap the simple analyzer in a new PerFieldAnalyzer.
-        let per_field_analyzer =
+        let mut per_field_analyzer =
             if let Some(existing) = analyzer.as_any().downcast_ref::<PerFieldAnalyzer>() {
                 let mut pfa = existing.clone();
                 pfa.add_analyzer("_id", Arc::new(KeywordAnalyzer::new()));
@@ -436,6 +482,34 @@ impl Engine {
                 pfa.add_analyzer("_id", Arc::new(KeywordAnalyzer::new()));
                 pfa
             };
+
+        // Register per-field analyzers declared in the schema.
+        // Resolution order: built-in name → custom definition in schema.analyzers.
+        for (name, field_option) in &schema.fields {
+            if let schema::FieldOption::Text(text_opt) = field_option
+                && let Some(analyzer_name) = &text_opt.analyzer
+            {
+                let field_analyzer =
+                    match crate::analysis::analyzer::registry::create_analyzer_by_name(
+                        analyzer_name,
+                    ) {
+                        Ok(a) => a,
+                        Err(_) => {
+                            let def = schema.analyzers.get(analyzer_name).ok_or_else(|| {
+                                crate::error::LaurusError::invalid_argument(format!(
+                                    "Unknown analyzer '{analyzer_name}' for field '{name}': \
+                                 not a built-in and not defined in schema.analyzers"
+                                ))
+                            })?;
+                            crate::analysis::analyzer::registry::create_analyzer_from_definition(
+                                analyzer_name,
+                                def,
+                            )?
+                        }
+                    };
+                per_field_analyzer.add_analyzer(name, field_analyzer);
+            }
+        }
 
         let mut lexical_builder =
             LexicalIndexConfig::builder().analyzer(Arc::new(per_field_analyzer));
@@ -448,7 +522,46 @@ impl Engine {
 
         let lexical_config = lexical_builder.build();
 
-        // Construct Vector Config
+        // Construct Vector Config — resolve embedder from schema if not explicitly provided.
+        let embedder = if embedder.is_some() {
+            embedder
+        } else if !schema.embedders.is_empty() {
+            // Build a PerFieldEmbedder from schema.embedders declarations.
+            let mut embedder_cache: HashMap<String, Arc<dyn crate::embedding::embedder::Embedder>> =
+                HashMap::new();
+            let default_embedder: Arc<dyn crate::embedding::embedder::Embedder> =
+                Arc::new(crate::embedding::precomputed::PrecomputedEmbedder::new());
+            let mut per_field =
+                crate::embedding::per_field::PerFieldEmbedder::new(default_embedder);
+
+            for (name, field_option) in &schema.fields {
+                if let Some(embedder_name) = field_option.embedder_name() {
+                    let emb = if let Some(cached) = embedder_cache.get(embedder_name) {
+                        cached.clone()
+                    } else {
+                        let def = schema.embedders.get(embedder_name).ok_or_else(|| {
+                            crate::error::LaurusError::invalid_argument(format!(
+                                "Unknown embedder '{embedder_name}' for field '{name}': \
+                                 not defined in schema.embedders"
+                            ))
+                        })?;
+                        let emb = crate::embedding::registry::create_embedder_from_definition(
+                            embedder_name,
+                            def,
+                        )
+                        .await?;
+                        embedder_cache.insert(embedder_name.to_string(), emb.clone());
+                        emb
+                    };
+                    per_field.add_embedder(name, emb);
+                }
+            }
+
+            Some(Arc::new(per_field) as Arc<dyn crate::embedding::embedder::Embedder>)
+        } else {
+            None
+        };
+
         let mut vector_builder = VectorIndexConfig::builder();
         if let Some(embedder) = &embedder {
             vector_builder = vector_builder.embedder(embedder.clone());
@@ -524,7 +637,7 @@ impl Engine {
                 let new_lexical_query: Option<Box<dyn crate::lexical::query::Query>> =
                     if let Some(lex_req) = &request.lexical_search_request {
                         use crate::lexical::query::boolean::BooleanQueryBuilder;
-                        let user_query = lex_req.query.clone().unwrap_query()?;
+                        let user_query = self.resolve_query(lex_req.query.clone())?;
                         let bool_query = BooleanQueryBuilder::new()
                             .must(user_query)
                             .filter(filter_query.clone_box())
@@ -543,7 +656,7 @@ impl Engine {
         let mut lexical_query_to_use = if lexical_query_override.is_some() {
             lexical_query_override
         } else if let Some(lex_req) = &request.lexical_search_request {
-            Some(lex_req.query.clone().unwrap_query()?)
+            Some(self.resolve_query(lex_req.query.clone())?)
         } else {
             None
         };
@@ -854,7 +967,7 @@ impl EngineBuilder {
     /// opening, or recovery replay fails.
     pub async fn build(self) -> Result<Engine> {
         let (lexical_config, vector_config) =
-            Engine::split_schema(&self.schema, self.analyzer, self.embedder)?;
+            Engine::split_schema(&self.schema, self.analyzer, self.embedder).await?;
 
         let lexical_storage = Arc::new(PrefixedStorage::new("lexical", self.storage.clone()));
         let vector_storage = Arc::new(PrefixedStorage::new("vector", self.storage.clone()));
@@ -947,5 +1060,126 @@ mod tests {
             .await;
 
         assert!(result.is_ok(), "Should accept simple embedder");
+    }
+
+    #[tokio::test]
+    async fn test_schema_per_field_analyzer() {
+        use crate::data::DataValue;
+        use crate::engine::schema::FieldOption;
+        use crate::lexical::core::field::TextOption;
+        use crate::lexical::search::searcher::LexicalSearchRequest;
+
+        let storage: Arc<dyn Storage> = Arc::new(MemoryStorage::new(Default::default()));
+
+        // "category" uses keyword analyzer (no tokenization).
+        // "body" uses default (standard) analyzer.
+        let schema = Schema::builder()
+            .add_field(
+                "category",
+                FieldOption::Text(TextOption::default().analyzer("keyword")),
+            )
+            .add_field("body", FieldOption::Text(TextOption::default()))
+            .build();
+
+        let engine = Engine::new(storage, schema).await.unwrap();
+
+        let mut doc = crate::data::Document::new();
+        doc.fields
+            .insert("category".into(), DataValue::Text("Rust Lang".into()));
+        doc.fields.insert(
+            "body".into(),
+            DataValue::Text("Rust is a systems programming language".into()),
+        );
+        engine.put_document("doc1", doc).await.unwrap();
+        engine.commit().await.unwrap();
+
+        // "Rust Lang" as keyword — exact match required.
+        let request = crate::engine::search::SearchRequestBuilder::new()
+            .lexical_search_request(LexicalSearchRequest::from_dsl("category:\"Rust Lang\""))
+            .limit(10)
+            .build();
+        let results = engine.search(request).await.unwrap();
+        assert_eq!(
+            results.len(),
+            1,
+            "Keyword analyzer should match exact phrase"
+        );
+
+        // Partial token "Rust" should NOT match keyword-analyzed category.
+        let request = crate::engine::search::SearchRequestBuilder::new()
+            .lexical_search_request(LexicalSearchRequest::from_dsl("category:Rust"))
+            .limit(10)
+            .build();
+        let results = engine.search(request).await.unwrap();
+        assert!(
+            results.is_empty(),
+            "Keyword analyzer should not match partial tokens"
+        );
+
+        // Standard-analyzed "body" field should match single token "rust".
+        let request = crate::engine::search::SearchRequestBuilder::new()
+            .lexical_search_request(LexicalSearchRequest::from_dsl("body:rust"))
+            .limit(10)
+            .build();
+        let results = engine.search(request).await.unwrap();
+        assert_eq!(
+            results.len(),
+            1,
+            "Standard analyzer should tokenize and match"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_custom_analyzer_definition_in_schema() {
+        use crate::data::DataValue;
+        use crate::engine::schema::FieldOption;
+        use crate::engine::schema::analyzer::{
+            AnalyzerDefinition, CharFilterConfig, TokenFilterConfig, TokenizerConfig,
+        };
+        use crate::lexical::core::field::TextOption;
+        use crate::lexical::search::searcher::LexicalSearchRequest;
+
+        let storage: Arc<dyn Storage> = Arc::new(MemoryStorage::new(Default::default()));
+
+        // Define a custom analyzer: whitespace + NFKC normalization + lowercase.
+        let schema = Schema::builder()
+            .add_analyzer(
+                "my_custom",
+                AnalyzerDefinition {
+                    char_filters: vec![CharFilterConfig::UnicodeNormalization {
+                        form: "nfkc".into(),
+                    }],
+                    tokenizer: TokenizerConfig::Whitespace,
+                    token_filters: vec![TokenFilterConfig::Lowercase],
+                },
+            )
+            .add_field(
+                "content",
+                FieldOption::Text(TextOption::default().analyzer("my_custom")),
+            )
+            .build();
+
+        let engine = Engine::new(storage, schema).await.unwrap();
+
+        let mut doc = crate::data::Document::new();
+        // Fullwidth "ＨＥＬＬＯ" should be normalized to "HELLO", then lowercased.
+        doc.fields.insert(
+            "content".into(),
+            DataValue::Text("\u{ff28}\u{ff25}\u{ff2c}\u{ff2c}\u{ff2f} world".into()),
+        );
+        engine.put_document("doc1", doc).await.unwrap();
+        engine.commit().await.unwrap();
+
+        // Search for "hello" should match (NFKC + lowercase).
+        let request = crate::engine::search::SearchRequestBuilder::new()
+            .lexical_search_request(LexicalSearchRequest::from_dsl("content:hello"))
+            .limit(10)
+            .build();
+        let results = engine.search(request).await.unwrap();
+        assert_eq!(
+            results.len(),
+            1,
+            "Custom analyzer (NFKC + lowercase) should match normalized text"
+        );
     }
 }

@@ -99,6 +99,10 @@ pub struct FlatOption {
     /// Optional quantization method to reduce memory usage at the cost of some precision.
     #[serde(default)]
     pub quantizer: Option<quantization::QuantizationMethod>,
+    /// Embedder name for this vector field.
+    /// When set, the engine automatically embeds input using the named embedder.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub embedder: Option<String>,
 }
 
 impl Default for FlatOption {
@@ -108,6 +112,7 @@ impl Default for FlatOption {
             distance: default_distance_metric(),
             base_weight: default_weight(),
             quantizer: None,
+            embedder: None,
         }
     }
 }
@@ -136,6 +141,10 @@ pub struct HnswOption {
     /// Optional quantization method to reduce memory usage at the cost of some precision.
     #[serde(default)]
     pub quantizer: Option<quantization::QuantizationMethod>,
+    /// Embedder name for this vector field.
+    /// When set, the engine automatically embeds input using the named embedder.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub embedder: Option<String>,
 }
 
 impl Default for HnswOption {
@@ -147,6 +156,7 @@ impl Default for HnswOption {
             ef_construction: default_getting_ef_construction(),
             base_weight: default_weight(),
             quantizer: None,
+            embedder: None,
         }
     }
 }
@@ -173,6 +183,10 @@ pub struct IvfOption {
     /// Optional quantization method to reduce memory usage at the cost of some precision.
     #[serde(default)]
     pub quantizer: Option<quantization::QuantizationMethod>,
+    /// Embedder name for this vector field.
+    /// When set, the engine automatically embeds input using the named embedder.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub embedder: Option<String>,
 }
 
 impl Default for IvfOption {
@@ -184,6 +198,7 @@ impl Default for IvfOption {
             n_probe: default_getting_n_probe(),
             base_weight: default_weight(),
             quantizer: None,
+            embedder: None,
         }
     }
 }

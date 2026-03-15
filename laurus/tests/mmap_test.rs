@@ -27,6 +27,7 @@ async fn test_mmap_mode_basic_search() {
             distance: DistanceMetric::Cosine,
             base_weight: 1.0,
             quantizer: None,
+            embedder: None,
         })),
         lexical: None,
     };
@@ -83,6 +84,7 @@ async fn test_mmap_mode_persistence_reload() {
                 distance: DistanceMetric::Cosine,
                 base_weight: 1.0,
                 quantizer: None,
+            embedder: None,
             })),
             lexical: None,
         };
@@ -120,6 +122,7 @@ async fn test_mmap_mode_persistence_reload() {
                 distance: DistanceMetric::Cosine,
                 base_weight: 1.0,
                 quantizer: None,
+            embedder: None,
             })),
             lexical: None,
         };
