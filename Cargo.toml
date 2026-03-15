@@ -3,7 +3,7 @@ members = ["laurus", "laurus-cli", "laurus-server"]
 resolver = "2"
 
 [workspace.package]
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 description = "Unified search library for lexical, vector, and semantic retrieval"
 documentation = "https://docs.rs/laurus"
@@ -15,17 +15,16 @@ categories = ["text-processing"]
 license = "MIT"
 
 [workspace.dependencies]
-laurus = { version = "0.1.0", path = "laurus" }
-laurus-server = { version = "0.1.0", path = "laurus-server" }
-laurus-cli = { version = "0.1.0", path = "laurus-cli" }
+laurus = { version = "0.2.0", path = "laurus" }
+laurus-server = { version = "0.2.0", path = "laurus-server" }
 
 anyhow = "1.0.102"
 chrono = { version = "0.4.44", features = ["serde"] }
-clap = { version = "4.5.60", features = ["derive", "env"] }
+clap = { version = "4.6.0", features = ["derive", "env"] }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.149"
-toml = "0.9.8"
-tokio = { version = "1.49.0", features = ["full"] }
+toml = "1.0.6"
+tokio = { version = "1.50.0", features = ["full"] }
 tabled = "0.20.0"
 rustyline = "17.0.2"
 dialoguer = "0.12.0"
@@ -36,7 +35,7 @@ tonic-build = "0.14.5"
 tonic-prost-build = "0.14.5"
 tokio-stream = "0.1.18"
 tracing = "0.1.44"
-tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 axum = "0.8.8"
 
 [profile.release]

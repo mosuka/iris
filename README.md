@@ -15,32 +15,75 @@ Rather than functioning as a monolithic search engine, Laurus is architected as 
 
 ## Documentation
 
-Comprehensive documentation is available in the [`docs/`](docs/) directory and online at [https://mosuka.github.io/laurus/](https://mosuka.github.io/laurus/):
+Comprehensive documentation is available online:
 
-- [**Getting Started**](https://mosuka.github.io/laurus/getting_started.html): Installation and basic usage.
-- [**Architecture**](https://mosuka.github.io/laurus/architecture.html): System architecture overview.
-- [**Core Concepts**](https://mosuka.github.io/laurus/concepts.html): Schema, Analysis, Embeddings, and Storage.
-- [**Indexing**](https://mosuka.github.io/laurus/indexing.html): Lexical and Vector indexing.
-- [**Search**](https://mosuka.github.io/laurus/search.html): Lexical, Vector, and Hybrid search.
-- [**Advanced Features**](https://mosuka.github.io/laurus/advanced.html): Query DSL, ID Management, Persistence, and Deletions.
-- [**API Reference**](https://docs.rs/laurus)
+- **English**: [https://mosuka.github.io/laurus/](https://mosuka.github.io/laurus/)
+- **Japanese (日本語)**: [https://mosuka.github.io/laurus/ja/](https://mosuka.github.io/laurus/ja/)
+
+### Contents
+
+- **Getting Started**
+  - [Installation](https://mosuka.github.io/laurus/getting_started/installation.html)
+  - [Quick Start](https://mosuka.github.io/laurus/getting_started/quickstart.html)
+  - [Examples](https://mosuka.github.io/laurus/getting_started/examples.html)
+- **Core Concepts**
+  - [Schema & Fields](https://mosuka.github.io/laurus/concepts/schema_and_fields.html)
+  - [Text Analysis](https://mosuka.github.io/laurus/concepts/analysis.html)
+  - [Embeddings](https://mosuka.github.io/laurus/concepts/embedding.html)
+  - [Storage](https://mosuka.github.io/laurus/concepts/storage.html)
+  - [Indexing](https://mosuka.github.io/laurus/concepts/indexing.html) (Lexical / Vector)
+  - [Search](https://mosuka.github.io/laurus/concepts/search.html) (Lexical / Vector / Hybrid)
+  - [Query DSL](https://mosuka.github.io/laurus/concepts/query_dsl.html)
+- **Crate Guides**
+  - [laurus (Library)](https://mosuka.github.io/laurus/laurus.html) — Engine, Scoring, Faceting, Highlighting, Spelling Correction, Persistence & WAL
+  - [laurus-cli](https://mosuka.github.io/laurus/laurus-cli.html) — Command-line interface, REPL, Schema Format
+  - [laurus-server](https://mosuka.github.io/laurus/laurus-server.html) — gRPC server, HTTP Gateway, Configuration
+- **Development**
+  - [Build & Test](https://mosuka.github.io/laurus/development/build_and_test.html)
+  - [Feature Flags](https://mosuka.github.io/laurus/development/feature_flags.html)
+  - [Project Structure](https://mosuka.github.io/laurus/development/project_structure.html)
+- [**API Reference (docs.rs)**](https://docs.rs/laurus)
 
 ## Features
 
 - **Pure Rust Implementation**: Memory-safe and fast performance with zero-cost abstractions.
 - **Hybrid Search**: Seamlessly combine BM25 lexical search with HNSW vector search using configurable fusion strategies.
-- **Multimodal capabilities**: Native support for text-to-image and image-to-image search via CLIP embeddings.
-- **Rich Query DSL**: Term, phrase, boolean, fuzzy, wildcard, range, and geographic queries.
-- **Flexible Analysis**: Configurable pipelines for tokenization, normalization, and stemming (including CJK support).
+- **Multimodal Capabilities**: Native support for text-to-image and image-to-image search via CLIP embeddings.
+- **Rich Query DSL**: Term, phrase, boolean, fuzzy, wildcard, range, geographic, and span queries.
+- **Flexible Analysis**: Configurable pipelines for tokenization, normalization, and stemming (including CJK support via [Lindera](https://github.com/lindera/lindera)).
 - **Pluggable Storage**: Interfaces for in-memory, file-system, and memory-mapped storage backends.
+- **Scoring & Ranking**: BM25 scoring with customizable fusion strategies for hybrid results.
+- **Faceting & Highlighting**: Built-in support for faceted navigation and search result highlighting.
+- **Spelling Correction**: Suggest corrections for misspelled query terms.
+
+## Workspace Structure
+
+Laurus is organized as a Cargo workspace with 3 crates:
+
+| Crate | Description |
+| --- | --- |
+| [`laurus`](laurus/) | Core search library — schema, analysis, indexing, search, and storage |
+| [`laurus-cli`](laurus-cli/) | Command-line interface with REPL for interactive search |
+| [`laurus-server`](laurus-server/) | gRPC server with HTTP gateway for deploying Laurus as a service |
+
+## Feature Flags
+
+The `laurus` crate provides optional feature flags for embedding support:
+
+| Feature | Description |
+| --- | --- |
+| `embeddings-candle` | Local BERT embeddings via [Candle](https://github.com/huggingface/candle) |
+| `embeddings-openai` | Cloud-based embeddings via the OpenAI API |
+| `embeddings-multimodal` | CLIP-based multimodal (text + image) embeddings |
+| `embeddings-all` | Enable all embedding backends |
 
 ## Quick Start
 
 ```rust
 use laurus::lexical::{TermQuery, TextOption};
-use laurus::{Document, Engine, LexicalSearchRequest, Schema, SearchRequestBuilder};
-use laurus::storage::{StorageConfig, StorageFactory};
 use laurus::storage::memory::MemoryStorageConfig;
+use laurus::storage::{StorageConfig, StorageFactory};
+use laurus::{Document, Engine, LexicalSearchRequest, Schema, SearchRequestBuilder};
 
 #[tokio::main]
 async fn main() -> laurus::Result<()> {
@@ -62,7 +105,10 @@ async fn main() -> laurus::Result<()> {
             "doc1",
             Document::builder()
                 .add_text("title", "Introduction to Rust")
-                .add_text("body", "Rust is a systems programming language focused on safety.")
+                .add_text(
+                    "body",
+                    "Rust is a systems programming language focused on safety and performance.",
+                )
                 .build(),
         )
         .await?;
@@ -71,7 +117,10 @@ async fn main() -> laurus::Result<()> {
             "doc2",
             Document::builder()
                 .add_text("title", "Python for Data Science")
-                .add_text("body", "Python is widely used in data science and machine learning.")
+                .add_text(
+                    "body",
+                    "Python is a versatile language widely used in data science and machine learning.",
+                )
                 .build(),
         )
         .await?;
@@ -84,12 +133,13 @@ async fn main() -> laurus::Result<()> {
                 .lexical_search_request(LexicalSearchRequest::new(Box::new(TermQuery::new(
                     "body", "rust",
                 ))))
+                .limit(5)
                 .build(),
         )
         .await?;
 
     for hit in &results {
-        println!("[{}] score={:.4}", hit.id, hit.score);
+        println!("score={:.4}", hit.score);
     }
 
     Ok(())
@@ -100,14 +150,16 @@ async fn main() -> laurus::Result<()> {
 
 You can find usage examples in the [`laurus/examples/`](laurus/examples/) directory:
 
-- [Quickstart](laurus/examples/quickstart.rs) - Basic full-text search
-- [Lexical Search](laurus/examples/lexical_search.rs) - All query types (Term, Phrase, Boolean, Fuzzy, Wildcard, Range, Geo, Span)
-- [Vector Search](laurus/examples/vector_search.rs) - Semantic similarity search with embeddings
-- [Hybrid Search](laurus/examples/hybrid_search.rs) - Combining lexical and vector search with fusion
-- [Multimodal Search](laurus/examples/multimodal_search.rs) - Text-to-image and image-to-image search
-- [Synonym Graph Filter](laurus/examples/synonym_graph_filter.rs) - Synonym expansion in analysis pipeline
-- [Candle Embedder](laurus/examples/search_with_candle.rs) - Local BERT embeddings
-- [OpenAI Embedder](laurus/examples/search_with_openai.rs) - Cloud-based embeddings
+| Example | Description | Feature Flag |
+| --- | --- | --- |
+| [quickstart](laurus/examples/quickstart.rs) | Basic full-text search | — |
+| [lexical_search](laurus/examples/lexical_search.rs) | All query types (Term, Phrase, Boolean, Fuzzy, Wildcard, Range, Geo, Span) | — |
+| [vector_search](laurus/examples/vector_search.rs) | Semantic similarity search with embeddings | — |
+| [hybrid_search](laurus/examples/hybrid_search.rs) | Combining lexical and vector search with fusion | — |
+| [synonym_graph_filter](laurus/examples/synonym_graph_filter.rs) | Synonym expansion in analysis pipeline | — |
+| [search_with_candle](laurus/examples/search_with_candle.rs) | Local BERT embeddings via Candle | `embeddings-candle` |
+| [search_with_openai](laurus/examples/search_with_openai.rs) | Cloud-based embeddings via OpenAI | `embeddings-openai` |
+| [multimodal_search](laurus/examples/multimodal_search.rs) | Text-to-image and image-to-image search | `embeddings-multimodal` |
 
 ## Contributing
 
