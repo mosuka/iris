@@ -108,6 +108,7 @@ impl<D: rkyv::rancor::Fallible + ?Sized>
 ///         indexed: true,
 ///         stored: true,
 ///         term_vectors: true,
+///         analyzer: None,
 ///     }),
 /// };
 /// ```
@@ -500,6 +501,7 @@ impl GeoOption {
 ///     indexed: true,
 ///     stored: true,
 ///     term_vectors: true,
+///     analyzer: None,
 /// });
 ///
 /// // Bytes field (e.g. for binary data)
