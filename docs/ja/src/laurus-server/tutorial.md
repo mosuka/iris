@@ -385,6 +385,12 @@ curl -X POST http://localhost:8080/v1/search \
 
 結果は返されません。
 
+期待されるレスポンス:
+
+```json
+{"results":[]}
+```
+
 ## Step 9: インデックス統計の確認
 
 現在のインデックス統計を確認します:
@@ -419,26 +425,68 @@ cargo build --release --features embeddings-candle
 
 ### BERT エンベッダーを使ったスキーマ
 
-```json
-{
-  "schema": {
-    "embedders": {
-      "bert": {
-        "type": "candle_bert",
-        "model": "sentence-transformers/all-MiniLM-L6-v2"
-      }
-    },
-    "fields": {
-      "title": {"text": {"indexed": true, "stored": true, "analyzer": "standard"}},
-      "body": {"text": {"indexed": true, "stored": true, "analyzer": "standard"}},
-      "embedding": {"hnsw": {"dimension": 384, "distance": "DISTANCE_METRIC_COSINE", "m": 16, "ef_construction": 200, "embedder": "bert"}}
-    },
-    "default_fields": ["title", "body"]
-  }
-}
+インデックスを作成します:
+
+```bash
+curl -X POST http://localhost:8080/v1/index \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "schema": {
+      "embedders": {
+        "bert": {
+          "type": "candle_bert",
+          "model": "sentence-transformers/all-MiniLM-L6-v2"
+        }
+      },
+      "fields": {
+        "title": {"text": {"indexed": true, "stored": true, "analyzer": "standard"}},
+        "body": {"text": {"indexed": true, "stored": true, "analyzer": "standard"}},
+        "embedding": {"hnsw": {"dimension": 384, "distance": "DISTANCE_METRIC_COSINE", "m": 16, "ef_construction": 200, "embedder": "bert"}}
+      },
+      "default_fields": ["title", "body"]
+    }
+  }'
 ```
 
 モデルは初回使用時に HuggingFace Hub から自動ダウンロードされます。`dimension`（384）はモデルの出力次元数と一致させる必要があります。
+
+ドキュメントを追加します。`embedding` フィールドには 384 次元のベクトルを事前計算して指定します:
+
+```bash
+curl -X PUT http://localhost:8080/v1/documents/doc001 \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "document": {
+      "fields": {
+        "title": "Introduction to Rust Programming",
+        "body": "Rust is a modern systems programming language.",
+        "embedding": [0.012, -0.034, 0.056, ...]
+      }
+    }
+  }'
+```
+
+コミットして検索します:
+
+```bash
+curl -X POST http://localhost:8080/v1/commit
+```
+
+```bash
+curl -X POST http://localhost:8080/v1/search \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "query": "systems programming",
+    "query_vectors": [
+      {
+        "vector": [0.011, -0.032, 0.055, ...],
+        "fields": ["embedding"]
+      }
+    ],
+    "fusion": {"rrf": {"k": 60.0}},
+    "limit": 10
+  }'
+```
 
 ### OpenAI Embeddings の利用
 
@@ -449,19 +497,29 @@ cargo build --release --features embeddings-openai
 export OPENAI_API_KEY="sk-..."
 ```
 
-```json
-{
-  "embedders": {
-    "openai": {
-      "type": "openai",
-      "model": "text-embedding-3-small"
+インデックスを作成します:
+
+```bash
+curl -X POST http://localhost:8080/v1/index \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "schema": {
+      "embedders": {
+        "openai": {
+          "type": "openai",
+          "model": "text-embedding-3-small"
+        }
+      },
+      "fields": {
+        "title": {"text": {"indexed": true, "stored": true}},
+        "embedding": {"hnsw": {"dimension": 1536, "distance": "DISTANCE_METRIC_COSINE", "embedder": "openai"}}
+      },
+      "default_fields": ["title"]
     }
-  },
-  "fields": {
-    "embedding": {"hnsw": {"dimension": 1536, "distance": "DISTANCE_METRIC_COSINE", "embedder": "openai"}}
-  }
-}
+  }'
 ```
+
+`text-embedding-3-small` モデルは 1536 次元のベクトルを出力します。
 
 ### 利用可能な埋め込みモデル
 

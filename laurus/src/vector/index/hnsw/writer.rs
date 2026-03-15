@@ -214,12 +214,22 @@ impl HnswIndexWriter {
     }
 
     /// Create a new HNSW index builder with storage.
+    ///
+    /// If an existing index file is found on disk, its vectors are loaded
+    /// into the writer so that the next commit preserves them. This
+    /// prevents data loss across multiple commit cycles.
     pub fn with_storage(
         index_config: HnswIndexConfig,
         writer_config: VectorIndexWriterConfig,
         path: impl Into<String>,
         storage: Arc<dyn Storage>,
     ) -> Result<Self> {
+        let path = path.into();
+        let file_name = format!("{}.hnsw", path);
+        if storage.file_exists(&file_name) {
+            return Self::load(index_config, writer_config, storage, &path);
+        }
+
         if index_config.m < 2 {
             return Err(crate::error::LaurusError::InvalidOperation(
                 "HNSW parameter m must be >= 2".to_string(),
@@ -232,7 +242,7 @@ impl HnswIndexWriter {
             index_config,
             writer_config,
             storage: Some(storage),
-            path: path.into(),
+            path,
             _ml,
             levels: vec![Vec::new(); max_level + 1],
             entry_point: None,

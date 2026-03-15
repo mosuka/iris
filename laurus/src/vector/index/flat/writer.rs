@@ -44,17 +44,28 @@ impl FlatIndexWriter {
     }
 
     /// Create a new flat vector index builder with storage.
+    /// Create a new flat vector index builder with storage.
+    ///
+    /// If an existing index file is found on disk, its vectors are loaded
+    /// into the writer so that the next commit preserves them. This
+    /// prevents data loss across multiple commit cycles.
     pub fn with_storage(
         index_config: FlatIndexConfig,
         writer_config: VectorIndexWriterConfig,
         path: impl Into<String>,
         storage: Arc<dyn Storage>,
     ) -> Result<Self> {
+        let path = path.into();
+        let file_name = format!("{}.flat", path);
+        if storage.file_exists(&file_name) {
+            return Self::load(index_config, writer_config, storage, &path);
+        }
+
         Ok(Self {
             index_config,
             writer_config,
             storage: Some(storage),
-            path: path.into(),
+            path,
             vectors: Vec::new(),
             is_finalized: false,
             total_vectors_to_add: None,
