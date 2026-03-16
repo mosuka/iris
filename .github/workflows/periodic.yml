@@ -43,6 +43,7 @@ jobs:
       - name: Install protoc
         uses: arduino/setup-protoc@v3
         with:
+          version: "24.x"
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install toolchain
@@ -84,6 +85,7 @@ jobs:
       - name: Install protoc
         uses: arduino/setup-protoc@v3
         with:
+          version: "24.x"
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install toolchain
