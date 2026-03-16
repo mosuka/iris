@@ -114,4 +114,4 @@ async fn main() -> Result<()> {
 
 ## License
 
-Laurus is dual-licensed under [MIT](https://opensource.org/licenses/MIT) and [Apache 2.0](https://www.apache.org/licenses/LICENSE-2.0).
+Laurus is licensed under the [MIT License](https://opensource.org/licenses/MIT).
