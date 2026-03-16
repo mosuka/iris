@@ -3,7 +3,7 @@ members = ["laurus", "laurus-cli", "laurus-server"]
 resolver = "2"
 
 [workspace.package]
-version = "0.2.0"
+version = "0.2.1"
 edition = "2024"
 description = "Unified search library for lexical, vector, and semantic retrieval"
 documentation = "https://docs.rs/laurus"
@@ -15,8 +15,8 @@ categories = ["text-processing"]
 license = "MIT"
 
 [workspace.dependencies]
-laurus = { version = "0.2.0", path = "laurus" }
-laurus-server = { version = "0.2.0", path = "laurus-server" }
+laurus = { version = "0.2.1", path = "laurus" }
+laurus-server = { version = "0.2.1", path = "laurus-server" }
 
 anyhow = "1.0.102"
 chrono = { version = "0.4.44", features = ["serde"] }

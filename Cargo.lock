@@ -2261,7 +2261,7 @@ dependencies = [
 
 [[package]]
 name = "laurus"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "ahash",
  "aho-corasick",
@@ -2311,7 +2311,7 @@ dependencies = [
 
 [[package]]
 name = "laurus-cli"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "clap",
@@ -2328,7 +2328,7 @@ dependencies = [
 
 [[package]]
 name = "laurus-server"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "axum",

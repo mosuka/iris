@@ -108,14 +108,92 @@ jobs:
             cargo test --target "${{ matrix.platform.target }}" $FEATURES
           fi
 
+  build-binary:
+    name: Build Binary
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [test]
+    strategy:
+      matrix:
+        platform:
+          - runner: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            binary: laurus
+            archive: tar.gz
+          - runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            binary: laurus
+            archive: tar.gz
+          - runner: macos-latest
+            target: aarch64-apple-darwin
+            binary: laurus
+            archive: tar.gz
+          - runner: macos-15-intel
+            target: x86_64-apple-darwin
+            binary: laurus
+            archive: tar.gz
+          - runner: windows-latest
+            target: x86_64-pc-windows-msvc
+            binary: laurus.exe
+            archive: zip
+          - runner: windows-latest
+            target: aarch64-pc-windows-msvc
+            binary: laurus.exe
+            archive: zip
+    runs-on: ${{ matrix.platform.runner }}
+    steps:
+      - name: Run checkout
+        uses: actions/checkout@v6
+
+      - name: Install protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install toolchain
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+          target: ${{ matrix.platform.target }}
+
+      - name: Build binary
+        run: cargo build --release --target ${{ matrix.platform.target }} -p laurus-cli
+
+      - name: Package binary (Unix)
+        if: runner.os == 'Linux' || runner.os == 'macOS'
+        run: |
+          tar \
+            -czf "laurus-${{ github.ref_name }}-${{ matrix.platform.target }}.tar.gz" \
+            -C "target/${{ matrix.platform.target }}/release" "${{ matrix.platform.binary }}"
+
+      - name: Package binary (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Compress-Archive `
+            -Path "target/${{ matrix.platform.target }}/release/${{ matrix.platform.binary }}" `
+            -DestinationPath "laurus-${{ github.ref_name }}-${{ matrix.platform.target }}.zip"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: laurus-${{ matrix.platform.target }}
+          path: laurus-${{ github.ref_name }}-${{ matrix.platform.target }}.${{ matrix.platform.archive }}
+
   create-release:
     name: Create Release
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [test]
+    needs: [build-binary]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: laurus-*
+          merge-multiple: true
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -125,6 +203,7 @@ jobs:
           prerelease: false
           generate_release_notes: true
           make_latest: true
+          files: artifacts/*
 
   publish-crates:
     name: Publish crates
@@ -135,6 +214,11 @@ jobs:
       - name: Run checkout
         uses: actions/checkout@v6
 
+      - name: Install protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Install toolchain
         uses: dtolnay/rust-toolchain@v1
         with:
@@ -142,7 +226,7 @@ jobs:
 
       - name: Publish crates
         run: |
-          for crate in laurus; do
+          for crate in laurus laurus-server laurus-cli; do
             VERSION=$(cargo metadata --no-deps --format-version=1 | jq -r ".packages[] | select(.name==\"$crate\") | .version")
             PUBLISHED_VERSIONS=$(curl -s -A "laurus-release-workflow (https://github.com/mosuka/laurus)" "https://crates.io/api/v1/crates/$crate" | jq -r 'select(.versions != null) | .versions[].num')
             if echo "${PUBLISHED_VERSIONS}" | grep -Fx "${VERSION}" >/dev/null; then
