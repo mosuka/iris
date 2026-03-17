@@ -26,6 +26,7 @@ jobs:
       laurus: ${{ steps.resolve.outputs.laurus }}
       cli: ${{ steps.resolve.outputs.cli }}
       server: ${{ steps.resolve.outputs.server }}
+      mcp: ${{ steps.resolve.outputs.mcp }}
     steps:
       - name: Run checkout
         uses: actions/checkout@v6
@@ -52,16 +53,24 @@ jobs:
               - 'Cargo.toml'
               - 'Cargo.lock'
               - '.github/workflows/regression.yml'
-            # cli: laurus-cli depends on laurus
+            # cli: laurus-cli depends on laurus, laurus-mcp
             cli:
               - 'laurus-cli/**'
               - 'laurus/**'
+              - 'laurus-mcp/**'
               - 'Cargo.toml'
               - 'Cargo.lock'
               - '.github/workflows/regression.yml'
             # server: laurus-server depends on laurus and has proto files
             server:
               - 'laurus-server/**'
+              - 'laurus/**'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+              - '.github/workflows/regression.yml'
+            # mcp: laurus-mcp depends on laurus
+            mcp:
+              - 'laurus-mcp/**'
               - 'laurus/**'
               - 'Cargo.toml'
               - 'Cargo.lock'
@@ -76,11 +85,13 @@ jobs:
           LAURUS: ${{ steps.filter.outputs.laurus }}
           CLI: ${{ steps.filter.outputs.cli }}
           SERVER: ${{ steps.filter.outputs.server }}
+          MCP: ${{ steps.filter.outputs.mcp }}
         run: |
           echo "code=${CODE:-true}" >> "$GITHUB_OUTPUT"
           echo "laurus=${LAURUS:-true}" >> "$GITHUB_OUTPUT"
           echo "cli=${CLI:-true}" >> "$GITHUB_OUTPUT"
           echo "server=${SERVER:-true}" >> "$GITHUB_OUTPUT"
+          echo "mcp=${MCP:-true}" >> "$GITHUB_OUTPUT"
 
   # ============================================================
   # Format
@@ -299,4 +310,63 @@ jobs:
             cargo check --package laurus-server --target "${{ matrix.platform.target }}" $FEATURES
           else
             cargo test --package laurus-server --target "${{ matrix.platform.target }}" $FEATURES
+          fi
+
+  # ============================================================
+  # Test laurus-mcp
+  # ============================================================
+  test-mcp:
+    name: Test laurus-mcp
+    needs: [changes, clippy]
+    if: ${{ !failure() && !cancelled() && needs.changes.outputs.mcp == 'true' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - runner: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            skip_embedding_features: true
+          - runner: macos-latest
+            target: aarch64-apple-darwin
+          - runner: macos-15-intel
+            target: x86_64-apple-darwin
+          - runner: windows-latest
+            target: x86_64-pc-windows-msvc
+          - runner: windows-latest
+            target: aarch64-pc-windows-msvc
+            skip_test_run: true
+            skip_embedding_features: true
+        toolchain: [stable]
+    runs-on: ${{ matrix.platform.runner }}
+    steps:
+      - name: Run checkout
+        uses: actions/checkout@v6
+
+      - name: Install protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          version: "24.x"
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install toolchain
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: ${{ matrix.toolchain }}
+          target: ${{ matrix.platform.target }}
+
+      - name: Run test
+        shell: bash
+        run: |
+          if [ "${{ matrix.platform.skip_embedding_features }}" == "true" ]; then
+            FEATURES=""
+          else
+            FEATURES="--all-features"
+          fi
+
+          if [ "${{ matrix.platform.skip_test_run }}" == "true" ]; then
+            cargo check --package laurus-mcp --target "${{ matrix.platform.target }}" $FEATURES
+          else
+            cargo test --package laurus-mcp --target "${{ matrix.platform.target }}" $FEATURES
           fi

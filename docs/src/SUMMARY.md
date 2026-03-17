@@ -58,6 +58,12 @@
   - [gRPC API Reference](laurus-server/grpc_api.md)
   - [HTTP Gateway](laurus-server/http_gateway.md)
 
+# laurus-mcp
+
+- [MCP Server Overview](laurus-mcp.md)
+  - [Getting Started](laurus-mcp/getting_started.md)
+  - [Tools Reference](laurus-mcp/tools.md)
+
 # Development Guide
 
 - [Build & Test](development/build_and_test.md)

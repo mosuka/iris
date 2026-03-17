@@ -58,6 +58,12 @@
   - [gRPC API リファレンス](laurus-server/grpc_api.md)
   - [HTTP Gateway](laurus-server/http_gateway.md)
 
+# laurus-mcp
+
+- [MCP サーバー概要](laurus-mcp.md)
+  - [はじめに](laurus-mcp/getting_started.md)
+  - [ツールリファレンス](laurus-mcp/tools.md)
+
 # 開発ガイド
 
 - [ビルドとテスト](development/build_and_test.md)

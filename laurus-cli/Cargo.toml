@@ -27,3 +27,4 @@ toml = { workspace = true }
 
 laurus = { workspace = true }
 laurus-server = { workspace = true }
+laurus-mcp = { workspace = true }
