@@ -53,24 +53,64 @@ rpc CreateIndex(CreateIndexRequest) returns (CreateIndexResponse);
 message Schema {
   map<string, FieldOption> fields = 1;
   repeated string default_fields = 2;
+  map<string, AnalyzerDefinition> analyzers = 3;
+  map<string, EmbedderConfig> embedders = 4;
 }
 ```
+
+- **`fields`** — フィールド名をキーとしたフィールド定義。
+- **`default_fields`** — クエリでフィールドを指定しない場合のデフォルト検索対象フィールド名。
+- **`analyzers`** — 名前をキーとしたカスタムアナライザーパイプライン。`TextOption.analyzer` で参照。
+- **`embedders`** — 名前をキーとしたエンベッダー設定。ベクトルフィールドオプション（`HnswOption.embedder` など）で参照。
+
+**AnalyzerDefinition:**
+
+```protobuf
+message AnalyzerDefinition {
+  repeated ComponentConfig char_filters = 1;
+  ComponentConfig tokenizer = 2;
+  repeated ComponentConfig token_filters = 3;
+}
+```
+
+**ComponentConfig**（文字フィルター、トークナイザー、トークンフィルターに使用）:
+
+| フィールド | 型 | 説明 |
+| :--- | :--- | :--- |
+| `type` | `string` | コンポーネントタイプ名（例: `"whitespace"`, `"lowercase"`, `"unicode_normalization"`） |
+| `params` | `map<string, string>` | タイプ固有のパラメータ（文字列のキーと値のペア） |
+
+**EmbedderConfig:**
+
+| フィールド | 型 | 説明 |
+| :--- | :--- | :--- |
+| `type` | `string` | エンベッダータイプ名（例: `"precomputed"`, `"candle_bert"`, `"openai"`） |
+| `params` | `map<string, string>` | タイプ固有のパラメータ（例: `"model"` → `"sentence-transformers/all-MiniLM-L6-v2"`） |
 
 各 `FieldOption` は以下のフィールドタイプのいずれかを持つ `oneof` です。
 
 | Lexical フィールド | Vector フィールド |
 | :--- | :--- |
-| `TextOption` (`indexed`, `stored`, `term_vectors`, `analyzer`) | `HnswOption` (`dimension`, `distance`, `m`, `ef_construction`, `base_weight`, `quantizer`) |
-| `IntegerOption` (`indexed`, `stored`) | `FlatOption` (`dimension`, `distance`, `base_weight`, `quantizer`) |
-| `FloatOption` (`indexed`, `stored`) | `IvfOption` (`dimension`, `distance`, `n_clusters`, `n_probe`, `base_weight`, `quantizer`) |
+| `TextOption` (`indexed`, `stored`, `term_vectors`, `analyzer`) | `HnswOption` (`dimension`, `distance`, `m`, `ef_construction`, `base_weight`, `quantizer`, `embedder`) |
+| `IntegerOption` (`indexed`, `stored`) | `FlatOption` (`dimension`, `distance`, `base_weight`, `quantizer`, `embedder`) |
+| `FloatOption` (`indexed`, `stored`) | `IvfOption` (`dimension`, `distance`, `n_clusters`, `n_probe`, `base_weight`, `quantizer`, `embedder`) |
 | `BooleanOption` (`indexed`, `stored`) | |
 | `DateTimeOption` (`indexed`, `stored`) | |
 | `GeoOption` (`indexed`, `stored`) | |
 | `BytesOption` (`stored`) | |
 
+ベクトルフィールドオプションの `embedder` フィールドには、`Schema.embedders` で定義したエンベッダー名を指定します。設定すると、インデックス時にドキュメントのテキストフィールドからベクトルを自動生成します。事前計算済みのベクトルを直接供給する場合は空のままにします。
+
 **距離メトリクス:** `COSINE`, `EUCLIDEAN`, `MANHATTAN`, `DOT_PRODUCT`, `ANGULAR`
 
 **量子化手法:** `NONE`, `SCALAR_8BIT`, `PRODUCT_QUANTIZATION`
+
+**QuantizationConfig 構造:**
+
+| フィールド | 型 | 説明 |
+| :--- | :--- | :--- |
+| `method` | `QuantizationMethod` | 量子化手法（`QUANTIZATION_METHOD_NONE`, `QUANTIZATION_METHOD_SCALAR_8BIT`, または `QUANTIZATION_METHOD_PRODUCT_QUANTIZATION`） |
+| `subvector_count` | `uint32` | サブベクトルの数（`method` が `PRODUCT_QUANTIZATION` の場合のみ使用。`dimension` を均等に割り切れる値を指定）。 |
 
 **例:**
 
@@ -216,6 +256,13 @@ rpc Commit(CommitRequest) returns (CommitResponse);
 rpc Search(SearchRequest) returns (SearchResponse);
 ```
 
+**レスポンスフィールド:**
+
+| フィールド | 型 | 説明 |
+| :--- | :--- | :--- |
+| `results` | `repeated SearchResult` | 関連度順の検索結果 |
+| `total_hits` | `uint64` | マッチするドキュメントの総数（`limit`/`offset` 適用前） |
+
 ### `SearchStream`
 
 検索クエリを実行し、結果を 1 件ずつストリーミングで返します。
@@ -262,6 +309,13 @@ rpc SearchStream(SearchRequest) returns (stream SearchResult);
 | `timeout_ms` | `uint64` | 検索タイムアウト（ミリ秒） |
 | `parallel` | `bool` | 並列検索を有効化 |
 | `sort_by` | `SortSpec` | スコアの代わりにフィールドでソート |
+
+### SortSpec
+
+| フィールド | 型 | 説明 |
+| :--- | :--- | :--- |
+| `field` | `string` | ソート対象のフィールド名。空文字列はスコアでソートすることを意味する |
+| `order` | `SortOrder` | `SORT_ORDER_ASC`（昇順）または `SORT_ORDER_DESC`（降順） |
 
 ### VectorParams
 
