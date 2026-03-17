@@ -36,7 +36,10 @@ use parking_lot::RwLock;
 /// # Caching Strategy
 ///
 /// - **Writer**: Created on first write operation, cached until `commit()` is called
-/// - **Searcher**: Invalidated after `commit()` or `optimize()` to ensure fresh data
+/// - **Searcher**: Cached on first search after invalidation; invalidated after `commit()` or `optimize()`.
+///   Uses double-checked locking with `RwLockWriteGuard::downgrade()` so that only
+///   searcher *creation* holds an exclusive lock; the actual search runs under a shared
+///   read lock, allowing concurrent queries.
 /// - This design ensures that you always read committed data while minimizing object creation
 ///
 /// # Usage Example
@@ -426,21 +429,24 @@ impl LexicalStore {
     /// let results = engine.search(LexicalSearchRequest::new(query)).unwrap();
     /// ```
     pub fn search(&self, request: LexicalSearchRequest) -> Result<LexicalSearchResults> {
-        let results = {
+        // Fast path: read lock, cache hit — concurrent searches proceed in parallel.
+        {
             let guard = self.searcher_cache.read();
             if let Some(ref searcher) = *guard {
-                searcher.search(request)?
-            } else {
-                drop(guard);
-                let mut guard = self.searcher_cache.write();
-                if guard.is_none() {
-                    *guard = Some(self.index.searcher()?);
-                }
-                guard.as_ref().unwrap().search(request)?
+                return searcher.search(request);
             }
-        };
+        }
 
-        Ok(results)
+        // Slow path: write lock to populate, then downgrade to read lock so that
+        // the actual search executes under a shared read lock rather than an
+        // exclusive write lock. This allows other readers to proceed as soon as
+        // the searcher is created.
+        let mut guard = self.searcher_cache.write();
+        if guard.is_none() {
+            *guard = Some(self.index.searcher()?);
+        }
+        let guard = parking_lot::RwLockWriteGuard::downgrade(guard);
+        guard.as_ref().unwrap().search(request)
     }
 
     /// Count documents matching the request.
@@ -477,16 +483,20 @@ impl LexicalStore {
     /// println!("Found {} documents with score >= 0.5", count);
     /// ```
     pub fn count(&self, request: LexicalSearchRequest) -> Result<u64> {
+        // Fast path: read lock, cache hit.
         {
             let guard = self.searcher_cache.read();
             if let Some(ref searcher) = *guard {
                 return searcher.count(request);
             }
         }
+
+        // Slow path: populate under write lock, then downgrade to read lock.
         let mut guard = self.searcher_cache.write();
         if guard.is_none() {
             *guard = Some(self.index.searcher()?);
         }
+        let guard = parking_lot::RwLockWriteGuard::downgrade(guard);
         guard.as_ref().unwrap().count(request)
     }
 

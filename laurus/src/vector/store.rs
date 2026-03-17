@@ -2,8 +2,17 @@
 //!
 //! This module provides a vector storage component with a simple 3-member structure:
 //! - `index`: The underlying vector index
-//! - `writer_cache`: Cached writer for write operations
-//! - `searcher_cache`: Cached searcher for search operations
+//! - `writer_cache`: Cached writer for write operations (`tokio::sync::Mutex`)
+//! - `searcher_cache`: Cached searcher for search operations (`parking_lot::RwLock`)
+//!
+//! # Concurrency Strategy
+//!
+//! - **Searcher cache** uses double-checked locking with `RwLockWriteGuard::downgrade()`
+//!   so that only searcher *creation* (on cache miss) holds an exclusive lock; the actual
+//!   search executes under a shared read lock, allowing concurrent queries.
+//! - **Writer cache** is protected by a `tokio::sync::Mutex`. Embedding (potentially slow
+//!   network I/O) is performed *outside* the lock; only the final `delete + add_vectors`
+//!   step runs while the lock is held, keeping the critical section short.
 //!
 //! # Module Structure
 //!
@@ -22,9 +31,10 @@ use std::sync::Arc;
 
 use tokio::sync::Mutex;
 
-use crate::data::Document;
-use crate::embedding::embedder::Embedder;
-use crate::error::Result;
+use crate::data::{DataValue, Document};
+use crate::embedding::embedder::{EmbedInput, Embedder};
+use crate::embedding::per_field::PerFieldEmbedder;
+use crate::error::{LaurusError, Result};
 use crate::storage::Storage;
 use crate::vector::core::vector::Vector;
 use crate::vector::index::VectorIndex;
@@ -170,24 +180,99 @@ impl VectorStore {
     /// Returns an error if obtaining/creating the writer fails, if deleting the
     /// existing document fails, or if adding any field value fails.
     pub async fn upsert_document_by_internal_id(&self, doc_id: u64, doc: Document) -> Result<()> {
-        // Get or create writer
+        // Phase 1: Embed all fields OUTSIDE the lock.
+        // This allows multiple concurrent upserts to perform embedding in parallel
+        // rather than being serialized by the writer Mutex.
+        let embedder = self.index.embedder();
+        let mut embedded_vectors: Vec<(u64, String, Vector)> = Vec::new();
+
+        for (field_name, value) in &doc.fields {
+            let vector = match value {
+                DataValue::Vector(v) => Vector::new(v.clone()),
+                DataValue::Text(_) | DataValue::Bytes(_, _) => {
+                    Self::embed_value(&*embedder, field_name, value).await?
+                }
+                _ => continue,
+            };
+            embedded_vectors.push((doc_id, field_name.clone(), vector));
+        }
+
+        // Phase 2: Acquire lock and write pre-computed vectors (fast, sync-only).
         let mut guard = self.writer_cache.lock().await;
         if guard.is_none() {
             *guard = Some(self.index.writer()?);
         }
-
-        // First, delete any existing vectors for this doc_id (ignore not-found)
         let writer = guard.as_mut().unwrap();
         writer.delete_document(doc_id)?;
-
-        // Add values to index (writer handles embedding automatically)
-        for (field_name, value) in &doc.fields {
-            writer
-                .add_value(doc_id, field_name.clone(), value.clone())
-                .await?;
-        }
+        writer.add_vectors(embedded_vectors)?;
 
         Ok(())
+    }
+
+    /// Validate input and embed a single field value into a vector.
+    ///
+    /// This is a helper extracted from `EmbeddingVectorIndexWriter::add_value()`
+    /// to allow embedding to happen outside the writer lock.
+    ///
+    /// # Arguments
+    ///
+    /// * `embedder` - The embedder to use for converting content to vectors.
+    /// * `field_name` - The name of the field being embedded.
+    /// * `value` - The data value to embed (must be `Text` or `Bytes`).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the embedder does not support the input type or if
+    /// the embedding operation fails.
+    async fn embed_value(
+        embedder: &dyn Embedder,
+        field_name: &str,
+        value: &DataValue,
+    ) -> Result<Vector> {
+        // Validate input type compatibility
+        match value {
+            DataValue::Text(_) if !embedder.supports_text() => {
+                return Err(LaurusError::invalid_argument(format!(
+                    "Embedder '{}' does not support text input",
+                    embedder.name()
+                )));
+            }
+            DataValue::Bytes(_, mime) if !embedder.supports_image() => {
+                if mime.as_ref().is_some_and(|m| m.starts_with("image/")) {
+                    return Err(LaurusError::invalid_argument(format!(
+                        "Embedder '{}' does not support image input",
+                        embedder.name()
+                    )));
+                }
+            }
+            _ => {}
+        }
+
+        // Prepare owned data for the embed call
+        let (text_owned, bytes_owned, mime_owned) = match value {
+            DataValue::Text(t) => (Some(t.clone()), None, None),
+            DataValue::Bytes(b, m) => (None, Some(b.clone()), m.clone()),
+            _ => {
+                return Err(LaurusError::invalid_argument(
+                    "Unsupported data type for embedding",
+                ));
+            }
+        };
+
+        let input = if let Some(ref text) = text_owned {
+            EmbedInput::Text(text)
+        } else if let Some(ref bytes) = bytes_owned {
+            EmbedInput::Bytes(bytes, mime_owned.as_deref())
+        } else {
+            return Err(LaurusError::internal("Unreachable state in embed_value"));
+        };
+
+        // Use field-specific embedder if PerFieldEmbedder, otherwise default.
+        if let Some(per_field) = embedder.as_any().downcast_ref::<PerFieldEmbedder>() {
+            per_field.embed_field(field_name, &input).await
+        } else {
+            embedder.embed(&input).await
+        }
     }
 
     /// Delete a document by its internal ID.
@@ -267,11 +352,29 @@ impl VectorStore {
         Ok(())
     }
 
-    /// Get or create a searcher.
-    fn get_searcher(&self) -> Result<Box<dyn VectorIndexSearcher>> {
-        // For now, always create a new searcher.
-        // The cache can be used for optimization later.
-        self.index.searcher()
+    /// Acquire a read lock on the cached searcher, populating the cache on miss.
+    ///
+    /// Uses double-checked locking: first tries a shared read lock (fast path),
+    /// then falls back to an exclusive write lock to create the searcher and
+    /// atomically downgrades it to a read lock so concurrent searches are not
+    /// blocked while the actual query executes.
+    fn acquire_searcher_guard(
+        &self,
+    ) -> Result<parking_lot::RwLockReadGuard<'_, Option<Box<dyn VectorIndexSearcher>>>> {
+        // Fast path: cache hit under read lock.
+        {
+            let guard = self.searcher_cache.read();
+            if guard.is_some() {
+                return Ok(guard);
+            }
+        }
+
+        // Slow path: populate under write lock, then downgrade.
+        let mut guard = self.searcher_cache.write();
+        if guard.is_none() {
+            *guard = Some(self.index.searcher()?);
+        }
+        Ok(parking_lot::RwLockWriteGuard::downgrade(guard))
     }
 
     /// Execute a low-level vector similarity search.
@@ -279,8 +382,8 @@ impl VectorStore {
         &self,
         request: &VectorIndexSearchRequest,
     ) -> Result<crate::vector::search::searcher::VectorIndexSearchResults> {
-        let searcher = self.get_searcher()?;
-        searcher.search(request)
+        let guard = self.acquire_searcher_guard()?;
+        guard.as_ref().unwrap().search(request)
     }
 
     /// Execute a high-level vector search (compatible with Engine).
@@ -321,7 +424,8 @@ impl VectorStore {
             return Ok(VectorSearchResults::default());
         }
 
-        let searcher = self.get_searcher()?;
+        let searcher_guard = self.acquire_searcher_guard()?;
+        let searcher = searcher_guard.as_ref().unwrap();
         let mut all_hits: std::collections::HashMap<u64, f32> = std::collections::HashMap::new();
 
         // Process each query vector
@@ -413,8 +517,8 @@ impl VectorStore {
     ///
     /// Returns an error if obtaining the searcher or executing the count fails.
     pub fn count(&self, request: VectorIndexSearchRequest) -> Result<u64> {
-        let searcher = self.get_searcher()?;
-        searcher.count(request)
+        let guard = self.acquire_searcher_guard()?;
+        guard.as_ref().unwrap().count(request)
     }
 
     /// Get index statistics including per-field vector counts.
