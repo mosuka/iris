@@ -147,7 +147,7 @@ mod tests {
         let json_val = json!({
             "text_field": "hello",
             "int_field": 10,
-            "float_field": 3.14,
+            "float_field": 2.78,
             "bool_field": true,
             "null_field": null,
             "vec_field": [0.1_f32, 0.2_f32, 0.3_f32]
