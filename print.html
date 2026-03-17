@@ -36,10 +36,10 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-40be7e2f.js";
+            window.path_to_searchindex_js = "searchindex-3551a720.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-8780f555.js"></script>
+        <script src="toc-710721a4.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -7172,8 +7172,345 @@ data: {"id":"doc2","score":0.4210,"document":{...}}
 <h2 id="requestresponse-format"><a class="header" href="#requestresponse-format">Request/Response Format</a></h2>
 <p>All request and response bodies use JSON. The JSON structure mirrors the gRPC protobuf messages. See <a href="#grpc-api-reference">gRPC API Reference</a> for the full message definitions.</p>
 <div style="break-before: page; page-break-before: always;"></div>
-<h1 id="build--test"><a class="header" href="#build--test">Build &amp; Test</a></h1>
+<h1 id="mcp-server-overview"><a class="header" href="#mcp-server-overview">MCP Server Overview</a></h1>
+<p>The <code>laurus-mcp</code> crate provides a <a href="https://modelcontextprotocol.io/">Model Context Protocol (MCP)</a> server for the Laurus search engine. It acts as a gRPC client to a running <code>laurus-server</code> instance, enabling AI assistants such as Claude to index documents and perform searches through the standard MCP stdio transport.</p>
+<h2 id="features-3"><a class="header" href="#features-3">Features</a></h2>
+<ul>
+<li><strong>MCP stdio transport</strong> — Runs as a subprocess; communicates with the AI client via stdin/stdout</li>
+<li><strong>gRPC client</strong> — Proxies all tool calls to a running <code>laurus-server</code> instance</li>
+<li><strong>All laurus search modes</strong> — Lexical (BM25), vector (HNSW/Flat/IVF), and hybrid search</li>
+<li><strong>Dynamic connection</strong> — Connect to any laurus-server endpoint via the <code>connect</code> tool</li>
+<li><strong>Document lifecycle</strong> — Add, update, delete, and retrieve documents through MCP tools</li>
+</ul>
+<h2 id="architecture-2"><a class="header" href="#architecture-2">Architecture</a></h2>
+<pre><code class="language-mermaid">graph LR
+    subgraph "laurus-mcp"
+        MCP["MCP Server\n(stdio)"]
+    end
+
+    AI["AI Client\n(Claude, etc.)"] --&gt;|"stdio (JSON-RPC)"| MCP
+    MCP --&gt;|"gRPC"| SRV["laurus-server\n(always running)"]
+    SRV --&gt; Disk["Index on Disk"]
+</code></pre>
+<p>The MCP server runs as a child process launched by the AI client. It proxies all
+tool calls to a <code>laurus-server</code> instance via gRPC. The <code>laurus-server</code> must be
+started separately before (or after) the MCP server.</p>
+<h2 id="quick-start-2"><a class="header" href="#quick-start-2">Quick Start</a></h2>
+<pre><code class="language-bash"># Step 1: Start the laurus-server
+laurus serve --grpc-port 50051
+
+# Step 2: Configure Claude Code and start the MCP server
+claude mcp add laurus laurus mcp --endpoint http://localhost:50051
+</code></pre>
+<p>Or with a manual configuration:</p>
+<pre><code class="language-json">{
+  "mcpServers": {
+    "laurus": {
+      "command": "laurus",
+      "args": ["mcp", "--endpoint", "http://localhost:50051"]
+    }
+  }
+}
+</code></pre>
+<h2 id="sections-2"><a class="header" href="#sections-2">Sections</a></h2>
+<ul>
+<li><a href="#getting-started-with-laurus-mcp">Getting Started</a> — Installation, configuration, and first steps</li>
+<li><a href="#mcp-tools-reference">Tools Reference</a> — Full reference for all MCP tools</li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="getting-started-with-laurus-mcp"><a class="header" href="#getting-started-with-laurus-mcp">Getting Started with laurus-mcp</a></h1>
 <h2 id="prerequisites-3"><a class="header" href="#prerequisites-3">Prerequisites</a></h2>
+<ul>
+<li>The <code>laurus</code> CLI binary installed (<code>cargo install laurus-cli</code>)</li>
+<li>A running <code>laurus-server</code> instance (see <a href="#getting-started-with-the-grpc-server">laurus-server getting started</a>)</li>
+<li>An AI client that supports MCP (Claude Desktop, Claude Code, etc.)</li>
+</ul>
+<h2 id="configuration-3"><a class="header" href="#configuration-3">Configuration</a></h2>
+<h3 id="step-1-start-laurus-server"><a class="header" href="#step-1-start-laurus-server">Step 1: Start laurus-server</a></h3>
+<pre><code class="language-bash">laurus serve --grpc-port 50051
+</code></pre>
+<h3 id="step-2-configure-the-mcp-client"><a class="header" href="#step-2-configure-the-mcp-client">Step 2: Configure the MCP client</a></h3>
+<h4 id="claude-code"><a class="header" href="#claude-code">Claude Code</a></h4>
+<p>Use the CLI command (recommended):</p>
+<pre><code class="language-bash">claude mcp add laurus laurus mcp --endpoint http://localhost:50051
+</code></pre>
+<p>Or edit <code>~/.claude/settings.json</code> directly:</p>
+<pre><code class="language-json">{
+  "mcpServers": {
+    "laurus": {
+      "command": "laurus",
+      "args": ["mcp", "--endpoint", "http://localhost:50051"]
+    }
+  }
+}
+</code></pre>
+<h4 id="claude-desktop"><a class="header" href="#claude-desktop">Claude Desktop</a></h4>
+<p>Edit <code>~/Library/Application Support/Claude/claude_desktop_config.json</code> (macOS)
+or <code>%APPDATA%\Claude\claude_desktop_config.json</code> (Windows):</p>
+<pre><code class="language-json">{
+  "mcpServers": {
+    "laurus": {
+      "command": "laurus",
+      "args": ["mcp", "--endpoint", "http://localhost:50051"]
+    }
+  }
+}
+</code></pre>
+<h2 id="usage-workflows"><a class="header" href="#usage-workflows">Usage Workflows</a></h2>
+<h3 id="workflow-1-pre-created-index"><a class="header" href="#workflow-1-pre-created-index">Workflow 1: Pre-created index</a></h3>
+<p>Create the index using the CLI first, then use the MCP server to query it:</p>
+<pre><code class="language-bash"># Step 1: Create a schema file
+cat &gt; schema.toml &lt;&lt; 'EOF'
+[fields.title]
+Text = { indexed = true, stored = true }
+
+[fields.body]
+Text = { indexed = true, stored = true }
+EOF
+
+# Step 2: Start the server and create the index
+laurus serve --grpc-port 50051 &amp;
+laurus create index --schema schema.toml
+
+# Step 3: Start the MCP server (done automatically by Claude)
+laurus mcp --endpoint http://localhost:50051
+</code></pre>
+<h3 id="workflow-2-ai-driven-index-creation"><a class="header" href="#workflow-2-ai-driven-index-creation">Workflow 2: AI-driven index creation</a></h3>
+<p>Start the MCP server without a pre-created index, then ask the AI to create one:</p>
+<pre><code class="language-bash"># Start laurus-server (no index required)
+laurus serve --grpc-port 50051
+</code></pre>
+<p>Then ask Claude:</p>
+<blockquote>
+<p>“Create a search index for blog posts. I need to search by title and body text,
+and I want to store the author and publication date.”</p>
+</blockquote>
+<p>Claude will call the <code>connect</code> tool (if not already connected), then design the
+schema and call <code>create_index</code> automatically.</p>
+<h3 id="workflow-3-connect-at-runtime"><a class="header" href="#workflow-3-connect-at-runtime">Workflow 3: Connect at runtime</a></h3>
+<p>Start the MCP server without specifying an endpoint:</p>
+<pre><code class="language-bash">laurus mcp
+</code></pre>
+<p>Then ask Claude to connect:</p>
+<blockquote>
+<p>“Connect to the laurus server at <code>http://localhost:50051</code>”</p>
+</blockquote>
+<p>Claude will call <code>connect(endpoint: "http://localhost:50051")</code> before using other tools.</p>
+<h2 id="lifecycle"><a class="header" href="#lifecycle">Lifecycle</a></h2>
+<pre><code class="language-text">laurus-server starts (separate process)
+  └─ listens on gRPC port 50051
+
+Claude starts
+  └─ spawns: laurus mcp --endpoint `http://localhost:50051`
+       └─ enters stdio event loop
+            ├─ receives tool calls via stdin
+            ├─ proxies calls to laurus-server via gRPC
+            └─ sends results via stdout
+Claude exits
+  └─ laurus-mcp process terminates
+  └─ laurus-server continues running
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="mcp-tools-reference"><a class="header" href="#mcp-tools-reference">MCP Tools Reference</a></h1>
+<p>The laurus MCP server exposes the following tools.</p>
+<h2 id="connect"><a class="header" href="#connect">connect</a></h2>
+<p>Connect to a running laurus-server gRPC endpoint. Call this before using other
+tools if the server was started without the <code>--endpoint</code> flag, or to switch to
+a different laurus-server at runtime.</p>
+<h3 id="parameters"><a class="header" href="#parameters">Parameters</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Name</th><th style="text-align: left">Type</th><th style="text-align: left">Required</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>endpoint</code></td><td style="text-align: left">string</td><td style="text-align: left">Yes</td><td style="text-align: left">gRPC endpoint URL (e.g. <code>http://localhost:50051</code>)</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="example-1"><a class="header" href="#example-1">Example</a></h3>
+<pre><code class="language-text">Tool: connect
+endpoint: "http://localhost:50051"
+</code></pre>
+<p>Result: <code>Connected to laurus-server at http://localhost:50051.</code></p>
+<hr>
+<h2 id="create_index"><a class="header" href="#create_index">create_index</a></h2>
+<p>Create a new search index with the provided schema.</p>
+<h3 id="parameters-1"><a class="header" href="#parameters-1">Parameters</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Name</th><th style="text-align: left">Type</th><th style="text-align: left">Required</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>schema_json</code></td><td style="text-align: left">string</td><td style="text-align: left">Yes</td><td style="text-align: left">Schema definition as a JSON string</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="schema-json-format"><a class="header" href="#schema-json-format">Schema JSON format</a></h3>
+<p>FieldOption uses serde’s externally-tagged representation where the variant name is the key:</p>
+<pre><code class="language-json">{
+  "fields": {
+    "title":     { "Text":    { "indexed": true, "stored": true } },
+    "body":      { "Text":    {} },
+    "score":     { "Float":   {} },
+    "count":     { "Integer": {} },
+    "active":    { "Boolean": {} },
+    "created":   { "DateTime": {} },
+    "embedding": { "Hnsw":    { "dimension": 384 } }
+  }
+}
+</code></pre>
+<h3 id="example-1-1"><a class="header" href="#example-1-1">Example</a></h3>
+<pre><code class="language-text">Tool: create_index
+schema_json: {"fields": {"title": {"Text": {}}, "body": {"Text": {}}}}
+</code></pre>
+<p>Result: <code>Index created successfully at /path/to/index.</code></p>
+<hr>
+<h2 id="get_index"><a class="header" href="#get_index">get_index</a></h2>
+<p>Get statistics for the current search index.</p>
+<h3 id="parameters-2"><a class="header" href="#parameters-2">Parameters</a></h3>
+<p>None.</p>
+<h3 id="result"><a class="header" href="#result">Result</a></h3>
+<pre><code class="language-json">{
+  "document_count": 42,
+  "vector_fields": ["embedding"]
+}
+</code></pre>
+<hr>
+<h2 id="add_document"><a class="header" href="#add_document">add_document</a></h2>
+<p>Add or upsert a document in the index. Call <code>commit</code> after adding documents.</p>
+<h3 id="parameters-3"><a class="header" href="#parameters-3">Parameters</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Name</th><th style="text-align: left">Type</th><th style="text-align: left">Required</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>id</code></td><td style="text-align: left">string</td><td style="text-align: left">Yes</td><td style="text-align: left">External document identifier</td></tr>
+<tr><td style="text-align: left"><code>document</code></td><td style="text-align: left">object</td><td style="text-align: left">Yes</td><td style="text-align: left">Document fields as a JSON object</td></tr>
+<tr><td style="text-align: left"><code>mode</code></td><td style="text-align: left">string</td><td style="text-align: left">No</td><td style="text-align: left"><code>"put"</code> (default, upsert) or <code>"add"</code> (append chunk)</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="modes"><a class="header" href="#modes">Modes</a></h3>
+<ul>
+<li><code>put</code> (default): Delete any existing document with the same <code>id</code>, then index the new one.</li>
+<li><code>add</code>: Append as a new chunk. Multiple chunks can share the same <code>id</code> (useful for splitting large documents).</li>
+</ul>
+<h3 id="example-2"><a class="header" href="#example-2">Example</a></h3>
+<pre><code class="language-text">Tool: add_document
+id: "doc-1"
+document: {"title": "Hello World", "body": "This is a test document."}
+</code></pre>
+<p>Result: <code>Document 'doc-1' added. Call commit to persist changes.</code></p>
+<hr>
+<h2 id="get_document"><a class="header" href="#get_document">get_document</a></h2>
+<p>Retrieve stored document(s) by external ID.</p>
+<h3 id="parameters-4"><a class="header" href="#parameters-4">Parameters</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Name</th><th style="text-align: left">Type</th><th style="text-align: left">Required</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>id</code></td><td style="text-align: left">string</td><td style="text-align: left">Yes</td><td style="text-align: left">External document identifier</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="result-1"><a class="header" href="#result-1">Result</a></h3>
+<pre><code class="language-json">{
+  "id": "doc-1",
+  "documents": [
+    { "title": "Hello World", "body": "This is a test document." }
+  ]
+}
+</code></pre>
+<hr>
+<h2 id="delete_document"><a class="header" href="#delete_document">delete_document</a></h2>
+<p>Delete document(s) by external ID. Call <code>commit</code> after deletion.</p>
+<h3 id="parameters-5"><a class="header" href="#parameters-5">Parameters</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Name</th><th style="text-align: left">Type</th><th style="text-align: left">Required</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>id</code></td><td style="text-align: left">string</td><td style="text-align: left">Yes</td><td style="text-align: left">External document identifier</td></tr>
+</tbody>
+</table>
+</div>
+<p>Result: <code>Document 'doc-1' deleted. Call commit to persist changes.</code></p>
+<hr>
+<h2 id="commit-3"><a class="header" href="#commit-3">commit</a></h2>
+<p>Commit pending changes to disk. Must be called after <code>add_document</code> or <code>delete_document</code> to make changes searchable and durable.</p>
+<h3 id="parameters-6"><a class="header" href="#parameters-6">Parameters</a></h3>
+<p>None.</p>
+<p>Result: <code>Changes committed successfully.</code></p>
+<hr>
+<h2 id="search-6"><a class="header" href="#search-6">search</a></h2>
+<p>Search documents using the laurus query DSL.</p>
+<h3 id="parameters-7"><a class="header" href="#parameters-7">Parameters</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Name</th><th style="text-align: left">Type</th><th style="text-align: left">Required</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>query</code></td><td style="text-align: left">string</td><td style="text-align: left">Yes</td><td style="text-align: left">Search query in laurus query DSL</td></tr>
+<tr><td style="text-align: left"><code>limit</code></td><td style="text-align: left">integer</td><td style="text-align: left">No</td><td style="text-align: left">Maximum results (default: 10)</td></tr>
+<tr><td style="text-align: left"><code>offset</code></td><td style="text-align: left">integer</td><td style="text-align: left">No</td><td style="text-align: left">Results to skip for pagination (default: 0)</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="query-dsl-examples"><a class="header" href="#query-dsl-examples">Query DSL examples</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Query</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>hello</code></td><td style="text-align: left">Term search across default fields</td></tr>
+<tr><td style="text-align: left"><code>title:hello</code></td><td style="text-align: left">Field-scoped term search</td></tr>
+<tr><td style="text-align: left"><code>title:hello AND body:world</code></td><td style="text-align: left">Boolean AND</td></tr>
+<tr><td style="text-align: left"><code>"exact phrase"</code></td><td style="text-align: left">Phrase search</td></tr>
+<tr><td style="text-align: left"><code>roam~2</code></td><td style="text-align: left">Fuzzy search (edit distance 2)</td></tr>
+<tr><td style="text-align: left"><code>count:[1 TO 10]</code></td><td style="text-align: left">Range search</td></tr>
+<tr><td style="text-align: left"><code>title:helo~1</code></td><td style="text-align: left">Fuzzy field search</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="result-2"><a class="header" href="#result-2">Result</a></h3>
+<pre><code class="language-json">{
+  "total": 2,
+  "results": [
+    {
+      "id": "doc-1",
+      "score": 3.14,
+      "document": { "title": "Hello World", "body": "..." }
+    },
+    {
+      "id": "doc-2",
+      "score": 1.57,
+      "document": { "title": "Hello Again", "body": "..." }
+    }
+  ]
+}
+</code></pre>
+<hr>
+<h2 id="typical-workflow"><a class="header" href="#typical-workflow">Typical Workflow</a></h2>
+<pre><code class="language-text">1. connect         → connect to a running laurus-server
+2. create_index    → define the schema (if index does not exist)
+3. add_document    → index documents (repeat as needed)
+4. commit          → persist changes to disk
+5. search          → query the index
+6. add_document    → update documents
+7. delete_document → remove documents
+8. commit          → persist changes
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="build--test"><a class="header" href="#build--test">Build &amp; Test</a></h1>
+<h2 id="prerequisites-4"><a class="header" href="#prerequisites-4">Prerequisites</a></h2>
 <ul>
 <li><strong>Rust</strong> 1.85 or later (edition 2024)</li>
 <li><strong>Cargo</strong> (included with Rust)</li>

@@ -36,10 +36,10 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-482c5576.js";
+            window.path_to_searchindex_js = "searchindex-70ad585d.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-e8a84d15.js"></script>
+        <script src="toc-d18ed058.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -7175,8 +7175,339 @@ data: {"id":"doc2","score":0.4210,"document":{...}}
 <h2 id="リクエストレスポンス形式"><a class="header" href="#リクエストレスポンス形式">リクエスト/レスポンス形式</a></h2>
 <p>すべてのリクエストおよびレスポンスボディは JSON を使用します。JSON の構造は gRPC の protobuf メッセージに対応しています。メッセージ定義の詳細は <a href="#grpc-api-リファレンス">gRPC API リファレンス</a>を参照してください。</p>
 <div style="break-before: page; page-break-before: always;"></div>
-<h1 id="ビルドとテスト"><a class="header" href="#ビルドとテスト">ビルドとテスト</a></h1>
+<h1 id="mcp-サーバー概要"><a class="header" href="#mcp-サーバー概要">MCP サーバー概要</a></h1>
+<p><code>laurus-mcp</code> クレートは、Laurus 検索エンジン用の <a href="https://modelcontextprotocol.io/">Model Context Protocol (MCP)</a> サーバーを提供します。実行中の <code>laurus-server</code> インスタンスへの gRPC クライアントとして動作し、Claude などの AI アシスタントが標準 MCP stdio トランスポートを通じてドキュメントのインデックス登録や検索を行えるようにします。</p>
+<h2 id="機能-3"><a class="header" href="#機能-3">機能</a></h2>
+<ul>
+<li><strong>MCP stdio トランスポート</strong> — サブプロセスとして起動し、stdin/stdout 経由で AI クライアントと通信</li>
+<li><strong>gRPC クライアント</strong> — すべてのツール呼び出しを実行中の <code>laurus-server</code> インスタンスにプロキシ</li>
+<li><strong>全 laurus 検索モード</strong> — Lexical（BM25）、Vector（HNSW/Flat/IVF）、ハイブリッド検索</li>
+<li><strong>動的接続</strong> — <code>connect</code> ツールで任意の laurus-server エンドポイントに接続可能</li>
+<li><strong>ドキュメントライフサイクル</strong> — MCP ツールを通じてドキュメントの追加・更新・削除・取得が可能</li>
+</ul>
+<h2 id="アーキテクチャ-2"><a class="header" href="#アーキテクチャ-2">アーキテクチャ</a></h2>
+<pre><code class="language-mermaid">graph LR
+    subgraph "laurus-mcp"
+        MCP["MCP Server\n(stdio)"]
+    end
+
+    AI["AI クライアント\n(Claude など)"] --&gt;|"stdio (JSON-RPC)"| MCP
+    MCP --&gt;|"gRPC"| SRV["laurus-server\n（常駐）"]
+    SRV --&gt; Disk["ディスク上のインデックス"]
+</code></pre>
+<p>MCP サーバーは AI クライアントによって起動される子プロセスとして動作します。すべてのツール呼び出しを gRPC 経由で <code>laurus-server</code> インスタンスにプロキシします。<code>laurus-server</code> は MCP サーバーとは別途、事前に起動しておく必要があります。</p>
+<h2 id="クイックスタート-2"><a class="header" href="#クイックスタート-2">クイックスタート</a></h2>
+<pre><code class="language-bash"># ステップ 1: laurus-server を起動
+laurus serve --grpc-port 50051
+
+# ステップ 2: Claude Code で MCP サーバーを設定
+claude mcp add laurus laurus mcp --endpoint http://localhost:50051
+</code></pre>
+<p>または手動で設定ファイルを編集：</p>
+<pre><code class="language-json">{
+  "mcpServers": {
+    "laurus": {
+      "command": "laurus",
+      "args": ["mcp", "--endpoint", "http://localhost:50051"]
+    }
+  }
+}
+</code></pre>
+<h2 id="セクション-2"><a class="header" href="#セクション-2">セクション</a></h2>
+<ul>
+<li><a href="#laurus-mcp-をはじめる">はじめに</a> — インストール、設定、最初のステップ</li>
+<li><a href="#mcp-ツールリファレンス">ツールリファレンス</a> — 全 MCP ツールの完全なリファレンス</li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="laurus-mcp-をはじめる"><a class="header" href="#laurus-mcp-をはじめる">laurus-mcp をはじめる</a></h1>
 <h2 id="前提条件-3"><a class="header" href="#前提条件-3">前提条件</a></h2>
+<ul>
+<li><code>laurus</code> CLI バイナリがインストール済み（<code>cargo install laurus-cli</code>）</li>
+<li>実行中の <code>laurus-server</code> インスタンス（<a href="#grpc-サーバーをはじめる">laurus-server はじめに</a>を参照）</li>
+<li>MCP をサポートする AI クライアント（Claude Desktop、Claude Code など）</li>
+</ul>
+<h2 id="設定-3"><a class="header" href="#設定-3">設定</a></h2>
+<h3 id="ステップ-1-laurus-server-を起動"><a class="header" href="#ステップ-1-laurus-server-を起動">ステップ 1: laurus-server を起動</a></h3>
+<pre><code class="language-bash">laurus serve --grpc-port 50051
+</code></pre>
+<h3 id="ステップ-2-mcp-クライアントの設定"><a class="header" href="#ステップ-2-mcp-クライアントの設定">ステップ 2: MCP クライアントの設定</a></h3>
+<h4 id="claude-code"><a class="header" href="#claude-code">Claude Code</a></h4>
+<p>CLI コマンドで追加する方法（推奨）：</p>
+<pre><code class="language-bash">claude mcp add laurus laurus mcp --endpoint http://localhost:50051
+</code></pre>
+<p>または <code>~/.claude/settings.json</code> を直接編集：</p>
+<pre><code class="language-json">{
+  "mcpServers": {
+    "laurus": {
+      "command": "laurus",
+      "args": ["mcp", "--endpoint", "http://localhost:50051"]
+    }
+  }
+}
+</code></pre>
+<h4 id="claude-desktop"><a class="header" href="#claude-desktop">Claude Desktop</a></h4>
+<p>macOS の場合は <code>~/Library/Application Support/Claude/claude_desktop_config.json</code>、
+Windows の場合は <code>%APPDATA%\Claude\claude_desktop_config.json</code> を編集：</p>
+<pre><code class="language-json">{
+  "mcpServers": {
+    "laurus": {
+      "command": "laurus",
+      "args": ["mcp", "--endpoint", "http://localhost:50051"]
+    }
+  }
+}
+</code></pre>
+<h2 id="使用ワークフロー"><a class="header" href="#使用ワークフロー">使用ワークフロー</a></h2>
+<h3 id="ワークフロー-1-既存のインデックスを使用する"><a class="header" href="#ワークフロー-1-既存のインデックスを使用する">ワークフロー 1: 既存のインデックスを使用する</a></h3>
+<p>CLI でインデックスを事前に作成してから MCP サーバーで検索します：</p>
+<pre><code class="language-bash"># ステップ 1: スキーマファイルを作成
+cat &gt; schema.toml &lt;&lt; 'EOF'
+[fields.title]
+Text = { indexed = true, stored = true }
+
+[fields.body]
+Text = { indexed = true, stored = true }
+EOF
+
+# ステップ 2: サーバーを起動してインデックスを作成
+laurus serve --grpc-port 50051 &amp;
+laurus create index --schema schema.toml
+
+# ステップ 3: MCP サーバーを起動（Claude が自動的に起動）
+laurus mcp --endpoint http://localhost:50051
+</code></pre>
+<h3 id="ワークフロー-2-ai-主導のインデックス作成"><a class="header" href="#ワークフロー-2-ai-主導のインデックス作成">ワークフロー 2: AI 主導のインデックス作成</a></h3>
+<p>インデックスを事前に作成せず MCP サーバーを起動し、AI にインデックスを作成させます：</p>
+<pre><code class="language-bash"># laurus-server を起動（インデックス不要）
+laurus serve --grpc-port 50051
+</code></pre>
+<p>次に Claude に依頼します：</p>
+<blockquote>
+<p>「ブログ記事用の検索インデックスを作成してください。タイトルと本文テキストで検索できるようにして、著者と公開日も保存したいです。」</p>
+</blockquote>
+<p>Claude は <code>connect</code> ツールを呼び出して接続し、スキーマを設計して <code>create_index</code> を自動的に呼び出します。</p>
+<h3 id="ワークフロー-3-実行時に接続する"><a class="header" href="#ワークフロー-3-実行時に接続する">ワークフロー 3: 実行時に接続する</a></h3>
+<p>エンドポイントを指定せずに MCP サーバーを起動します：</p>
+<pre><code class="language-bash">laurus mcp
+</code></pre>
+<p>次に Claude に接続を依頼します：</p>
+<blockquote>
+<p>「<code>http://localhost:50051</code> の laurus サーバーに接続してください」</p>
+</blockquote>
+<p>Claude は他のツールを使用する前に <code>connect</code> を呼び出します。</p>
+<h2 id="ライフサイクル"><a class="header" href="#ライフサイクル">ライフサイクル</a></h2>
+<pre><code class="language-text">laurus-server 起動（別プロセス）
+  └─ gRPC ポート 50051 でリッスン
+
+Claude 起動
+  └─ 起動: laurus mcp --endpoint http://localhost:50051
+       └─ stdio イベントループに入る
+            ├─ stdin 経由でツール呼び出しを受信
+            ├─ gRPC 経由で laurus-server にプロキシ
+            └─ stdout 経由で結果を送信
+Claude 終了
+  └─ laurus-mcp プロセスが終了
+  └─ laurus-server は継続して動作
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="mcp-ツールリファレンス"><a class="header" href="#mcp-ツールリファレンス">MCP ツールリファレンス</a></h1>
+<p>laurus MCP サーバーは以下のツールを公開しています。</p>
+<h2 id="connect"><a class="header" href="#connect">connect</a></h2>
+<p>実行中の laurus-server gRPC エンドポイントに接続します。<code>--endpoint</code> フラグなしでサーバーを起動した場合や、実行時に別の laurus-server に切り替える場合に、他のツールを使用する前にこのツールを呼び出してください。</p>
+<h3 id="パラメーター"><a class="header" href="#パラメーター">パラメーター</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">名前</th><th style="text-align: left">型</th><th style="text-align: left">必須</th><th style="text-align: left">説明</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>endpoint</code></td><td style="text-align: left">string</td><td style="text-align: left">はい</td><td style="text-align: left">gRPC エンドポイント URL（例: <code>http://localhost:50051</code>）</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="例-2"><a class="header" href="#例-2">例</a></h3>
+<pre><code class="language-text">Tool: connect
+endpoint: "http://localhost:50051"
+</code></pre>
+<p>結果: <code>Connected to laurus-server at http://localhost:50051.</code></p>
+<hr>
+<h2 id="create_index"><a class="header" href="#create_index">create_index</a></h2>
+<p>指定されたスキーマで新しい検索インデックスを作成します。</p>
+<h3 id="パラメーター-1"><a class="header" href="#パラメーター-1">パラメーター</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">名前</th><th style="text-align: left">型</th><th style="text-align: left">必須</th><th style="text-align: left">説明</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>schema_json</code></td><td style="text-align: left">string</td><td style="text-align: left">はい</td><td style="text-align: left">JSON 文字列としてのスキーマ定義</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="スキーマ-json-フォーマット"><a class="header" href="#スキーマ-json-フォーマット">スキーマ JSON フォーマット</a></h3>
+<p>FieldOption は serde の externally-tagged 表現を使用します（バリアント名がキーになります）：</p>
+<pre><code class="language-json">{
+  "fields": {
+    "title":     { "Text":    { "indexed": true, "stored": true } },
+    "body":      { "Text":    {} },
+    "score":     { "Float":   {} },
+    "count":     { "Integer": {} },
+    "active":    { "Boolean": {} },
+    "created":   { "DateTime": {} },
+    "embedding": { "Hnsw":    { "dimension": 384 } }
+  }
+}
+</code></pre>
+<h3 id="例-1-1"><a class="header" href="#例-1-1">例</a></h3>
+<pre><code class="language-text">Tool: create_index
+schema_json: {"fields": {"title": {"Text": {}}, "body": {"Text": {}}}}
+</code></pre>
+<p>結果: <code>Index created successfully at /path/to/index.</code></p>
+<hr>
+<h2 id="get_index"><a class="header" href="#get_index">get_index</a></h2>
+<p>現在の検索インデックスの統計情報を取得します。</p>
+<h3 id="パラメーター-2"><a class="header" href="#パラメーター-2">パラメーター</a></h3>
+<p>なし。</p>
+<h3 id="結果"><a class="header" href="#結果">結果</a></h3>
+<pre><code class="language-json">{
+  "document_count": 42,
+  "vector_fields": ["embedding"]
+}
+</code></pre>
+<hr>
+<h2 id="add_document"><a class="header" href="#add_document">add_document</a></h2>
+<p>インデックスにドキュメントを追加またはアップサートします。ドキュメントを追加した後は <code>commit</code> を呼び出してください。</p>
+<h3 id="パラメーター-3"><a class="header" href="#パラメーター-3">パラメーター</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">名前</th><th style="text-align: left">型</th><th style="text-align: left">必須</th><th style="text-align: left">説明</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>id</code></td><td style="text-align: left">string</td><td style="text-align: left">はい</td><td style="text-align: left">外部ドキュメント識別子</td></tr>
+<tr><td style="text-align: left"><code>document</code></td><td style="text-align: left">object</td><td style="text-align: left">はい</td><td style="text-align: left">JSON オブジェクトとしてのドキュメントフィールド</td></tr>
+<tr><td style="text-align: left"><code>mode</code></td><td style="text-align: left">string</td><td style="text-align: left">いいえ</td><td style="text-align: left"><code>"put"</code>（デフォルト、アップサート）または <code>"add"</code>（チャンク追加）</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="モード"><a class="header" href="#モード">モード</a></h3>
+<ul>
+<li><code>put</code>（デフォルト）: 同じ <code>id</code> を持つ既存のドキュメントを削除してから新しいものをインデックスします。</li>
+<li><code>add</code>: 新しいチャンクとして追加します。複数のチャンクが同じ <code>id</code> を持てます（大きなドキュメントの分割に便利）。</li>
+</ul>
+<h3 id="例-2-1"><a class="header" href="#例-2-1">例</a></h3>
+<pre><code class="language-text">Tool: add_document
+id: "doc-1"
+document: {"title": "Hello World", "body": "これはテストドキュメントです。"}
+</code></pre>
+<p>結果: <code>Document 'doc-1' added. Call commit to persist changes.</code></p>
+<hr>
+<h2 id="get_document"><a class="header" href="#get_document">get_document</a></h2>
+<p>外部 ID でドキュメントを取得します。</p>
+<h3 id="パラメーター-4"><a class="header" href="#パラメーター-4">パラメーター</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">名前</th><th style="text-align: left">型</th><th style="text-align: left">必須</th><th style="text-align: left">説明</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>id</code></td><td style="text-align: left">string</td><td style="text-align: left">はい</td><td style="text-align: left">外部ドキュメント識別子</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="結果-1"><a class="header" href="#結果-1">結果</a></h3>
+<pre><code class="language-json">{
+  "id": "doc-1",
+  "documents": [
+    { "title": "Hello World", "body": "これはテストドキュメントです。" }
+  ]
+}
+</code></pre>
+<hr>
+<h2 id="delete_document"><a class="header" href="#delete_document">delete_document</a></h2>
+<p>外部 ID でドキュメントを削除します。削除後は <code>commit</code> を呼び出してください。</p>
+<h3 id="パラメーター-5"><a class="header" href="#パラメーター-5">パラメーター</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">名前</th><th style="text-align: left">型</th><th style="text-align: left">必須</th><th style="text-align: left">説明</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>id</code></td><td style="text-align: left">string</td><td style="text-align: left">はい</td><td style="text-align: left">外部ドキュメント識別子</td></tr>
+</tbody>
+</table>
+</div>
+<p>結果: <code>Document 'doc-1' deleted. Call commit to persist changes.</code></p>
+<hr>
+<h2 id="commit-2"><a class="header" href="#commit-2">commit</a></h2>
+<p>保留中の変更をディスクにコミットします。変更を検索可能かつ永続的にするため、<code>add_document</code> または <code>delete_document</code> の後に必ず呼び出してください。</p>
+<h3 id="パラメーター-6"><a class="header" href="#パラメーター-6">パラメーター</a></h3>
+<p>なし。</p>
+<p>結果: <code>Changes committed successfully.</code></p>
+<hr>
+<h2 id="search-3"><a class="header" href="#search-3">search</a></h2>
+<p>laurus クエリ DSL を使用してドキュメントを検索します。</p>
+<h3 id="パラメーター-7"><a class="header" href="#パラメーター-7">パラメーター</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">名前</th><th style="text-align: left">型</th><th style="text-align: left">必須</th><th style="text-align: left">説明</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>query</code></td><td style="text-align: left">string</td><td style="text-align: left">はい</td><td style="text-align: left">laurus クエリ DSL による検索クエリ</td></tr>
+<tr><td style="text-align: left"><code>limit</code></td><td style="text-align: left">integer</td><td style="text-align: left">いいえ</td><td style="text-align: left">最大結果数（デフォルト: 10）</td></tr>
+<tr><td style="text-align: left"><code>offset</code></td><td style="text-align: left">integer</td><td style="text-align: left">いいえ</td><td style="text-align: left">ページネーション用スキップ数（デフォルト: 0）</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="クエリ-dsl-の例"><a class="header" href="#クエリ-dsl-の例">クエリ DSL の例</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">クエリ</th><th style="text-align: left">説明</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>hello</code></td><td style="text-align: left">デフォルトフィールド全体のターム検索</td></tr>
+<tr><td style="text-align: left"><code>title:hello</code></td><td style="text-align: left">フィールド指定のターム検索</td></tr>
+<tr><td style="text-align: left"><code>title:hello AND body:world</code></td><td style="text-align: left">ブール AND</td></tr>
+<tr><td style="text-align: left"><code>"exact phrase"</code></td><td style="text-align: left">フレーズ検索</td></tr>
+<tr><td style="text-align: left"><code>roam~2</code></td><td style="text-align: left">ファジー検索（編集距離 2）</td></tr>
+<tr><td style="text-align: left"><code>count:[1 TO 10]</code></td><td style="text-align: left">範囲検索</td></tr>
+<tr><td style="text-align: left"><code>title:helo~1</code></td><td style="text-align: left">フィールド指定のファジー検索</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="結果-2"><a class="header" href="#結果-2">結果</a></h3>
+<pre><code class="language-json">{
+  "total": 2,
+  "results": [
+    {
+      "id": "doc-1",
+      "score": 3.14,
+      "document": { "title": "Hello World", "body": "..." }
+    },
+    {
+      "id": "doc-2",
+      "score": 1.57,
+      "document": { "title": "Hello Again", "body": "..." }
+    }
+  ]
+}
+</code></pre>
+<hr>
+<h2 id="典型的なワークフロー"><a class="header" href="#典型的なワークフロー">典型的なワークフロー</a></h2>
+<pre><code class="language-text">1. connect         → 実行中の laurus-server に接続
+2. create_index    → スキーマを定義（インデックスが存在しない場合）
+3. add_document    → ドキュメントをインデックス（必要に応じて繰り返し）
+4. commit          → 変更をディスクに永続化
+5. search          → インデックスを検索
+6. add_document    → ドキュメントを更新
+7. delete_document → ドキュメントを削除
+8. commit          → 変更を永続化
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="ビルドとテスト"><a class="header" href="#ビルドとテスト">ビルドとテスト</a></h1>
+<h2 id="前提条件-4"><a class="header" href="#前提条件-4">前提条件</a></h2>
 <ul>
 <li><strong>Rust</strong> 1.85 以降（edition 2024）</li>
 <li><strong>Cargo</strong>（Rust に付属）</li>
