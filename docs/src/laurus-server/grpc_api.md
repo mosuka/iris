@@ -53,24 +53,64 @@ rpc CreateIndex(CreateIndexRequest) returns (CreateIndexResponse);
 message Schema {
   map<string, FieldOption> fields = 1;
   repeated string default_fields = 2;
+  map<string, AnalyzerDefinition> analyzers = 3;
+  map<string, EmbedderConfig> embedders = 4;
 }
 ```
+
+- **`fields`** — Field definitions keyed by field name.
+- **`default_fields`** — Field names used as default search targets when a query does not specify a field.
+- **`analyzers`** — Custom analyzer pipelines keyed by name. Referenced by `TextOption.analyzer`.
+- **`embedders`** — Embedder configurations keyed by name. Referenced by vector field options (`HnswOption.embedder`, etc.).
+
+**AnalyzerDefinition:**
+
+```protobuf
+message AnalyzerDefinition {
+  repeated ComponentConfig char_filters = 1;
+  ComponentConfig tokenizer = 2;
+  repeated ComponentConfig token_filters = 3;
+}
+```
+
+**ComponentConfig** (used for char filters, tokenizer, and token filters):
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `type` | `string` | Component type name (e.g. `"whitespace"`, `"lowercase"`, `"unicode_normalization"`) |
+| `params` | `map<string, string>` | Type-specific parameters as string key-value pairs |
+
+**EmbedderConfig:**
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `type` | `string` | Embedder type name (e.g. `"precomputed"`, `"candle_bert"`, `"openai"`) |
+| `params` | `map<string, string>` | Type-specific parameters (e.g. `"model"` → `"sentence-transformers/all-MiniLM-L6-v2"`) |
 
 Each `FieldOption` is a `oneof` with one of the following field types:
 
 | Lexical Fields | Vector Fields |
 | :--- | :--- |
-| `TextOption` (`indexed`, `stored`, `term_vectors`, `analyzer`) | `HnswOption` (`dimension`, `distance`, `m`, `ef_construction`, `base_weight`, `quantizer`) |
-| `IntegerOption` (`indexed`, `stored`) | `FlatOption` (`dimension`, `distance`, `base_weight`, `quantizer`) |
-| `FloatOption` (`indexed`, `stored`) | `IvfOption` (`dimension`, `distance`, `n_clusters`, `n_probe`, `base_weight`, `quantizer`) |
+| `TextOption` (`indexed`, `stored`, `term_vectors`, `analyzer`) | `HnswOption` (`dimension`, `distance`, `m`, `ef_construction`, `base_weight`, `quantizer`, `embedder`) |
+| `IntegerOption` (`indexed`, `stored`) | `FlatOption` (`dimension`, `distance`, `base_weight`, `quantizer`, `embedder`) |
+| `FloatOption` (`indexed`, `stored`) | `IvfOption` (`dimension`, `distance`, `n_clusters`, `n_probe`, `base_weight`, `quantizer`, `embedder`) |
 | `BooleanOption` (`indexed`, `stored`) | |
 | `DateTimeOption` (`indexed`, `stored`) | |
 | `GeoOption` (`indexed`, `stored`) | |
 | `BytesOption` (`stored`) | |
 
+The `embedder` field in vector options specifies the name of an embedder defined in `Schema.embedders`. When set, the server automatically generates vectors from document text fields at index time. Leave empty to supply pre-computed vectors directly.
+
 **Distance metrics:** `COSINE`, `EUCLIDEAN`, `MANHATTAN`, `DOT_PRODUCT`, `ANGULAR`
 
 **Quantization methods:** `NONE`, `SCALAR_8BIT`, `PRODUCT_QUANTIZATION`
+
+**QuantizationConfig structure:**
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `method` | `QuantizationMethod` | Quantization method (`QUANTIZATION_METHOD_NONE`, `QUANTIZATION_METHOD_SCALAR_8BIT`, or `QUANTIZATION_METHOD_PRODUCT_QUANTIZATION`) |
+| `subvector_count` | `uint32` | Number of subvectors (only used when `method` is `PRODUCT_QUANTIZATION`; must evenly divide `dimension`) |
 
 **Example:**
 
@@ -216,6 +256,13 @@ Execute a search query and return results as a single response.
 rpc Search(SearchRequest) returns (SearchResponse);
 ```
 
+**Response fields:**
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `results` | `repeated SearchResult` | Search results ordered by relevance |
+| `total_hits` | `uint64` | Total number of matching documents (before `limit`/`offset`) |
+
 ### `SearchStream`
 
 Execute a search query and stream results back one at a time.
@@ -262,6 +309,13 @@ A `oneof` with two options:
 | `timeout_ms` | `uint64` | Search timeout in milliseconds |
 | `parallel` | `bool` | Enable parallel search |
 | `sort_by` | `SortSpec` | Sort by a field instead of score |
+
+### SortSpec
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `field` | `string` | Field name to sort by. Empty string means sort by relevance score |
+| `order` | `SortOrder` | `SORT_ORDER_ASC` (ascending) or `SORT_ORDER_DESC` (descending) |
 
 ### VectorParams
 

@@ -9,14 +9,87 @@ on:
     types: [opened, synchronize, reopened]
 
 jobs:
+  # ============================================================
+  # Detect Changes
+  # ------------------------------------------------------------
+  # Analyze PR diffs and output change flags for each package.
+  # For push (main) / workflow_dispatch, default all flags to true.
+  # ============================================================
+  changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      code: ${{ steps.resolve.outputs.code }}
+      laurus: ${{ steps.resolve.outputs.laurus }}
+      cli: ${{ steps.resolve.outputs.cli }}
+      server: ${{ steps.resolve.outputs.server }}
+    steps:
+      - name: Run checkout
+        uses: actions/checkout@v6
+
+      # Detect file changes on PR events only.
+      # For push / workflow_dispatch, this step is skipped and
+      # the Resolve outputs step falls back to true for all flags.
+      - name: Detect file changes
+        uses: dorny/paths-filter@v3
+        id: filter
+        if: github.event_name == 'pull_request'
+        with:
+          filters: |
+            # code: triggers format + clippy
+            code:
+              - '**/*.rs'
+              - '**/Cargo.toml'
+              - 'Cargo.lock'
+              - 'laurus-server/proto/**'
+              - '.github/workflows/regression.yml'
+            # laurus: core library
+            laurus:
+              - 'laurus/**'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+              - '.github/workflows/regression.yml'
+            # cli: laurus-cli depends on laurus
+            cli:
+              - 'laurus-cli/**'
+              - 'laurus/**'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+              - '.github/workflows/regression.yml'
+            # server: laurus-server depends on laurus and has proto files
+            server:
+              - 'laurus-server/**'
+              - 'laurus/**'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+              - '.github/workflows/regression.yml'
+
+      # For non-PR events (push / workflow_dispatch), filter outputs are empty.
+      # Default to true so all jobs run.
+      - name: Resolve outputs
+        id: resolve
+        env:
+          CODE: ${{ steps.filter.outputs.code }}
+          LAURUS: ${{ steps.filter.outputs.laurus }}
+          CLI: ${{ steps.filter.outputs.cli }}
+          SERVER: ${{ steps.filter.outputs.server }}
+        run: |
+          echo "code=${CODE:-true}" >> "$GITHUB_OUTPUT"
+          echo "laurus=${LAURUS:-true}" >> "$GITHUB_OUTPUT"
+          echo "cli=${CLI:-true}" >> "$GITHUB_OUTPUT"
+          echo "server=${SERVER:-true}" >> "$GITHUB_OUTPUT"
+
+  # ============================================================
+  # Format
+  # ============================================================
   format:
     name: Format
-    strategy:
-      matrix:
-        platform:
-          - runner: ubuntu-latest
-        toolchain: [stable]
-    runs-on: ${{ matrix.platform.runner }}
+    needs: [changes]
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
     steps:
       - name: Run checkout
         uses: actions/checkout@v6
@@ -24,21 +97,20 @@ jobs:
       - name: Install toolchain
         uses: dtolnay/rust-toolchain@v1
         with:
-          toolchain: ${{ matrix.toolchain }}
+          toolchain: stable
           components: rustfmt
 
       - name: Run format
         run: cargo fmt --all -- --check
 
+  # ============================================================
+  # Clippy
+  # ============================================================
   clippy:
     name: Clippy
-    needs: [format]
-    strategy:
-      matrix:
-        platform:
-          - runner: ubuntu-latest
-        toolchain: [stable]
-    runs-on: ${{ matrix.platform.runner }}
+    needs: [changes, format]
+    if: ${{ !failure() && !cancelled() && needs.changes.outputs.code == 'true' }}
+    runs-on: ubuntu-latest
     steps:
       - name: Run checkout
         uses: actions/checkout@v6
@@ -52,16 +124,74 @@ jobs:
       - name: Install toolchain
         uses: dtolnay/rust-toolchain@v1
         with:
-          toolchain: ${{ matrix.toolchain }}
+          toolchain: stable
           components: clippy
 
       - name: Run clippy
         run: cargo clippy --all-targets --all-features -- -D warnings
 
-  test:
-    name: Test
-    needs: [clippy]
+  # ============================================================
+  # Test laurus (core library)
+  # ============================================================
+  test-laurus:
+    name: Test laurus
+    needs: [changes, clippy]
+    if: ${{ !failure() && !cancelled() && needs.changes.outputs.laurus == 'true' }}
     strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - runner: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            skip_embedding_features: true
+          - runner: macos-latest
+            target: aarch64-apple-darwin
+          - runner: macos-15-intel
+            target: x86_64-apple-darwin
+          - runner: windows-latest
+            target: x86_64-pc-windows-msvc
+          - runner: windows-latest
+            target: aarch64-pc-windows-msvc
+            skip_test_run: true
+            skip_embedding_features: true
+        toolchain: [stable]
+    runs-on: ${{ matrix.platform.runner }}
+    steps:
+      - name: Run checkout
+        uses: actions/checkout@v6
+
+      - name: Install toolchain
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: ${{ matrix.toolchain }}
+          target: ${{ matrix.platform.target }}
+
+      - name: Run test
+        shell: bash
+        run: |
+          if [ "${{ matrix.platform.skip_embedding_features }}" == "true" ]; then
+            FEATURES=""
+          else
+            FEATURES="--all-features"
+          fi
+
+          if [ "${{ matrix.platform.skip_test_run }}" == "true" ]; then
+            cargo check --package laurus --target "${{ matrix.platform.target }}" $FEATURES
+          else
+            cargo test --package laurus --target "${{ matrix.platform.target }}" $FEATURES
+          fi
+
+  # ============================================================
+  # Test laurus-cli
+  # ============================================================
+  test-cli:
+    name: Test laurus-cli
+    needs: [changes, clippy]
+    if: ${{ !failure() && !cancelled() && needs.changes.outputs.cli == 'true' }}
+    strategy:
+      fail-fast: false
       matrix:
         platform:
           - runner: ubuntu-latest
@@ -107,7 +237,66 @@ jobs:
           fi
 
           if [ "${{ matrix.platform.skip_test_run }}" == "true" ]; then
-            cargo check --target "${{ matrix.platform.target }}" $FEATURES
+            cargo check --package laurus-cli --target "${{ matrix.platform.target }}" $FEATURES
           else
-            cargo test --target "${{ matrix.platform.target }}" $FEATURES
+            cargo test --package laurus-cli --target "${{ matrix.platform.target }}" $FEATURES
+          fi
+
+  # ============================================================
+  # Test laurus-server
+  # ============================================================
+  test-server:
+    name: Test laurus-server
+    needs: [changes, clippy]
+    if: ${{ !failure() && !cancelled() && needs.changes.outputs.server == 'true' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - runner: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            skip_embedding_features: true
+          - runner: macos-latest
+            target: aarch64-apple-darwin
+          - runner: macos-15-intel
+            target: x86_64-apple-darwin
+          - runner: windows-latest
+            target: x86_64-pc-windows-msvc
+          - runner: windows-latest
+            target: aarch64-pc-windows-msvc
+            skip_test_run: true
+            skip_embedding_features: true
+        toolchain: [stable]
+    runs-on: ${{ matrix.platform.runner }}
+    steps:
+      - name: Run checkout
+        uses: actions/checkout@v6
+
+      - name: Install protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          version: "24.x"
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install toolchain
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: ${{ matrix.toolchain }}
+          target: ${{ matrix.platform.target }}
+
+      - name: Run test
+        shell: bash
+        run: |
+          if [ "${{ matrix.platform.skip_embedding_features }}" == "true" ]; then
+            FEATURES=""
+          else
+            FEATURES="--all-features"
+          fi
+
+          if [ "${{ matrix.platform.skip_test_run }}" == "true" ]; then
+            cargo check --package laurus-server --target "${{ matrix.platform.target }}" $FEATURES
+          else
+            cargo test --package laurus-server --target "${{ matrix.platform.target }}" $FEATURES
           fi
