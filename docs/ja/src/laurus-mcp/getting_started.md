@@ -1,0 +1,124 @@
+# laurus-mcp をはじめる
+
+## 前提条件
+
+- `laurus` CLI バイナリがインストール済み（`cargo install laurus-cli`）
+- 実行中の `laurus-server` インスタンス（[laurus-server はじめに](../laurus-server/getting_started.md)を参照）
+- MCP をサポートする AI クライアント（Claude Desktop、Claude Code など）
+
+## 設定
+
+### ステップ 1: laurus-server を起動
+
+```bash
+laurus serve --grpc-port 50051
+```
+
+### ステップ 2: MCP クライアントの設定
+
+#### Claude Code
+
+CLI コマンドで追加する方法（推奨）：
+
+```bash
+claude mcp add laurus laurus mcp --endpoint http://localhost:50051
+```
+
+または `~/.claude/settings.json` を直接編集：
+
+```json
+{
+  "mcpServers": {
+    "laurus": {
+      "command": "laurus",
+      "args": ["mcp", "--endpoint", "http://localhost:50051"]
+    }
+  }
+}
+```
+
+#### Claude Desktop
+
+macOS の場合は `~/Library/Application Support/Claude/claude_desktop_config.json`、
+Windows の場合は `%APPDATA%\Claude\claude_desktop_config.json` を編集：
+
+```json
+{
+  "mcpServers": {
+    "laurus": {
+      "command": "laurus",
+      "args": ["mcp", "--endpoint", "http://localhost:50051"]
+    }
+  }
+}
+```
+
+## 使用ワークフロー
+
+### ワークフロー 1: 既存のインデックスを使用する
+
+CLI でインデックスを事前に作成してから MCP サーバーで検索します：
+
+```bash
+# ステップ 1: スキーマファイルを作成
+cat > schema.toml << 'EOF'
+[fields.title]
+Text = { indexed = true, stored = true }
+
+[fields.body]
+Text = { indexed = true, stored = true }
+EOF
+
+# ステップ 2: サーバーを起動してインデックスを作成
+laurus serve --grpc-port 50051 &
+laurus create index --schema schema.toml
+
+# ステップ 3: MCP サーバーを起動（Claude が自動的に起動）
+laurus mcp --endpoint http://localhost:50051
+```
+
+### ワークフロー 2: AI 主導のインデックス作成
+
+インデックスを事前に作成せず MCP サーバーを起動し、AI にインデックスを作成させます：
+
+```bash
+# laurus-server を起動（インデックス不要）
+laurus serve --grpc-port 50051
+```
+
+次に Claude に依頼します：
+
+> 「ブログ記事用の検索インデックスを作成してください。タイトルと本文テキストで検索できるようにして、著者と公開日も保存したいです。」
+
+Claude は `connect` ツールを呼び出して接続し、スキーマを設計して `create_index` を自動的に呼び出します。
+
+### ワークフロー 3: 実行時に接続する
+
+エンドポイントを指定せずに MCP サーバーを起動します：
+
+```bash
+laurus mcp
+```
+
+次に Claude に接続を依頼します：
+
+> 「`http://localhost:50051` の laurus サーバーに接続してください」
+
+Claude は他のツールを使用する前に `connect` を呼び出します。
+
+## ライフサイクル
+
+```text
+laurus-server 起動（別プロセス）
+  └─ gRPC ポート 50051 でリッスン
+
+Claude 起動
+  └─ 起動: laurus mcp --endpoint http://localhost:50051
+       └─ stdio イベントループに入る
+            ├─ stdin 経由でツール呼び出しを受信
+            ├─ gRPC 経由で laurus-server にプロキシ
+            └─ stdout 経由で結果を送信
+Claude 終了
+  └─ laurus-mcp プロセスが終了
+  └─ laurus-server は継続して動作
+```

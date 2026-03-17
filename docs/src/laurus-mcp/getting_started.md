@@ -1,0 +1,126 @@
+# Getting Started with laurus-mcp
+
+## Prerequisites
+
+- The `laurus` CLI binary installed (`cargo install laurus-cli`)
+- A running `laurus-server` instance (see [laurus-server getting started](../laurus-server/getting_started.md))
+- An AI client that supports MCP (Claude Desktop, Claude Code, etc.)
+
+## Configuration
+
+### Step 1: Start laurus-server
+
+```bash
+laurus serve --grpc-port 50051
+```
+
+### Step 2: Configure the MCP client
+
+#### Claude Code
+
+Use the CLI command (recommended):
+
+```bash
+claude mcp add laurus laurus mcp --endpoint http://localhost:50051
+```
+
+Or edit `~/.claude/settings.json` directly:
+
+```json
+{
+  "mcpServers": {
+    "laurus": {
+      "command": "laurus",
+      "args": ["mcp", "--endpoint", "http://localhost:50051"]
+    }
+  }
+}
+```
+
+#### Claude Desktop
+
+Edit `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS)
+or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
+
+```json
+{
+  "mcpServers": {
+    "laurus": {
+      "command": "laurus",
+      "args": ["mcp", "--endpoint", "http://localhost:50051"]
+    }
+  }
+}
+```
+
+## Usage Workflows
+
+### Workflow 1: Pre-created index
+
+Create the index using the CLI first, then use the MCP server to query it:
+
+```bash
+# Step 1: Create a schema file
+cat > schema.toml << 'EOF'
+[fields.title]
+Text = { indexed = true, stored = true }
+
+[fields.body]
+Text = { indexed = true, stored = true }
+EOF
+
+# Step 2: Start the server and create the index
+laurus serve --grpc-port 50051 &
+laurus create index --schema schema.toml
+
+# Step 3: Start the MCP server (done automatically by Claude)
+laurus mcp --endpoint http://localhost:50051
+```
+
+### Workflow 2: AI-driven index creation
+
+Start the MCP server without a pre-created index, then ask the AI to create one:
+
+```bash
+# Start laurus-server (no index required)
+laurus serve --grpc-port 50051
+```
+
+Then ask Claude:
+
+> "Create a search index for blog posts. I need to search by title and body text,
+> and I want to store the author and publication date."
+
+Claude will call the `connect` tool (if not already connected), then design the
+schema and call `create_index` automatically.
+
+### Workflow 3: Connect at runtime
+
+Start the MCP server without specifying an endpoint:
+
+```bash
+laurus mcp
+```
+
+Then ask Claude to connect:
+
+> "Connect to the laurus server at `http://localhost:50051`"
+
+Claude will call `connect(endpoint: "http://localhost:50051")` before using other tools.
+
+## Lifecycle
+
+```text
+laurus-server starts (separate process)
+  └─ listens on gRPC port 50051
+
+Claude starts
+  └─ spawns: laurus mcp --endpoint `http://localhost:50051`
+       └─ enters stdio event loop
+            ├─ receives tool calls via stdin
+            ├─ proxies calls to laurus-server via gRPC
+            └─ sends results via stdout
+Claude exits
+  └─ laurus-mcp process terminates
+  └─ laurus-server continues running
+```

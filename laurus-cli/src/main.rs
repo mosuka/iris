@@ -24,8 +24,10 @@ use anyhow::{Context, Result};
 use clap::Parser;
 use laurus::Document;
 
-use crate::cli::{AddResource, Cli, Command, CreateResource, DeleteResource, GetResource};
-use crate::commands::{repl, schema, search, serve};
+use crate::cli::{
+    AddResource, Cli, Command, CreateResource, DeleteResource, GetResource, McpCommand,
+};
+use crate::commands::{mcp, repl, schema, search, serve};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -83,5 +85,6 @@ async fn main() -> Result<()> {
         Command::Search(cmd) => search::run(cmd, &data_dir, format).await,
         Command::Repl => repl::run(&data_dir, format).await,
         Command::Serve(cmd) => serve::run(cmd, &data_dir).await,
+        Command::Mcp(McpCommand { endpoint }) => mcp::run(endpoint.as_deref()).await,
     }
 }

@@ -1,5 +1,5 @@
 [workspace]
-members = ["laurus", "laurus-cli", "laurus-server"]
+members = ["laurus", "laurus-cli", "laurus-server", "laurus-mcp"]
 resolver = "2"
 
 [workspace.package]
@@ -17,12 +17,15 @@ license = "MIT"
 [workspace.dependencies]
 laurus = { version = "0.2.1", path = "laurus" }
 laurus-server = { version = "0.2.1", path = "laurus-server" }
+laurus-mcp = { version = "0.2.1", path = "laurus-mcp" }
+rmcp = { version = "1.2.0", features = ["server", "transport-io"] }
 
 anyhow = "1.0.102"
 chrono = { version = "0.4.44", features = ["serde"] }
 clap = { version = "4.6.0", features = ["derive", "env"] }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.149"
+thiserror = "2.0.18"
 toml = "1.0.6"
 tokio = { version = "1.50.0", features = ["full"] }
 tabled = "0.20.0"
@@ -37,6 +40,7 @@ tokio-stream = "0.1.18"
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 axum = "0.8.8"
+tempfile = "3.25.0"
 
 [profile.release]
 lto = true

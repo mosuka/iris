@@ -45,6 +45,8 @@ pub enum Command {
     Repl,
     /// Start the gRPC server.
     Serve(ServeCommand),
+    /// Start the MCP (Model Context Protocol) server on stdio.
+    Mcp(McpCommand),
 }
 
 // --- Create ---
@@ -140,6 +142,22 @@ pub enum DeleteResource {
         #[arg(long)]
         id: String,
     },
+}
+
+// --- Mcp ---
+
+/// CLI arguments for the `mcp` subcommand.
+///
+/// Configures the MCP stdio server and its connection to a running
+/// laurus-server instance.
+#[derive(Parser)]
+pub struct McpCommand {
+    /// gRPC endpoint of a running laurus-server to connect to at startup.
+    ///
+    /// If omitted, the server starts without a connection.  Use the `connect`
+    /// MCP tool to connect later.
+    #[arg(long, env = "LAURUS_ENDPOINT")]
+    pub endpoint: Option<String>,
 }
 
 // --- Serve ---
