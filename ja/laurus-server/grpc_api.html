@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-dc38a5a0.js";
+            window.path_to_searchindex_js = "../searchindex-482c5576.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-e8a84d15.js"></script>
@@ -234,8 +234,47 @@
 <pre><code class="language-protobuf">message Schema {
   map&lt;string, FieldOption&gt; fields = 1;
   repeated string default_fields = 2;
+  map&lt;string, AnalyzerDefinition&gt; analyzers = 3;
+  map&lt;string, EmbedderConfig&gt; embedders = 4;
 }
 </code></pre>
+<ul>
+<li><strong><code>fields</code></strong> — フィールド名をキーとしたフィールド定義。</li>
+<li><strong><code>default_fields</code></strong> — クエリでフィールドを指定しない場合のデフォルト検索対象フィールド名。</li>
+<li><strong><code>analyzers</code></strong> — 名前をキーとしたカスタムアナライザーパイプライン。<code>TextOption.analyzer</code> で参照。</li>
+<li><strong><code>embedders</code></strong> — 名前をキーとしたエンベッダー設定。ベクトルフィールドオプション（<code>HnswOption.embedder</code> など）で参照。</li>
+</ul>
+<p><strong>AnalyzerDefinition:</strong></p>
+<pre><code class="language-protobuf">message AnalyzerDefinition {
+  repeated ComponentConfig char_filters = 1;
+  ComponentConfig tokenizer = 2;
+  repeated ComponentConfig token_filters = 3;
+}
+</code></pre>
+<p><strong>ComponentConfig</strong>（文字フィルター、トークナイザー、トークンフィルターに使用）:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">フィールド</th><th style="text-align: left">型</th><th style="text-align: left">説明</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>type</code></td><td style="text-align: left"><code>string</code></td><td style="text-align: left">コンポーネントタイプ名（例: <code>"whitespace"</code>, <code>"lowercase"</code>, <code>"unicode_normalization"</code>）</td></tr>
+<tr><td style="text-align: left"><code>params</code></td><td style="text-align: left"><code>map&lt;string, string&gt;</code></td><td style="text-align: left">タイプ固有のパラメータ（文字列のキーと値のペア）</td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>EmbedderConfig:</strong></p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">フィールド</th><th style="text-align: left">型</th><th style="text-align: left">説明</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>type</code></td><td style="text-align: left"><code>string</code></td><td style="text-align: left">エンベッダータイプ名（例: <code>"precomputed"</code>, <code>"candle_bert"</code>, <code>"openai"</code>）</td></tr>
+<tr><td style="text-align: left"><code>params</code></td><td style="text-align: left"><code>map&lt;string, string&gt;</code></td><td style="text-align: left">タイプ固有のパラメータ（例: <code>"model"</code> → <code>"sentence-transformers/all-MiniLM-L6-v2"</code>）</td></tr>
+</tbody>
+</table>
+</div>
 <p>各 <code>FieldOption</code> は以下のフィールドタイプのいずれかを持つ <code>oneof</code> です。</p>
 <div class="table-wrapper">
 <table>
@@ -243,9 +282,9 @@
 <tr><th style="text-align: left">Lexical フィールド</th><th style="text-align: left">Vector フィールド</th></tr>
 </thead>
 <tbody>
-<tr><td style="text-align: left"><code>TextOption</code> (<code>indexed</code>, <code>stored</code>, <code>term_vectors</code>, <code>analyzer</code>)</td><td style="text-align: left"><code>HnswOption</code> (<code>dimension</code>, <code>distance</code>, <code>m</code>, <code>ef_construction</code>, <code>base_weight</code>, <code>quantizer</code>)</td></tr>
-<tr><td style="text-align: left"><code>IntegerOption</code> (<code>indexed</code>, <code>stored</code>)</td><td style="text-align: left"><code>FlatOption</code> (<code>dimension</code>, <code>distance</code>, <code>base_weight</code>, <code>quantizer</code>)</td></tr>
-<tr><td style="text-align: left"><code>FloatOption</code> (<code>indexed</code>, <code>stored</code>)</td><td style="text-align: left"><code>IvfOption</code> (<code>dimension</code>, <code>distance</code>, <code>n_clusters</code>, <code>n_probe</code>, <code>base_weight</code>, <code>quantizer</code>)</td></tr>
+<tr><td style="text-align: left"><code>TextOption</code> (<code>indexed</code>, <code>stored</code>, <code>term_vectors</code>, <code>analyzer</code>)</td><td style="text-align: left"><code>HnswOption</code> (<code>dimension</code>, <code>distance</code>, <code>m</code>, <code>ef_construction</code>, <code>base_weight</code>, <code>quantizer</code>, <code>embedder</code>)</td></tr>
+<tr><td style="text-align: left"><code>IntegerOption</code> (<code>indexed</code>, <code>stored</code>)</td><td style="text-align: left"><code>FlatOption</code> (<code>dimension</code>, <code>distance</code>, <code>base_weight</code>, <code>quantizer</code>, <code>embedder</code>)</td></tr>
+<tr><td style="text-align: left"><code>FloatOption</code> (<code>indexed</code>, <code>stored</code>)</td><td style="text-align: left"><code>IvfOption</code> (<code>dimension</code>, <code>distance</code>, <code>n_clusters</code>, <code>n_probe</code>, <code>base_weight</code>, <code>quantizer</code>, <code>embedder</code>)</td></tr>
 <tr><td style="text-align: left"><code>BooleanOption</code> (<code>indexed</code>, <code>stored</code>)</td><td style="text-align: left"></td></tr>
 <tr><td style="text-align: left"><code>DateTimeOption</code> (<code>indexed</code>, <code>stored</code>)</td><td style="text-align: left"></td></tr>
 <tr><td style="text-align: left"><code>GeoOption</code> (<code>indexed</code>, <code>stored</code>)</td><td style="text-align: left"></td></tr>
@@ -253,8 +292,21 @@
 </tbody>
 </table>
 </div>
+<p>ベクトルフィールドオプションの <code>embedder</code> フィールドには、<code>Schema.embedders</code> で定義したエンベッダー名を指定します。設定すると、インデックス時にドキュメントのテキストフィールドからベクトルを自動生成します。事前計算済みのベクトルを直接供給する場合は空のままにします。</p>
 <p><strong>距離メトリクス:</strong> <code>COSINE</code>, <code>EUCLIDEAN</code>, <code>MANHATTAN</code>, <code>DOT_PRODUCT</code>, <code>ANGULAR</code></p>
 <p><strong>量子化手法:</strong> <code>NONE</code>, <code>SCALAR_8BIT</code>, <code>PRODUCT_QUANTIZATION</code></p>
+<p><strong>QuantizationConfig 構造:</strong></p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">フィールド</th><th style="text-align: left">型</th><th style="text-align: left">説明</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>method</code></td><td style="text-align: left"><code>QuantizationMethod</code></td><td style="text-align: left">量子化手法（<code>QUANTIZATION_METHOD_NONE</code>, <code>QUANTIZATION_METHOD_SCALAR_8BIT</code>, または <code>QUANTIZATION_METHOD_PRODUCT_QUANTIZATION</code>）</td></tr>
+<tr><td style="text-align: left"><code>subvector_count</code></td><td style="text-align: left"><code>uint32</code></td><td style="text-align: left">サブベクトルの数（<code>method</code> が <code>PRODUCT_QUANTIZATION</code> の場合のみ使用。<code>dimension</code> を均等に割り切れる値を指定）。</td></tr>
+</tbody>
+</table>
+</div>
 <p><strong>例:</strong></p>
 <pre><code class="language-json">{
   "schema": {
@@ -385,6 +437,18 @@
 <p>検索クエリを実行し、結果を単一のレスポンスとして返します。</p>
 <pre><code class="language-protobuf">rpc Search(SearchRequest) returns (SearchResponse);
 </code></pre>
+<p><strong>レスポンスフィールド:</strong></p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">フィールド</th><th style="text-align: left">型</th><th style="text-align: left">説明</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>results</code></td><td style="text-align: left"><code>repeated SearchResult</code></td><td style="text-align: left">関連度順の検索結果</td></tr>
+<tr><td style="text-align: left"><code>total_hits</code></td><td style="text-align: left"><code>uint64</code></td><td style="text-align: left">マッチするドキュメントの総数（<code>limit</code>/<code>offset</code> 適用前）</td></tr>
+</tbody>
+</table>
+</div>
 <h3 id="searchstream"><a class="header" href="#searchstream"><code>SearchStream</code></a></h3>
 <p>検索クエリを実行し、結果を 1 件ずつストリーミングで返します。</p>
 <pre><code class="language-protobuf">rpc SearchStream(SearchRequest) returns (stream SearchResult);
@@ -438,6 +502,18 @@
 <tr><td style="text-align: left"><code>timeout_ms</code></td><td style="text-align: left"><code>uint64</code></td><td style="text-align: left">検索タイムアウト（ミリ秒）</td></tr>
 <tr><td style="text-align: left"><code>parallel</code></td><td style="text-align: left"><code>bool</code></td><td style="text-align: left">並列検索を有効化</td></tr>
 <tr><td style="text-align: left"><code>sort_by</code></td><td style="text-align: left"><code>SortSpec</code></td><td style="text-align: left">スコアの代わりにフィールドでソート</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="sortspec"><a class="header" href="#sortspec">SortSpec</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">フィールド</th><th style="text-align: left">型</th><th style="text-align: left">説明</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>field</code></td><td style="text-align: left"><code>string</code></td><td style="text-align: left">ソート対象のフィールド名。空文字列はスコアでソートすることを意味する</td></tr>
+<tr><td style="text-align: left"><code>order</code></td><td style="text-align: left"><code>SortOrder</code></td><td style="text-align: left"><code>SORT_ORDER_ASC</code>（昇順）または <code>SORT_ORDER_DESC</code>（降順）</td></tr>
 </tbody>
 </table>
 </div>
