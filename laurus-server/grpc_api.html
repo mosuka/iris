@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-3551a720.js";
+            window.path_to_searchindex_js = "../searchindex-d2cf4146.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-710721a4.js"></script>
@@ -187,7 +187,7 @@
 </thead>
 <tbody>
 <tr><td style="text-align: left"><code>HealthService</code></td><td style="text-align: left"><code>Check</code></td><td style="text-align: left">Health checking</td></tr>
-<tr><td style="text-align: left"><code>IndexService</code></td><td style="text-align: left"><code>CreateIndex</code>, <code>GetIndex</code>, <code>GetSchema</code></td><td style="text-align: left">Index lifecycle and schema</td></tr>
+<tr><td style="text-align: left"><code>IndexService</code></td><td style="text-align: left"><code>CreateIndex</code>, <code>GetIndex</code>, <code>GetSchema</code>, <code>AddField</code></td><td style="text-align: left">Index lifecycle and schema</td></tr>
 <tr><td style="text-align: left"><code>DocumentService</code></td><td style="text-align: left"><code>PutDocument</code>, <code>AddDocument</code>, <code>GetDocuments</code>, <code>DeleteDocuments</code>, <code>Commit</code></td><td style="text-align: left">Document CRUD and commit</td></tr>
 <tr><td style="text-align: left"><code>SearchService</code></td><td style="text-align: left"><code>Search</code>, <code>SearchStream</code></td><td style="text-align: left">Unary and streaming search</td></tr>
 </tbody>
@@ -332,6 +332,20 @@
 </table>
 </div>
 <p>Each <code>VectorFieldStats</code> contains <code>vector_count</code> and <code>dimension</code>.</p>
+<h3 id="addfield"><a class="header" href="#addfield"><code>AddField</code></a></h3>
+<p>Add a new field to the running index at runtime.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Field</th><th style="text-align: left">Type</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>name</code></td><td style="text-align: left"><code>string</code></td><td style="text-align: left">The field name</td></tr>
+<tr><td style="text-align: left"><code>field_option</code></td><td style="text-align: left"><code>FieldOption</code></td><td style="text-align: left">The field configuration</td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>Response:</strong> Returns the updated <code>Schema</code>.</p>
 <h3 id="getschema"><a class="header" href="#getschema"><code>GetSchema</code></a></h3>
 <p>Retrieve the current index schema.</p>
 <pre><code class="language-protobuf">rpc GetSchema(GetSchemaRequest) returns (GetSchemaResponse);

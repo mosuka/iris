@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-70ad585d.js";
+            window.path_to_searchindex_js = "../searchindex-c30725f2.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-d18ed058.js"></script>
@@ -190,7 +190,7 @@
 </thead>
 <tbody>
 <tr><td style="text-align: left"><code>HealthService</code></td><td style="text-align: left"><code>Check</code></td><td style="text-align: left">ヘルスチェック</td></tr>
-<tr><td style="text-align: left"><code>IndexService</code></td><td style="text-align: left"><code>CreateIndex</code>, <code>GetIndex</code>, <code>GetSchema</code></td><td style="text-align: left">インデックスのライフサイクルとスキーマ</td></tr>
+<tr><td style="text-align: left"><code>IndexService</code></td><td style="text-align: left"><code>CreateIndex</code>, <code>GetIndex</code>, <code>GetSchema</code>, <code>AddField</code></td><td style="text-align: left">インデックスのライフサイクルとスキーマ</td></tr>
 <tr><td style="text-align: left"><code>DocumentService</code></td><td style="text-align: left"><code>PutDocument</code>, <code>AddDocument</code>, <code>GetDocuments</code>, <code>DeleteDocuments</code>, <code>Commit</code></td><td style="text-align: left">ドキュメント CRUD とコミット</td></tr>
 <tr><td style="text-align: left"><code>SearchService</code></td><td style="text-align: left"><code>Search</code>, <code>SearchStream</code></td><td style="text-align: left">単発検索とストリーミング検索</td></tr>
 </tbody>
@@ -350,6 +350,20 @@
 </tbody>
 </table>
 </div>
+<h3 id="addfield"><a class="header" href="#addfield">AddField</a></h3>
+<p>稼働中のインデックスにフィールドを動的に追加します。</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">フィールド</th><th style="text-align: left">型</th><th style="text-align: left">説明</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>name</code></td><td style="text-align: left"><code>string</code></td><td style="text-align: left">フィールド名</td></tr>
+<tr><td style="text-align: left"><code>field_option</code></td><td style="text-align: left"><code>FieldOption</code></td><td style="text-align: left">フィールド設定</td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>レスポンス:</strong> 更新後の <code>Schema</code> を返します。</p>
 <hr>
 <h2 id="documentservice"><a class="header" href="#documentservice">DocumentService</a></h2>
 <h3 id="putdocument"><a class="header" href="#putdocument"><code>PutDocument</code></a></h3>

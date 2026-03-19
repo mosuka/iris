@@ -36,7 +36,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-3551a720.js";
+            window.path_to_searchindex_js = "searchindex-d2cf4146.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-710721a4.js"></script>
@@ -1111,6 +1111,22 @@ let v: DataValue = vec![0.1f32, 0.2].into(); // Vector
 <span class="boring">}</span></code></pre>
 <h2 id="reserved-fields"><a class="header" href="#reserved-fields">Reserved Fields</a></h2>
 <p>The <code>_id</code> field is reserved by Laurus for internal use. It stores the external document ID and is always indexed with <code>KeywordAnalyzer</code> (exact match). You do not need to add it to your schema — it is managed automatically.</p>
+<h2 id="dynamic-field-addition"><a class="header" href="#dynamic-field-addition">Dynamic Field Addition</a></h2>
+<p>Fields can be added to a running engine at runtime using <code>Engine::add_field()</code>.
+Only field addition is supported—removal or type changes are not allowed.</p>
+<h3 id="adding-a-lexical-field"><a class="header" href="#adding-a-lexical-field">Adding a Lexical Field</a></h3>
+<pre><code class="language-rust ignore">let updated_schema = engine.add_field(
+    "category",
+    FieldOption::Text(TextOption::default()),
+).await?;</code></pre>
+<h3 id="adding-a-vector-field"><a class="header" href="#adding-a-vector-field">Adding a Vector Field</a></h3>
+<pre><code class="language-rust ignore">let updated_schema = engine.add_field(
+    "embedding",
+    FieldOption::Flat(FlatOption::default().dimension(384)),
+).await?;</code></pre>
+<p>Existing documents are unaffected—they simply have no value for the new
+field. The returned <code>Schema</code> should be persisted (e.g., to <code>schema.toml</code>)
+by the caller.</p>
 <h2 id="schema-design-tips"><a class="header" href="#schema-design-tips">Schema Design Tips</a></h2>
 <ol>
 <li>
@@ -1274,7 +1290,7 @@ use laurus::analysis::analyzer::keyword::KeywordAnalyzer;
 use laurus::analysis::analyzer::per_field::PerFieldAnalyzer;
 
 // Default analyzer for fields not explicitly configured
-let mut per_field = PerFieldAnalyzer::new(
+let per_field = PerFieldAnalyzer::new(
     Arc::new(StandardAnalyzer::default())
 );
 
@@ -1593,7 +1609,7 @@ let bert = Arc::new(CandleBertEmbedder::new("...")?);
 let clip = Arc::new(CandleClipEmbedder::new("...")?);
 
 
-let mut per_field = PerFieldEmbedder::new(bert.clone());
+let per_field = PerFieldEmbedder::new(bert.clone());
 per_field.add_embedder("text_vec", bert.clone());
 per_field.add_embedder("image_vec", clip.clone());
 
@@ -2801,7 +2817,7 @@ async fn main() -&gt; laurus::Result&lt;()&gt; {
 
     // Set up per-field embedder
     let embedder = Arc::new(my_embedder);
-    let mut pfe = PerFieldEmbedder::new(embedder.clone());
+    let pfe = PerFieldEmbedder::new(embedder.clone());
     pfe.add_embedder("text_vec", embedder.clone());
 
     let engine = Engine::builder(storage, schema)
@@ -3562,6 +3578,8 @@ let engine = Engine::builder(storage, schema)
 <tr><td style="text-align: left"><code>delete_documents(id)</code></td><td style="text-align: left">Delete all documents/chunks by external ID</td></tr>
 <tr><td style="text-align: left"><code>commit()</code></td><td style="text-align: left">Flush pending changes to storage (makes documents searchable)</td></tr>
 <tr><td style="text-align: left"><code>recover()</code></td><td style="text-align: left">Replay WAL to restore uncommitted state after crash</td></tr>
+<tr><td style="text-align: left"><code>add_field(name, field_option)</code></td><td style="text-align: left">Dynamically add a new field to the schema at runtime</td></tr>
+<tr><td style="text-align: left"><code>schema()</code></td><td style="text-align: left">Return the current <code>Schema</code></td></tr>
 </tbody>
 </table>
 </div>
@@ -4559,7 +4577,7 @@ let engine = Engine::builder(storage, schema)
 </span>use laurus::analysis::analyzer::per_field::PerFieldAnalyzer;
 use laurus::analysis::analyzer::standard::StandardAnalyzer;
 
-let mut per_field = PerFieldAnalyzer::new(Arc::new(StandardAnalyzer::new()?));
+let per_field = PerFieldAnalyzer::new(Arc::new(StandardAnalyzer::new()?));
 per_field.add_analyzer("custom_field", Arc::new(ReverseAnalyzer));
 
 let engine = Engine::builder(storage, schema)
@@ -4652,7 +4670,7 @@ let engine = Engine::builder(storage, schema)
 </span><span class="boring">fn main() {
 </span>use laurus::embedding::per_field::PerFieldEmbedder;
 
-let mut per_field = PerFieldEmbedder::new(Arc::new(MyEmbedder { dimension: 384 }));
+let per_field = PerFieldEmbedder::new(Arc::new(MyEmbedder { dimension: 384 }));
 per_field.add_embedder("image_vec", Arc::new(ClipEmbedder::new()?));
 
 let engine = Engine::builder(storage, schema)
@@ -4791,6 +4809,8 @@ impl Storage for S3Storage {
 <tr><td style="text-align: left"><code>engine.get_documents(id).await?</code></td><td style="text-align: left">Get all documents/chunks by external ID</td></tr>
 <tr><td style="text-align: left"><code>engine.search(request).await?</code></td><td style="text-align: left">Execute a search request</td></tr>
 <tr><td style="text-align: left"><code>engine.commit().await?</code></td><td style="text-align: left">Flush all pending changes to storage</td></tr>
+<tr><td style="text-align: left"><code>engine.add_field(name, field_option).await?</code></td><td style="text-align: left">Dynamically add a new field to the schema at runtime</td></tr>
+<tr><td style="text-align: left"><code>engine.schema()</code></td><td style="text-align: left">Return the current <code>Schema</code></td></tr>
 <tr><td style="text-align: left"><code>engine.stats()?</code></td><td style="text-align: left">Get index statistics</td></tr>
 </tbody>
 </table>
@@ -5441,6 +5461,15 @@ Vector fields:
 <blockquote>
 <p><strong>Tip:</strong> Multiple documents can share the same external ID (chunking pattern). Use <code>add doc</code> for each chunk.</p>
 </blockquote>
+<h3 id="add-field"><a class="header" href="#add-field"><code>add field</code></a></h3>
+<p>Dynamically add a new field to an existing index.</p>
+<pre><code class="language-bash">laurus add field --data-dir ./data \
+    --name category \
+    --field-option '{"Text": {"indexed": true, "stored": true}}'
+</code></pre>
+<p>The <code>--field-option</code> argument accepts a JSON string using the same
+externally-tagged format as the schema file. The schema is automatically
+persisted after the field is added.</p>
 <hr>
 <h2 id="delete--delete-a-resource"><a class="header" href="#delete--delete-a-resource"><code>delete</code> — Delete a Resource</a></h2>
 <h3 id="delete-doc"><a class="header" href="#delete-doc"><code>delete doc</code></a></h3>
@@ -6651,7 +6680,7 @@ laurus serve
 </thead>
 <tbody>
 <tr><td style="text-align: left"><code>HealthService</code></td><td style="text-align: left"><code>Check</code></td><td style="text-align: left">Health checking</td></tr>
-<tr><td style="text-align: left"><code>IndexService</code></td><td style="text-align: left"><code>CreateIndex</code>, <code>GetIndex</code>, <code>GetSchema</code></td><td style="text-align: left">Index lifecycle and schema</td></tr>
+<tr><td style="text-align: left"><code>IndexService</code></td><td style="text-align: left"><code>CreateIndex</code>, <code>GetIndex</code>, <code>GetSchema</code>, <code>AddField</code></td><td style="text-align: left">Index lifecycle and schema</td></tr>
 <tr><td style="text-align: left"><code>DocumentService</code></td><td style="text-align: left"><code>PutDocument</code>, <code>AddDocument</code>, <code>GetDocuments</code>, <code>DeleteDocuments</code>, <code>Commit</code></td><td style="text-align: left">Document CRUD and commit</td></tr>
 <tr><td style="text-align: left"><code>SearchService</code></td><td style="text-align: left"><code>Search</code>, <code>SearchStream</code></td><td style="text-align: left">Unary and streaming search</td></tr>
 </tbody>
@@ -6796,6 +6825,20 @@ laurus serve
 </table>
 </div>
 <p>Each <code>VectorFieldStats</code> contains <code>vector_count</code> and <code>dimension</code>.</p>
+<h3 id="addfield"><a class="header" href="#addfield"><code>AddField</code></a></h3>
+<p>Add a new field to the running index at runtime.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Field</th><th style="text-align: left">Type</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>name</code></td><td style="text-align: left"><code>string</code></td><td style="text-align: left">The field name</td></tr>
+<tr><td style="text-align: left"><code>field_option</code></td><td style="text-align: left"><code>FieldOption</code></td><td style="text-align: left">The field configuration</td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>Response:</strong> Returns the updated <code>Schema</code>.</p>
 <h3 id="getschema"><a class="header" href="#getschema"><code>GetSchema</code></a></h3>
 <p>Retrieve the current index schema.</p>
 <pre><code class="language-protobuf">rpc GetSchema(GetSchemaRequest) returns (GetSchemaResponse);
@@ -7367,9 +7410,31 @@ schema_json: {"fields": {"title": {"Text": {}}, "body": {"Text": {}}}}
 </code></pre>
 <p>Result: <code>Index created successfully at /path/to/index.</code></p>
 <hr>
+<h2 id="add_field"><a class="header" href="#add_field">add_field</a></h2>
+<p>Add a new field to the index.</p>
+<h3 id="parameters-2"><a class="header" href="#parameters-2">Parameters</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Name</th><th style="text-align: left">Type</th><th style="text-align: left">Required</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>name</code></td><td style="text-align: left">string</td><td style="text-align: left">Yes</td><td style="text-align: left">The field name</td></tr>
+<tr><td style="text-align: left"><code>field_option_json</code></td><td style="text-align: left">string</td><td style="text-align: left">Yes</td><td style="text-align: left">Field configuration as JSON</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="example-2"><a class="header" href="#example-2">Example</a></h3>
+<pre><code class="language-json">{
+  "name": "category",
+  "field_option_json": "{\"Text\": {\"indexed\": true, \"stored\": true}}"
+}
+</code></pre>
+<p>Result: <code>Field 'category' added successfully.</code></p>
+<hr>
 <h2 id="get_index"><a class="header" href="#get_index">get_index</a></h2>
 <p>Get statistics for the current search index.</p>
-<h3 id="parameters-2"><a class="header" href="#parameters-2">Parameters</a></h3>
+<h3 id="parameters-3"><a class="header" href="#parameters-3">Parameters</a></h3>
 <p>None.</p>
 <h3 id="result"><a class="header" href="#result">Result</a></h3>
 <pre><code class="language-json">{
@@ -7380,7 +7445,7 @@ schema_json: {"fields": {"title": {"Text": {}}, "body": {"Text": {}}}}
 <hr>
 <h2 id="add_document"><a class="header" href="#add_document">add_document</a></h2>
 <p>Add or upsert a document in the index. Call <code>commit</code> after adding documents.</p>
-<h3 id="parameters-3"><a class="header" href="#parameters-3">Parameters</a></h3>
+<h3 id="parameters-4"><a class="header" href="#parameters-4">Parameters</a></h3>
 <div class="table-wrapper">
 <table>
 <thead>
@@ -7398,7 +7463,7 @@ schema_json: {"fields": {"title": {"Text": {}}, "body": {"Text": {}}}}
 <li><code>put</code> (default): Delete any existing document with the same <code>id</code>, then index the new one.</li>
 <li><code>add</code>: Append as a new chunk. Multiple chunks can share the same <code>id</code> (useful for splitting large documents).</li>
 </ul>
-<h3 id="example-2"><a class="header" href="#example-2">Example</a></h3>
+<h3 id="example-3"><a class="header" href="#example-3">Example</a></h3>
 <pre><code class="language-text">Tool: add_document
 id: "doc-1"
 document: {"title": "Hello World", "body": "This is a test document."}
@@ -7407,7 +7472,7 @@ document: {"title": "Hello World", "body": "This is a test document."}
 <hr>
 <h2 id="get_document"><a class="header" href="#get_document">get_document</a></h2>
 <p>Retrieve stored document(s) by external ID.</p>
-<h3 id="parameters-4"><a class="header" href="#parameters-4">Parameters</a></h3>
+<h3 id="parameters-5"><a class="header" href="#parameters-5">Parameters</a></h3>
 <div class="table-wrapper">
 <table>
 <thead>
@@ -7429,7 +7494,7 @@ document: {"title": "Hello World", "body": "This is a test document."}
 <hr>
 <h2 id="delete_document"><a class="header" href="#delete_document">delete_document</a></h2>
 <p>Delete document(s) by external ID. Call <code>commit</code> after deletion.</p>
-<h3 id="parameters-5"><a class="header" href="#parameters-5">Parameters</a></h3>
+<h3 id="parameters-6"><a class="header" href="#parameters-6">Parameters</a></h3>
 <div class="table-wrapper">
 <table>
 <thead>
@@ -7444,13 +7509,13 @@ document: {"title": "Hello World", "body": "This is a test document."}
 <hr>
 <h2 id="commit-3"><a class="header" href="#commit-3">commit</a></h2>
 <p>Commit pending changes to disk. Must be called after <code>add_document</code> or <code>delete_document</code> to make changes searchable and durable.</p>
-<h3 id="parameters-6"><a class="header" href="#parameters-6">Parameters</a></h3>
+<h3 id="parameters-7"><a class="header" href="#parameters-7">Parameters</a></h3>
 <p>None.</p>
 <p>Result: <code>Changes committed successfully.</code></p>
 <hr>
 <h2 id="search-6"><a class="header" href="#search-6">search</a></h2>
 <p>Search documents using the laurus query DSL.</p>
-<h3 id="parameters-7"><a class="header" href="#parameters-7">Parameters</a></h3>
+<h3 id="parameters-8"><a class="header" href="#parameters-8">Parameters</a></h3>
 <div class="table-wrapper">
 <table>
 <thead>
@@ -7501,12 +7566,13 @@ document: {"title": "Hello World", "body": "This is a test document."}
 <h2 id="typical-workflow"><a class="header" href="#typical-workflow">Typical Workflow</a></h2>
 <pre><code class="language-text">1. connect         → connect to a running laurus-server
 2. create_index    → define the schema (if index does not exist)
-3. add_document    → index documents (repeat as needed)
-4. commit          → persist changes to disk
-5. search          → query the index
-6. add_document    → update documents
-7. delete_document → remove documents
-8. commit          → persist changes
+3. add_field       → dynamically add fields (optional)
+4. add_document    → index documents (repeat as needed)
+5. commit          → persist changes to disk
+6. search          → query the index
+7. add_document    → update documents
+8. delete_document → remove documents
+9. commit          → persist changes
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="build--test"><a class="header" href="#build--test">Build &amp; Test</a></h1>

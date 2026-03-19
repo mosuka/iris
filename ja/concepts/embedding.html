@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-70ad585d.js";
+            window.path_to_searchindex_js = "../searchindex-c30725f2.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-d18ed058.js"></script>
@@ -318,7 +318,7 @@ let bert = Arc::new(CandleBertEmbedder::new("...")?);
 let clip = Arc::new(CandleClipEmbedder::new("...")?);
 
 
-let mut per_field = PerFieldEmbedder::new(bert.clone());
+let per_field = PerFieldEmbedder::new(bert.clone());
 per_field.add_embedder("text_vec", bert.clone());
 per_field.add_embedder("image_vec", clip.clone());
 

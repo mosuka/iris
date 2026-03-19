@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-3551a720.js";
+            window.path_to_searchindex_js = "../searchindex-d2cf4146.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-710721a4.js"></script>
@@ -233,9 +233,31 @@ schema_json: {"fields": {"title": {"Text": {}}, "body": {"Text": {}}}}
 </code></pre>
 <p>Result: <code>Index created successfully at /path/to/index.</code></p>
 <hr>
+<h2 id="add_field"><a class="header" href="#add_field">add_field</a></h2>
+<p>Add a new field to the index.</p>
+<h3 id="parameters-2"><a class="header" href="#parameters-2">Parameters</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Name</th><th style="text-align: left">Type</th><th style="text-align: left">Required</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>name</code></td><td style="text-align: left">string</td><td style="text-align: left">Yes</td><td style="text-align: left">The field name</td></tr>
+<tr><td style="text-align: left"><code>field_option_json</code></td><td style="text-align: left">string</td><td style="text-align: left">Yes</td><td style="text-align: left">Field configuration as JSON</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="example-2"><a class="header" href="#example-2">Example</a></h3>
+<pre><code class="language-json">{
+  "name": "category",
+  "field_option_json": "{\"Text\": {\"indexed\": true, \"stored\": true}}"
+}
+</code></pre>
+<p>Result: <code>Field 'category' added successfully.</code></p>
+<hr>
 <h2 id="get_index"><a class="header" href="#get_index">get_index</a></h2>
 <p>Get statistics for the current search index.</p>
-<h3 id="parameters-2"><a class="header" href="#parameters-2">Parameters</a></h3>
+<h3 id="parameters-3"><a class="header" href="#parameters-3">Parameters</a></h3>
 <p>None.</p>
 <h3 id="result"><a class="header" href="#result">Result</a></h3>
 <pre><code class="language-json">{
@@ -246,7 +268,7 @@ schema_json: {"fields": {"title": {"Text": {}}, "body": {"Text": {}}}}
 <hr>
 <h2 id="add_document"><a class="header" href="#add_document">add_document</a></h2>
 <p>Add or upsert a document in the index. Call <code>commit</code> after adding documents.</p>
-<h3 id="parameters-3"><a class="header" href="#parameters-3">Parameters</a></h3>
+<h3 id="parameters-4"><a class="header" href="#parameters-4">Parameters</a></h3>
 <div class="table-wrapper">
 <table>
 <thead>
@@ -264,7 +286,7 @@ schema_json: {"fields": {"title": {"Text": {}}, "body": {"Text": {}}}}
 <li><code>put</code> (default): Delete any existing document with the same <code>id</code>, then index the new one.</li>
 <li><code>add</code>: Append as a new chunk. Multiple chunks can share the same <code>id</code> (useful for splitting large documents).</li>
 </ul>
-<h3 id="example-2"><a class="header" href="#example-2">Example</a></h3>
+<h3 id="example-3"><a class="header" href="#example-3">Example</a></h3>
 <pre><code class="language-text">Tool: add_document
 id: "doc-1"
 document: {"title": "Hello World", "body": "This is a test document."}
@@ -273,7 +295,7 @@ document: {"title": "Hello World", "body": "This is a test document."}
 <hr>
 <h2 id="get_document"><a class="header" href="#get_document">get_document</a></h2>
 <p>Retrieve stored document(s) by external ID.</p>
-<h3 id="parameters-4"><a class="header" href="#parameters-4">Parameters</a></h3>
+<h3 id="parameters-5"><a class="header" href="#parameters-5">Parameters</a></h3>
 <div class="table-wrapper">
 <table>
 <thead>
@@ -295,7 +317,7 @@ document: {"title": "Hello World", "body": "This is a test document."}
 <hr>
 <h2 id="delete_document"><a class="header" href="#delete_document">delete_document</a></h2>
 <p>Delete document(s) by external ID. Call <code>commit</code> after deletion.</p>
-<h3 id="parameters-5"><a class="header" href="#parameters-5">Parameters</a></h3>
+<h3 id="parameters-6"><a class="header" href="#parameters-6">Parameters</a></h3>
 <div class="table-wrapper">
 <table>
 <thead>
@@ -310,13 +332,13 @@ document: {"title": "Hello World", "body": "This is a test document."}
 <hr>
 <h2 id="commit"><a class="header" href="#commit">commit</a></h2>
 <p>Commit pending changes to disk. Must be called after <code>add_document</code> or <code>delete_document</code> to make changes searchable and durable.</p>
-<h3 id="parameters-6"><a class="header" href="#parameters-6">Parameters</a></h3>
+<h3 id="parameters-7"><a class="header" href="#parameters-7">Parameters</a></h3>
 <p>None.</p>
 <p>Result: <code>Changes committed successfully.</code></p>
 <hr>
 <h2 id="search"><a class="header" href="#search">search</a></h2>
 <p>Search documents using the laurus query DSL.</p>
-<h3 id="parameters-7"><a class="header" href="#parameters-7">Parameters</a></h3>
+<h3 id="parameters-8"><a class="header" href="#parameters-8">Parameters</a></h3>
 <div class="table-wrapper">
 <table>
 <thead>
@@ -367,12 +389,13 @@ document: {"title": "Hello World", "body": "This is a test document."}
 <h2 id="typical-workflow"><a class="header" href="#typical-workflow">Typical Workflow</a></h2>
 <pre><code class="language-text">1. connect         → connect to a running laurus-server
 2. create_index    → define the schema (if index does not exist)
-3. add_document    → index documents (repeat as needed)
-4. commit          → persist changes to disk
-5. search          → query the index
-6. add_document    → update documents
-7. delete_document → remove documents
-8. commit          → persist changes
+3. add_field       → dynamically add fields (optional)
+4. add_document    → index documents (repeat as needed)
+5. commit          → persist changes to disk
+6. search          → query the index
+7. add_document    → update documents
+8. delete_document → remove documents
+9. commit          → persist changes
 </code></pre>
 
                     </main>

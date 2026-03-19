@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-70ad585d.js";
+            window.path_to_searchindex_js = "../searchindex-c30725f2.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-d18ed058.js"></script>
@@ -375,6 +375,14 @@ Vector fields:
 <blockquote>
 <p><strong>ヒント:</strong> 複数のドキュメントが同じ外部 ID を共有できます（チャンキングパターン）。各チャンクに対して <code>add doc</code> を使用してください。</p>
 </blockquote>
+<h3 id="add-field"><a class="header" href="#add-field"><code>add field</code></a></h3>
+<p>既存のインデックスにフィールドを動的に追加します。</p>
+<pre><code class="language-bash">laurus add field --data-dir ./data \
+    --name category \
+    --field-option '{"Text": {"indexed": true, "stored": true}}'
+</code></pre>
+<p><code>--field-option</code> 引数はスキーマファイルと同じ外部タグ付き JSON 形式を受け付けます。
+フィールド追加後、スキーマは自動的に永続化されます。</p>
 <hr>
 <h2 id="delete--リソースの削除"><a class="header" href="#delete--リソースの削除"><code>delete</code> — リソースの削除</a></h2>
 <h3 id="delete-doc"><a class="header" href="#delete-doc"><code>delete doc</code></a></h3>

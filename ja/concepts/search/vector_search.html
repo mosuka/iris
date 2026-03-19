@@ -35,7 +35,7 @@
             const path_to_root = "../../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../../searchindex-70ad585d.js";
+            window.path_to_searchindex_js = "../../searchindex-c30725f2.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../../toc-d18ed058.js"></script>
@@ -359,7 +359,7 @@ async fn main() -&gt; laurus::Result&lt;()&gt; {
 
     // Set up per-field embedder
     let embedder = Arc::new(my_embedder);
-    let mut pfe = PerFieldEmbedder::new(embedder.clone());
+    let pfe = PerFieldEmbedder::new(embedder.clone());
     pfe.add_embedder("text_vec", embedder.clone());
 
     let engine = Engine::builder(storage, schema)

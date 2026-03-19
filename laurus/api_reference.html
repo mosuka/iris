@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-3551a720.js";
+            window.path_to_searchindex_js = "../searchindex-d2cf4146.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-710721a4.js"></script>
@@ -196,6 +196,8 @@
 <tr><td style="text-align: left"><code>engine.get_documents(id).await?</code></td><td style="text-align: left">Get all documents/chunks by external ID</td></tr>
 <tr><td style="text-align: left"><code>engine.search(request).await?</code></td><td style="text-align: left">Execute a search request</td></tr>
 <tr><td style="text-align: left"><code>engine.commit().await?</code></td><td style="text-align: left">Flush all pending changes to storage</td></tr>
+<tr><td style="text-align: left"><code>engine.add_field(name, field_option).await?</code></td><td style="text-align: left">Dynamically add a new field to the schema at runtime</td></tr>
+<tr><td style="text-align: left"><code>engine.schema()</code></td><td style="text-align: left">Return the current <code>Schema</code></td></tr>
 <tr><td style="text-align: left"><code>engine.stats()?</code></td><td style="text-align: left">Get index statistics</td></tr>
 </tbody>
 </table>

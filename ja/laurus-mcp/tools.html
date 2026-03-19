@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-70ad585d.js";
+            window.path_to_searchindex_js = "../searchindex-c30725f2.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-d18ed058.js"></script>
@@ -315,9 +315,30 @@ document: {"title": "Hello World", "body": "これはテストドキュメント
 <p>なし。</p>
 <p>結果: <code>Changes committed successfully.</code></p>
 <hr>
+<h2 id="add_field"><a class="header" href="#add_field">add_field</a></h2>
+<p>インデックスにフィールドを追加します。</p>
+<h3 id="パラメーター-7"><a class="header" href="#パラメーター-7">パラメーター</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">名前</th><th style="text-align: left">型</th><th style="text-align: left">必須</th><th style="text-align: left">説明</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>name</code></td><td style="text-align: left">string</td><td style="text-align: left">はい</td><td style="text-align: left">フィールド名</td></tr>
+<tr><td style="text-align: left"><code>field_option_json</code></td><td style="text-align: left">string</td><td style="text-align: left">はい</td><td style="text-align: left">JSON 形式のフィールド設定</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="例-3"><a class="header" href="#例-3">例</a></h3>
+<pre><code class="language-json">{
+  "name": "category",
+  "field_option_json": "{\"Text\": {\"indexed\": true, \"stored\": true}}"
+}
+</code></pre>
+<hr>
 <h2 id="search"><a class="header" href="#search">search</a></h2>
 <p>laurus クエリ DSL を使用してドキュメントを検索します。</p>
-<h3 id="パラメーター-7"><a class="header" href="#パラメーター-7">パラメーター</a></h3>
+<h3 id="パラメーター-8"><a class="header" href="#パラメーター-8">パラメーター</a></h3>
 <div class="table-wrapper">
 <table>
 <thead>

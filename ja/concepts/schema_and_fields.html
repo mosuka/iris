@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-70ad585d.js";
+            window.path_to_searchindex_js = "../searchindex-c30725f2.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-d18ed058.js"></script>
@@ -411,6 +411,21 @@ let v: DataValue = vec![0.1f32, 0.2].into(); // Vector
 <span class="boring">}</span></code></pre>
 <h2 id="予約フィールド"><a class="header" href="#予約フィールド">予約フィールド</a></h2>
 <p><code>_id</code> フィールドは Laurus の内部使用のために予約されています。外部ドキュメント ID を格納し、常に <code>KeywordAnalyzer</code>（完全一致）でインデクシングされます。スキーマに追加する必要はありません。自動的に管理されます。</p>
+<h2 id="動的フィールド追加"><a class="header" href="#動的フィールド追加">動的フィールド追加</a></h2>
+<p><code>Engine::add_field()</code> を使用すると、稼働中のエンジンにフィールドを動的に追加できます。
+フィールドの追加のみサポートされており、削除や型の変更はできません。</p>
+<h3 id="lexical-フィールドの追加"><a class="header" href="#lexical-フィールドの追加">Lexical フィールドの追加</a></h3>
+<pre><code class="language-rust ignore">let updated_schema = engine.add_field(
+    "category",
+    FieldOption::Text(TextOption::default()),
+).await?;</code></pre>
+<h3 id="vector-フィールドの追加"><a class="header" href="#vector-フィールドの追加">Vector フィールドの追加</a></h3>
+<pre><code class="language-rust ignore">let updated_schema = engine.add_field(
+    "embedding",
+    FieldOption::Flat(FlatOption::default().dimension(384)),
+).await?;</code></pre>
+<p>既存のドキュメントには影響がありません（新しいフィールドの値が存在しないだけです）。
+返却された <code>Schema</code> は呼び出し側で永続化する必要があります（例: <code>schema.toml</code> への書き出し）。</p>
 <h2 id="スキーマ設計のヒント"><a class="header" href="#スキーマ設計のヒント">スキーマ設計のヒント</a></h2>
 <ol>
 <li>

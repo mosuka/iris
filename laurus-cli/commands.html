@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-3551a720.js";
+            window.path_to_searchindex_js = "../searchindex-d2cf4146.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-710721a4.js"></script>
@@ -372,6 +372,15 @@ Vector fields:
 <blockquote>
 <p><strong>Tip:</strong> Multiple documents can share the same external ID (chunking pattern). Use <code>add doc</code> for each chunk.</p>
 </blockquote>
+<h3 id="add-field"><a class="header" href="#add-field"><code>add field</code></a></h3>
+<p>Dynamically add a new field to an existing index.</p>
+<pre><code class="language-bash">laurus add field --data-dir ./data \
+    --name category \
+    --field-option '{"Text": {"indexed": true, "stored": true}}'
+</code></pre>
+<p>The <code>--field-option</code> argument accepts a JSON string using the same
+externally-tagged format as the schema file. The schema is automatically
+persisted after the field is added.</p>
 <hr>
 <h2 id="delete--delete-a-resource"><a class="header" href="#delete--delete-a-resource"><code>delete</code> — Delete a Resource</a></h2>
 <h3 id="delete-doc"><a class="header" href="#delete-doc"><code>delete doc</code></a></h3>

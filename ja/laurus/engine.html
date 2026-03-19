@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-70ad585d.js";
+            window.path_to_searchindex_js = "../searchindex-c30725f2.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-d18ed058.js"></script>
@@ -306,6 +306,8 @@ let engine = Engine::builder(storage, schema)
 <tr><td style="text-align: left"><code>delete_documents(id)</code></td><td style="text-align: left">外部IDによるすべてのドキュメント/チャンクの削除</td></tr>
 <tr><td style="text-align: left"><code>commit()</code></td><td style="text-align: left">保留中の変更をストレージにフラッシュ（ドキュメントが検索可能になる）</td></tr>
 <tr><td style="text-align: left"><code>recover()</code></td><td style="text-align: left">クラッシュ後にWALをリプレイして未コミット状態を復元</td></tr>
+<tr><td style="text-align: left"><code>add_field(name, field_option)</code></td><td style="text-align: left">稼働中のエンジンにフィールドを動的に追加し、更新後の <code>Schema</code> を返す</td></tr>
+<tr><td style="text-align: left"><code>schema()</code></td><td style="text-align: left">現在の <code>Schema</code> への参照を返す</td></tr>
 </tbody>
 </table>
 </div>

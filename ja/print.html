@@ -36,7 +36,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-70ad585d.js";
+            window.path_to_searchindex_js = "searchindex-c30725f2.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-d18ed058.js"></script>
@@ -1111,6 +1111,21 @@ let v: DataValue = vec![0.1f32, 0.2].into(); // Vector
 <span class="boring">}</span></code></pre>
 <h2 id="予約フィールド"><a class="header" href="#予約フィールド">予約フィールド</a></h2>
 <p><code>_id</code> フィールドは Laurus の内部使用のために予約されています。外部ドキュメント ID を格納し、常に <code>KeywordAnalyzer</code>（完全一致）でインデクシングされます。スキーマに追加する必要はありません。自動的に管理されます。</p>
+<h2 id="動的フィールド追加"><a class="header" href="#動的フィールド追加">動的フィールド追加</a></h2>
+<p><code>Engine::add_field()</code> を使用すると、稼働中のエンジンにフィールドを動的に追加できます。
+フィールドの追加のみサポートされており、削除や型の変更はできません。</p>
+<h3 id="lexical-フィールドの追加"><a class="header" href="#lexical-フィールドの追加">Lexical フィールドの追加</a></h3>
+<pre><code class="language-rust ignore">let updated_schema = engine.add_field(
+    "category",
+    FieldOption::Text(TextOption::default()),
+).await?;</code></pre>
+<h3 id="vector-フィールドの追加"><a class="header" href="#vector-フィールドの追加">Vector フィールドの追加</a></h3>
+<pre><code class="language-rust ignore">let updated_schema = engine.add_field(
+    "embedding",
+    FieldOption::Flat(FlatOption::default().dimension(384)),
+).await?;</code></pre>
+<p>既存のドキュメントには影響がありません（新しいフィールドの値が存在しないだけです）。
+返却された <code>Schema</code> は呼び出し側で永続化する必要があります（例: <code>schema.toml</code> への書き出し）。</p>
 <h2 id="スキーマ設計のヒント"><a class="header" href="#スキーマ設計のヒント">スキーマ設計のヒント</a></h2>
 <ol>
 <li>
@@ -1274,7 +1289,7 @@ use laurus::analysis::analyzer::keyword::KeywordAnalyzer;
 use laurus::analysis::analyzer::per_field::PerFieldAnalyzer;
 
 // Default analyzer for fields not explicitly configured
-let mut per_field = PerFieldAnalyzer::new(
+let per_field = PerFieldAnalyzer::new(
     Arc::new(StandardAnalyzer::default())
 );
 
@@ -1593,7 +1608,7 @@ let bert = Arc::new(CandleBertEmbedder::new("...")?);
 let clip = Arc::new(CandleClipEmbedder::new("...")?);
 
 
-let mut per_field = PerFieldEmbedder::new(bert.clone());
+let per_field = PerFieldEmbedder::new(bert.clone());
 per_field.add_embedder("text_vec", bert.clone());
 per_field.add_embedder("image_vec", clip.clone());
 
@@ -2801,7 +2816,7 @@ async fn main() -&gt; laurus::Result&lt;()&gt; {
 
     // Set up per-field embedder
     let embedder = Arc::new(my_embedder);
-    let mut pfe = PerFieldEmbedder::new(embedder.clone());
+    let pfe = PerFieldEmbedder::new(embedder.clone());
     pfe.add_embedder("text_vec", embedder.clone());
 
     let engine = Engine::builder(storage, schema)
@@ -3562,6 +3577,8 @@ let engine = Engine::builder(storage, schema)
 <tr><td style="text-align: left"><code>delete_documents(id)</code></td><td style="text-align: left">外部IDによるすべてのドキュメント/チャンクの削除</td></tr>
 <tr><td style="text-align: left"><code>commit()</code></td><td style="text-align: left">保留中の変更をストレージにフラッシュ（ドキュメントが検索可能になる）</td></tr>
 <tr><td style="text-align: left"><code>recover()</code></td><td style="text-align: left">クラッシュ後にWALをリプレイして未コミット状態を復元</td></tr>
+<tr><td style="text-align: left"><code>add_field(name, field_option)</code></td><td style="text-align: left">稼働中のエンジンにフィールドを動的に追加し、更新後の <code>Schema</code> を返す</td></tr>
+<tr><td style="text-align: left"><code>schema()</code></td><td style="text-align: left">現在の <code>Schema</code> への参照を返す</td></tr>
 </tbody>
 </table>
 </div>
@@ -4559,7 +4576,7 @@ let engine = Engine::builder(storage, schema)
 </span>use laurus::analysis::analyzer::per_field::PerFieldAnalyzer;
 use laurus::analysis::analyzer::standard::StandardAnalyzer;
 
-let mut per_field = PerFieldAnalyzer::new(Arc::new(StandardAnalyzer::new()?));
+let per_field = PerFieldAnalyzer::new(Arc::new(StandardAnalyzer::new()?));
 per_field.add_analyzer("custom_field", Arc::new(ReverseAnalyzer));
 
 let engine = Engine::builder(storage, schema)
@@ -4652,7 +4669,7 @@ let engine = Engine::builder(storage, schema)
 </span><span class="boring">fn main() {
 </span>use laurus::embedding::per_field::PerFieldEmbedder;
 
-let mut per_field = PerFieldEmbedder::new(Arc::new(MyEmbedder { dimension: 384 }));
+let per_field = PerFieldEmbedder::new(Arc::new(MyEmbedder { dimension: 384 }));
 per_field.add_embedder("image_vec", Arc::new(ClipEmbedder::new()?));
 
 let engine = Engine::builder(storage, schema)
@@ -4791,6 +4808,8 @@ impl Storage for S3Storage {
 <tr><td style="text-align: left"><code>engine.get_documents(id).await?</code></td><td style="text-align: left">外部IDによるすべてのドキュメント/チャンクの取得</td></tr>
 <tr><td style="text-align: left"><code>engine.search(request).await?</code></td><td style="text-align: left">検索リクエストの実行</td></tr>
 <tr><td style="text-align: left"><code>engine.commit().await?</code></td><td style="text-align: left">保留中のすべての変更をストレージにフラッシュ</td></tr>
+<tr><td style="text-align: left"><code>engine.add_field(name, field_option).await?</code></td><td style="text-align: left">稼働中のエンジンにフィールドを動的に追加</td></tr>
+<tr><td style="text-align: left"><code>engine.schema()</code></td><td style="text-align: left">現在のスキーマへの参照を取得</td></tr>
 <tr><td style="text-align: left"><code>engine.stats()?</code></td><td style="text-align: left">インデックス統計の取得</td></tr>
 </tbody>
 </table>
@@ -5441,6 +5460,14 @@ Vector fields:
 <blockquote>
 <p><strong>ヒント:</strong> 複数のドキュメントが同じ外部 ID を共有できます（チャンキングパターン）。各チャンクに対して <code>add doc</code> を使用してください。</p>
 </blockquote>
+<h3 id="add-field"><a class="header" href="#add-field"><code>add field</code></a></h3>
+<p>既存のインデックスにフィールドを動的に追加します。</p>
+<pre><code class="language-bash">laurus add field --data-dir ./data \
+    --name category \
+    --field-option '{"Text": {"indexed": true, "stored": true}}'
+</code></pre>
+<p><code>--field-option</code> 引数はスキーマファイルと同じ外部タグ付き JSON 形式を受け付けます。
+フィールド追加後、スキーマは自動的に永続化されます。</p>
 <hr>
 <h2 id="delete--リソースの削除"><a class="header" href="#delete--リソースの削除"><code>delete</code> — リソースの削除</a></h2>
 <h3 id="delete-doc"><a class="header" href="#delete-doc"><code>delete doc</code></a></h3>
@@ -6654,7 +6681,7 @@ laurus serve
 </thead>
 <tbody>
 <tr><td style="text-align: left"><code>HealthService</code></td><td style="text-align: left"><code>Check</code></td><td style="text-align: left">ヘルスチェック</td></tr>
-<tr><td style="text-align: left"><code>IndexService</code></td><td style="text-align: left"><code>CreateIndex</code>, <code>GetIndex</code>, <code>GetSchema</code></td><td style="text-align: left">インデックスのライフサイクルとスキーマ</td></tr>
+<tr><td style="text-align: left"><code>IndexService</code></td><td style="text-align: left"><code>CreateIndex</code>, <code>GetIndex</code>, <code>GetSchema</code>, <code>AddField</code></td><td style="text-align: left">インデックスのライフサイクルとスキーマ</td></tr>
 <tr><td style="text-align: left"><code>DocumentService</code></td><td style="text-align: left"><code>PutDocument</code>, <code>AddDocument</code>, <code>GetDocuments</code>, <code>DeleteDocuments</code>, <code>Commit</code></td><td style="text-align: left">ドキュメント CRUD とコミット</td></tr>
 <tr><td style="text-align: left"><code>SearchService</code></td><td style="text-align: left"><code>Search</code>, <code>SearchStream</code></td><td style="text-align: left">単発検索とストリーミング検索</td></tr>
 </tbody>
@@ -6814,6 +6841,20 @@ laurus serve
 </tbody>
 </table>
 </div>
+<h3 id="addfield"><a class="header" href="#addfield">AddField</a></h3>
+<p>稼働中のインデックスにフィールドを動的に追加します。</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">フィールド</th><th style="text-align: left">型</th><th style="text-align: left">説明</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>name</code></td><td style="text-align: left"><code>string</code></td><td style="text-align: left">フィールド名</td></tr>
+<tr><td style="text-align: left"><code>field_option</code></td><td style="text-align: left"><code>FieldOption</code></td><td style="text-align: left">フィールド設定</td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>レスポンス:</strong> 更新後の <code>Schema</code> を返します。</p>
 <hr>
 <h2 id="documentservice"><a class="header" href="#documentservice">DocumentService</a></h2>
 <h3 id="putdocument"><a class="header" href="#putdocument"><code>PutDocument</code></a></h3>
@@ -7445,9 +7486,30 @@ document: {"title": "Hello World", "body": "これはテストドキュメント
 <p>なし。</p>
 <p>結果: <code>Changes committed successfully.</code></p>
 <hr>
+<h2 id="add_field"><a class="header" href="#add_field">add_field</a></h2>
+<p>インデックスにフィールドを追加します。</p>
+<h3 id="パラメーター-7"><a class="header" href="#パラメーター-7">パラメーター</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">名前</th><th style="text-align: left">型</th><th style="text-align: left">必須</th><th style="text-align: left">説明</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>name</code></td><td style="text-align: left">string</td><td style="text-align: left">はい</td><td style="text-align: left">フィールド名</td></tr>
+<tr><td style="text-align: left"><code>field_option_json</code></td><td style="text-align: left">string</td><td style="text-align: left">はい</td><td style="text-align: left">JSON 形式のフィールド設定</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="例-3"><a class="header" href="#例-3">例</a></h3>
+<pre><code class="language-json">{
+  "name": "category",
+  "field_option_json": "{\"Text\": {\"indexed\": true, \"stored\": true}}"
+}
+</code></pre>
+<hr>
 <h2 id="search-3"><a class="header" href="#search-3">search</a></h2>
 <p>laurus クエリ DSL を使用してドキュメントを検索します。</p>
-<h3 id="パラメーター-7"><a class="header" href="#パラメーター-7">パラメーター</a></h3>
+<h3 id="パラメーター-8"><a class="header" href="#パラメーター-8">パラメーター</a></h3>
 <div class="table-wrapper">
 <table>
 <thead>
