@@ -64,6 +64,30 @@ Result: `Index created successfully at /path/to/index.`
 
 ---
 
+## add_field
+
+Add a new field to the index.
+
+### Parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `name` | string | Yes | The field name |
+| `field_option_json` | string | Yes | Field configuration as JSON |
+
+### Example
+
+```json
+{
+  "name": "category",
+  "field_option_json": "{\"Text\": {\"indexed\": true, \"stored\": true}}"
+}
+```
+
+Result: `Field 'category' added successfully.`
+
+---
+
 ## get_index
 
 Get statistics for the current search index.
@@ -212,10 +236,11 @@ Search documents using the laurus query DSL.
 ```text
 1. connect         → connect to a running laurus-server
 2. create_index    → define the schema (if index does not exist)
-3. add_document    → index documents (repeat as needed)
-4. commit          → persist changes to disk
-5. search          → query the index
-6. add_document    → update documents
-7. delete_document → remove documents
-8. commit          → persist changes
+3. add_field       → dynamically add fields (optional)
+4. add_document    → index documents (repeat as needed)
+5. commit          → persist changes to disk
+6. search          → query the index
+7. add_document    → update documents
+8. delete_document → remove documents
+9. commit          → persist changes
 ```

@@ -94,6 +94,31 @@ pub trait LexicalIndex: Send + Sync + std::fmt::Debug {
     fn set_last_wal_seq(&self, _seq: u64) -> Result<()> {
         Ok(())
     }
+
+    /// Dynamically add a new field to the index at runtime.
+    ///
+    /// After this call, subsequent writers created via [`writer()`](Self::writer)
+    /// will include the new field in their configuration, enabling indexing of
+    /// documents that contain this field.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The field name
+    /// * `option` - The field configuration (e.g., indexed, stored, term_vectors)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the index implementation does not support dynamic field
+    /// addition.
+    fn add_field(
+        &self,
+        _name: &str,
+        _option: crate::lexical::core::field::FieldOption,
+    ) -> Result<()> {
+        Err(crate::error::LaurusError::invalid_argument(
+            "This index implementation does not support dynamic field addition",
+        ))
+    }
 }
 
 pub mod config;

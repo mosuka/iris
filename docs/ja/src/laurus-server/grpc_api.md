@@ -7,7 +7,7 @@
 | サービス | RPC | 説明 |
 | :--- | :--- | :--- |
 | `HealthService` | `Check` | ヘルスチェック |
-| `IndexService` | `CreateIndex`, `GetIndex`, `GetSchema` | インデックスのライフサイクルとスキーマ |
+| `IndexService` | `CreateIndex`, `GetIndex`, `GetSchema`, `AddField` | インデックスのライフサイクルとスキーマ |
 | `DocumentService` | `PutDocument`, `AddDocument`, `GetDocuments`, `DeleteDocuments`, `Commit` | ドキュメント CRUD とコミット |
 | `SearchService` | `Search`, `SearchStream` | 単発検索とストリーミング検索 |
 
@@ -156,6 +156,17 @@ rpc GetSchema(GetSchemaRequest) returns (GetSchemaResponse);
 | フィールド | 型 | 説明 |
 | :--- | :--- | :--- |
 | `schema` | `Schema` | インデックスのスキーマ |
+
+### AddField
+
+稼働中のインデックスにフィールドを動的に追加します。
+
+| フィールド | 型 | 説明 |
+| :--- | :--- | :--- |
+| `name` | `string` | フィールド名 |
+| `field_option` | `FieldOption` | フィールド設定 |
+
+**レスポンス:** 更新後の `Schema` を返します。
 
 ---
 

@@ -5,6 +5,8 @@ pub mod search;
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use parking_lot::RwLock;
+
 use crate::analysis::analyzer::analyzer::Analyzer;
 use crate::analysis::analyzer::keyword::KeywordAnalyzer;
 use crate::analysis::analyzer::per_field::PerFieldAnalyzer;
@@ -41,7 +43,7 @@ pub struct EngineStats {
 /// A system field `_id` is automatically injected into every indexed document
 /// to track the external document identifier.
 pub struct Engine {
-    schema: Schema,
+    schema: RwLock<Schema>,
     lexical: LexicalStore,
     vector: VectorStore,
     log: Arc<DocumentLog>,
@@ -113,14 +115,12 @@ impl Engine {
                     if record.seq > vector_last_seq {
                         // Filter for vector fields
                         let mut vector_doc = Document::new();
-                        for (name, val) in &document.fields {
-                            if self
-                                .schema
-                                .fields
-                                .get(name)
-                                .is_some_and(|fc| fc.is_vector())
-                            {
-                                vector_doc.fields.insert(name.clone(), val.clone());
+                        {
+                            let schema = self.schema.read();
+                            for (name, val) in &document.fields {
+                                if schema.fields.get(name).is_some_and(|fc| fc.is_vector()) {
+                                    vector_doc.fields.insert(name.clone(), val.clone());
+                                }
                             }
                         }
                         self.vector
@@ -232,14 +232,12 @@ impl Engine {
 
         // 4. Prepare vector document (extract vector fields only)
         let mut vector_doc = Document::new();
-        for (name, val) in &doc.fields {
-            if self
-                .schema
-                .fields
-                .get(name)
-                .is_some_and(|fc| fc.is_vector())
-            {
-                vector_doc.fields.insert(name.clone(), val.clone());
+        {
+            let schema = self.schema.read();
+            for (name, val) in &doc.fields {
+                if schema.fields.get(name).is_some_and(|fc| fc.is_vector()) {
+                    vector_doc.fields.insert(name.clone(), val.clone());
+                }
             }
         }
 
@@ -348,6 +346,124 @@ impl Engine {
         })
     }
 
+    /// Return a clone of the current schema.
+    ///
+    /// This can be used to inspect the schema after dynamic field additions
+    /// or to persist it to storage (e.g., `schema.toml`).
+    pub fn schema(&self) -> Schema {
+        self.schema.read().clone()
+    }
+
+    /// Dynamically add a new field to the engine at runtime.
+    ///
+    /// This method registers the field in both the engine schema and the
+    /// appropriate underlying store (lexical or vector). Only field addition
+    /// is supported; removal or type changes are not allowed.
+    ///
+    /// After adding a field, new documents can include values for this field
+    /// and searches can target it. Existing documents are unaffected (they
+    /// simply do not have a value for the new field).
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The field name. Must not collide with an existing field.
+    /// * `option` - The field configuration (e.g., `FieldOption::Text`,
+    ///   `FieldOption::Hnsw`, etc.).
+    ///
+    /// # Returns
+    ///
+    /// Returns the updated [`Schema`] on success. The caller is responsible
+    /// for persisting it (e.g., writing `schema.toml`).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - A field with the same name already exists.
+    /// - The field references an unknown analyzer or embedder.
+    /// - The underlying store rejects the field.
+    pub async fn add_field(&self, name: &str, option: schema::FieldOption) -> Result<Schema> {
+        // 1. Check for duplicates.
+        {
+            let schema = self.schema.read();
+            if schema.fields.contains_key(name) {
+                return Err(crate::error::LaurusError::invalid_argument(format!(
+                    "Field '{name}' already exists in the schema"
+                )));
+            }
+        }
+
+        // 2. Register in the appropriate store.
+        if option.is_lexical() {
+            // Resolve the per-field analyzer if configured.
+            let field_analyzer = if let schema::FieldOption::Text(ref text_opt) = option
+                && let Some(ref analyzer_name) = text_opt.analyzer
+            {
+                let schema = self.schema.read();
+                let analyzer = match crate::analysis::analyzer::registry::create_analyzer_by_name(
+                    analyzer_name,
+                ) {
+                    Ok(a) => a,
+                    Err(_) => {
+                        let def = schema.analyzers.get(analyzer_name).ok_or_else(|| {
+                            crate::error::LaurusError::invalid_argument(format!(
+                                "Unknown analyzer '{analyzer_name}' for field '{name}': \
+                                     not a built-in and not defined in schema.analyzers"
+                            ))
+                        })?;
+                        crate::analysis::analyzer::registry::create_analyzer_from_definition(
+                            analyzer_name,
+                            def,
+                        )?
+                    }
+                };
+                Some(analyzer)
+            } else {
+                None
+            };
+
+            let lexical_opt = option
+                .to_lexical()
+                .expect("is_lexical() was true but to_lexical() returned None");
+            self.lexical.add_field(name, lexical_opt, field_analyzer)?;
+        }
+
+        if option.is_vector() {
+            // Resolve the per-field embedder if configured.
+            // Clone the embedder definition out of the schema lock before
+            // calling the async factory so that the non-Send parking_lot
+            // guard is not held across an await point.
+            let field_embedder = if let Some(embedder_name) = option.embedder_name() {
+                let embedder_def = {
+                    let schema = self.schema.read();
+                    schema.embedders.get(embedder_name).cloned()
+                };
+                if let Some(def) = embedder_def {
+                    Some(
+                        crate::embedding::registry::create_embedder_from_definition(
+                            embedder_name,
+                            &def,
+                        )
+                        .await?,
+                    )
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+
+            self.vector.add_field(name, field_embedder).await;
+        }
+
+        // 3. Update the schema.
+        {
+            let mut schema = self.schema.write();
+            schema.fields.insert(name.to_string(), option);
+        }
+
+        Ok(self.schema.read().clone())
+    }
+
     /// Resolve a [`LexicalSearchQuery`] into a concrete [`Query`] object.
     ///
     /// If the query is already an `Obj` variant, it is returned as-is.
@@ -410,7 +526,8 @@ impl Engine {
         if name == "_id" {
             return true;
         }
-        if let Some(field_opt) = self.schema.fields.get(name) {
+        let schema = self.schema.read();
+        if let Some(field_opt) = schema.fields.get(name) {
             match field_opt {
                 FieldOption::Text(o) => o.stored,
                 FieldOption::Integer(o) => o.stored,
@@ -478,13 +595,13 @@ impl Engine {
 
         // If the user passed a PerFieldAnalyzer, clone it and ensure _id uses KeywordAnalyzer.
         // Otherwise, wrap the simple analyzer in a new PerFieldAnalyzer.
-        let mut per_field_analyzer =
+        let per_field_analyzer =
             if let Some(existing) = analyzer.as_any().downcast_ref::<PerFieldAnalyzer>() {
-                let mut pfa = existing.clone();
+                let pfa = existing.clone();
                 pfa.add_analyzer("_id", Arc::new(KeywordAnalyzer::new()));
                 pfa
             } else {
-                let mut pfa = PerFieldAnalyzer::new(analyzer);
+                let pfa = PerFieldAnalyzer::new(analyzer);
                 pfa.add_analyzer("_id", Arc::new(KeywordAnalyzer::new()));
                 pfa
             };
@@ -541,8 +658,7 @@ impl Engine {
                 HashMap::new();
             let default_embedder: Arc<dyn crate::embedding::embedder::Embedder> =
                 Arc::new(crate::embedding::precomputed::PrecomputedEmbedder::new());
-            let mut per_field =
-                crate::embedding::per_field::PerFieldEmbedder::new(default_embedder);
+            let per_field = crate::embedding::per_field::PerFieldEmbedder::new(default_embedder);
 
             for (name, field_option) in &schema.fields {
                 if let Some(embedder_name) = field_option.embedder_name() {
@@ -994,7 +1110,7 @@ impl EngineBuilder {
         )?);
 
         let engine = Engine {
-            schema: self.schema,
+            schema: RwLock::new(self.schema),
             lexical,
             vector,
             log,
@@ -1191,5 +1307,157 @@ mod tests {
             1,
             "Custom analyzer (NFKC + lowercase) should match normalized text"
         );
+    }
+
+    #[tokio::test]
+    async fn test_add_lexical_field() {
+        let storage: Arc<dyn Storage> = Arc::new(MemoryStorage::new(Default::default()));
+
+        // Start with a schema containing only "title".
+        let schema = Schema::builder()
+            .add_field(
+                "title",
+                schema::FieldOption::Text(crate::lexical::core::field::TextOption::default()),
+            )
+            .build();
+
+        let engine = Engine::new(storage, schema).await.unwrap();
+
+        // Dynamically add a "category" field.
+        let updated = engine
+            .add_field(
+                "category",
+                schema::FieldOption::Text(crate::lexical::core::field::TextOption::default()),
+            )
+            .await
+            .unwrap();
+
+        assert!(updated.fields.contains_key("category"));
+        assert!(updated.fields.contains_key("title"));
+
+        // Index a document that uses the new field.
+        engine
+            .add_document(
+                "doc1",
+                Document::builder()
+                    .add_text("title", "Rust Programming")
+                    .add_text("category", "programming")
+                    .build(),
+            )
+            .await
+            .unwrap();
+        engine.commit().await.unwrap();
+
+        // Search on the dynamically added field.
+        use crate::lexical::search::searcher::LexicalSearchRequest;
+        let request = crate::engine::search::SearchRequestBuilder::new()
+            .lexical_search_request(LexicalSearchRequest::from_dsl("category:programming"))
+            .limit(10)
+            .build();
+        let results = engine.search(request).await.unwrap();
+        assert_eq!(
+            results.len(),
+            1,
+            "Should find doc via dynamically added field"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_add_field_duplicate_rejected() {
+        let storage: Arc<dyn Storage> = Arc::new(MemoryStorage::new(Default::default()));
+
+        let schema = Schema::builder()
+            .add_field(
+                "title",
+                schema::FieldOption::Text(crate::lexical::core::field::TextOption::default()),
+            )
+            .build();
+
+        let engine = Engine::new(storage, schema).await.unwrap();
+
+        // Adding a field with the same name should fail.
+        let result = engine
+            .add_field(
+                "title",
+                schema::FieldOption::Text(crate::lexical::core::field::TextOption::default()),
+            )
+            .await;
+        assert!(result.is_err(), "Duplicate field should be rejected");
+    }
+
+    #[tokio::test]
+    async fn test_add_vector_field() {
+        let storage: Arc<dyn Storage> = Arc::new(MemoryStorage::new(Default::default()));
+
+        let schema = Schema::builder()
+            .add_field(
+                "title",
+                schema::FieldOption::Text(crate::lexical::core::field::TextOption::default()),
+            )
+            .build();
+
+        let dummy_embedder = Arc::new(PrecomputedEmbedder::new());
+        let per_field = PerFieldEmbedder::new(dummy_embedder);
+
+        let engine = Engine::builder(storage, schema)
+            .embedder(Arc::new(per_field))
+            .build()
+            .await
+            .unwrap();
+
+        // Dynamically add a vector field with dimension 128 (matching PrecomputedEmbedder default).
+        let updated = engine
+            .add_field(
+                "embedding",
+                schema::FieldOption::Flat(
+                    crate::vector::core::field::FlatOption::default().dimension(128),
+                ),
+            )
+            .await
+            .unwrap();
+
+        assert!(updated.fields.contains_key("embedding"));
+
+        // Index a document with the vector field.
+        let vec_data: Vec<f32> = (0..128).map(|i| i as f32 / 128.0).collect();
+        engine
+            .add_document(
+                "doc1",
+                Document::builder()
+                    .add_text("title", "Hello")
+                    .add_vector("embedding", vec_data)
+                    .build(),
+            )
+            .await
+            .unwrap();
+        engine.commit().await.unwrap();
+
+        // Verify document was indexed successfully.
+        let docs = engine.get_documents("doc1").await.unwrap();
+        assert_eq!(docs.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_schema_returns_current_state() {
+        let storage: Arc<dyn Storage> = Arc::new(MemoryStorage::new(Default::default()));
+        let schema = Schema::new();
+
+        let engine = Engine::new(storage, schema).await.unwrap();
+
+        // Initially empty (no user fields).
+        assert!(engine.schema().fields.is_empty());
+
+        // Add a field.
+        engine
+            .add_field(
+                "body",
+                schema::FieldOption::Text(crate::lexical::core::field::TextOption::default()),
+            )
+            .await
+            .unwrap();
+
+        // schema() should reflect the addition.
+        let current = engine.schema();
+        assert!(current.fields.contains_key("body"));
     }
 }

@@ -31,7 +31,7 @@
 //! );
 //!
 //! // Create per-field embedder with default
-//! let mut per_field = PerFieldEmbedder::new(default_embedder);
+//! let per_field = PerFieldEmbedder::new(default_embedder);
 //!
 //! // Add specialized embedder for title field
 //! let title_embedder: Arc<dyn Embedder> = Arc::new(
@@ -55,6 +55,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use parking_lot::RwLock;
 
 use crate::embedding::embedder::{EmbedInput, EmbedInputType, Embedder};
 use crate::error::Result;
@@ -65,6 +66,10 @@ use crate::vector::core::vector::Vector;
 /// This is similar to `PerFieldAnalyzer` in the lexical module. It allows you
 /// to specify a different embedder for each field, with a default embedder
 /// for fields not explicitly configured.
+///
+/// Field-specific embedders can be added at any time via [`add_embedder`](Self::add_embedder),
+/// even after the embedder has been wrapped in an `Arc`. This enables dynamic
+/// field addition at runtime.
 ///
 /// # Memory Efficiency
 ///
@@ -89,7 +94,7 @@ use crate::vector::core::vector::Vector;
 /// );
 ///
 /// // Create per-field embedder
-/// let mut per_field = PerFieldEmbedder::new(default_embedder);
+/// let per_field = PerFieldEmbedder::new(default_embedder);
 ///
 /// // Reuse embedder instances to save memory
 /// let keyword_embedder: Arc<dyn Embedder> = Arc::new(
@@ -101,20 +106,32 @@ use crate::vector::core::vector::Vector;
 /// # }
 /// # }
 /// ```
-#[derive(Clone)]
 pub struct PerFieldEmbedder {
     /// Default embedder for fields not in the map.
     default_embedder: Arc<dyn Embedder>,
 
     /// Map of field names to their specific embedders.
-    field_embedders: HashMap<String, Arc<dyn Embedder>>,
+    /// Wrapped in `RwLock` to allow adding embedders at runtime via `&self`.
+    field_embedders: RwLock<HashMap<String, Arc<dyn Embedder>>>,
+}
+
+impl Clone for PerFieldEmbedder {
+    fn clone(&self) -> Self {
+        Self {
+            default_embedder: self.default_embedder.clone(),
+            field_embedders: RwLock::new(self.field_embedders.read().clone()),
+        }
+    }
 }
 
 impl std::fmt::Debug for PerFieldEmbedder {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("PerFieldEmbedder")
             .field("default_embedder", &self.default_embedder.name())
-            .field("fields", &self.field_embedders.keys().collect::<Vec<_>>())
+            .field(
+                "fields",
+                &self.field_embedders.read().keys().collect::<Vec<_>>(),
+            )
             .finish()
     }
 }
@@ -148,31 +165,37 @@ impl PerFieldEmbedder {
     pub fn new(default_embedder: Arc<dyn Embedder>) -> Self {
         Self {
             default_embedder,
-            field_embedders: HashMap::new(),
+            field_embedders: RwLock::new(HashMap::new()),
         }
     }
 
     /// Add a field-specific embedder.
     ///
+    /// This method takes `&self` (not `&mut self`) and uses interior mutability,
+    /// so it can be called even after the embedder has been wrapped in an `Arc`.
+    ///
     /// # Arguments
     ///
     /// * `field` - The field name
     /// * `embedder` - The embedder to use for this field
-    pub fn add_embedder(&mut self, field: impl Into<String>, embedder: Arc<dyn Embedder>) {
-        self.field_embedders.insert(field.into(), embedder);
+    pub fn add_embedder(&self, field: impl Into<String>, embedder: Arc<dyn Embedder>) {
+        self.field_embedders.write().insert(field.into(), embedder);
     }
 
     /// Get the embedder for a specific field.
     ///
     /// Returns the field-specific embedder if configured, otherwise returns the default.
+    /// The returned `Arc` is cloned from under the internal read lock.
     ///
     /// # Arguments
     ///
     /// * `field` - The field name
-    pub fn get_embedder(&self, field: &str) -> &Arc<dyn Embedder> {
-        self.field_embedders
+    pub fn get_embedder(&self, field: &str) -> Arc<dyn Embedder> {
+        let guard = self.field_embedders.read();
+        guard
             .get(field)
-            .unwrap_or(&self.default_embedder)
+            .cloned()
+            .unwrap_or_else(|| self.default_embedder.clone())
     }
 
     /// Get the default embedder.
@@ -195,8 +218,8 @@ impl PerFieldEmbedder {
     }
 
     /// List all configured field names.
-    pub fn configured_fields(&self) -> Vec<&str> {
-        self.field_embedders.keys().map(|s| s.as_str()).collect()
+    pub fn configured_fields(&self) -> Vec<String> {
+        self.field_embedders.read().keys().cloned().collect()
     }
 
     /// Check if a specific field supports the given input type.
@@ -233,7 +256,8 @@ impl Embedder for PerFieldEmbedder {
             .supported_input_types()
             .into_iter()
             .collect();
-        for emb in self.field_embedders.values() {
+        let guard = self.field_embedders.read();
+        for emb in guard.values() {
             for t in emb.supported_input_types() {
                 types.insert(t);
             }
@@ -289,7 +313,7 @@ mod tests {
             name: "default".into(),
             dim: 384,
         });
-        let mut per_field = PerFieldEmbedder::new(default);
+        let per_field = PerFieldEmbedder::new(default);
 
         let title_embedder: Arc<dyn Embedder> = Arc::new(MockEmbedder {
             name: "title".into(),
@@ -347,7 +371,7 @@ mod tests {
             name: "default".into(),
             dim: 384,
         });
-        let mut per_field = PerFieldEmbedder::new(default);
+        let per_field = PerFieldEmbedder::new(default);
 
         let title_embedder: Arc<dyn Embedder> = Arc::new(MockEmbedder {
             name: "title".into(),
@@ -371,7 +395,7 @@ mod tests {
             name: "default".into(),
             dim: 384,
         });
-        let mut per_field = PerFieldEmbedder::new(default);
+        let per_field = PerFieldEmbedder::new(default);
 
         let embedder: Arc<dyn Embedder> = Arc::new(MockEmbedder {
             name: "special".into(),
@@ -381,9 +405,9 @@ mod tests {
         per_field.add_embedder("body", embedder);
 
         let fields = per_field.configured_fields();
-        assert!(fields.contains(&"title"));
-        assert!(fields.contains(&"body"));
-        assert!(!fields.contains(&"unknown"));
+        assert!(fields.contains(&"title".to_string()));
+        assert!(fields.contains(&"body".to_string()));
+        assert!(!fields.contains(&"unknown".to_string()));
     }
 
     #[test]

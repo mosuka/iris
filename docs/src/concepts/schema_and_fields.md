@@ -231,6 +231,33 @@ let v: DataValue = vec![0.1f32, 0.2].into(); // Vector
 
 The `_id` field is reserved by Laurus for internal use. It stores the external document ID and is always indexed with `KeywordAnalyzer` (exact match). You do not need to add it to your schema — it is managed automatically.
 
+## Dynamic Field Addition
+
+Fields can be added to a running engine at runtime using `Engine::add_field()`.
+Only field addition is supported—removal or type changes are not allowed.
+
+### Adding a Lexical Field
+
+```rust,ignore
+let updated_schema = engine.add_field(
+    "category",
+    FieldOption::Text(TextOption::default()),
+).await?;
+```
+
+### Adding a Vector Field
+
+```rust,ignore
+let updated_schema = engine.add_field(
+    "embedding",
+    FieldOption::Flat(FlatOption::default().dimension(384)),
+).await?;
+```
+
+Existing documents are unaffected—they simply have no value for the new
+field. The returned `Schema` should be persisted (e.g., to `schema.toml`)
+by the caller.
+
 ## Schema Design Tips
 
 1. **Separate lexical and vector fields** — a field is either lexical or vector, never both. For hybrid search, create separate fields (e.g., `body` for text, `body_vec` for vector).

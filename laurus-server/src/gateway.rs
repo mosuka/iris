@@ -46,6 +46,7 @@ pub fn create_router(state: GatewayState) -> Router {
         .route("/v1/health", get(health::check))
         .route("/v1/index", post(index::create).get(index::get_index))
         .route("/v1/schema", get(index::get_schema))
+        .route("/v1/schema/fields", post(index::add_field))
         .route(
             "/v1/documents/{id}",
             put(document::put_document)

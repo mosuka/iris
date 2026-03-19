@@ -112,3 +112,24 @@ pub async fn open_index(data_dir: &Path) -> Result<Engine> {
 
     Ok(engine)
 }
+
+/// Persist the current schema back to the data directory.
+///
+/// Serializes the given schema as TOML and writes it to `schema.toml`
+/// inside `data_dir`, overwriting the existing file.
+///
+/// # Arguments
+///
+/// * `data_dir` - Path to the data directory containing the index.
+/// * `schema` - The schema to persist.
+///
+/// # Errors
+///
+/// Returns an error if serialization or file write fails.
+pub fn save_schema(data_dir: &Path, schema: &Schema) -> Result<()> {
+    let schema_toml =
+        toml::to_string_pretty(schema).context("Failed to serialize schema to TOML")?;
+    let schema_dest = data_dir.join(SCHEMA_FILE);
+    std::fs::write(&schema_dest, &schema_toml).context("Failed to write schema file")?;
+    Ok(())
+}

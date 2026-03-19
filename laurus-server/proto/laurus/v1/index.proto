@@ -11,6 +11,9 @@ service IndexService {
 
   // Get the schema of the current index.
   rpc GetSchema(GetSchemaRequest) returns (GetSchemaResponse);
+
+  // Dynamically add a new field to the current index.
+  rpc AddField(AddFieldRequest) returns (AddFieldResponse);
 }
 
 // ---- Schema definitions ----
@@ -180,5 +183,17 @@ message VectorFieldStats {
 message GetSchemaRequest {}
 
 message GetSchemaResponse {
+  Schema schema = 1;
+}
+
+message AddFieldRequest {
+  // The name of the new field to add.
+  string name = 1;
+  // The field configuration.
+  FieldOption field_option = 2;
+}
+
+message AddFieldResponse {
+  // The updated schema after the field has been added.
   Schema schema = 1;
 }

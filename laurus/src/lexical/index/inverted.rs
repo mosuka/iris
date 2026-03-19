@@ -10,6 +10,7 @@
 //! - Index maintenance operations
 //! - Query types for searching
 
+use std::collections::HashMap;
 use std::io::Read;
 use std::path::Path;
 use std::sync::Arc;
@@ -21,6 +22,7 @@ use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 
 use crate::error::{LaurusError, Result};
+use crate::lexical::core::field::FieldOption;
 use crate::lexical::index::LexicalIndex;
 use crate::lexical::index::config::InvertedIndexConfig;
 use crate::lexical::reader::LexicalIndexReader;
@@ -117,6 +119,10 @@ pub struct InvertedIndex {
     /// Inverted index specific configuration.
     config: InvertedIndexConfig,
 
+    /// Fields added dynamically at runtime via [`add_field()`](Self::add_field).
+    /// These are merged with `config.fields` when creating a new writer.
+    extra_fields: RwLock<HashMap<String, FieldOption>>,
+
     /// Whether the index is closed (thread-safe).
     closed: AtomicBool,
 
@@ -143,6 +149,7 @@ impl InvertedIndex {
         let index = InvertedIndex {
             storage,
             config,
+            extra_fields: RwLock::new(HashMap::new()),
             closed: AtomicBool::new(false),
             metadata: RwLock::new(metadata),
         };
@@ -162,6 +169,7 @@ impl InvertedIndex {
         Ok(InvertedIndex {
             storage,
             config,
+            extra_fields: RwLock::new(HashMap::new()),
             closed: AtomicBool::new(false),
             metadata: RwLock::new(metadata),
         })
@@ -348,11 +356,20 @@ impl LexicalIndex for InvertedIndex {
     fn writer(&self) -> Result<Box<dyn LexicalIndexWriter>> {
         self.check_closed()?;
 
+        // Merge base config fields with dynamically added fields.
+        let mut fields = self.config.fields.clone();
+        fields.extend(
+            self.extra_fields
+                .read()
+                .iter()
+                .map(|(k, v)| (k.clone(), v.clone())),
+        );
+
         // Use analyzer and shard_id from index config
         let writer_config = InvertedIndexWriterConfig {
             analyzer: self.config.analyzer.clone(),
             shard_id: self.config.shard_id,
-            fields: self.config.fields.clone(),
+            fields,
             ..Default::default()
         };
         let writer = InvertedIndexWriter::new(self.storage.clone(), writer_config)?;
@@ -409,6 +426,17 @@ impl LexicalIndex for InvertedIndex {
 
     fn default_fields(&self) -> Result<Vec<String>> {
         Ok(self.config.default_fields.clone())
+    }
+
+    fn add_field(&self, name: &str, option: FieldOption) -> Result<()> {
+        // Check for duplicates in both base config and extra fields.
+        if self.config.fields.contains_key(name) || self.extra_fields.read().contains_key(name) {
+            return Err(LaurusError::invalid_argument(format!(
+                "Field '{name}' already exists in the lexical index"
+            )));
+        }
+        self.extra_fields.write().insert(name.to_string(), option);
+        Ok(())
     }
 }
 

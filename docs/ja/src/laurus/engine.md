@@ -133,6 +133,8 @@ graph LR
 | `delete_documents(id)` | 外部IDによるすべてのドキュメント/チャンクの削除 |
 | `commit()` | 保留中の変更をストレージにフラッシュ（ドキュメントが検索可能になる） |
 | `recover()` | クラッシュ後にWALをリプレイして未コミット状態を復元 |
+| `add_field(name, field_option)` | 稼働中のエンジンにフィールドを動的に追加し、更新後の `Schema` を返す |
+| `schema()` | 現在の `Schema` への参照を返す |
 
 ### 検索
 

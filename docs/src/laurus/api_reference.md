@@ -19,6 +19,8 @@ The central coordinator for all indexing and search operations.
 | `engine.get_documents(id).await?` | Get all documents/chunks by external ID |
 | `engine.search(request).await?` | Execute a search request |
 | `engine.commit().await?` | Flush all pending changes to storage |
+| `engine.add_field(name, field_option).await?` | Dynamically add a new field to the schema at runtime |
+| `engine.schema()` | Return the current `Schema` |
 | `engine.stats()?` | Get index statistics |
 
 > **`put_document` vs `add_document`:** `put_document` performs an upsert — if a document with the same external ID already exists, it is deleted and replaced. `add_document` always appends, allowing multiple document chunks to share the same external ID. See [Schema & Fields — Indexing Documents](concepts/schema_and_fields.md#indexing-documents) for details.

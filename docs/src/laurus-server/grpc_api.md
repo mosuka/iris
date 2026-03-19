@@ -7,7 +7,7 @@ All services are defined under the `laurus.v1` protobuf package.
 | Service | RPCs | Description |
 | :--- | :--- | :--- |
 | `HealthService` | `Check` | Health checking |
-| `IndexService` | `CreateIndex`, `GetIndex`, `GetSchema` | Index lifecycle and schema |
+| `IndexService` | `CreateIndex`, `GetIndex`, `GetSchema`, `AddField` | Index lifecycle and schema |
 | `DocumentService` | `PutDocument`, `AddDocument`, `GetDocuments`, `DeleteDocuments`, `Commit` | Document CRUD and commit |
 | `SearchService` | `Search`, `SearchStream` | Unary and streaming search |
 
@@ -142,6 +142,17 @@ rpc GetIndex(GetIndexRequest) returns (GetIndexResponse);
 | `vector_fields` | `map<string, VectorFieldStats>` | Per-field vector statistics |
 
 Each `VectorFieldStats` contains `vector_count` and `dimension`.
+
+### `AddField`
+
+Add a new field to the running index at runtime.
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `name` | `string` | The field name |
+| `field_option` | `FieldOption` | The field configuration |
+
+**Response:** Returns the updated `Schema`.
 
 ### `GetSchema`
 

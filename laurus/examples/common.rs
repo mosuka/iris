@@ -38,7 +38,7 @@ pub fn memory_storage() -> Result<Arc<dyn Storage>> {
 pub fn per_field_analyzer(keyword_fields: &[&str]) -> Arc<PerFieldAnalyzer> {
     let std_analyzer: Arc<dyn Analyzer> = Arc::new(StandardAnalyzer::default());
     let kw_analyzer: Arc<dyn Analyzer> = Arc::new(KeywordAnalyzer::new());
-    let mut pfa = PerFieldAnalyzer::new(Arc::clone(&std_analyzer));
+    let pfa = PerFieldAnalyzer::new(Arc::clone(&std_analyzer));
     for &field in keyword_fields {
         pfa.add_analyzer(field, Arc::clone(&kw_analyzer));
     }

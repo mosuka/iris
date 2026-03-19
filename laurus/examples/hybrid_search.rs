@@ -44,7 +44,7 @@ async fn main() -> Result<()> {
     let analyzer = common::per_field_analyzer(&["title", "category"]);
 
     let embedder: Arc<dyn laurus::Embedder> = Arc::new(common::MockEmbedder);
-    let mut per_field_embedder = PerFieldEmbedder::new(embedder.clone());
+    let per_field_embedder = PerFieldEmbedder::new(embedder.clone());
     per_field_embedder.add_embedder("text_vec", embedder.clone());
     let per_field_embedder = Arc::new(per_field_embedder);
 

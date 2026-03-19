@@ -134,7 +134,7 @@ let bert = Arc::new(CandleBertEmbedder::new("...")?);
 let clip = Arc::new(CandleClipEmbedder::new("...")?);
 
 
-let mut per_field = PerFieldEmbedder::new(bert.clone());
+let per_field = PerFieldEmbedder::new(bert.clone());
 per_field.add_embedder("text_vec", bert.clone());
 per_field.add_embedder("image_vec", clip.clone());
 

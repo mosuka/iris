@@ -27,7 +27,7 @@ use laurus::Document;
 use crate::cli::{
     AddResource, Cli, Command, CreateResource, DeleteResource, GetResource, McpCommand,
 };
-use crate::commands::{mcp, repl, schema, search, serve};
+use crate::commands::{add_field, mcp, repl, schema, search, serve};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -66,6 +66,9 @@ async fn main() -> Result<()> {
                 engine.add_document(&id, doc).await?;
                 println!("Document '{id}' added. Run 'commit' to persist changes.");
                 Ok(())
+            }
+            AddResource::Field { name, field_option } => {
+                add_field::run(&name, &field_option, &data_dir).await
             }
         },
         Command::Delete(cmd) => match cmd.resource {

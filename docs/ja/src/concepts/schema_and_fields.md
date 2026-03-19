@@ -231,6 +231,32 @@ let v: DataValue = vec![0.1f32, 0.2].into(); // Vector
 
 `_id` フィールドは Laurus の内部使用のために予約されています。外部ドキュメント ID を格納し、常に `KeywordAnalyzer`（完全一致）でインデクシングされます。スキーマに追加する必要はありません。自動的に管理されます。
 
+## 動的フィールド追加
+
+`Engine::add_field()` を使用すると、稼働中のエンジンにフィールドを動的に追加できます。
+フィールドの追加のみサポートされており、削除や型の変更はできません。
+
+### Lexical フィールドの追加
+
+```rust,ignore
+let updated_schema = engine.add_field(
+    "category",
+    FieldOption::Text(TextOption::default()),
+).await?;
+```
+
+### Vector フィールドの追加
+
+```rust,ignore
+let updated_schema = engine.add_field(
+    "embedding",
+    FieldOption::Flat(FlatOption::default().dimension(384)),
+).await?;
+```
+
+既存のドキュメントには影響がありません（新しいフィールドの値が存在しないだけです）。
+返却された `Schema` は呼び出し側で永続化する必要があります（例: `schema.toml` への書き出し）。
+
 ## スキーマ設計のヒント
 
 1. **Lexical フィールドと Vector フィールドを分離する** — フィールドは Lexical か Vector のいずれかであり、両方にはなりません。ハイブリッド検索には、別々のフィールドを作成してください（例: テキスト用に `body`、ベクトル用に `body_vec`）。
