@@ -598,6 +598,37 @@ impl VectorStore {
     pub fn set_last_wal_seq(&self, seq: u64) {
         let _ = self.index.set_last_wal_seq(seq);
     }
+
+    /// Register a field-specific embedder for a dynamically added vector field.
+    ///
+    /// If the underlying index's embedder is a
+    /// [`PerFieldEmbedder`](crate::embedding::per_field::PerFieldEmbedder),
+    /// this method registers the given embedder for the specified field.
+    /// The writer and searcher caches are invalidated afterwards.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The vector field name
+    /// * `embedder` - Optional field-specific embedder to register
+    pub async fn add_field(
+        &self,
+        name: &str,
+        embedder: Option<Arc<dyn crate::embedding::embedder::Embedder>>,
+    ) {
+        if let Some(field_embedder) = embedder {
+            let index_embedder = self.index.embedder();
+            if let Some(pfe) = index_embedder
+                .as_any()
+                .downcast_ref::<crate::embedding::per_field::PerFieldEmbedder>()
+            {
+                pfe.add_embedder(name, field_embedder);
+            }
+        }
+
+        // Invalidate caches so the next writer/searcher uses updated config.
+        *self.writer_cache.lock().await = None;
+        *self.searcher_cache.write() = None;
+    }
 }
 
 #[cfg(test)]

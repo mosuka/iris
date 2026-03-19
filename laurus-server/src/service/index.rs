@@ -14,8 +14,9 @@ use laurus::Engine;
 use crate::context;
 use crate::convert::{error, schema as schema_convert};
 use crate::proto::laurus::v1::{
-    CreateIndexRequest, CreateIndexResponse, GetIndexRequest, GetIndexResponse, GetSchemaRequest,
-    GetSchemaResponse, VectorFieldStats, index_service_server::IndexService as IndexServiceTrait,
+    AddFieldRequest, AddFieldResponse, CreateIndexRequest, CreateIndexResponse, GetIndexRequest,
+    GetIndexResponse, GetSchemaRequest, GetSchemaResponse, VectorFieldStats,
+    index_service_server::IndexService as IndexServiceTrait,
 };
 
 /// gRPC IndexService implementation.
@@ -96,6 +97,42 @@ impl IndexServiceTrait for IndexService {
         let schema = context::read_schema(&self.data_dir).map_err(error::anyhow_to_status)?;
         let proto_schema = schema_convert::to_proto(&schema);
         Ok(Response::new(GetSchemaResponse {
+            schema: Some(proto_schema),
+        }))
+    }
+
+    /// Dynamically adds a new field to the current index and persists the updated schema.
+    async fn add_field(
+        &self,
+        request: Request<AddFieldRequest>,
+    ) -> Result<Response<AddFieldResponse>, Status> {
+        let req = request.into_inner();
+        let name = req.name;
+        if name.is_empty() {
+            return Err(Status::invalid_argument("field name is required"));
+        }
+        let proto_field_option = req
+            .field_option
+            .as_ref()
+            .ok_or_else(|| Status::invalid_argument("field_option is required"))?;
+        let field_option = schema_convert::field_option_from_proto(proto_field_option)
+            .ok_or_else(|| Status::invalid_argument("field_option has no option set"))?;
+
+        let guard = self.engine.read().await;
+        let engine = guard
+            .as_ref()
+            .ok_or_else(|| Status::failed_precondition("No index is open"))?;
+
+        let updated_schema = engine
+            .add_field(&name, field_option)
+            .await
+            .map_err(error::to_status)?;
+
+        context::save_schema(&self.data_dir, &updated_schema).map_err(error::anyhow_to_status)?;
+
+        tracing::info!("Field '{}' added to index", name);
+        let proto_schema = schema_convert::to_proto(&updated_schema);
+        Ok(Response::new(AddFieldResponse {
             schema: Some(proto_schema),
         }))
     }

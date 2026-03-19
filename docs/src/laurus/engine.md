@@ -133,6 +133,8 @@ graph LR
 | `delete_documents(id)` | Delete all documents/chunks by external ID |
 | `commit()` | Flush pending changes to storage (makes documents searchable) |
 | `recover()` | Replay WAL to restore uncommitted state after crash |
+| `add_field(name, field_option)` | Dynamically add a new field to the schema at runtime |
+| `schema()` | Return the current `Schema` |
 
 ### Search
 

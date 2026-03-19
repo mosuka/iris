@@ -79,3 +79,40 @@ pub async fn get_schema(State(mut state): State<GatewayState>) -> Result<Json<Va
 
     Ok(Json(json!({ "schema": schema_json })))
 }
+
+/// `POST /v1/schema/fields` — Adds a new field to the index schema.
+pub async fn add_field(
+    State(mut state): State<GatewayState>,
+    Json(body): Json<Value>,
+) -> Result<Json<Value>, Response> {
+    let name = body
+        .get("name")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| BadRequest("missing or invalid \"name\" key".to_string()).into_response())?
+        .to_string();
+
+    let field_option_json = body
+        .get("field_option")
+        .ok_or_else(|| BadRequest("missing \"field_option\" key".to_string()).into_response())?;
+
+    let field_option = convert::json_to_proto_field_option(field_option_json)
+        .map_err(|e| BadRequest(e).into_response())?;
+
+    let response = state
+        .index_client
+        .add_field(v1::AddFieldRequest {
+            name,
+            field_option: Some(field_option),
+        })
+        .await
+        .map_err(|s| GatewayError(s).into_response())?;
+
+    let inner = response.into_inner();
+    let schema_json = inner
+        .schema
+        .as_ref()
+        .map(convert::proto_schema_to_json)
+        .unwrap_or(Value::Null);
+
+    Ok(Json(json!({ "schema": schema_json })))
+}

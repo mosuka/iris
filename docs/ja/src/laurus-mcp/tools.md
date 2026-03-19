@@ -159,6 +159,28 @@ document: {"title": "Hello World", "body": "これはテストドキュメント
 
 ---
 
+## add_field
+
+インデックスにフィールドを追加します。
+
+### パラメーター
+
+| 名前 | 型 | 必須 | 説明 |
+| :--- | :--- | :--- | :--- |
+| `name` | string | はい | フィールド名 |
+| `field_option_json` | string | はい | JSON 形式のフィールド設定 |
+
+### 例
+
+```json
+{
+  "name": "category",
+  "field_option_json": "{\"Text\": {\"indexed\": true, \"stored\": true}}"
+}
+```
+
+---
+
 ## search
 
 laurus クエリ DSL を使用してドキュメントを検索します。

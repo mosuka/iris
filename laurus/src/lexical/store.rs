@@ -588,6 +588,54 @@ impl LexicalStore {
         }
         Ok(())
     }
+
+    /// Dynamically add a new lexical field to the index at runtime.
+    ///
+    /// This registers the field in the underlying index so that subsequent
+    /// writers will include the new field in their configuration. It also
+    /// registers the field-specific analyzer if the index's analyzer is a
+    /// [`PerFieldAnalyzer`](crate::analysis::analyzer::per_field::PerFieldAnalyzer).
+    ///
+    /// After adding a field, the writer and searcher caches are invalidated
+    /// so the next operation uses updated configurations.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The field name
+    /// * `option` - The field configuration
+    /// * `analyzer` - Optional field-specific analyzer to register
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the field already exists or the underlying index
+    /// does not support dynamic field addition.
+    pub fn add_field(
+        &self,
+        name: &str,
+        option: crate::lexical::core::field::FieldOption,
+        analyzer: Option<Arc<dyn Analyzer>>,
+    ) -> Result<()> {
+        // Register the field in the underlying index.
+        self.index.add_field(name, option)?;
+
+        // If a field-specific analyzer is provided, register it in the
+        // PerFieldAnalyzer (if the index's analyzer supports it).
+        if let Some(field_analyzer) = analyzer
+            && let Ok(index_analyzer) = self.analyzer()
+            && let Some(pfa) = index_analyzer
+                .as_any()
+                .downcast_ref::<crate::analysis::analyzer::per_field::PerFieldAnalyzer>(
+            )
+        {
+            pfa.add_analyzer(name, field_analyzer);
+        }
+
+        // Invalidate caches so the next writer/searcher uses updated config.
+        *self.writer_cache.lock() = None;
+        *self.searcher_cache.write() = None;
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]

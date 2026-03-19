@@ -263,7 +263,20 @@ pub fn proto_schema_to_json(schema: &v1::Schema) -> Value {
 // FieldOption conversion
 // ---------------------------------------------------------------------------
 
-fn json_to_proto_field_option(json: &Value) -> Result<v1::FieldOption, String> {
+/// Converts a JSON object to a proto `FieldOption`.
+///
+/// The JSON object must contain exactly one key identifying the field type
+/// (e.g. `"text"`, `"integer"`, `"hnsw"`) with its configuration as the value.
+///
+/// # Arguments
+///
+/// * `json` - The JSON value representing a single field option.
+///
+/// # Errors
+///
+/// Returns an error string if the JSON is not an object or contains an
+/// unknown field option type.
+pub fn json_to_proto_field_option(json: &Value) -> Result<v1::FieldOption, String> {
     let obj = json
         .as_object()
         .ok_or_else(|| "field option must be an object".to_string())?;

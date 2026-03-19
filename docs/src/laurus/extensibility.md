@@ -66,7 +66,7 @@ For per-field analyzers, wrap with `PerFieldAnalyzer`:
 use laurus::analysis::analyzer::per_field::PerFieldAnalyzer;
 use laurus::analysis::analyzer::standard::StandardAnalyzer;
 
-let mut per_field = PerFieldAnalyzer::new(Arc::new(StandardAnalyzer::new()?));
+let per_field = PerFieldAnalyzer::new(Arc::new(StandardAnalyzer::new()?));
 per_field.add_analyzer("custom_field", Arc::new(ReverseAnalyzer));
 
 let engine = Engine::builder(storage, schema)
@@ -153,7 +153,7 @@ For per-field embedders, wrap with `PerFieldEmbedder`:
 ```rust
 use laurus::embedding::per_field::PerFieldEmbedder;
 
-let mut per_field = PerFieldEmbedder::new(Arc::new(MyEmbedder { dimension: 384 }));
+let per_field = PerFieldEmbedder::new(Arc::new(MyEmbedder { dimension: 384 }));
 per_field.add_embedder("image_vec", Arc::new(ClipEmbedder::new()?));
 
 let engine = Engine::builder(storage, schema)

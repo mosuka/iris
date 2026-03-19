@@ -121,6 +121,21 @@ pub enum AddResource {
         #[arg(long)]
         data: String,
     },
+    /// Dynamically add a new field to an existing index.
+    Field {
+        /// The name of the new field.
+        #[arg(long)]
+        name: String,
+        /// Field configuration as a JSON string.
+        ///
+        /// Uses the same externally-tagged format as the schema TOML.
+        /// Examples:
+        ///   '{"Text": {"indexed": true, "stored": true}}'
+        ///   '{"Hnsw": {"dimension": 384}}'
+        ///   '{"Integer": {}}'
+        #[arg(long)]
+        field_option: String,
+    },
 }
 
 // --- Delete ---

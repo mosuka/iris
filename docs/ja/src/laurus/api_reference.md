@@ -19,6 +19,8 @@ cargo doc --open
 | `engine.get_documents(id).await?` | 外部IDによるすべてのドキュメント/チャンクの取得 |
 | `engine.search(request).await?` | 検索リクエストの実行 |
 | `engine.commit().await?` | 保留中のすべての変更をストレージにフラッシュ |
+| `engine.add_field(name, field_option).await?` | 稼働中のエンジンにフィールドを動的に追加 |
+| `engine.schema()` | 現在のスキーマへの参照を取得 |
 | `engine.stats()?` | インデックス統計の取得 |
 
 > **`put_document` と `add_document` の違い:** `put_document` はUpsertを実行します。同じ外部IDのドキュメントが既に存在する場合、削除して置き換えます。`add_document` は常に追加し、複数のドキュメントチャンクが同じ外部IDを共有できます。詳細は [Schema & Fields -- ドキュメントのインデキシング](concepts/schema_and_fields.md#indexing-documents) を参照してください。

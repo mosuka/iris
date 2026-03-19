@@ -301,7 +301,7 @@ impl InvertedIndexWriter {
     /// use std::sync::Arc;
     ///
     /// let storage = Arc::new(MemoryStorage::new(MemoryStorageConfig::default()));
-    /// let mut per_field = PerFieldAnalyzer::new(Arc::new(StandardAnalyzer::new().unwrap()));
+    /// let per_field = PerFieldAnalyzer::new(Arc::new(StandardAnalyzer::new().unwrap()));
     /// let config = InvertedIndexWriterConfig {
     ///     analyzer: Arc::new(per_field.clone()),
     ///     ..Default::default()

@@ -19,7 +19,7 @@ use tonic::transport::Channel;
 use tracing::info;
 
 use laurus_server::proto::laurus::v1::{
-    AddDocumentRequest, CommitRequest, CreateIndexRequest, DeleteDocumentsRequest,
+    AddDocumentRequest, AddFieldRequest, CommitRequest, CreateIndexRequest, DeleteDocumentsRequest,
     GetDocumentsRequest, GetIndexRequest, PutDocumentRequest, SearchRequest,
     document_service_client::DocumentServiceClient, index_service_client::IndexServiceClient,
     search_service_client::SearchServiceClient,
@@ -112,6 +112,25 @@ struct SearchParams {
 
     /// Number of results to skip for pagination. Defaults to `0`.
     offset: Option<u32>,
+}
+
+/// Parameters for the `add_field` tool.
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+struct AddFieldParams {
+    /// The name of the new field to add.
+    name: String,
+
+    /// Field configuration as a JSON string.
+    ///
+    /// Uses the same externally-tagged serde representation as the schema.
+    /// The variant name is the key.  Example:
+    ///
+    /// ```json
+    /// {"Text": {"indexed": true, "stored": true}}
+    /// {"Hnsw": {"dimension": 384, "distance": "Cosine"}}
+    /// {"Integer": {}}
+    /// ```
+    field_option_json: String,
 }
 
 // ── Server struct ─────────────────────────────────────────────────────────────
@@ -245,6 +264,62 @@ impl LaurusMcpServer {
                 )]))
             }
             Err(e) => Ok(Self::tool_error(format!("Failed to get index stats: {e}"))),
+        }
+    }
+
+    /// Dynamically add a new field to the current index.
+    #[tool(
+        description = "Dynamically add a new field to an existing index. The field_option_json must be a JSON string describing the field type and options (e.g. '{\"Text\": {\"indexed\": true, \"stored\": true}}', '{\"Hnsw\": {\"dimension\": 384}}', '{\"Integer\": {}}'). Returns the updated schema."
+    )]
+    async fn add_field(
+        &self,
+        Parameters(params): Parameters<AddFieldParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let channel = match self.channel.read().await.clone() {
+            Some(ch) => ch,
+            None => {
+                return Ok(Self::tool_error(
+                    "Not connected. Call the connect tool first.",
+                ));
+            }
+        };
+
+        let field_option: laurus::FieldOption =
+            match serde_json::from_str(&params.field_option_json) {
+                Ok(fo) => fo,
+                Err(e) => {
+                    return Ok(Self::tool_error(format!(
+                        "Failed to parse field_option_json: {e}"
+                    )));
+                }
+            };
+
+        let proto_field_option =
+            laurus_server::convert::schema::field_option_to_proto(&field_option);
+        let request = AddFieldRequest {
+            name: params.name.clone(),
+            field_option: Some(proto_field_option),
+        };
+
+        match IndexServiceClient::new(channel).add_field(request).await {
+            Ok(resp) => {
+                let r = resp.into_inner();
+                let output = if let Some(schema) = r.schema {
+                    let field_names: Vec<&String> = schema.fields.keys().collect();
+                    json!({
+                        "message": format!("Field '{}' added successfully.", params.name),
+                        "fields": field_names,
+                    })
+                } else {
+                    json!({
+                        "message": format!("Field '{}' added successfully.", params.name),
+                    })
+                };
+                Ok(CallToolResult::success(vec![Content::text(
+                    output.to_string(),
+                )]))
+            }
+            Err(e) => Ok(Self::tool_error(format!("Failed to add field: {e}"))),
         }
     }
 
@@ -462,7 +537,7 @@ impl ServerHandler for LaurusMcpServer {
             .with_server_info(Implementation::from_build_env())
             .with_instructions(
                 "Laurus search engine MCP server (gRPC client). \
-             Tools: connect, create_index, get_index, add_document, get_document, \
+             Tools: connect, create_index, get_index, add_field, add_document, get_document, \
              delete_document, commit, search. \
              Start by calling connect(endpoint) to connect to a running laurus-server, \
              then use the other tools to manage and search the index."

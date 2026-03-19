@@ -68,7 +68,7 @@
 //! use std::sync::Arc;
 //!
 //! // Configure per-field analyzers
-//! let mut per_field = PerFieldAnalyzer::new(Arc::new(StandardAnalyzer::new().unwrap()));
+//! let per_field = PerFieldAnalyzer::new(Arc::new(StandardAnalyzer::new().unwrap()));
 //! per_field.add_analyzer("id", Arc::new(KeywordAnalyzer::new()));
 //!
 //! let parser = DocumentParser::new(Arc::new(per_field));
@@ -112,7 +112,7 @@ use crate::lexical::core::field::FieldValue;
 /// use laurus::analysis::analyzer::keyword::KeywordAnalyzer;
 /// use std::sync::Arc;
 ///
-/// let mut per_field = PerFieldAnalyzer::new(Arc::new(StandardAnalyzer::new().unwrap()));
+/// let per_field = PerFieldAnalyzer::new(Arc::new(StandardAnalyzer::new().unwrap()));
 /// per_field.add_analyzer("id", Arc::new(KeywordAnalyzer::new()));
 ///
 /// let parser = DocumentParser::new(Arc::new(per_field));
@@ -343,7 +343,7 @@ mod tests {
 
     #[test]
     fn test_per_field_analyzer() {
-        let mut per_field = PerFieldAnalyzer::new(Arc::new(StandardAnalyzer::new().unwrap()));
+        let per_field = PerFieldAnalyzer::new(Arc::new(StandardAnalyzer::new().unwrap()));
         per_field.add_analyzer("id", Arc::new(KeywordAnalyzer::new()));
 
         let parser = DocumentParser::new(Arc::new(per_field));

@@ -64,7 +64,12 @@ pub fn from_proto(proto: &v1::Schema) -> Result<Schema, String> {
     })
 }
 
-fn field_option_to_proto(fo: &FieldOption) -> v1::FieldOption {
+/// Convert a laurus `FieldOption` into a proto `FieldOption`.
+///
+/// # Arguments
+///
+/// * `fo` - The laurus field option to convert.
+pub fn field_option_to_proto(fo: &FieldOption) -> v1::FieldOption {
     use v1::field_option::Option as Opt;
     let option = match fo {
         FieldOption::Text(o) => Some(Opt::Text(v1::TextOption {
@@ -123,7 +128,14 @@ fn field_option_to_proto(fo: &FieldOption) -> v1::FieldOption {
     v1::FieldOption { option }
 }
 
-fn field_option_from_proto(fo: &v1::FieldOption) -> Option<FieldOption> {
+/// Convert a proto `FieldOption` into a laurus `FieldOption`.
+///
+/// Returns `None` if the proto message has no option variant set.
+///
+/// # Arguments
+///
+/// * `fo` - The proto field option to convert.
+pub fn field_option_from_proto(fo: &v1::FieldOption) -> Option<FieldOption> {
     use v1::field_option::Option as Opt;
     match &fo.option {
         Some(Opt::Text(o)) => Some(FieldOption::Text(TextOption {

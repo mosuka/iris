@@ -228,6 +228,20 @@ laurus add doc --id doc1 --data '{"title":"Hello World","body":"This is a test d
 
 > **Tip:** Multiple documents can share the same external ID (chunking pattern). Use `add doc` for each chunk.
 
+### `add field`
+
+Dynamically add a new field to an existing index.
+
+```bash
+laurus add field --data-dir ./data \
+    --name category \
+    --field-option '{"Text": {"indexed": true, "stored": true}}'
+```
+
+The `--field-option` argument accepts a JSON string using the same
+externally-tagged format as the schema file. The schema is automatically
+persisted after the field is added.
+
 ---
 
 ## `delete` — Delete a Resource

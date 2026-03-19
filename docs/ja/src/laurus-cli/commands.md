@@ -228,6 +228,19 @@ laurus add doc --id doc1 --data '{"title":"Hello World","body":"This is a test d
 
 > **ヒント:** 複数のドキュメントが同じ外部 ID を共有できます（チャンキングパターン）。各チャンクに対して `add doc` を使用してください。
 
+### `add field`
+
+既存のインデックスにフィールドを動的に追加します。
+
+```bash
+laurus add field --data-dir ./data \
+    --name category \
+    --field-option '{"Text": {"indexed": true, "stored": true}}'
+```
+
+`--field-option` 引数はスキーマファイルと同じ外部タグ付き JSON 形式を受け付けます。
+フィールド追加後、スキーマは自動的に永続化されます。
+
 ---
 
 ## `delete` — リソースの削除
