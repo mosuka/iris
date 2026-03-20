@@ -15,9 +15,9 @@ use crate::output::OutputFormat;
 #[derive(Parser)]
 #[command(name = "laurus", version, about)]
 pub struct Cli {
-    /// Path to the data directory.
-    #[arg(long, env = "LAURUS_DATA_DIR", default_value = "./laurus_data")]
-    pub data_dir: PathBuf,
+    /// Path to the index directory.
+    #[arg(long, env = "LAURUS_INDEX_DIR", default_value = "./laurus_index")]
+    pub index_dir: PathBuf,
 
     /// Output format.
     #[arg(long, value_enum, default_value_t = OutputFormat::Table)]
@@ -90,7 +90,9 @@ pub struct GetCommand {
 #[derive(Subcommand)]
 pub enum GetResource {
     /// Show index statistics.
-    Index,
+    Stats,
+    /// Show the current schema.
+    Schema,
     /// Get a document by ID.
     Doc {
         /// External document ID.
@@ -156,6 +158,12 @@ pub enum DeleteResource {
         /// External document ID.
         #[arg(long)]
         id: String,
+    },
+    /// Remove a field from the index schema.
+    Field {
+        /// The name of the field to delete.
+        #[arg(long)]
+        name: String,
     },
 }
 

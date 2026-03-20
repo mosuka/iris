@@ -636,6 +636,42 @@ impl LexicalStore {
 
         Ok(())
     }
+
+    /// Remove a field from the lexical store.
+    ///
+    /// Removes the field from the underlying index (if it was dynamically added)
+    /// and unregisters any field-specific analyzer from the `PerFieldAnalyzer`.
+    /// After this call, the field will no longer be available for indexing or
+    /// searching, but existing data in the index is not deleted.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The field name to remove
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the underlying index does not support dynamic field
+    /// deletion.
+    pub fn delete_field(&self, name: &str) -> Result<()> {
+        // Remove the field from the underlying index.
+        self.index.delete_field(name)?;
+
+        // Remove the field-specific analyzer from the PerFieldAnalyzer if present.
+        if let Ok(index_analyzer) = self.analyzer()
+            && let Some(pfa) = index_analyzer
+                .as_any()
+                .downcast_ref::<crate::analysis::analyzer::per_field::PerFieldAnalyzer>(
+            )
+        {
+            pfa.remove_analyzer(name);
+        }
+
+        // Invalidate caches so the next writer/searcher uses updated config.
+        *self.writer_cache.lock() = None;
+        *self.searcher_cache.write() = None;
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]

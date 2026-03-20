@@ -88,6 +88,30 @@ Result: `Field 'category' added successfully.`
 
 ---
 
+## delete_field
+
+Remove a field from the index schema. Existing indexed data remains in
+storage but becomes inaccessible. Per-field analyzers and embedders are
+unregistered.
+
+### Parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `name` | string | Yes | The name of the field to remove |
+
+### Example
+
+```json
+{
+  "name": "category"
+}
+```
+
+Result: `Field 'category' deleted successfully.`
+
+---
+
 ## get_index
 
 Get statistics for the current search index.
@@ -237,6 +261,7 @@ Search documents using the laurus query DSL.
 1. connect         → connect to a running laurus-server
 2. create_index    → define the schema (if index does not exist)
 3. add_field       → dynamically add fields (optional)
+   delete_field    → remove fields (optional)
 4. add_document    → index documents (repeat as needed)
 5. commit          → persist changes to disk
 6. search          → query the index

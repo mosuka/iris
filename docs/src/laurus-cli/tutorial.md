@@ -44,13 +44,13 @@ This defines three text fields. The `default_fields` setting means queries witho
 Create an index using the schema:
 
 ```bash
-laurus --data-dir ./tutorial_data create index --schema schema.toml
+laurus --index-dir ./tutorial_data create index --schema schema.toml
 ```
 
 Verify the index was created:
 
 ```bash
-laurus --data-dir ./tutorial_data get index
+laurus --index-dir ./tutorial_data get stats
 ```
 
 The output shows the document count is 0.
@@ -60,19 +60,19 @@ The output shows the document count is 0.
 Add documents to the index. Each document needs an ID and a JSON object with field values:
 
 ```bash
-laurus --data-dir ./tutorial_data add doc \
+laurus --index-dir ./tutorial_data add doc \
   --id doc001 \
   --data '{"title":"Introduction to Rust Programming","body":"Rust is a modern systems programming language that focuses on safety, speed, and concurrency.","category":"programming"}'
 ```
 
 ```bash
-laurus --data-dir ./tutorial_data add doc \
+laurus --index-dir ./tutorial_data add doc \
   --id doc002 \
   --data '{"title":"Web Development with Rust","body":"Building web applications with Rust has become increasingly popular. Frameworks like Actix and Rocket make it easy to create fast and secure web services.","category":"web-development"}'
 ```
 
 ```bash
-laurus --data-dir ./tutorial_data add doc \
+laurus --index-dir ./tutorial_data add doc \
   --id doc003 \
   --data '{"title":"Python for Data Science","body":"Python is the most popular language for data science and machine learning. Libraries like NumPy and Pandas provide powerful tools for data analysis.","category":"data-science"}'
 ```
@@ -82,7 +82,7 @@ laurus --data-dir ./tutorial_data add doc \
 Documents are not searchable until committed:
 
 ```bash
-laurus --data-dir ./tutorial_data commit
+laurus --index-dir ./tutorial_data commit
 ```
 
 ## Step 5: Search Documents
@@ -92,7 +92,7 @@ laurus --data-dir ./tutorial_data commit
 Search for documents containing "rust":
 
 ```bash
-laurus --data-dir ./tutorial_data search "rust"
+laurus --index-dir ./tutorial_data search "rust"
 ```
 
 This searches the default fields (`title` and `body`). Results show `doc001` and `doc002`.
@@ -102,7 +102,7 @@ This searches the default fields (`title` and `body`). Results show `doc001` and
 Search only in the `title` field:
 
 ```bash
-laurus --data-dir ./tutorial_data search "title:python"
+laurus --index-dir ./tutorial_data search "title:python"
 ```
 
 Only `doc003` is returned.
@@ -110,7 +110,7 @@ Only `doc003` is returned.
 ### Category Search
 
 ```bash
-laurus --data-dir ./tutorial_data search "category:programming"
+laurus --index-dir ./tutorial_data search "category:programming"
 ```
 
 Only `doc001` is returned.
@@ -120,7 +120,7 @@ Only `doc001` is returned.
 Combine conditions with `+` (must) and `-` (must not):
 
 ```bash
-laurus --data-dir ./tutorial_data search "+body:rust -body:web"
+laurus --index-dir ./tutorial_data search "+body:rust -body:web"
 ```
 
 Only `doc001` is returned (contains "rust" but not "web").
@@ -130,7 +130,7 @@ Only `doc001` is returned (contains "rust" but not "web").
 Search for an exact phrase:
 
 ```bash
-laurus --data-dir ./tutorial_data search 'body:"data science"'
+laurus --index-dir ./tutorial_data search 'body:"data science"'
 ```
 
 Only `doc003` is returned.
@@ -140,7 +140,7 @@ Only `doc003` is returned.
 Search with typo tolerance using `~`:
 
 ```bash
-laurus --data-dir ./tutorial_data search "body:programing~1"
+laurus --index-dir ./tutorial_data search "body:programing~1"
 ```
 
 Matches "programming" despite the typo.
@@ -150,7 +150,7 @@ Matches "programming" despite the typo.
 Get results in JSON format for programmatic use:
 
 ```bash
-laurus --data-dir ./tutorial_data --format json search "rust"
+laurus --index-dir ./tutorial_data --format json search "rust"
 ```
 
 ## Step 6: Retrieve a Document
@@ -158,7 +158,7 @@ laurus --data-dir ./tutorial_data --format json search "rust"
 Fetch a specific document by ID:
 
 ```bash
-laurus --data-dir ./tutorial_data get doc --id doc001
+laurus --index-dir ./tutorial_data get doc --id doc001
 ```
 
 ## Step 7: Delete a Document
@@ -166,14 +166,14 @@ laurus --data-dir ./tutorial_data get doc --id doc001
 Delete a document and commit the change:
 
 ```bash
-laurus --data-dir ./tutorial_data delete doc --id doc003
-laurus --data-dir ./tutorial_data commit
+laurus --index-dir ./tutorial_data delete doc --id doc003
+laurus --index-dir ./tutorial_data commit
 ```
 
 Verify it was deleted:
 
 ```bash
-laurus --data-dir ./tutorial_data search "python"
+laurus --index-dir ./tutorial_data search "python"
 ```
 
 No results are returned.
@@ -183,7 +183,7 @@ No results are returned.
 The REPL provides an interactive session for exploring your index:
 
 ```bash
-laurus --data-dir ./tutorial_data repl
+laurus --index-dir ./tutorial_data repl
 ```
 
 Try these commands in the REPL:

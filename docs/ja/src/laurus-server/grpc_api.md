@@ -7,7 +7,7 @@
 | サービス | RPC | 説明 |
 | :--- | :--- | :--- |
 | `HealthService` | `Check` | ヘルスチェック |
-| `IndexService` | `CreateIndex`, `GetIndex`, `GetSchema`, `AddField` | インデックスのライフサイクルとスキーマ |
+| `IndexService` | `CreateIndex`, `GetIndex`, `GetSchema`, `AddField`, `DeleteField` | インデックスのライフサイクルとスキーマ |
 | `DocumentService` | `PutDocument`, `AddDocument`, `GetDocuments`, `DeleteDocuments`, `Commit` | ドキュメント CRUD とコミット |
 | `SearchService` | `Search`, `SearchStream` | 単発検索とストリーミング検索 |
 
@@ -161,10 +161,38 @@ rpc GetSchema(GetSchemaRequest) returns (GetSchemaResponse);
 
 稼働中のインデックスにフィールドを動的に追加します。
 
+```protobuf
+rpc AddField(AddFieldRequest) returns (AddFieldResponse);
+```
+
 | フィールド | 型 | 説明 |
 | :--- | :--- | :--- |
 | `name` | `string` | フィールド名 |
 | `field_option` | `FieldOption` | フィールド設定 |
+
+**レスポンス:** 更新後の `Schema` を返します。
+
+### DeleteField
+
+稼働中のインデックスからフィールドを動的に削除します。既にインデックスされたデータは残りますが、削除されたフィールドにはアクセスできなくなります。
+
+```protobuf
+rpc DeleteField(DeleteFieldRequest) returns (DeleteFieldResponse);
+
+message DeleteFieldRequest {
+  string name = 1;
+}
+
+message DeleteFieldResponse {
+  Schema schema = 1;
+}
+```
+
+**リクエストフィールド:**
+
+| フィールド | 型 | 必須 | 説明 |
+| :--- | :--- | :--- | :--- |
+| `name` | `string` | はい | 削除するフィールド名 |
 
 **レスポンス:** 更新後の `Schema` を返します。
 

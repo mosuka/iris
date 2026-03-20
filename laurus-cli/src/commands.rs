@@ -1,18 +1,23 @@
 //! CLI subcommand implementations.
 //!
-//! Each submodule contains the `run` entry-point for its respective CLI
-//! subcommand:
+//! Each submodule corresponds to a top-level CLI subcommand:
 //!
-//! - [`add_field`] - Dynamically add a new field to an existing index.
+//! - [`add`] - Add a resource (field or document).
+//! - [`commit`] - Commit pending changes.
+//! - [`create`] - Create a resource (index or schema file).
+//! - [`delete`] - Delete a resource (field or document).
+//! - [`get`] - Retrieve a resource (index stats or document).
 //! - [`mcp`] - MCP (Model Context Protocol) server on stdio.
 //! - [`repl`] - Interactive Read-Eval-Print Loop session.
-//! - [`schema`] - Interactive schema TOML generation wizard.
 //! - [`search`] - One-shot search query execution.
 //! - [`serve`] - gRPC (and optional HTTP gateway) server.
 
-pub mod add_field;
+pub mod add;
+pub mod commit;
+pub mod create;
+pub mod delete;
+pub mod get;
 pub mod mcp;
 pub mod repl;
-pub mod schema;
 pub mod search;
 pub mod serve;

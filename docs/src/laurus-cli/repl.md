@@ -5,7 +5,7 @@ The REPL provides an interactive session for exploring your index without typing
 ## Starting the REPL
 
 ```bash
-laurus --data-dir ./my_index repl
+laurus --index-dir ./my_index repl
 ```
 
 ```text
@@ -17,18 +17,21 @@ The REPL opens the index at startup and keeps it loaded throughout the session.
 
 ## Available Commands
 
+Commands follow the same `<operation> <resource>` ordering as the CLI.
+
 | Command | Description |
 | :--- | :--- |
-| `search <query>` | Search the index (returns up to 10 results) |
-| `doc add <id> <json>` | Add a document |
-| `doc get <id>` | Get a document by ID |
-| `doc delete <id>` | Delete a document by ID |
+| `search <query>` | Search the index |
+| `add field <name> <json>` | Add a field to the schema |
+| `add doc <id> <json>` | Add a document |
+| `get stats` | Show index statistics |
+| `get schema` | Show the current schema |
+| `get doc <id>` | Get a document by ID |
+| `delete field <name>` | Remove a field from the schema |
+| `delete doc <id>` | Delete a document by ID |
 | `commit` | Commit pending changes |
-| `stats` | Show index statistics |
 | `help` | Show available commands |
 | `quit` / `exit` | Exit the REPL |
-
-The search command always returns up to 10 results. The limit is not currently configurable in the REPL.
 
 ## Usage Examples
 
@@ -43,19 +46,37 @@ laurus> search body:rust
 ╰──────┴────────┴────────────────────────────────────╯
 ```
 
+### Managing Fields
+
+```text
+laurus> add field category {"Text": {"indexed": true, "stored": true}}
+Field 'category' added.
+laurus> delete field category
+Field 'category' deleted.
+```
+
 ### Adding and Committing Documents
 
 ```text
-laurus> doc add doc4 {"title":"New Document","body":"Some content here."}
+laurus> add doc doc4 {"title":"New Document","body":"Some content here."}
 Document 'doc4' added.
 laurus> commit
 Changes committed.
 ```
 
-### Retrieving Documents
+### Retrieving Information
 
 ```text
-laurus> doc get doc4
+laurus> get stats
+Document count: 3
+
+laurus> get schema
+{
+  "fields": { ... },
+  "default_fields": ["title", "body"]
+}
+
+laurus> get doc doc4
 ╭──────┬───────────────────────────────────────────────╮
 │ ID   │ Fields                                        │
 ├──────┼───────────────────────────────────────────────┤
@@ -66,17 +87,10 @@ laurus> doc get doc4
 ### Deleting Documents
 
 ```text
-laurus> doc delete doc4
+laurus> delete doc doc4
 Document 'doc4' deleted.
 laurus> commit
 Changes committed.
-```
-
-### Viewing Statistics
-
-```text
-laurus> stats
-Document count: 3
 ```
 
 ## Features

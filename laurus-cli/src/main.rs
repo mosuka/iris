@@ -3,9 +3,9 @@
 //! Command-line interface binary for the **laurus** search engine.
 //!
 //! This crate provides the `laurus` CLI executable, which supports creating and
-//! managing search indices, adding/retrieving/deleting documents, executing
-//! search queries, running an interactive REPL session, and starting a gRPC
-//! server.
+//! managing search indices, adding/retrieving/deleting documents and fields,
+//! executing search queries, running an interactive REPL session, and starting
+//! a gRPC server.
 //!
 //! ## Usage
 //!
@@ -20,74 +20,44 @@ mod commands;
 mod context;
 mod output;
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use clap::Parser;
-use laurus::Document;
 
 use crate::cli::{
     AddResource, Cli, Command, CreateResource, DeleteResource, GetResource, McpCommand,
 };
-use crate::commands::{add_field, mcp, repl, schema, search, serve};
+use crate::commands::{add, commit, create, delete, get, mcp, repl, search, serve};
 
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
     let format = cli.format;
-    let data_dir = cli.data_dir;
+    let index_dir = cli.index_dir;
 
     match cli.command {
         Command::Create(cmd) => match cmd.resource {
-            CreateResource::Index { schema } => {
-                context::create_index(&data_dir, &schema).await?;
-                println!("Index created at {}.", data_dir.display());
-                Ok(())
-            }
-            CreateResource::Schema { output } => schema::run(&output),
+            CreateResource::Index { schema } => create::run_index(&schema, &index_dir).await,
+            CreateResource::Schema { output } => create::run_schema(&output),
         },
         Command::Get(cmd) => match cmd.resource {
-            GetResource::Index => {
-                let engine = context::open_index(&data_dir).await?;
-                let stats = engine.stats()?;
-                output::print_stats(&stats, format);
-                Ok(())
-            }
-            GetResource::Doc { id } => {
-                let engine = context::open_index(&data_dir).await?;
-                let documents = engine.get_documents(&id).await?;
-                output::print_documents(&id, &documents, format);
-                Ok(())
-            }
+            GetResource::Stats => get::run_stats(&index_dir, format).await,
+            GetResource::Schema => get::run_schema(&index_dir),
+            GetResource::Doc { id } => get::run_doc(&id, &index_dir, format).await,
         },
         Command::Add(cmd) => match cmd.resource {
-            AddResource::Doc { id, data } => {
-                let engine = context::open_index(&data_dir).await?;
-                let doc: Document =
-                    serde_json::from_str(&data).context("Failed to parse document JSON")?;
-                engine.add_document(&id, doc).await?;
-                println!("Document '{id}' added. Run 'commit' to persist changes.");
-                Ok(())
-            }
+            AddResource::Doc { id, data } => add::run_doc(&id, &data, &index_dir).await,
             AddResource::Field { name, field_option } => {
-                add_field::run(&name, &field_option, &data_dir).await
+                add::run_field(&name, &field_option, &index_dir).await
             }
         },
         Command::Delete(cmd) => match cmd.resource {
-            DeleteResource::Doc { id } => {
-                let engine = context::open_index(&data_dir).await?;
-                engine.delete_documents(&id).await?;
-                println!("Document '{id}' deleted. Run 'commit' to persist changes.");
-                Ok(())
-            }
+            DeleteResource::Doc { id } => delete::run_doc(&id, &index_dir).await,
+            DeleteResource::Field { name } => delete::run_field(&name, &index_dir).await,
         },
-        Command::Commit => {
-            let engine = context::open_index(&data_dir).await?;
-            engine.commit().await?;
-            println!("Changes committed successfully.");
-            Ok(())
-        }
-        Command::Search(cmd) => search::run(cmd, &data_dir, format).await,
-        Command::Repl => repl::run(&data_dir, format).await,
-        Command::Serve(cmd) => serve::run(cmd, &data_dir).await,
+        Command::Commit => commit::run(&index_dir).await,
+        Command::Search(cmd) => search::run(cmd, &index_dir, format).await,
+        Command::Repl => repl::run(&index_dir, format).await,
+        Command::Serve(cmd) => serve::run(cmd, &index_dir).await,
         Command::Mcp(McpCommand { endpoint }) => mcp::run(endpoint.as_deref()).await,
     }
 }

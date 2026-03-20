@@ -44,13 +44,13 @@ EOF
 スキーマを使ってインデックスを作成します:
 
 ```bash
-laurus --data-dir ./tutorial_data create index --schema schema.toml
+laurus --index-dir ./tutorial_data create index --schema schema.toml
 ```
 
 インデックスが作成されたことを確認します:
 
 ```bash
-laurus --data-dir ./tutorial_data get index
+laurus --index-dir ./tutorial_data get stats
 ```
 
 ドキュメント数が 0 であることが表示されます。
@@ -60,19 +60,19 @@ laurus --data-dir ./tutorial_data get index
 ドキュメントをインデックスに追加します。各ドキュメントには ID と JSON 形式のフィールド値が必要です:
 
 ```bash
-laurus --data-dir ./tutorial_data add doc \
+laurus --index-dir ./tutorial_data add doc \
   --id doc001 \
   --data '{"title":"Introduction to Rust Programming","body":"Rust is a modern systems programming language that focuses on safety, speed, and concurrency.","category":"programming"}'
 ```
 
 ```bash
-laurus --data-dir ./tutorial_data add doc \
+laurus --index-dir ./tutorial_data add doc \
   --id doc002 \
   --data '{"title":"Web Development with Rust","body":"Building web applications with Rust has become increasingly popular. Frameworks like Actix and Rocket make it easy to create fast and secure web services.","category":"web-development"}'
 ```
 
 ```bash
-laurus --data-dir ./tutorial_data add doc \
+laurus --index-dir ./tutorial_data add doc \
   --id doc003 \
   --data '{"title":"Python for Data Science","body":"Python is the most popular language for data science and machine learning. Libraries like NumPy and Pandas provide powerful tools for data analysis.","category":"data-science"}'
 ```
@@ -82,7 +82,7 @@ laurus --data-dir ./tutorial_data add doc \
 ドキュメントはコミットするまで検索対象になりません:
 
 ```bash
-laurus --data-dir ./tutorial_data commit
+laurus --index-dir ./tutorial_data commit
 ```
 
 ## Step 5: ドキュメントの検索
@@ -92,7 +92,7 @@ laurus --data-dir ./tutorial_data commit
 "rust" を含むドキュメントを検索します:
 
 ```bash
-laurus --data-dir ./tutorial_data search "rust"
+laurus --index-dir ./tutorial_data search "rust"
 ```
 
 デフォルトフィールド（`title` と `body`）が検索されます。`doc001` と `doc002` が返されます。
@@ -102,7 +102,7 @@ laurus --data-dir ./tutorial_data search "rust"
 `title` フィールドのみを検索します:
 
 ```bash
-laurus --data-dir ./tutorial_data search "title:python"
+laurus --index-dir ./tutorial_data search "title:python"
 ```
 
 `doc003` のみが返されます。
@@ -110,7 +110,7 @@ laurus --data-dir ./tutorial_data search "title:python"
 ### カテゴリ検索
 
 ```bash
-laurus --data-dir ./tutorial_data search "category:programming"
+laurus --index-dir ./tutorial_data search "category:programming"
 ```
 
 `doc001` のみが返されます。
@@ -120,7 +120,7 @@ laurus --data-dir ./tutorial_data search "category:programming"
 `+`（必須）と `-`（除外）で条件を組み合わせます:
 
 ```bash
-laurus --data-dir ./tutorial_data search "+body:rust -body:web"
+laurus --index-dir ./tutorial_data search "+body:rust -body:web"
 ```
 
 "rust" を含み "web" を含まない `doc001` のみが返されます。
@@ -130,7 +130,7 @@ laurus --data-dir ./tutorial_data search "+body:rust -body:web"
 完全一致するフレーズを検索します:
 
 ```bash
-laurus --data-dir ./tutorial_data search 'body:"data science"'
+laurus --index-dir ./tutorial_data search 'body:"data science"'
 ```
 
 `doc003` のみが返されます。
@@ -140,7 +140,7 @@ laurus --data-dir ./tutorial_data search 'body:"data science"'
 `~` を使ってタイプミスに対応した検索を行います:
 
 ```bash
-laurus --data-dir ./tutorial_data search "body:programing~1"
+laurus --index-dir ./tutorial_data search "body:programing~1"
 ```
 
 タイプミスがあっても "programming" にマッチします。
@@ -150,7 +150,7 @@ laurus --data-dir ./tutorial_data search "body:programing~1"
 プログラムでの利用に向けて JSON 形式で結果を取得します:
 
 ```bash
-laurus --data-dir ./tutorial_data --format json search "rust"
+laurus --index-dir ./tutorial_data --format json search "rust"
 ```
 
 ## Step 6: ドキュメントの取得
@@ -158,7 +158,7 @@ laurus --data-dir ./tutorial_data --format json search "rust"
 ID を指定して特定のドキュメントを取得します:
 
 ```bash
-laurus --data-dir ./tutorial_data get doc --id doc001
+laurus --index-dir ./tutorial_data get doc --id doc001
 ```
 
 ## Step 7: ドキュメントの削除
@@ -166,14 +166,14 @@ laurus --data-dir ./tutorial_data get doc --id doc001
 ドキュメントを削除してコミットします:
 
 ```bash
-laurus --data-dir ./tutorial_data delete doc --id doc003
-laurus --data-dir ./tutorial_data commit
+laurus --index-dir ./tutorial_data delete doc --id doc003
+laurus --index-dir ./tutorial_data commit
 ```
 
 削除されたことを確認します:
 
 ```bash
-laurus --data-dir ./tutorial_data search "python"
+laurus --index-dir ./tutorial_data search "python"
 ```
 
 結果は返されません。
@@ -183,7 +183,7 @@ laurus --data-dir ./tutorial_data search "python"
 REPL はインデックスを対話的に操作するためのインタラクティブセッションです:
 
 ```bash
-laurus --data-dir ./tutorial_data repl
+laurus --index-dir ./tutorial_data repl
 ```
 
 REPL で以下のコマンドを試してみてください:

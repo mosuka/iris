@@ -14,9 +14,9 @@ use laurus::Engine;
 use crate::context;
 use crate::convert::{error, schema as schema_convert};
 use crate::proto::laurus::v1::{
-    AddFieldRequest, AddFieldResponse, CreateIndexRequest, CreateIndexResponse, GetIndexRequest,
-    GetIndexResponse, GetSchemaRequest, GetSchemaResponse, VectorFieldStats,
-    index_service_server::IndexService as IndexServiceTrait,
+    AddFieldRequest, AddFieldResponse, CreateIndexRequest, CreateIndexResponse, DeleteFieldRequest,
+    DeleteFieldResponse, GetIndexRequest, GetIndexResponse, GetSchemaRequest, GetSchemaResponse,
+    VectorFieldStats, index_service_server::IndexService as IndexServiceTrait,
 };
 
 /// gRPC IndexService implementation.
@@ -133,6 +133,33 @@ impl IndexServiceTrait for IndexService {
         tracing::info!("Field '{}' added to index", name);
         let proto_schema = schema_convert::to_proto(&updated_schema);
         Ok(Response::new(AddFieldResponse {
+            schema: Some(proto_schema),
+        }))
+    }
+
+    /// Removes a field from the current index schema and persists the updated schema.
+    async fn delete_field(
+        &self,
+        request: Request<DeleteFieldRequest>,
+    ) -> Result<Response<DeleteFieldResponse>, Status> {
+        let req = request.into_inner();
+        let name = req.name;
+        if name.is_empty() {
+            return Err(Status::invalid_argument("field name is required"));
+        }
+
+        let guard = self.engine.read().await;
+        let engine = guard
+            .as_ref()
+            .ok_or_else(|| Status::failed_precondition("No index is open"))?;
+
+        let updated_schema = engine.delete_field(&name).await.map_err(error::to_status)?;
+
+        context::save_schema(&self.data_dir, &updated_schema).map_err(error::anyhow_to_status)?;
+
+        tracing::info!("Field '{}' deleted from index", name);
+        let proto_schema = schema_convert::to_proto(&updated_schema);
+        Ok(Response::new(DeleteFieldResponse {
             schema: Some(proto_schema),
         }))
     }

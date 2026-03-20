@@ -134,6 +134,7 @@ graph LR
 | `commit()` | Flush pending changes to storage (makes documents searchable) |
 | `recover()` | Replay WAL to restore uncommitted state after crash |
 | `add_field(name, field_option)` | Dynamically add a new field to the schema at runtime |
+| `delete_field(name)` | Remove a field from the schema at runtime |
 | `schema()` | Return the current `Schema` |
 
 ### Search

@@ -181,6 +181,27 @@ document: {"title": "Hello World", "body": "これはテストドキュメント
 
 ---
 
+## delete_field
+
+インデックスからフィールドを削除します。既にインデックスされたデータは残りますが、削除されたフィールドにはアクセスできなくなります。
+
+### パラメーター
+
+| 名前 | 型 | 必須 | 説明 |
+| :--- | :--- | :--- | :--- |
+| `name` | string | はい | 削除するフィールド名 |
+
+### 例
+
+```text
+Tool: delete_field
+name: "category"
+```
+
+結果: `Field 'category' deleted.`
+
+---
+
 ## search
 
 laurus クエリ DSL を使用してドキュメントを検索します。
@@ -232,10 +253,12 @@ laurus クエリ DSL を使用してドキュメントを検索します。
 ```text
 1. connect         → 実行中の laurus-server に接続
 2. create_index    → スキーマを定義（インデックスが存在しない場合）
-3. add_document    → ドキュメントをインデックス（必要に応じて繰り返し）
-4. commit          → 変更をディスクに永続化
-5. search          → インデックスを検索
-6. add_document    → ドキュメントを更新
-7. delete_document → ドキュメントを削除
-8. commit          → 変更を永続化
+3. add_field       → フィールドを追加（必要に応じて）
+4. add_document    → ドキュメントをインデックス（必要に応じて繰り返し）
+5. commit          → 変更をディスクに永続化
+6. search          → インデックスを検索
+7. add_document    → ドキュメントを更新
+8. delete_document → ドキュメントを削除
+9. delete_field    → 不要なフィールドを削除（必要に応じて）
+10. commit         → 変更を永続化
 ```

@@ -20,14 +20,14 @@ laurus serve [OPTIONS]
 ログの詳細度は標準の `RUST_LOG` 環境変数で制御します（デフォルト: `info`）。
 `RUST_LOG=laurus=debug,tonic=warn` のようなフィルタディレクティブの詳細は [env_logger の構文](https://docs.rs/env_logger/latest/env_logger/#enabling-logging)を参照してください。
 
-グローバルオプション `--data-dir`（環境変数: `LAURUS_DATA_DIR`）でインデックスデータのディレクトリを指定します。
+グローバルオプション `--index-dir`（環境変数: `LAURUS_INDEX_DIR`）でインデックスデータのディレクトリを指定します。
 
 ```bash
 # CLI 引数を使用
-laurus --data-dir ./my_index serve --port 8080
+laurus --index-dir ./my_index serve --port 8080
 
 # 環境変数を使用
-export LAURUS_DATA_DIR=./my_index
+export LAURUS_INDEX_DIR=./my_index
 export LAURUS_PORT=8080
 export RUST_LOG=debug
 laurus serve

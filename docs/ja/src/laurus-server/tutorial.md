@@ -12,7 +12,7 @@
 HTTP Gateway を有効にして laurus-server を起動します:
 
 ```bash
-laurus --data-dir /tmp/laurus/tutorial serve --port 50051 --http-port 8080
+laurus --index-dir /tmp/laurus/tutorial serve --port 50051 --http-port 8080
 ```
 
 gRPC サーバー（ポート 50051）と HTTP Gateway（ポート 8080）が起動したことを示すログが表示されます。

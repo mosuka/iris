@@ -119,6 +119,27 @@ pub trait LexicalIndex: Send + Sync + std::fmt::Debug {
             "This index implementation does not support dynamic field addition",
         ))
     }
+
+    /// Dynamically remove a field from the index at runtime.
+    ///
+    /// Only fields that were dynamically added via [`add_field`](Self::add_field)
+    /// can be removed. Fields defined in the initial index configuration are not
+    /// affected at the index level (though the engine-level schema will no longer
+    /// list them).
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The field name to remove
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the index implementation does not support dynamic field
+    /// deletion.
+    fn delete_field(&self, _name: &str) -> Result<()> {
+        Err(crate::error::LaurusError::invalid_argument(
+            "This index implementation does not support dynamic field deletion",
+        ))
+    }
 }
 
 pub mod config;

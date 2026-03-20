@@ -629,6 +629,30 @@ impl VectorStore {
         *self.writer_cache.lock().await = None;
         *self.searcher_cache.write() = None;
     }
+
+    /// Remove a field from the vector store.
+    ///
+    /// Unregisters any field-specific embedder from the `PerFieldEmbedder` and
+    /// invalidates writer/searcher caches. Existing vector data in the index is
+    /// not deleted.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The vector field name to remove
+    pub async fn delete_field(&self, name: &str) {
+        // Remove the field-specific embedder from the PerFieldEmbedder if present.
+        let index_embedder = self.index.embedder();
+        if let Some(pfe) = index_embedder
+            .as_any()
+            .downcast_ref::<crate::embedding::per_field::PerFieldEmbedder>()
+        {
+            pfe.remove_embedder(name);
+        }
+
+        // Invalidate caches so the next writer/searcher uses updated config.
+        *self.writer_cache.lock().await = None;
+        *self.searcher_cache.write() = None;
+    }
 }
 
 #[cfg(test)]

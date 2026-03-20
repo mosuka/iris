@@ -12,7 +12,7 @@ This tutorial walks you through a complete workflow with laurus-server: starting
 Start laurus-server with the HTTP Gateway enabled:
 
 ```bash
-laurus --data-dir /tmp/laurus/tutorial serve --port 50051 --http-port 8080
+laurus --index-dir /tmp/laurus/tutorial serve --port 50051 --http-port 8080
 ```
 
 You should see log output indicating the gRPC server (port 50051) and the HTTP Gateway (port 8080) have started.

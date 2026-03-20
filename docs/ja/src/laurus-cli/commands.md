@@ -6,12 +6,12 @@
 
 | オプション | 環境変数 | デフォルト | 説明 |
 | :--- | :--- | :--- | :--- |
-| `--data-dir <PATH>` | `LAURUS_DATA_DIR` | `./laurus_data` | インデックスデータディレクトリのパス |
+| `--index-dir <PATH>` | `LAURUS_INDEX_DIR` | `./laurus_index` | インデックスデータディレクトリのパス |
 | `--format <FORMAT>` | — | `table` | 出力形式: `table` または `json` |
 
 ```bash
 # 例: カスタムデータディレクトリで JSON 出力を使用
-laurus --data-dir /var/data/my_index --format json search "title:rust"
+laurus --index-dir /var/data/my_index --format json search "title:rust"
 ```
 
 ---
@@ -55,7 +55,7 @@ indexed = true
 **例:**
 
 ```bash
-laurus --data-dir ./my_index create index --schema schema.toml
+laurus --index-dir ./my_index create index --schema schema.toml
 # Index created at ./my_index.
 ```
 
@@ -115,12 +115,12 @@ laurus create index --schema schema.toml
 
 ## `get` — リソースの取得
 
-### `get index`
+### `get stats`
 
 インデックスの統計情報を表示します。
 
 ```bash
-laurus get index
+laurus get stats
 ```
 
 **テーブル出力の例:**
@@ -139,7 +139,7 @@ Vector fields:
 **JSON 出力の例:**
 
 ```bash
-laurus --format json get index
+laurus --format json get stats
 ```
 
 ```json
@@ -152,6 +152,25 @@ laurus --format json get index
     }
   }
 }
+```
+
+### `get schema`
+
+現在のインデックスのスキーマを JSON 形式で表示します。
+
+```bash
+laurus get schema
+```
+
+**例:**
+
+```bash
+laurus get schema
+# {
+#   "fields": { ... },
+#   "default_fields": ["title", "body"],
+#   ...
+# }
 ```
 
 ### `get doc`
@@ -233,7 +252,7 @@ laurus add doc --id doc1 --data '{"title":"Hello World","body":"This is a test d
 既存のインデックスにフィールドを動的に追加します。
 
 ```bash
-laurus add field --data-dir ./data \
+laurus add field --index-dir ./data \
     --name category \
     --field-option '{"Text": {"indexed": true, "stored": true}}'
 ```
@@ -244,6 +263,21 @@ laurus add field --data-dir ./data \
 ---
 
 ## `delete` — リソースの削除
+
+### `delete field`
+
+スキーマからフィールドを動的に削除します。既にインデックスされたデータは残りますが、削除されたフィールドにはアクセスできなくなります。
+
+```bash
+laurus delete field --name <FIELD_NAME>
+```
+
+**例:**
+
+```bash
+laurus delete field --name category
+# Field 'category' deleted.
+```
 
 ### `delete doc`
 
@@ -273,7 +307,7 @@ laurus commit
 **例:**
 
 ```bash
-laurus --data-dir ./my_index commit
+laurus --index-dir ./my_index commit
 # Changes committed successfully.
 ```
 

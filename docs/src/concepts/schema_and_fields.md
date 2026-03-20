@@ -231,12 +231,17 @@ let v: DataValue = vec![0.1f32, 0.2].into(); // Vector
 
 The `_id` field is reserved by Laurus for internal use. It stores the external document ID and is always indexed with `KeywordAnalyzer` (exact match). You do not need to add it to your schema — it is managed automatically.
 
-## Dynamic Field Addition
+## Dynamic Field Management
 
-Fields can be added to a running engine at runtime using `Engine::add_field()`.
-Only field addition is supported—removal or type changes are not allowed.
+Fields can be added to or removed from a running engine at runtime.
+Type changes are not supported—remove the field and re-add it with the
+new type instead.
 
-### Adding a Lexical Field
+### Adding a Field
+
+Use `Engine::add_field()` to add a new field to the schema.
+
+#### Adding a Lexical Field
 
 ```rust,ignore
 let updated_schema = engine.add_field(
@@ -245,7 +250,7 @@ let updated_schema = engine.add_field(
 ).await?;
 ```
 
-### Adding a Vector Field
+#### Adding a Vector Field
 
 ```rust,ignore
 let updated_schema = engine.add_field(
@@ -257,6 +262,23 @@ let updated_schema = engine.add_field(
 Existing documents are unaffected—they simply have no value for the new
 field. The returned `Schema` should be persisted (e.g., to `schema.toml`)
 by the caller.
+
+### Removing a Field
+
+Use `Engine::delete_field()` to remove a field from the schema.
+
+```rust,ignore
+let updated_schema = engine.delete_field("category").await?;
+```
+
+When a field is deleted:
+
+- The field definition is removed from the schema.
+- Existing indexed data for the field **remains** in the index but becomes
+  inaccessible through queries.
+- If the field was listed in `default_fields`, it is automatically removed.
+- Any per-field analyzer or embedder registered for the field is
+  unregistered.
 
 ## Schema Design Tips
 
