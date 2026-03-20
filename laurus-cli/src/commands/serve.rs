@@ -14,14 +14,14 @@ use crate::cli::ServeCommand;
 ///
 /// Loads a base configuration from the TOML file specified in `cmd.config`
 /// (or uses defaults), applies any overrides from CLI flags / environment
-/// variables, sets the index data directory, and delegates to the
+/// variables, sets the index index directory, and delegates to the
 /// `laurus-server` runtime.
 ///
 /// # Arguments
 ///
 /// * `cmd` - Parsed [`ServeCommand`] containing optional config path, host,
 ///   port, and HTTP port.
-/// * `data_dir` - Path to the data directory holding the index.
+/// * `index_dir` - Path to the index directory holding the index.
 ///
 /// # Returns
 ///
@@ -33,7 +33,7 @@ use crate::cli::ServeCommand;
 /// Returns an error if:
 /// - The configuration file cannot be read or parsed.
 /// - The server fails to start or encounters a fatal runtime error.
-pub async fn run(cmd: ServeCommand, data_dir: &Path) -> Result<()> {
+pub async fn run(cmd: ServeCommand, index_dir: &Path) -> Result<()> {
     let mut config = match &cmd.config {
         Some(path) => laurus_server::config::Config::from_file(path)?,
         None => laurus_server::config::Config::default(),
@@ -49,7 +49,7 @@ pub async fn run(cmd: ServeCommand, data_dir: &Path) -> Result<()> {
     if cmd.http_port.is_some() {
         config.server.http_port = cmd.http_port;
     }
-    config.index.data_dir = data_dir.to_path_buf();
+    config.index.data_dir = index_dir.to_path_buf();
 
     laurus_server::server::run(&config).await
 }

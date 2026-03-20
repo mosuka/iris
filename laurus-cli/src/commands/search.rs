@@ -17,7 +17,7 @@ use crate::output::{self, OutputFormat};
 
 /// Execute a search command against the index.
 ///
-/// Opens the index at `data_dir`, builds a unified query parser (supporting
+/// Opens the index at `index_dir`, builds a unified query parser (supporting
 /// both lexical and vector clauses), parses the query from `cmd`, and prints
 /// matching results.
 ///
@@ -25,7 +25,7 @@ use crate::output::{self, OutputFormat};
 ///
 /// * `cmd` - Parsed [`SearchCommand`] containing the query string, limit,
 ///   and offset.
-/// * `data_dir` - Path to the data directory holding the index.
+/// * `index_dir` - Path to the index directory holding the index.
 /// * `format` - The desired output format (table or JSON).
 ///
 /// # Returns
@@ -39,11 +39,11 @@ use crate::output::{self, OutputFormat};
 /// - The schema file cannot be read or parsed.
 /// - The query parser cannot be created or the query string is invalid.
 /// - The search execution fails.
-pub async fn run(cmd: SearchCommand, data_dir: &Path, format: OutputFormat) -> Result<()> {
-    let engine = context::open_index(data_dir).await?;
+pub async fn run(cmd: SearchCommand, index_dir: &Path, format: OutputFormat) -> Result<()> {
+    let engine = context::open_index(index_dir).await?;
 
     // Read schema to get default fields.
-    let schema_toml = std::fs::read_to_string(data_dir.join("schema.toml"))
+    let schema_toml = std::fs::read_to_string(index_dir.join("schema.toml"))
         .context("Failed to read schema file")?;
     let schema: Schema = toml::from_str(&schema_toml).context("Failed to parse schema TOML")?;
 

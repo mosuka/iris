@@ -1,16 +1,43 @@
-//! Interactive schema generation wizard.
+//! Implementations for the `create` subcommand.
 //!
-//! Guides the user through an interactive terminal session to define index
-//! fields and their options, then writes the resulting schema as a TOML file.
-//! Supports all field types provided by the laurus engine, including lexical
-//! fields (Text, Integer, Float, etc.) and vector index fields (HNSW, Flat,
-//! IVF).
+//! Handles creating new resources:
+//!
+//! - [`run_index`] - Create a new index from a schema TOML file.
+//! - [`run_schema`] - Interactive schema TOML generation wizard.
+//!
+//! The schema wizard guides the user through an interactive terminal session
+//! to define index fields and their options, then writes the resulting schema
+//! as a TOML file. Supports all field types provided by the laurus engine,
+//! including lexical fields (Text, Integer, Float, etc.) and vector index
+//! fields (HNSW, Flat, IVF).
 
 use std::collections::HashMap;
 use std::path::Path;
 
 use anyhow::{Context, Result};
 use dialoguer::{Confirm, Input, MultiSelect, Select};
+
+use crate::context;
+
+/// Execute the `create index` command.
+///
+/// Creates a new index from a schema TOML file at the given index directory.
+///
+/// # Arguments
+///
+/// * `schema_path` - Path to the schema TOML file.
+/// * `index_dir` - Path to the index directory for the new index.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - The schema file cannot be read or parsed.
+/// - The index cannot be created.
+pub async fn run_index(schema_path: &Path, index_dir: &Path) -> Result<()> {
+    context::create_index(index_dir, schema_path).await?;
+    println!("Index created at {}.", index_dir.display());
+    Ok(())
+}
 use laurus::lexical::core::field::{
     BooleanOption, BytesOption, DateTimeOption, FloatOption, GeoOption, IntegerOption, TextOption,
 };
@@ -26,7 +53,7 @@ const FIELD_TYPES: &[&str] = &[
 /// Distance metric names shown in the interactive prompt.
 const DISTANCE_METRICS: &[&str] = &["Cosine", "Euclidean", "Manhattan", "DotProduct", "Angular"];
 
-/// Run the interactive schema generation wizard.
+/// Run the interactive schema generation wizard (`create schema`).
 ///
 /// Prompts the user to define fields one by one, asks for default search
 /// fields among the lexical fields, previews the resulting TOML, and writes
@@ -46,7 +73,7 @@ const DISTANCE_METRICS: &[&str] = &["Cosine", "Euclidean", "Manhattan", "DotProd
 /// - An interactive prompt fails (e.g. terminal I/O error).
 /// - The schema cannot be serialised to TOML.
 /// - The output file cannot be written.
-pub fn run(output: &Path) -> Result<()> {
+pub fn run_schema(output: &Path) -> Result<()> {
     println!("\n=== Laurus Schema Generator ===\n");
 
     let mut fields: HashMap<String, FieldOption> = HashMap::new();

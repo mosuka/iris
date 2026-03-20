@@ -1,0 +1,65 @@
+//! Implementations for the `delete` subcommand.
+//!
+//! Handles deleting resources from an existing index:
+//!
+//! - [`run_field`] - Remove a field from the schema.
+//! - [`run_doc`] - Delete a document by ID.
+
+use std::path::Path;
+
+use anyhow::Result;
+
+use crate::context;
+
+/// Execute the `delete field` command.
+///
+/// Opens the index at `index_dir`, calls [`Engine::delete_field`], and writes
+/// the updated schema to disk. Existing data in the index is not deleted;
+/// the field simply becomes inaccessible for future indexing and searching.
+///
+/// # Arguments
+///
+/// * `name` - The name of the field to delete.
+/// * `index_dir` - Path to the index directory holding the index.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - The index cannot be opened.
+/// - The engine rejects the deletion (e.g. field does not exist).
+/// - The updated schema cannot be persisted to disk.
+pub async fn run_field(name: &str, index_dir: &Path) -> Result<()> {
+    let engine = context::open_index(index_dir).await?;
+
+    let updated_schema = engine
+        .delete_field(name)
+        .await
+        .map_err(|e| anyhow::anyhow!("{e}"))?;
+
+    context::save_schema(index_dir, &updated_schema)?;
+
+    println!("Field '{name}' deleted successfully.");
+    Ok(())
+}
+
+/// Execute the `delete doc` command.
+///
+/// Opens the index at `index_dir` and marks the document for deletion.
+/// Changes are not committed automatically.
+///
+/// # Arguments
+///
+/// * `id` - External document ID.
+/// * `index_dir` - Path to the index directory holding the index.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - The index cannot be opened.
+/// - The engine rejects the deletion.
+pub async fn run_doc(id: &str, index_dir: &Path) -> Result<()> {
+    let engine = context::open_index(index_dir).await?;
+    engine.delete_documents(id).await?;
+    println!("Document '{id}' deleted. Run 'commit' to persist changes.");
+    Ok(())
+}
