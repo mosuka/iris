@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-c30725f2.js";
+            window.path_to_searchindex_js = "../searchindex-5438fea2.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-d18ed058.js"></script>
@@ -336,9 +336,28 @@ document: {"title": "Hello World", "body": "これはテストドキュメント
 }
 </code></pre>
 <hr>
+<h2 id="delete_field"><a class="header" href="#delete_field">delete_field</a></h2>
+<p>インデックスからフィールドを削除します。既にインデックスされたデータは残りますが、削除されたフィールドにはアクセスできなくなります。</p>
+<h3 id="パラメーター-8"><a class="header" href="#パラメーター-8">パラメーター</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">名前</th><th style="text-align: left">型</th><th style="text-align: left">必須</th><th style="text-align: left">説明</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>name</code></td><td style="text-align: left">string</td><td style="text-align: left">はい</td><td style="text-align: left">削除するフィールド名</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="例-4"><a class="header" href="#例-4">例</a></h3>
+<pre><code class="language-text">Tool: delete_field
+name: "category"
+</code></pre>
+<p>結果: <code>Field 'category' deleted.</code></p>
+<hr>
 <h2 id="search"><a class="header" href="#search">search</a></h2>
 <p>laurus クエリ DSL を使用してドキュメントを検索します。</p>
-<h3 id="パラメーター-8"><a class="header" href="#パラメーター-8">パラメーター</a></h3>
+<h3 id="パラメーター-9"><a class="header" href="#パラメーター-9">パラメーター</a></h3>
 <div class="table-wrapper">
 <table>
 <thead>
@@ -389,12 +408,14 @@ document: {"title": "Hello World", "body": "これはテストドキュメント
 <h2 id="典型的なワークフロー"><a class="header" href="#典型的なワークフロー">典型的なワークフロー</a></h2>
 <pre><code class="language-text">1. connect         → 実行中の laurus-server に接続
 2. create_index    → スキーマを定義（インデックスが存在しない場合）
-3. add_document    → ドキュメントをインデックス（必要に応じて繰り返し）
-4. commit          → 変更をディスクに永続化
-5. search          → インデックスを検索
-6. add_document    → ドキュメントを更新
-7. delete_document → ドキュメントを削除
-8. commit          → 変更を永続化
+3. add_field       → フィールドを追加（必要に応じて）
+4. add_document    → ドキュメントをインデックス（必要に応じて繰り返し）
+5. commit          → 変更をディスクに永続化
+6. search          → インデックスを検索
+7. add_document    → ドキュメントを更新
+8. delete_document → ドキュメントを削除
+9. delete_field    → 不要なフィールドを削除（必要に応じて）
+10. commit         → 変更を永続化
 </code></pre>
 
                     </main>

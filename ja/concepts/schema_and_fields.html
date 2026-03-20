@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-c30725f2.js";
+            window.path_to_searchindex_js = "../searchindex-5438fea2.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-d18ed058.js"></script>
@@ -411,21 +411,34 @@ let v: DataValue = vec![0.1f32, 0.2].into(); // Vector
 <span class="boring">}</span></code></pre>
 <h2 id="予約フィールド"><a class="header" href="#予約フィールド">予約フィールド</a></h2>
 <p><code>_id</code> フィールドは Laurus の内部使用のために予約されています。外部ドキュメント ID を格納し、常に <code>KeywordAnalyzer</code>（完全一致）でインデクシングされます。スキーマに追加する必要はありません。自動的に管理されます。</p>
-<h2 id="動的フィールド追加"><a class="header" href="#動的フィールド追加">動的フィールド追加</a></h2>
-<p><code>Engine::add_field()</code> を使用すると、稼働中のエンジンにフィールドを動的に追加できます。
-フィールドの追加のみサポートされており、削除や型の変更はできません。</p>
-<h3 id="lexical-フィールドの追加"><a class="header" href="#lexical-フィールドの追加">Lexical フィールドの追加</a></h3>
+<h2 id="動的フィールド管理"><a class="header" href="#動的フィールド管理">動的フィールド管理</a></h2>
+<p>稼働中のエンジンに対して、フィールドの追加および削除を動的に行えます。
+フィールドの型変更はサポートされていません。</p>
+<h3 id="フィールドの追加"><a class="header" href="#フィールドの追加">フィールドの追加</a></h3>
+<p><code>Engine::add_field()</code> を使用すると、稼働中のエンジンにフィールドを動的に追加できます。</p>
+<h4 id="lexical-フィールドの追加"><a class="header" href="#lexical-フィールドの追加">Lexical フィールドの追加</a></h4>
 <pre><code class="language-rust ignore">let updated_schema = engine.add_field(
     "category",
     FieldOption::Text(TextOption::default()),
 ).await?;</code></pre>
-<h3 id="vector-フィールドの追加"><a class="header" href="#vector-フィールドの追加">Vector フィールドの追加</a></h3>
+<h4 id="vector-フィールドの追加"><a class="header" href="#vector-フィールドの追加">Vector フィールドの追加</a></h4>
 <pre><code class="language-rust ignore">let updated_schema = engine.add_field(
     "embedding",
     FieldOption::Flat(FlatOption::default().dimension(384)),
 ).await?;</code></pre>
-<p>既存のドキュメントには影響がありません（新しいフィールドの値が存在しないだけです）。
-返却された <code>Schema</code> は呼び出し側で永続化する必要があります（例: <code>schema.toml</code> への書き出し）。</p>
+<p>既存のドキュメントには影響がありません（新しいフィールドの値が存在しないだけです）。</p>
+<h3 id="フィールドの削除"><a class="header" href="#フィールドの削除">フィールドの削除</a></h3>
+<p><code>Engine::delete_field()</code> を使用すると、稼働中のエンジンからフィールドを動的に削除できます。</p>
+<pre><code class="language-rust ignore">let updated_schema = engine.delete_field("category").await?;</code></pre>
+<p>フィールド削除時の動作は以下の通りです。</p>
+<ul>
+<li>スキーマからフィールド定義が削除されます。</li>
+<li><code>default_fields</code> に含まれている場合、そこからも削除されます。</li>
+<li>フィールドに紐づくアナライザーおよびエンベッダーの登録が解除されます。</li>
+<li>既にインデックスされたデータは物理的に残りますが、スキーマから削除されたフィールドにはアクセスできなくなります。</li>
+</ul>
+<h3 id="共通の注意事項"><a class="header" href="#共通の注意事項">共通の注意事項</a></h3>
+<p>返却された <code>Schema</code> は呼び出し側で永続化する必要があります（例: <code>schema.toml</code> への書き出し）。</p>
 <h2 id="スキーマ設計のヒント"><a class="header" href="#スキーマ設計のヒント">スキーマ設計のヒント</a></h2>
 <ol>
 <li>

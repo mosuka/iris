@@ -36,7 +36,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-d2cf4146.js";
+            window.path_to_searchindex_js = "searchindex-bfceb69b.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-710721a4.js"></script>
@@ -1111,15 +1111,18 @@ let v: DataValue = vec![0.1f32, 0.2].into(); // Vector
 <span class="boring">}</span></code></pre>
 <h2 id="reserved-fields"><a class="header" href="#reserved-fields">Reserved Fields</a></h2>
 <p>The <code>_id</code> field is reserved by Laurus for internal use. It stores the external document ID and is always indexed with <code>KeywordAnalyzer</code> (exact match). You do not need to add it to your schema — it is managed automatically.</p>
-<h2 id="dynamic-field-addition"><a class="header" href="#dynamic-field-addition">Dynamic Field Addition</a></h2>
-<p>Fields can be added to a running engine at runtime using <code>Engine::add_field()</code>.
-Only field addition is supported—removal or type changes are not allowed.</p>
-<h3 id="adding-a-lexical-field"><a class="header" href="#adding-a-lexical-field">Adding a Lexical Field</a></h3>
+<h2 id="dynamic-field-management"><a class="header" href="#dynamic-field-management">Dynamic Field Management</a></h2>
+<p>Fields can be added to or removed from a running engine at runtime.
+Type changes are not supported—remove the field and re-add it with the
+new type instead.</p>
+<h3 id="adding-a-field"><a class="header" href="#adding-a-field">Adding a Field</a></h3>
+<p>Use <code>Engine::add_field()</code> to add a new field to the schema.</p>
+<h4 id="adding-a-lexical-field"><a class="header" href="#adding-a-lexical-field">Adding a Lexical Field</a></h4>
 <pre><code class="language-rust ignore">let updated_schema = engine.add_field(
     "category",
     FieldOption::Text(TextOption::default()),
 ).await?;</code></pre>
-<h3 id="adding-a-vector-field"><a class="header" href="#adding-a-vector-field">Adding a Vector Field</a></h3>
+<h4 id="adding-a-vector-field"><a class="header" href="#adding-a-vector-field">Adding a Vector Field</a></h4>
 <pre><code class="language-rust ignore">let updated_schema = engine.add_field(
     "embedding",
     FieldOption::Flat(FlatOption::default().dimension(384)),
@@ -1127,6 +1130,18 @@ Only field addition is supported—removal or type changes are not allowed.</p>
 <p>Existing documents are unaffected—they simply have no value for the new
 field. The returned <code>Schema</code> should be persisted (e.g., to <code>schema.toml</code>)
 by the caller.</p>
+<h3 id="removing-a-field"><a class="header" href="#removing-a-field">Removing a Field</a></h3>
+<p>Use <code>Engine::delete_field()</code> to remove a field from the schema.</p>
+<pre><code class="language-rust ignore">let updated_schema = engine.delete_field("category").await?;</code></pre>
+<p>When a field is deleted:</p>
+<ul>
+<li>The field definition is removed from the schema.</li>
+<li>Existing indexed data for the field <strong>remains</strong> in the index but becomes
+inaccessible through queries.</li>
+<li>If the field was listed in <code>default_fields</code>, it is automatically removed.</li>
+<li>Any per-field analyzer or embedder registered for the field is
+unregistered.</li>
+</ul>
 <h2 id="schema-design-tips"><a class="header" href="#schema-design-tips">Schema Design Tips</a></h2>
 <ol>
 <li>
@@ -3579,6 +3594,7 @@ let engine = Engine::builder(storage, schema)
 <tr><td style="text-align: left"><code>commit()</code></td><td style="text-align: left">Flush pending changes to storage (makes documents searchable)</td></tr>
 <tr><td style="text-align: left"><code>recover()</code></td><td style="text-align: left">Replay WAL to restore uncommitted state after crash</td></tr>
 <tr><td style="text-align: left"><code>add_field(name, field_option)</code></td><td style="text-align: left">Dynamically add a new field to the schema at runtime</td></tr>
+<tr><td style="text-align: left"><code>delete_field(name)</code></td><td style="text-align: left">Remove a field from the schema at runtime</td></tr>
 <tr><td style="text-align: left"><code>schema()</code></td><td style="text-align: left">Return the current <code>Schema</code></td></tr>
 </tbody>
 </table>
@@ -4810,6 +4826,7 @@ impl Storage for S3Storage {
 <tr><td style="text-align: left"><code>engine.search(request).await?</code></td><td style="text-align: left">Execute a search request</td></tr>
 <tr><td style="text-align: left"><code>engine.commit().await?</code></td><td style="text-align: left">Flush all pending changes to storage</td></tr>
 <tr><td style="text-align: left"><code>engine.add_field(name, field_option).await?</code></td><td style="text-align: left">Dynamically add a new field to the schema at runtime</td></tr>
+<tr><td style="text-align: left"><code>engine.delete_field(name).await?</code></td><td style="text-align: left">Remove a field from the schema at runtime</td></tr>
 <tr><td style="text-align: left"><code>engine.schema()</code></td><td style="text-align: left">Return the current <code>Schema</code></td></tr>
 <tr><td style="text-align: left"><code>engine.stats()?</code></td><td style="text-align: left">Get index statistics</td></tr>
 </tbody>
@@ -5101,16 +5118,16 @@ cargo install laurus-cli
 laurus create schema
 
 # Create an index from the schema
-laurus --data-dir ./my_index create index --schema schema.toml
+laurus --index-dir ./my_index create index --schema schema.toml
 
 # Add a document
-laurus --data-dir ./my_index add doc --id doc1 --data '{"title":"Hello","body":"World"}'
+laurus --index-dir ./my_index add doc --id doc1 --data '{"title":"Hello","body":"World"}'
 
 # Commit changes
-laurus --data-dir ./my_index commit
+laurus --index-dir ./my_index commit
 
 # Search
-laurus --data-dir ./my_index search "body:world"
+laurus --index-dir ./my_index search "body:world"
 </code></pre>
 <p>See the sub-sections for detailed documentation:</p>
 <ul>
@@ -5167,80 +5184,80 @@ EOF
 <p>This defines three text fields. The <code>default_fields</code> setting means queries without a field prefix will search <code>title</code> and <code>body</code>.</p>
 <h2 id="step-2-create-an-index"><a class="header" href="#step-2-create-an-index">Step 2: Create an Index</a></h2>
 <p>Create an index using the schema:</p>
-<pre><code class="language-bash">laurus --data-dir ./tutorial_data create index --schema schema.toml
+<pre><code class="language-bash">laurus --index-dir ./tutorial_data create index --schema schema.toml
 </code></pre>
 <p>Verify the index was created:</p>
-<pre><code class="language-bash">laurus --data-dir ./tutorial_data get index
+<pre><code class="language-bash">laurus --index-dir ./tutorial_data get stats
 </code></pre>
 <p>The output shows the document count is 0.</p>
 <h2 id="step-3-add-documents"><a class="header" href="#step-3-add-documents">Step 3: Add Documents</a></h2>
 <p>Add documents to the index. Each document needs an ID and a JSON object with field values:</p>
-<pre><code class="language-bash">laurus --data-dir ./tutorial_data add doc \
+<pre><code class="language-bash">laurus --index-dir ./tutorial_data add doc \
   --id doc001 \
   --data '{"title":"Introduction to Rust Programming","body":"Rust is a modern systems programming language that focuses on safety, speed, and concurrency.","category":"programming"}'
 </code></pre>
-<pre><code class="language-bash">laurus --data-dir ./tutorial_data add doc \
+<pre><code class="language-bash">laurus --index-dir ./tutorial_data add doc \
   --id doc002 \
   --data '{"title":"Web Development with Rust","body":"Building web applications with Rust has become increasingly popular. Frameworks like Actix and Rocket make it easy to create fast and secure web services.","category":"web-development"}'
 </code></pre>
-<pre><code class="language-bash">laurus --data-dir ./tutorial_data add doc \
+<pre><code class="language-bash">laurus --index-dir ./tutorial_data add doc \
   --id doc003 \
   --data '{"title":"Python for Data Science","body":"Python is the most popular language for data science and machine learning. Libraries like NumPy and Pandas provide powerful tools for data analysis.","category":"data-science"}'
 </code></pre>
 <h2 id="step-4-commit-changes"><a class="header" href="#step-4-commit-changes">Step 4: Commit Changes</a></h2>
 <p>Documents are not searchable until committed:</p>
-<pre><code class="language-bash">laurus --data-dir ./tutorial_data commit
+<pre><code class="language-bash">laurus --index-dir ./tutorial_data commit
 </code></pre>
 <h2 id="step-5-search-documents"><a class="header" href="#step-5-search-documents">Step 5: Search Documents</a></h2>
 <h3 id="basic-search"><a class="header" href="#basic-search">Basic Search</a></h3>
 <p>Search for documents containing “rust”:</p>
-<pre><code class="language-bash">laurus --data-dir ./tutorial_data search "rust"
+<pre><code class="language-bash">laurus --index-dir ./tutorial_data search "rust"
 </code></pre>
 <p>This searches the default fields (<code>title</code> and <code>body</code>). Results show <code>doc001</code> and <code>doc002</code>.</p>
 <h3 id="field-specific-search"><a class="header" href="#field-specific-search">Field-Specific Search</a></h3>
 <p>Search only in the <code>title</code> field:</p>
-<pre><code class="language-bash">laurus --data-dir ./tutorial_data search "title:python"
+<pre><code class="language-bash">laurus --index-dir ./tutorial_data search "title:python"
 </code></pre>
 <p>Only <code>doc003</code> is returned.</p>
 <h3 id="category-search"><a class="header" href="#category-search">Category Search</a></h3>
-<pre><code class="language-bash">laurus --data-dir ./tutorial_data search "category:programming"
+<pre><code class="language-bash">laurus --index-dir ./tutorial_data search "category:programming"
 </code></pre>
 <p>Only <code>doc001</code> is returned.</p>
 <h3 id="boolean-queries"><a class="header" href="#boolean-queries">Boolean Queries</a></h3>
 <p>Combine conditions with <code>+</code> (must) and <code>-</code> (must not):</p>
-<pre><code class="language-bash">laurus --data-dir ./tutorial_data search "+body:rust -body:web"
+<pre><code class="language-bash">laurus --index-dir ./tutorial_data search "+body:rust -body:web"
 </code></pre>
 <p>Only <code>doc001</code> is returned (contains “rust” but not “web”).</p>
 <h3 id="phrase-search"><a class="header" href="#phrase-search">Phrase Search</a></h3>
 <p>Search for an exact phrase:</p>
-<pre><code class="language-bash">laurus --data-dir ./tutorial_data search 'body:"data science"'
+<pre><code class="language-bash">laurus --index-dir ./tutorial_data search 'body:"data science"'
 </code></pre>
 <p>Only <code>doc003</code> is returned.</p>
 <h3 id="fuzzy-search"><a class="header" href="#fuzzy-search">Fuzzy Search</a></h3>
 <p>Search with typo tolerance using <code>~</code>:</p>
-<pre><code class="language-bash">laurus --data-dir ./tutorial_data search "body:programing~1"
+<pre><code class="language-bash">laurus --index-dir ./tutorial_data search "body:programing~1"
 </code></pre>
 <p>Matches “programming” despite the typo.</p>
 <h3 id="json-output"><a class="header" href="#json-output">JSON Output</a></h3>
 <p>Get results in JSON format for programmatic use:</p>
-<pre><code class="language-bash">laurus --data-dir ./tutorial_data --format json search "rust"
+<pre><code class="language-bash">laurus --index-dir ./tutorial_data --format json search "rust"
 </code></pre>
 <h2 id="step-6-retrieve-a-document"><a class="header" href="#step-6-retrieve-a-document">Step 6: Retrieve a Document</a></h2>
 <p>Fetch a specific document by ID:</p>
-<pre><code class="language-bash">laurus --data-dir ./tutorial_data get doc --id doc001
+<pre><code class="language-bash">laurus --index-dir ./tutorial_data get doc --id doc001
 </code></pre>
 <h2 id="step-7-delete-a-document"><a class="header" href="#step-7-delete-a-document">Step 7: Delete a Document</a></h2>
 <p>Delete a document and commit the change:</p>
-<pre><code class="language-bash">laurus --data-dir ./tutorial_data delete doc --id doc003
-laurus --data-dir ./tutorial_data commit
+<pre><code class="language-bash">laurus --index-dir ./tutorial_data delete doc --id doc003
+laurus --index-dir ./tutorial_data commit
 </code></pre>
 <p>Verify it was deleted:</p>
-<pre><code class="language-bash">laurus --data-dir ./tutorial_data search "python"
+<pre><code class="language-bash">laurus --index-dir ./tutorial_data search "python"
 </code></pre>
 <p>No results are returned.</p>
 <h2 id="step-8-use-the-repl"><a class="header" href="#step-8-use-the-repl">Step 8: Use the REPL</a></h2>
 <p>The REPL provides an interactive session for exploring your index:</p>
-<pre><code class="language-bash">laurus --data-dir ./tutorial_data repl
+<pre><code class="language-bash">laurus --index-dir ./tutorial_data repl
 </code></pre>
 <p>Try these commands in the REPL:</p>
 <pre><code class="language-text">&gt; stats
@@ -5275,13 +5292,13 @@ laurus --data-dir ./tutorial_data commit
 <tr><th style="text-align: left">Option</th><th style="text-align: left">Environment Variable</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr>
 </thead>
 <tbody>
-<tr><td style="text-align: left"><code>--data-dir &lt;PATH&gt;</code></td><td style="text-align: left"><code>LAURUS_DATA_DIR</code></td><td style="text-align: left"><code>./laurus_data</code></td><td style="text-align: left">Path to the index data directory</td></tr>
+<tr><td style="text-align: left"><code>--index-dir &lt;PATH&gt;</code></td><td style="text-align: left"><code>LAURUS_INDEX_DIR</code></td><td style="text-align: left"><code>./laurus_index</code></td><td style="text-align: left">Path to the index data directory</td></tr>
 <tr><td style="text-align: left"><code>--format &lt;FORMAT&gt;</code></td><td style="text-align: left">—</td><td style="text-align: left"><code>table</code></td><td style="text-align: left">Output format: <code>table</code> or <code>json</code></td></tr>
 </tbody>
 </table>
 </div>
 <pre><code class="language-bash"># Example: use JSON output with a custom data directory
-laurus --data-dir /var/data/my_index --format json search "title:rust"
+laurus --index-dir /var/data/my_index --format json search "title:rust"
 </code></pre>
 <hr>
 <h2 id="create--create-a-resource"><a class="header" href="#create--create-a-resource"><code>create</code> — Create a Resource</a></h2>
@@ -5317,7 +5334,7 @@ stored = true
 indexed = true
 </code></pre>
 <p><strong>Example:</strong></p>
-<pre><code class="language-bash">laurus --data-dir ./my_index create index --schema schema.toml
+<pre><code class="language-bash">laurus --index-dir ./my_index create index --schema schema.toml
 # Index created at ./my_index.
 </code></pre>
 <blockquote>
@@ -5378,9 +5395,9 @@ laurus create index --schema schema.toml
 </code></pre>
 <hr>
 <h2 id="get--get-a-resource"><a class="header" href="#get--get-a-resource"><code>get</code> — Get a Resource</a></h2>
-<h3 id="get-index"><a class="header" href="#get-index"><code>get index</code></a></h3>
+<h3 id="get-stats"><a class="header" href="#get-stats"><code>get stats</code></a></h3>
 <p>Display statistics about the index.</p>
-<pre><code class="language-bash">laurus get index
+<pre><code class="language-bash">laurus get stats
 </code></pre>
 <p><strong>Table output example:</strong></p>
 <pre><code class="language-text">Document count: 42
@@ -5393,7 +5410,7 @@ Vector fields:
 ╰──────────┴─────────┴───────────╯
 </code></pre>
 <p><strong>JSON output example:</strong></p>
-<pre><code class="language-bash">laurus --format json get index
+<pre><code class="language-bash">laurus --format json get stats
 </code></pre>
 <pre><code class="language-json">{
   "document_count": 42,
@@ -5404,6 +5421,18 @@ Vector fields:
     }
   }
 }
+</code></pre>
+<h3 id="get-schema"><a class="header" href="#get-schema"><code>get schema</code></a></h3>
+<p>Display the current index schema as JSON.</p>
+<pre><code class="language-bash">laurus get schema
+</code></pre>
+<p><strong>Example:</strong></p>
+<pre><code class="language-bash">laurus get schema
+# {
+#   "fields": { ... },
+#   "default_fields": ["title", "body"],
+#   ...
+# }
 </code></pre>
 <h3 id="get-doc"><a class="header" href="#get-doc"><code>get doc</code></a></h3>
 <p>Retrieve a document (and all its chunks) by external ID.</p>
@@ -5463,7 +5492,7 @@ Vector fields:
 </blockquote>
 <h3 id="add-field"><a class="header" href="#add-field"><code>add field</code></a></h3>
 <p>Dynamically add a new field to an existing index.</p>
-<pre><code class="language-bash">laurus add field --data-dir ./data \
+<pre><code class="language-bash">laurus add field --index-dir ./data \
     --name category \
     --field-option '{"Text": {"indexed": true, "stored": true}}'
 </code></pre>
@@ -5480,13 +5509,23 @@ persisted after the field is added.</p>
 <pre><code class="language-bash">laurus delete doc --id doc1
 # Document 'doc1' deleted. Run 'commit' to persist changes.
 </code></pre>
+<h3 id="delete-field"><a class="header" href="#delete-field"><code>delete field</code></a></h3>
+<p>Remove a field from the index schema.</p>
+<pre><code class="language-bash">laurus delete field --name &lt;FIELD_NAME&gt;
+</code></pre>
+<p><strong>Example:</strong></p>
+<pre><code class="language-bash">laurus delete field --name category
+# Field 'category' deleted.
+</code></pre>
+<p>Existing indexed data for the field remains in storage but becomes
+inaccessible. Per-field analyzers and embedders are unregistered.</p>
 <hr>
 <h2 id="commit"><a class="header" href="#commit"><code>commit</code></a></h2>
 <p>Commit pending changes (additions and deletions) to the index. Until committed, changes are not visible to search.</p>
 <pre><code class="language-bash">laurus commit
 </code></pre>
 <p><strong>Example:</strong></p>
-<pre><code class="language-bash">laurus --data-dir ./my_index commit
+<pre><code class="language-bash">laurus --index-dir ./my_index commit
 # Changes committed successfully.
 </code></pre>
 <hr>
@@ -5960,31 +5999,34 @@ let schema: Schema = toml::from_str(&amp;toml_str)?;
 <h1 id="repl-interactive-mode"><a class="header" href="#repl-interactive-mode">REPL (Interactive Mode)</a></h1>
 <p>The REPL provides an interactive session for exploring your index without typing the full <code>laurus</code> command each time.</p>
 <h2 id="starting-the-repl"><a class="header" href="#starting-the-repl">Starting the REPL</a></h2>
-<pre><code class="language-bash">laurus --data-dir ./my_index repl
+<pre><code class="language-bash">laurus --index-dir ./my_index repl
 </code></pre>
 <pre><code class="language-text">Laurus REPL (type 'help' for commands, 'quit' to exit)
 laurus&gt;
 </code></pre>
 <p>The REPL opens the index at startup and keeps it loaded throughout the session.</p>
 <h2 id="available-commands"><a class="header" href="#available-commands">Available Commands</a></h2>
+<p>Commands follow the same <code>&lt;operation&gt; &lt;resource&gt;</code> ordering as the CLI.</p>
 <div class="table-wrapper">
 <table>
 <thead>
 <tr><th style="text-align: left">Command</th><th style="text-align: left">Description</th></tr>
 </thead>
 <tbody>
-<tr><td style="text-align: left"><code>search &lt;query&gt;</code></td><td style="text-align: left">Search the index (returns up to 10 results)</td></tr>
-<tr><td style="text-align: left"><code>doc add &lt;id&gt; &lt;json&gt;</code></td><td style="text-align: left">Add a document</td></tr>
-<tr><td style="text-align: left"><code>doc get &lt;id&gt;</code></td><td style="text-align: left">Get a document by ID</td></tr>
-<tr><td style="text-align: left"><code>doc delete &lt;id&gt;</code></td><td style="text-align: left">Delete a document by ID</td></tr>
+<tr><td style="text-align: left"><code>search &lt;query&gt;</code></td><td style="text-align: left">Search the index</td></tr>
+<tr><td style="text-align: left"><code>add field &lt;name&gt; &lt;json&gt;</code></td><td style="text-align: left">Add a field to the schema</td></tr>
+<tr><td style="text-align: left"><code>add doc &lt;id&gt; &lt;json&gt;</code></td><td style="text-align: left">Add a document</td></tr>
+<tr><td style="text-align: left"><code>get stats</code></td><td style="text-align: left">Show index statistics</td></tr>
+<tr><td style="text-align: left"><code>get schema</code></td><td style="text-align: left">Show the current schema</td></tr>
+<tr><td style="text-align: left"><code>get doc &lt;id&gt;</code></td><td style="text-align: left">Get a document by ID</td></tr>
+<tr><td style="text-align: left"><code>delete field &lt;name&gt;</code></td><td style="text-align: left">Remove a field from the schema</td></tr>
+<tr><td style="text-align: left"><code>delete doc &lt;id&gt;</code></td><td style="text-align: left">Delete a document by ID</td></tr>
 <tr><td style="text-align: left"><code>commit</code></td><td style="text-align: left">Commit pending changes</td></tr>
-<tr><td style="text-align: left"><code>stats</code></td><td style="text-align: left">Show index statistics</td></tr>
 <tr><td style="text-align: left"><code>help</code></td><td style="text-align: left">Show available commands</td></tr>
 <tr><td style="text-align: left"><code>quit</code> / <code>exit</code></td><td style="text-align: left">Exit the REPL</td></tr>
 </tbody>
 </table>
 </div>
-<p>The search command always returns up to 10 results. The limit is not currently configurable in the REPL.</p>
 <h2 id="usage-examples"><a class="header" href="#usage-examples">Usage Examples</a></h2>
 <h3 id="searching"><a class="header" href="#searching">Searching</a></h3>
 <pre><code class="language-text">laurus&gt; search body:rust
@@ -5994,14 +6036,29 @@ laurus&gt;
 │ doc1 │ 0.8532 │ body: Rust is a systems..., title… │
 ╰──────┴────────┴────────────────────────────────────╯
 </code></pre>
+<h3 id="managing-fields"><a class="header" href="#managing-fields">Managing Fields</a></h3>
+<pre><code class="language-text">laurus&gt; add field category {"Text": {"indexed": true, "stored": true}}
+Field 'category' added.
+laurus&gt; delete field category
+Field 'category' deleted.
+</code></pre>
 <h3 id="adding-and-committing-documents"><a class="header" href="#adding-and-committing-documents">Adding and Committing Documents</a></h3>
-<pre><code class="language-text">laurus&gt; doc add doc4 {"title":"New Document","body":"Some content here."}
+<pre><code class="language-text">laurus&gt; add doc doc4 {"title":"New Document","body":"Some content here."}
 Document 'doc4' added.
 laurus&gt; commit
 Changes committed.
 </code></pre>
-<h3 id="retrieving-documents-1"><a class="header" href="#retrieving-documents-1">Retrieving Documents</a></h3>
-<pre><code class="language-text">laurus&gt; doc get doc4
+<h3 id="retrieving-information"><a class="header" href="#retrieving-information">Retrieving Information</a></h3>
+<pre><code class="language-text">laurus&gt; get stats
+Document count: 3
+
+laurus&gt; get schema
+{
+  "fields": { ... },
+  "default_fields": ["title", "body"]
+}
+
+laurus&gt; get doc doc4
 ╭──────┬───────────────────────────────────────────────╮
 │ ID   │ Fields                                        │
 ├──────┼───────────────────────────────────────────────┤
@@ -6009,14 +6066,10 @@ Changes committed.
 ╰──────┴───────────────────────────────────────────────╯
 </code></pre>
 <h3 id="deleting-documents-2"><a class="header" href="#deleting-documents-2">Deleting Documents</a></h3>
-<pre><code class="language-text">laurus&gt; doc delete doc4
+<pre><code class="language-text">laurus&gt; delete doc doc4
 Document 'doc4' deleted.
 laurus&gt; commit
 Changes committed.
-</code></pre>
-<h3 id="viewing-statistics"><a class="header" href="#viewing-statistics">Viewing Statistics</a></h3>
-<pre><code class="language-text">laurus&gt; stats
-Document count: 3
 </code></pre>
 <h2 id="features-1"><a class="header" href="#features-1">Features</a></h2>
 <ul>
@@ -6089,12 +6142,12 @@ laurus serve --config config.toml
 </div>
 <p>Log verbosity is controlled by the standard <code>RUST_LOG</code> environment variable (default: <code>info</code>).
 See <a href="https://docs.rs/env_logger/latest/env_logger/#enabling-logging">env_logger syntax</a> for filter directives such as <code>RUST_LOG=laurus=debug,tonic=warn</code>.</p>
-<p>The global <code>--data-dir</code> option (env: <code>LAURUS_DATA_DIR</code>) specifies the index data directory:</p>
+<p>The global <code>--index-dir</code> option (env: <code>LAURUS_INDEX_DIR</code>) specifies the index data directory:</p>
 <pre><code class="language-bash"># Using CLI arguments
-laurus --data-dir ./my_index serve --port 8080
+laurus --index-dir ./my_index serve --port 8080
 
 # Using environment variables
-export LAURUS_DATA_DIR=./my_index
+export LAURUS_INDEX_DIR=./my_index
 export LAURUS_PORT=8080
 export RUST_LOG=debug
 laurus serve
@@ -6161,7 +6214,7 @@ grpcurl -plaintext -d '{"query": "body:test", "limit": 10}' \
 </ul>
 <h2 id="step-1-start-the-server"><a class="header" href="#step-1-start-the-server">Step 1: Start the Server</a></h2>
 <p>Start laurus-server with the HTTP Gateway enabled:</p>
-<pre><code class="language-bash">laurus --data-dir /tmp/laurus/tutorial serve --port 50051 --http-port 8080
+<pre><code class="language-bash">laurus --index-dir /tmp/laurus/tutorial serve --port 50051 --http-port 8080
 </code></pre>
 <p>You should see log output indicating the gRPC server (port 50051) and the HTTP Gateway (port 8080) have started.</p>
 <p>Verify the server is running:</p>
@@ -6583,7 +6636,7 @@ port = 50051
 http_port = 8080  # Optional: enables HTTP Gateway
 
 [index]
-data_dir = "./laurus_data"
+data_dir = "./laurus_index"
 </code></pre>
 <p>Log verbosity is controlled by the <code>RUST_LOG</code> environment variable (default: <code>info</code>), not through the config file.</p>
 <h3 id="field-reference"><a class="header" href="#field-reference">Field Reference</a></h3>
@@ -6607,7 +6660,7 @@ data_dir = "./laurus_data"
 <tr><th style="text-align: left">Field</th><th style="text-align: left">Type</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr>
 </thead>
 <tbody>
-<tr><td style="text-align: left"><code>data_dir</code></td><td style="text-align: left">String</td><td style="text-align: left"><code>"./laurus_data"</code></td><td style="text-align: left">Path to the index data directory</td></tr>
+<tr><td style="text-align: left"><code>data_dir</code></td><td style="text-align: left">String</td><td style="text-align: left"><code>"./laurus_index"</code></td><td style="text-align: left">Path to the index data directory</td></tr>
 </tbody>
 </table>
 </div>
@@ -6621,7 +6674,7 @@ data_dir = "./laurus_data"
 <tr><td style="text-align: left"><code>LAURUS_HOST</code></td><td style="text-align: left"><code>server.host</code></td><td style="text-align: left">Listen address</td></tr>
 <tr><td style="text-align: left"><code>LAURUS_PORT</code></td><td style="text-align: left"><code>server.port</code></td><td style="text-align: left">gRPC listen port</td></tr>
 <tr><td style="text-align: left"><code>LAURUS_HTTP_PORT</code></td><td style="text-align: left"><code>server.http_port</code></td><td style="text-align: left">HTTP Gateway port</td></tr>
-<tr><td style="text-align: left"><code>LAURUS_DATA_DIR</code></td><td style="text-align: left"><code>index.data_dir</code></td><td style="text-align: left">Index data directory</td></tr>
+<tr><td style="text-align: left"><code>LAURUS_INDEX_DIR</code></td><td style="text-align: left"><code>index.data_dir</code></td><td style="text-align: left">Index data directory</td></tr>
 <tr><td style="text-align: left"><code>RUST_LOG</code></td><td style="text-align: left">–</td><td style="text-align: left">Log filter directive (e.g. <code>info</code>, <code>debug</code>, <code>laurus=debug,tonic=warn</code>)</td></tr>
 <tr><td style="text-align: left"><code>LAURUS_CONFIG</code></td><td style="text-align: left">–</td><td style="text-align: left">Path to TOML config file</td></tr>
 </tbody>
@@ -6638,7 +6691,7 @@ data_dir = "./laurus_data"
 <tr><td style="text-align: left"><code>--host &lt;HOST&gt;</code></td><td style="text-align: left"><code>-H</code></td><td style="text-align: left"><code>0.0.0.0</code></td><td style="text-align: left">Listen address</td></tr>
 <tr><td style="text-align: left"><code>--port &lt;PORT&gt;</code></td><td style="text-align: left"><code>-p</code></td><td style="text-align: left"><code>50051</code></td><td style="text-align: left">gRPC listen port</td></tr>
 <tr><td style="text-align: left"><code>--http-port &lt;PORT&gt;</code></td><td style="text-align: left">–</td><td style="text-align: left">–</td><td style="text-align: left">HTTP Gateway port</td></tr>
-<tr><td style="text-align: left"><code>--data-dir &lt;PATH&gt;</code></td><td style="text-align: left">–</td><td style="text-align: left"><code>./laurus_data</code></td><td style="text-align: left">Index data directory (global option)</td></tr>
+<tr><td style="text-align: left"><code>--index-dir &lt;PATH&gt;</code></td><td style="text-align: left">–</td><td style="text-align: left"><code>./laurus_index</code></td><td style="text-align: left">Index data directory (global option)</td></tr>
 </tbody>
 </table>
 </div>
@@ -6663,7 +6716,7 @@ http_port = 8080
 data_dir = "/var/lib/laurus/data"
 </code></pre>
 <h3 id="minimal-environment-variables-only"><a class="header" href="#minimal-environment-variables-only">Minimal (environment variables only)</a></h3>
-<pre><code class="language-bash">export LAURUS_DATA_DIR=/var/lib/laurus/data
+<pre><code class="language-bash">export LAURUS_INDEX_DIR=/var/lib/laurus/data
 export LAURUS_PORT=50051
 export LAURUS_HTTP_PORT=8080
 export RUST_LOG=info
@@ -6680,7 +6733,7 @@ laurus serve
 </thead>
 <tbody>
 <tr><td style="text-align: left"><code>HealthService</code></td><td style="text-align: left"><code>Check</code></td><td style="text-align: left">Health checking</td></tr>
-<tr><td style="text-align: left"><code>IndexService</code></td><td style="text-align: left"><code>CreateIndex</code>, <code>GetIndex</code>, <code>GetSchema</code>, <code>AddField</code></td><td style="text-align: left">Index lifecycle and schema</td></tr>
+<tr><td style="text-align: left"><code>IndexService</code></td><td style="text-align: left"><code>CreateIndex</code>, <code>GetIndex</code>, <code>GetSchema</code>, <code>AddField</code>, <code>DeleteField</code></td><td style="text-align: left">Index lifecycle and schema</td></tr>
 <tr><td style="text-align: left"><code>DocumentService</code></td><td style="text-align: left"><code>PutDocument</code>, <code>AddDocument</code>, <code>GetDocuments</code>, <code>DeleteDocuments</code>, <code>Commit</code></td><td style="text-align: left">Document CRUD and commit</td></tr>
 <tr><td style="text-align: left"><code>SearchService</code></td><td style="text-align: left"><code>Search</code>, <code>SearchStream</code></td><td style="text-align: left">Unary and streaming search</td></tr>
 </tbody>
@@ -6839,6 +6892,35 @@ laurus serve
 </table>
 </div>
 <p><strong>Response:</strong> Returns the updated <code>Schema</code>.</p>
+<h3 id="deletefield"><a class="header" href="#deletefield"><code>DeleteField</code></a></h3>
+<p>Remove a field from the running index schema.</p>
+<pre><code class="language-protobuf">rpc DeleteField(DeleteFieldRequest) returns (DeleteFieldResponse);
+</code></pre>
+<p><strong>Request fields:</strong></p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Field</th><th style="text-align: left">Type</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>name</code></td><td style="text-align: left"><code>string</code></td><td style="text-align: left">The field name to remove</td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>Response fields:</strong></p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Field</th><th style="text-align: left">Type</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>schema</code></td><td style="text-align: left"><code>Schema</code></td><td style="text-align: left">The updated schema after removal</td></tr>
+</tbody>
+</table>
+</div>
+<p>Existing indexed data for the field remains in storage but becomes
+inaccessible. Per-field analyzers and embedders are unregistered.</p>
+<p><strong>HTTP gateway:</strong> <code>DELETE /v1/schema/fields/{name}</code></p>
 <h3 id="getschema"><a class="header" href="#getschema"><code>GetSchema</code></a></h3>
 <p>Retrieve the current index schema.</p>
 <pre><code class="language-protobuf">rpc GetSchema(GetSchemaRequest) returns (GetSchemaResponse);
@@ -7139,7 +7221,7 @@ laurus serve --config config.toml
 <h3 id="get-index-statistics"><a class="header" href="#get-index-statistics">Get Index Statistics</a></h3>
 <pre><code class="language-bash">curl http://localhost:8080/v1/index
 </code></pre>
-<h3 id="get-schema"><a class="header" href="#get-schema">Get Schema</a></h3>
+<h3 id="get-schema-1"><a class="header" href="#get-schema-1">Get Schema</a></h3>
 <pre><code class="language-bash">curl http://localhost:8080/v1/schema
 </code></pre>
 <h3 id="upsert-a-document-put"><a class="header" href="#upsert-a-document-put">Upsert a Document (PUT)</a></h3>
@@ -7432,9 +7514,31 @@ schema_json: {"fields": {"title": {"Text": {}}, "body": {"Text": {}}}}
 </code></pre>
 <p>Result: <code>Field 'category' added successfully.</code></p>
 <hr>
+<h2 id="delete_field"><a class="header" href="#delete_field">delete_field</a></h2>
+<p>Remove a field from the index schema. Existing indexed data remains in
+storage but becomes inaccessible. Per-field analyzers and embedders are
+unregistered.</p>
+<h3 id="parameters-3"><a class="header" href="#parameters-3">Parameters</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Name</th><th style="text-align: left">Type</th><th style="text-align: left">Required</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>name</code></td><td style="text-align: left">string</td><td style="text-align: left">Yes</td><td style="text-align: left">The name of the field to remove</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="example-3"><a class="header" href="#example-3">Example</a></h3>
+<pre><code class="language-json">{
+  "name": "category"
+}
+</code></pre>
+<p>Result: <code>Field 'category' deleted successfully.</code></p>
+<hr>
 <h2 id="get_index"><a class="header" href="#get_index">get_index</a></h2>
 <p>Get statistics for the current search index.</p>
-<h3 id="parameters-3"><a class="header" href="#parameters-3">Parameters</a></h3>
+<h3 id="parameters-4"><a class="header" href="#parameters-4">Parameters</a></h3>
 <p>None.</p>
 <h3 id="result"><a class="header" href="#result">Result</a></h3>
 <pre><code class="language-json">{
@@ -7445,7 +7549,7 @@ schema_json: {"fields": {"title": {"Text": {}}, "body": {"Text": {}}}}
 <hr>
 <h2 id="add_document"><a class="header" href="#add_document">add_document</a></h2>
 <p>Add or upsert a document in the index. Call <code>commit</code> after adding documents.</p>
-<h3 id="parameters-4"><a class="header" href="#parameters-4">Parameters</a></h3>
+<h3 id="parameters-5"><a class="header" href="#parameters-5">Parameters</a></h3>
 <div class="table-wrapper">
 <table>
 <thead>
@@ -7463,7 +7567,7 @@ schema_json: {"fields": {"title": {"Text": {}}, "body": {"Text": {}}}}
 <li><code>put</code> (default): Delete any existing document with the same <code>id</code>, then index the new one.</li>
 <li><code>add</code>: Append as a new chunk. Multiple chunks can share the same <code>id</code> (useful for splitting large documents).</li>
 </ul>
-<h3 id="example-3"><a class="header" href="#example-3">Example</a></h3>
+<h3 id="example-4"><a class="header" href="#example-4">Example</a></h3>
 <pre><code class="language-text">Tool: add_document
 id: "doc-1"
 document: {"title": "Hello World", "body": "This is a test document."}
@@ -7472,7 +7576,7 @@ document: {"title": "Hello World", "body": "This is a test document."}
 <hr>
 <h2 id="get_document"><a class="header" href="#get_document">get_document</a></h2>
 <p>Retrieve stored document(s) by external ID.</p>
-<h3 id="parameters-5"><a class="header" href="#parameters-5">Parameters</a></h3>
+<h3 id="parameters-6"><a class="header" href="#parameters-6">Parameters</a></h3>
 <div class="table-wrapper">
 <table>
 <thead>
@@ -7494,7 +7598,7 @@ document: {"title": "Hello World", "body": "This is a test document."}
 <hr>
 <h2 id="delete_document"><a class="header" href="#delete_document">delete_document</a></h2>
 <p>Delete document(s) by external ID. Call <code>commit</code> after deletion.</p>
-<h3 id="parameters-6"><a class="header" href="#parameters-6">Parameters</a></h3>
+<h3 id="parameters-7"><a class="header" href="#parameters-7">Parameters</a></h3>
 <div class="table-wrapper">
 <table>
 <thead>
@@ -7509,13 +7613,13 @@ document: {"title": "Hello World", "body": "This is a test document."}
 <hr>
 <h2 id="commit-3"><a class="header" href="#commit-3">commit</a></h2>
 <p>Commit pending changes to disk. Must be called after <code>add_document</code> or <code>delete_document</code> to make changes searchable and durable.</p>
-<h3 id="parameters-7"><a class="header" href="#parameters-7">Parameters</a></h3>
+<h3 id="parameters-8"><a class="header" href="#parameters-8">Parameters</a></h3>
 <p>None.</p>
 <p>Result: <code>Changes committed successfully.</code></p>
 <hr>
 <h2 id="search-6"><a class="header" href="#search-6">search</a></h2>
 <p>Search documents using the laurus query DSL.</p>
-<h3 id="parameters-8"><a class="header" href="#parameters-8">Parameters</a></h3>
+<h3 id="parameters-9"><a class="header" href="#parameters-9">Parameters</a></h3>
 <div class="table-wrapper">
 <table>
 <thead>
@@ -7567,6 +7671,7 @@ document: {"title": "Hello World", "body": "This is a test document."}
 <pre><code class="language-text">1. connect         → connect to a running laurus-server
 2. create_index    → define the schema (if index does not exist)
 3. add_field       → dynamically add fields (optional)
+   delete_field    → remove fields (optional)
 4. add_document    → index documents (repeat as needed)
 5. commit          → persist changes to disk
 6. search          → query the index

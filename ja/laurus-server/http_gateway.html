@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-c30725f2.js";
+            window.path_to_searchindex_js = "../searchindex-5438fea2.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-d18ed058.js"></script>
@@ -213,6 +213,8 @@ laurus serve --config config.toml
 <tr><td style="text-align: left">GET</td><td style="text-align: left"><code>/v1/documents/:id</code></td><td style="text-align: left"><code>DocumentService/GetDocuments</code></td><td style="text-align: left">ID でドキュメントを取得</td></tr>
 <tr><td style="text-align: left">DELETE</td><td style="text-align: left"><code>/v1/documents/:id</code></td><td style="text-align: left"><code>DocumentService/DeleteDocuments</code></td><td style="text-align: left">ID でドキュメントを削除</td></tr>
 <tr><td style="text-align: left">POST</td><td style="text-align: left"><code>/v1/commit</code></td><td style="text-align: left"><code>DocumentService/Commit</code></td><td style="text-align: left">保留中の変更をコミット</td></tr>
+<tr><td style="text-align: left">POST</td><td style="text-align: left"><code>/v1/schema/fields</code></td><td style="text-align: left"><code>IndexService/AddField</code></td><td style="text-align: left">フィールドの追加</td></tr>
+<tr><td style="text-align: left">DELETE</td><td style="text-align: left"><code>/v1/schema/fields/:name</code></td><td style="text-align: left"><code>IndexService/DeleteField</code></td><td style="text-align: left">フィールドの削除</td></tr>
 <tr><td style="text-align: left">POST</td><td style="text-align: left"><code>/v1/search</code></td><td style="text-align: left"><code>SearchService/Search</code></td><td style="text-align: left">検索（単発）</td></tr>
 <tr><td style="text-align: left">POST</td><td style="text-align: left"><code>/v1/search/stream</code></td><td style="text-align: left"><code>SearchService/SearchStream</code></td><td style="text-align: left">検索（Server-Sent Events）</td></tr>
 </tbody>

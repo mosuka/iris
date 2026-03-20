@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-c30725f2.js";
+            window.path_to_searchindex_js = "../searchindex-5438fea2.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-d18ed058.js"></script>
@@ -201,12 +201,12 @@
 </div>
 <p>ログの詳細度は標準の <code>RUST_LOG</code> 環境変数で制御します（デフォルト: <code>info</code>）。
 <code>RUST_LOG=laurus=debug,tonic=warn</code> のようなフィルタディレクティブの詳細は <a href="https://docs.rs/env_logger/latest/env_logger/#enabling-logging">env_logger の構文</a>を参照してください。</p>
-<p>グローバルオプション <code>--data-dir</code>（環境変数: <code>LAURUS_DATA_DIR</code>）でインデックスデータのディレクトリを指定します。</p>
+<p>グローバルオプション <code>--index-dir</code>（環境変数: <code>LAURUS_INDEX_DIR</code>）でインデックスデータのディレクトリを指定します。</p>
 <pre><code class="language-bash"># CLI 引数を使用
-laurus --data-dir ./my_index serve --port 8080
+laurus --index-dir ./my_index serve --port 8080
 
 # 環境変数を使用
-export LAURUS_DATA_DIR=./my_index
+export LAURUS_INDEX_DIR=./my_index
 export LAURUS_PORT=8080
 export RUST_LOG=debug
 laurus serve

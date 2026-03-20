@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-c30725f2.js";
+            window.path_to_searchindex_js = "../searchindex-5438fea2.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-d18ed058.js"></script>
@@ -213,80 +213,80 @@ EOF
 <p>3 つのテキストフィールドを定義しています。<code>default_fields</code> を設定することで、フィールド指定なしのクエリは <code>title</code> と <code>body</code> の両方を検索します。</p>
 <h2 id="step-2-インデックスの作成"><a class="header" href="#step-2-インデックスの作成">Step 2: インデックスの作成</a></h2>
 <p>スキーマを使ってインデックスを作成します:</p>
-<pre><code class="language-bash">laurus --data-dir ./tutorial_data create index --schema schema.toml
+<pre><code class="language-bash">laurus --index-dir ./tutorial_data create index --schema schema.toml
 </code></pre>
 <p>インデックスが作成されたことを確認します:</p>
-<pre><code class="language-bash">laurus --data-dir ./tutorial_data get index
+<pre><code class="language-bash">laurus --index-dir ./tutorial_data get stats
 </code></pre>
 <p>ドキュメント数が 0 であることが表示されます。</p>
 <h2 id="step-3-ドキュメントの登録"><a class="header" href="#step-3-ドキュメントの登録">Step 3: ドキュメントの登録</a></h2>
 <p>ドキュメントをインデックスに追加します。各ドキュメントには ID と JSON 形式のフィールド値が必要です:</p>
-<pre><code class="language-bash">laurus --data-dir ./tutorial_data add doc \
+<pre><code class="language-bash">laurus --index-dir ./tutorial_data add doc \
   --id doc001 \
   --data '{"title":"Introduction to Rust Programming","body":"Rust is a modern systems programming language that focuses on safety, speed, and concurrency.","category":"programming"}'
 </code></pre>
-<pre><code class="language-bash">laurus --data-dir ./tutorial_data add doc \
+<pre><code class="language-bash">laurus --index-dir ./tutorial_data add doc \
   --id doc002 \
   --data '{"title":"Web Development with Rust","body":"Building web applications with Rust has become increasingly popular. Frameworks like Actix and Rocket make it easy to create fast and secure web services.","category":"web-development"}'
 </code></pre>
-<pre><code class="language-bash">laurus --data-dir ./tutorial_data add doc \
+<pre><code class="language-bash">laurus --index-dir ./tutorial_data add doc \
   --id doc003 \
   --data '{"title":"Python for Data Science","body":"Python is the most popular language for data science and machine learning. Libraries like NumPy and Pandas provide powerful tools for data analysis.","category":"data-science"}'
 </code></pre>
 <h2 id="step-4-変更のコミット"><a class="header" href="#step-4-変更のコミット">Step 4: 変更のコミット</a></h2>
 <p>ドキュメントはコミットするまで検索対象になりません:</p>
-<pre><code class="language-bash">laurus --data-dir ./tutorial_data commit
+<pre><code class="language-bash">laurus --index-dir ./tutorial_data commit
 </code></pre>
 <h2 id="step-5-ドキュメントの検索"><a class="header" href="#step-5-ドキュメントの検索">Step 5: ドキュメントの検索</a></h2>
 <h3 id="基本的な検索"><a class="header" href="#基本的な検索">基本的な検索</a></h3>
 <p>“rust” を含むドキュメントを検索します:</p>
-<pre><code class="language-bash">laurus --data-dir ./tutorial_data search "rust"
+<pre><code class="language-bash">laurus --index-dir ./tutorial_data search "rust"
 </code></pre>
 <p>デフォルトフィールド（<code>title</code> と <code>body</code>）が検索されます。<code>doc001</code> と <code>doc002</code> が返されます。</p>
 <h3 id="フィールド指定検索"><a class="header" href="#フィールド指定検索">フィールド指定検索</a></h3>
 <p><code>title</code> フィールドのみを検索します:</p>
-<pre><code class="language-bash">laurus --data-dir ./tutorial_data search "title:python"
+<pre><code class="language-bash">laurus --index-dir ./tutorial_data search "title:python"
 </code></pre>
 <p><code>doc003</code> のみが返されます。</p>
 <h3 id="カテゴリ検索"><a class="header" href="#カテゴリ検索">カテゴリ検索</a></h3>
-<pre><code class="language-bash">laurus --data-dir ./tutorial_data search "category:programming"
+<pre><code class="language-bash">laurus --index-dir ./tutorial_data search "category:programming"
 </code></pre>
 <p><code>doc001</code> のみが返されます。</p>
 <h3 id="ブーリアンクエリ"><a class="header" href="#ブーリアンクエリ">ブーリアンクエリ</a></h3>
 <p><code>+</code>（必須）と <code>-</code>（除外）で条件を組み合わせます:</p>
-<pre><code class="language-bash">laurus --data-dir ./tutorial_data search "+body:rust -body:web"
+<pre><code class="language-bash">laurus --index-dir ./tutorial_data search "+body:rust -body:web"
 </code></pre>
 <p>“rust” を含み “web” を含まない <code>doc001</code> のみが返されます。</p>
 <h3 id="フレーズ検索"><a class="header" href="#フレーズ検索">フレーズ検索</a></h3>
 <p>完全一致するフレーズを検索します:</p>
-<pre><code class="language-bash">laurus --data-dir ./tutorial_data search 'body:"data science"'
+<pre><code class="language-bash">laurus --index-dir ./tutorial_data search 'body:"data science"'
 </code></pre>
 <p><code>doc003</code> のみが返されます。</p>
 <h3 id="あいまい検索"><a class="header" href="#あいまい検索">あいまい検索</a></h3>
 <p><code>~</code> を使ってタイプミスに対応した検索を行います:</p>
-<pre><code class="language-bash">laurus --data-dir ./tutorial_data search "body:programing~1"
+<pre><code class="language-bash">laurus --index-dir ./tutorial_data search "body:programing~1"
 </code></pre>
 <p>タイプミスがあっても “programming” にマッチします。</p>
 <h3 id="json-出力"><a class="header" href="#json-出力">JSON 出力</a></h3>
 <p>プログラムでの利用に向けて JSON 形式で結果を取得します:</p>
-<pre><code class="language-bash">laurus --data-dir ./tutorial_data --format json search "rust"
+<pre><code class="language-bash">laurus --index-dir ./tutorial_data --format json search "rust"
 </code></pre>
 <h2 id="step-6-ドキュメントの取得"><a class="header" href="#step-6-ドキュメントの取得">Step 6: ドキュメントの取得</a></h2>
 <p>ID を指定して特定のドキュメントを取得します:</p>
-<pre><code class="language-bash">laurus --data-dir ./tutorial_data get doc --id doc001
+<pre><code class="language-bash">laurus --index-dir ./tutorial_data get doc --id doc001
 </code></pre>
 <h2 id="step-7-ドキュメントの削除"><a class="header" href="#step-7-ドキュメントの削除">Step 7: ドキュメントの削除</a></h2>
 <p>ドキュメントを削除してコミットします:</p>
-<pre><code class="language-bash">laurus --data-dir ./tutorial_data delete doc --id doc003
-laurus --data-dir ./tutorial_data commit
+<pre><code class="language-bash">laurus --index-dir ./tutorial_data delete doc --id doc003
+laurus --index-dir ./tutorial_data commit
 </code></pre>
 <p>削除されたことを確認します:</p>
-<pre><code class="language-bash">laurus --data-dir ./tutorial_data search "python"
+<pre><code class="language-bash">laurus --index-dir ./tutorial_data search "python"
 </code></pre>
 <p>結果は返されません。</p>
 <h2 id="step-8-repl-を使う"><a class="header" href="#step-8-repl-を使う">Step 8: REPL を使う</a></h2>
 <p>REPL はインデックスを対話的に操作するためのインタラクティブセッションです:</p>
-<pre><code class="language-bash">laurus --data-dir ./tutorial_data repl
+<pre><code class="language-bash">laurus --index-dir ./tutorial_data repl
 </code></pre>
 <p>REPL で以下のコマンドを試してみてください:</p>
 <pre><code class="language-text">&gt; stats

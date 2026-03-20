@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-c30725f2.js";
+            window.path_to_searchindex_js = "../searchindex-5438fea2.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-d18ed058.js"></script>
@@ -183,31 +183,34 @@
                         <h1 id="repl対話モード"><a class="header" href="#repl対話モード">REPL（対話モード）</a></h1>
 <p>REPL は、毎回 <code>laurus</code> コマンドをフルで入力することなく、インデックスを操作できる対話型セッションを提供します。</p>
 <h2 id="repl-の起動"><a class="header" href="#repl-の起動">REPL の起動</a></h2>
-<pre><code class="language-bash">laurus --data-dir ./my_index repl
+<pre><code class="language-bash">laurus --index-dir ./my_index repl
 </code></pre>
 <pre><code class="language-text">Laurus REPL (type 'help' for commands, 'quit' to exit)
 laurus&gt;
 </code></pre>
 <p>REPL は起動時にインデックスを開き、セッション中ロードされた状態を維持します。</p>
 <h2 id="利用可能なコマンド"><a class="header" href="#利用可能なコマンド">利用可能なコマンド</a></h2>
+<p>コマンドは CLI と同じ <code>&lt;操作&gt; &lt;リソース&gt;</code> の順序に従います。</p>
 <div class="table-wrapper">
 <table>
 <thead>
 <tr><th style="text-align: left">コマンド</th><th style="text-align: left">説明</th></tr>
 </thead>
 <tbody>
-<tr><td style="text-align: left"><code>search &lt;query&gt;</code></td><td style="text-align: left">インデックスを検索（最大10件の結果を返す）</td></tr>
-<tr><td style="text-align: left"><code>doc add &lt;id&gt; &lt;json&gt;</code></td><td style="text-align: left">ドキュメントを追加</td></tr>
-<tr><td style="text-align: left"><code>doc get &lt;id&gt;</code></td><td style="text-align: left">ID でドキュメントを取得</td></tr>
-<tr><td style="text-align: left"><code>doc delete &lt;id&gt;</code></td><td style="text-align: left">ID でドキュメントを削除</td></tr>
+<tr><td style="text-align: left"><code>search &lt;query&gt;</code></td><td style="text-align: left">インデックスを検索</td></tr>
+<tr><td style="text-align: left"><code>add field &lt;name&gt; &lt;json&gt;</code></td><td style="text-align: left">スキーマにフィールドを追加</td></tr>
+<tr><td style="text-align: left"><code>add doc &lt;id&gt; &lt;json&gt;</code></td><td style="text-align: left">ドキュメントを追加</td></tr>
+<tr><td style="text-align: left"><code>get stats</code></td><td style="text-align: left">インデックスの統計情報を表示</td></tr>
+<tr><td style="text-align: left"><code>get schema</code></td><td style="text-align: left">現在のスキーマを表示</td></tr>
+<tr><td style="text-align: left"><code>get doc &lt;id&gt;</code></td><td style="text-align: left">ID でドキュメントを取得</td></tr>
+<tr><td style="text-align: left"><code>delete field &lt;name&gt;</code></td><td style="text-align: left">スキーマからフィールドを削除</td></tr>
+<tr><td style="text-align: left"><code>delete doc &lt;id&gt;</code></td><td style="text-align: left">ID でドキュメントを削除</td></tr>
 <tr><td style="text-align: left"><code>commit</code></td><td style="text-align: left">保留中の変更をコミット</td></tr>
-<tr><td style="text-align: left"><code>stats</code></td><td style="text-align: left">インデックスの統計情報を表示</td></tr>
 <tr><td style="text-align: left"><code>help</code></td><td style="text-align: left">利用可能なコマンドを表示</td></tr>
 <tr><td style="text-align: left"><code>quit</code> / <code>exit</code></td><td style="text-align: left">REPL を終了</td></tr>
 </tbody>
 </table>
 </div>
-<p>search コマンドは常に最大10件の結果を返します。REPL ではこの上限は現在変更できません。</p>
 <h2 id="使用例"><a class="header" href="#使用例">使用例</a></h2>
 <h3 id="検索"><a class="header" href="#検索">検索</a></h3>
 <pre><code class="language-text">laurus&gt; search body:rust
@@ -217,14 +220,29 @@ laurus&gt;
 │ doc1 │ 0.8532 │ body: Rust is a systems..., title… │
 ╰──────┴────────┴────────────────────────────────────╯
 </code></pre>
+<h3 id="フィールドの管理"><a class="header" href="#フィールドの管理">フィールドの管理</a></h3>
+<pre><code class="language-text">laurus&gt; add field category {"Text": {"indexed": true, "stored": true}}
+Field 'category' added.
+laurus&gt; delete field category
+Field 'category' deleted.
+</code></pre>
 <h3 id="ドキュメントの追加とコミット"><a class="header" href="#ドキュメントの追加とコミット">ドキュメントの追加とコミット</a></h3>
-<pre><code class="language-text">laurus&gt; doc add doc4 {"title":"New Document","body":"Some content here."}
+<pre><code class="language-text">laurus&gt; add doc doc4 {"title":"New Document","body":"Some content here."}
 Document 'doc4' added.
 laurus&gt; commit
 Changes committed.
 </code></pre>
-<h3 id="ドキュメントの取得"><a class="header" href="#ドキュメントの取得">ドキュメントの取得</a></h3>
-<pre><code class="language-text">laurus&gt; doc get doc4
+<h3 id="情報の取得"><a class="header" href="#情報の取得">情報の取得</a></h3>
+<pre><code class="language-text">laurus&gt; get stats
+Document count: 3
+
+laurus&gt; get schema
+{
+  "fields": { ... },
+  "default_fields": ["title", "body"]
+}
+
+laurus&gt; get doc doc4
 ╭──────┬───────────────────────────────────────────────╮
 │ ID   │ Fields                                        │
 ├──────┼───────────────────────────────────────────────┤
@@ -232,14 +250,10 @@ Changes committed.
 ╰──────┴───────────────────────────────────────────────╯
 </code></pre>
 <h3 id="ドキュメントの削除"><a class="header" href="#ドキュメントの削除">ドキュメントの削除</a></h3>
-<pre><code class="language-text">laurus&gt; doc delete doc4
+<pre><code class="language-text">laurus&gt; delete doc doc4
 Document 'doc4' deleted.
 laurus&gt; commit
 Changes committed.
-</code></pre>
-<h3 id="統計情報の表示"><a class="header" href="#統計情報の表示">統計情報の表示</a></h3>
-<pre><code class="language-text">laurus&gt; stats
-Document count: 3
 </code></pre>
 <h2 id="機能"><a class="header" href="#機能">機能</a></h2>
 <ul>

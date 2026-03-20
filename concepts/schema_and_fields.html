@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-d2cf4146.js";
+            window.path_to_searchindex_js = "../searchindex-bfceb69b.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-710721a4.js"></script>
@@ -408,15 +408,18 @@ let v: DataValue = vec![0.1f32, 0.2].into(); // Vector
 <span class="boring">}</span></code></pre>
 <h2 id="reserved-fields"><a class="header" href="#reserved-fields">Reserved Fields</a></h2>
 <p>The <code>_id</code> field is reserved by Laurus for internal use. It stores the external document ID and is always indexed with <code>KeywordAnalyzer</code> (exact match). You do not need to add it to your schema — it is managed automatically.</p>
-<h2 id="dynamic-field-addition"><a class="header" href="#dynamic-field-addition">Dynamic Field Addition</a></h2>
-<p>Fields can be added to a running engine at runtime using <code>Engine::add_field()</code>.
-Only field addition is supported—removal or type changes are not allowed.</p>
-<h3 id="adding-a-lexical-field"><a class="header" href="#adding-a-lexical-field">Adding a Lexical Field</a></h3>
+<h2 id="dynamic-field-management"><a class="header" href="#dynamic-field-management">Dynamic Field Management</a></h2>
+<p>Fields can be added to or removed from a running engine at runtime.
+Type changes are not supported—remove the field and re-add it with the
+new type instead.</p>
+<h3 id="adding-a-field"><a class="header" href="#adding-a-field">Adding a Field</a></h3>
+<p>Use <code>Engine::add_field()</code> to add a new field to the schema.</p>
+<h4 id="adding-a-lexical-field"><a class="header" href="#adding-a-lexical-field">Adding a Lexical Field</a></h4>
 <pre><code class="language-rust ignore">let updated_schema = engine.add_field(
     "category",
     FieldOption::Text(TextOption::default()),
 ).await?;</code></pre>
-<h3 id="adding-a-vector-field"><a class="header" href="#adding-a-vector-field">Adding a Vector Field</a></h3>
+<h4 id="adding-a-vector-field"><a class="header" href="#adding-a-vector-field">Adding a Vector Field</a></h4>
 <pre><code class="language-rust ignore">let updated_schema = engine.add_field(
     "embedding",
     FieldOption::Flat(FlatOption::default().dimension(384)),
@@ -424,6 +427,18 @@ Only field addition is supported—removal or type changes are not allowed.</p>
 <p>Existing documents are unaffected—they simply have no value for the new
 field. The returned <code>Schema</code> should be persisted (e.g., to <code>schema.toml</code>)
 by the caller.</p>
+<h3 id="removing-a-field"><a class="header" href="#removing-a-field">Removing a Field</a></h3>
+<p>Use <code>Engine::delete_field()</code> to remove a field from the schema.</p>
+<pre><code class="language-rust ignore">let updated_schema = engine.delete_field("category").await?;</code></pre>
+<p>When a field is deleted:</p>
+<ul>
+<li>The field definition is removed from the schema.</li>
+<li>Existing indexed data for the field <strong>remains</strong> in the index but becomes
+inaccessible through queries.</li>
+<li>If the field was listed in <code>default_fields</code>, it is automatically removed.</li>
+<li>Any per-field analyzer or embedder registered for the field is
+unregistered.</li>
+</ul>
 <h2 id="schema-design-tips"><a class="header" href="#schema-design-tips">Schema Design Tips</a></h2>
 <ol>
 <li>

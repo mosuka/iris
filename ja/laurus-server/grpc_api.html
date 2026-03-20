@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-c30725f2.js";
+            window.path_to_searchindex_js = "../searchindex-5438fea2.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-d18ed058.js"></script>
@@ -190,7 +190,7 @@
 </thead>
 <tbody>
 <tr><td style="text-align: left"><code>HealthService</code></td><td style="text-align: left"><code>Check</code></td><td style="text-align: left">ヘルスチェック</td></tr>
-<tr><td style="text-align: left"><code>IndexService</code></td><td style="text-align: left"><code>CreateIndex</code>, <code>GetIndex</code>, <code>GetSchema</code>, <code>AddField</code></td><td style="text-align: left">インデックスのライフサイクルとスキーマ</td></tr>
+<tr><td style="text-align: left"><code>IndexService</code></td><td style="text-align: left"><code>CreateIndex</code>, <code>GetIndex</code>, <code>GetSchema</code>, <code>AddField</code>, <code>DeleteField</code></td><td style="text-align: left">インデックスのライフサイクルとスキーマ</td></tr>
 <tr><td style="text-align: left"><code>DocumentService</code></td><td style="text-align: left"><code>PutDocument</code>, <code>AddDocument</code>, <code>GetDocuments</code>, <code>DeleteDocuments</code>, <code>Commit</code></td><td style="text-align: left">ドキュメント CRUD とコミット</td></tr>
 <tr><td style="text-align: left"><code>SearchService</code></td><td style="text-align: left"><code>Search</code>, <code>SearchStream</code></td><td style="text-align: left">単発検索とストリーミング検索</td></tr>
 </tbody>
@@ -352,6 +352,8 @@
 </div>
 <h3 id="addfield"><a class="header" href="#addfield">AddField</a></h3>
 <p>稼働中のインデックスにフィールドを動的に追加します。</p>
+<pre><code class="language-protobuf">rpc AddField(AddFieldRequest) returns (AddFieldResponse);
+</code></pre>
 <div class="table-wrapper">
 <table>
 <thead>
@@ -360,6 +362,30 @@
 <tbody>
 <tr><td style="text-align: left"><code>name</code></td><td style="text-align: left"><code>string</code></td><td style="text-align: left">フィールド名</td></tr>
 <tr><td style="text-align: left"><code>field_option</code></td><td style="text-align: left"><code>FieldOption</code></td><td style="text-align: left">フィールド設定</td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>レスポンス:</strong> 更新後の <code>Schema</code> を返します。</p>
+<h3 id="deletefield"><a class="header" href="#deletefield">DeleteField</a></h3>
+<p>稼働中のインデックスからフィールドを動的に削除します。既にインデックスされたデータは残りますが、削除されたフィールドにはアクセスできなくなります。</p>
+<pre><code class="language-protobuf">rpc DeleteField(DeleteFieldRequest) returns (DeleteFieldResponse);
+
+message DeleteFieldRequest {
+  string name = 1;
+}
+
+message DeleteFieldResponse {
+  Schema schema = 1;
+}
+</code></pre>
+<p><strong>リクエストフィールド:</strong></p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">フィールド</th><th style="text-align: left">型</th><th style="text-align: left">必須</th><th style="text-align: left">説明</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>name</code></td><td style="text-align: left"><code>string</code></td><td style="text-align: left">はい</td><td style="text-align: left">削除するフィールド名</td></tr>
 </tbody>
 </table>
 </div>

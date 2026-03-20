@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-d2cf4146.js";
+            window.path_to_searchindex_js = "../searchindex-bfceb69b.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-710721a4.js"></script>
@@ -198,12 +198,12 @@
 </div>
 <p>Log verbosity is controlled by the standard <code>RUST_LOG</code> environment variable (default: <code>info</code>).
 See <a href="https://docs.rs/env_logger/latest/env_logger/#enabling-logging">env_logger syntax</a> for filter directives such as <code>RUST_LOG=laurus=debug,tonic=warn</code>.</p>
-<p>The global <code>--data-dir</code> option (env: <code>LAURUS_DATA_DIR</code>) specifies the index data directory:</p>
+<p>The global <code>--index-dir</code> option (env: <code>LAURUS_INDEX_DIR</code>) specifies the index data directory:</p>
 <pre><code class="language-bash"># Using CLI arguments
-laurus --data-dir ./my_index serve --port 8080
+laurus --index-dir ./my_index serve --port 8080
 
 # Using environment variables
-export LAURUS_DATA_DIR=./my_index
+export LAURUS_INDEX_DIR=./my_index
 export LAURUS_PORT=8080
 export RUST_LOG=debug
 laurus serve

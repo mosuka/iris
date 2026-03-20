@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-c30725f2.js";
+            window.path_to_searchindex_js = "../searchindex-5438fea2.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-d18ed058.js"></script>
@@ -189,7 +189,7 @@
 </ul>
 <h2 id="step-1-サーバーの起動"><a class="header" href="#step-1-サーバーの起動">Step 1: サーバーの起動</a></h2>
 <p>HTTP Gateway を有効にして laurus-server を起動します:</p>
-<pre><code class="language-bash">laurus --data-dir /tmp/laurus/tutorial serve --port 50051 --http-port 8080
+<pre><code class="language-bash">laurus --index-dir /tmp/laurus/tutorial serve --port 50051 --http-port 8080
 </code></pre>
 <p>gRPC サーバー（ポート 50051）と HTTP Gateway（ポート 8080）が起動したことを示すログが表示されます。</p>
 <p>サーバーが正常に動作しているか確認します:</p>

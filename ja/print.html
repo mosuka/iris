@@ -36,7 +36,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-c30725f2.js";
+            window.path_to_searchindex_js = "searchindex-5438fea2.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-d18ed058.js"></script>
@@ -1111,21 +1111,34 @@ let v: DataValue = vec![0.1f32, 0.2].into(); // Vector
 <span class="boring">}</span></code></pre>
 <h2 id="予約フィールド"><a class="header" href="#予約フィールド">予約フィールド</a></h2>
 <p><code>_id</code> フィールドは Laurus の内部使用のために予約されています。外部ドキュメント ID を格納し、常に <code>KeywordAnalyzer</code>（完全一致）でインデクシングされます。スキーマに追加する必要はありません。自動的に管理されます。</p>
-<h2 id="動的フィールド追加"><a class="header" href="#動的フィールド追加">動的フィールド追加</a></h2>
-<p><code>Engine::add_field()</code> を使用すると、稼働中のエンジンにフィールドを動的に追加できます。
-フィールドの追加のみサポートされており、削除や型の変更はできません。</p>
-<h3 id="lexical-フィールドの追加"><a class="header" href="#lexical-フィールドの追加">Lexical フィールドの追加</a></h3>
+<h2 id="動的フィールド管理"><a class="header" href="#動的フィールド管理">動的フィールド管理</a></h2>
+<p>稼働中のエンジンに対して、フィールドの追加および削除を動的に行えます。
+フィールドの型変更はサポートされていません。</p>
+<h3 id="フィールドの追加"><a class="header" href="#フィールドの追加">フィールドの追加</a></h3>
+<p><code>Engine::add_field()</code> を使用すると、稼働中のエンジンにフィールドを動的に追加できます。</p>
+<h4 id="lexical-フィールドの追加"><a class="header" href="#lexical-フィールドの追加">Lexical フィールドの追加</a></h4>
 <pre><code class="language-rust ignore">let updated_schema = engine.add_field(
     "category",
     FieldOption::Text(TextOption::default()),
 ).await?;</code></pre>
-<h3 id="vector-フィールドの追加"><a class="header" href="#vector-フィールドの追加">Vector フィールドの追加</a></h3>
+<h4 id="vector-フィールドの追加"><a class="header" href="#vector-フィールドの追加">Vector フィールドの追加</a></h4>
 <pre><code class="language-rust ignore">let updated_schema = engine.add_field(
     "embedding",
     FieldOption::Flat(FlatOption::default().dimension(384)),
 ).await?;</code></pre>
-<p>既存のドキュメントには影響がありません（新しいフィールドの値が存在しないだけです）。
-返却された <code>Schema</code> は呼び出し側で永続化する必要があります（例: <code>schema.toml</code> への書き出し）。</p>
+<p>既存のドキュメントには影響がありません（新しいフィールドの値が存在しないだけです）。</p>
+<h3 id="フィールドの削除"><a class="header" href="#フィールドの削除">フィールドの削除</a></h3>
+<p><code>Engine::delete_field()</code> を使用すると、稼働中のエンジンからフィールドを動的に削除できます。</p>
+<pre><code class="language-rust ignore">let updated_schema = engine.delete_field("category").await?;</code></pre>
+<p>フィールド削除時の動作は以下の通りです。</p>
+<ul>
+<li>スキーマからフィールド定義が削除されます。</li>
+<li><code>default_fields</code> に含まれている場合、そこからも削除されます。</li>
+<li>フィールドに紐づくアナライザーおよびエンベッダーの登録が解除されます。</li>
+<li>既にインデックスされたデータは物理的に残りますが、スキーマから削除されたフィールドにはアクセスできなくなります。</li>
+</ul>
+<h3 id="共通の注意事項"><a class="header" href="#共通の注意事項">共通の注意事項</a></h3>
+<p>返却された <code>Schema</code> は呼び出し側で永続化する必要があります（例: <code>schema.toml</code> への書き出し）。</p>
 <h2 id="スキーマ設計のヒント"><a class="header" href="#スキーマ設計のヒント">スキーマ設計のヒント</a></h2>
 <ol>
 <li>
@@ -3578,6 +3591,7 @@ let engine = Engine::builder(storage, schema)
 <tr><td style="text-align: left"><code>commit()</code></td><td style="text-align: left">保留中の変更をストレージにフラッシュ（ドキュメントが検索可能になる）</td></tr>
 <tr><td style="text-align: left"><code>recover()</code></td><td style="text-align: left">クラッシュ後にWALをリプレイして未コミット状態を復元</td></tr>
 <tr><td style="text-align: left"><code>add_field(name, field_option)</code></td><td style="text-align: left">稼働中のエンジンにフィールドを動的に追加し、更新後の <code>Schema</code> を返す</td></tr>
+<tr><td style="text-align: left"><code>delete_field(name)</code></td><td style="text-align: left">稼働中のエンジンからフィールドを動的に削除し、更新後の <code>Schema</code> を返す</td></tr>
 <tr><td style="text-align: left"><code>schema()</code></td><td style="text-align: left">現在の <code>Schema</code> への参照を返す</td></tr>
 </tbody>
 </table>
@@ -5100,16 +5114,16 @@ cargo install laurus-cli
 laurus create schema
 
 # スキーマからインデックスを作成
-laurus --data-dir ./my_index create index --schema schema.toml
+laurus --index-dir ./my_index create index --schema schema.toml
 
 # ドキュメントを追加
-laurus --data-dir ./my_index add doc --id doc1 --data '{"title":"Hello","body":"World"}'
+laurus --index-dir ./my_index add doc --id doc1 --data '{"title":"Hello","body":"World"}'
 
 # 変更をコミット
-laurus --data-dir ./my_index commit
+laurus --index-dir ./my_index commit
 
 # 検索
-laurus --data-dir ./my_index search "body:world"
+laurus --index-dir ./my_index search "body:world"
 </code></pre>
 <p>詳細はサブセクションを参照してください:</p>
 <ul>
@@ -5166,80 +5180,80 @@ EOF
 <p>3 つのテキストフィールドを定義しています。<code>default_fields</code> を設定することで、フィールド指定なしのクエリは <code>title</code> と <code>body</code> の両方を検索します。</p>
 <h2 id="step-2-インデックスの作成"><a class="header" href="#step-2-インデックスの作成">Step 2: インデックスの作成</a></h2>
 <p>スキーマを使ってインデックスを作成します:</p>
-<pre><code class="language-bash">laurus --data-dir ./tutorial_data create index --schema schema.toml
+<pre><code class="language-bash">laurus --index-dir ./tutorial_data create index --schema schema.toml
 </code></pre>
 <p>インデックスが作成されたことを確認します:</p>
-<pre><code class="language-bash">laurus --data-dir ./tutorial_data get index
+<pre><code class="language-bash">laurus --index-dir ./tutorial_data get stats
 </code></pre>
 <p>ドキュメント数が 0 であることが表示されます。</p>
 <h2 id="step-3-ドキュメントの登録"><a class="header" href="#step-3-ドキュメントの登録">Step 3: ドキュメントの登録</a></h2>
 <p>ドキュメントをインデックスに追加します。各ドキュメントには ID と JSON 形式のフィールド値が必要です:</p>
-<pre><code class="language-bash">laurus --data-dir ./tutorial_data add doc \
+<pre><code class="language-bash">laurus --index-dir ./tutorial_data add doc \
   --id doc001 \
   --data '{"title":"Introduction to Rust Programming","body":"Rust is a modern systems programming language that focuses on safety, speed, and concurrency.","category":"programming"}'
 </code></pre>
-<pre><code class="language-bash">laurus --data-dir ./tutorial_data add doc \
+<pre><code class="language-bash">laurus --index-dir ./tutorial_data add doc \
   --id doc002 \
   --data '{"title":"Web Development with Rust","body":"Building web applications with Rust has become increasingly popular. Frameworks like Actix and Rocket make it easy to create fast and secure web services.","category":"web-development"}'
 </code></pre>
-<pre><code class="language-bash">laurus --data-dir ./tutorial_data add doc \
+<pre><code class="language-bash">laurus --index-dir ./tutorial_data add doc \
   --id doc003 \
   --data '{"title":"Python for Data Science","body":"Python is the most popular language for data science and machine learning. Libraries like NumPy and Pandas provide powerful tools for data analysis.","category":"data-science"}'
 </code></pre>
 <h2 id="step-4-変更のコミット"><a class="header" href="#step-4-変更のコミット">Step 4: 変更のコミット</a></h2>
 <p>ドキュメントはコミットするまで検索対象になりません:</p>
-<pre><code class="language-bash">laurus --data-dir ./tutorial_data commit
+<pre><code class="language-bash">laurus --index-dir ./tutorial_data commit
 </code></pre>
 <h2 id="step-5-ドキュメントの検索"><a class="header" href="#step-5-ドキュメントの検索">Step 5: ドキュメントの検索</a></h2>
 <h3 id="基本的な検索"><a class="header" href="#基本的な検索">基本的な検索</a></h3>
 <p>“rust” を含むドキュメントを検索します:</p>
-<pre><code class="language-bash">laurus --data-dir ./tutorial_data search "rust"
+<pre><code class="language-bash">laurus --index-dir ./tutorial_data search "rust"
 </code></pre>
 <p>デフォルトフィールド（<code>title</code> と <code>body</code>）が検索されます。<code>doc001</code> と <code>doc002</code> が返されます。</p>
 <h3 id="フィールド指定検索"><a class="header" href="#フィールド指定検索">フィールド指定検索</a></h3>
 <p><code>title</code> フィールドのみを検索します:</p>
-<pre><code class="language-bash">laurus --data-dir ./tutorial_data search "title:python"
+<pre><code class="language-bash">laurus --index-dir ./tutorial_data search "title:python"
 </code></pre>
 <p><code>doc003</code> のみが返されます。</p>
 <h3 id="カテゴリ検索"><a class="header" href="#カテゴリ検索">カテゴリ検索</a></h3>
-<pre><code class="language-bash">laurus --data-dir ./tutorial_data search "category:programming"
+<pre><code class="language-bash">laurus --index-dir ./tutorial_data search "category:programming"
 </code></pre>
 <p><code>doc001</code> のみが返されます。</p>
 <h3 id="ブーリアンクエリ"><a class="header" href="#ブーリアンクエリ">ブーリアンクエリ</a></h3>
 <p><code>+</code>（必須）と <code>-</code>（除外）で条件を組み合わせます:</p>
-<pre><code class="language-bash">laurus --data-dir ./tutorial_data search "+body:rust -body:web"
+<pre><code class="language-bash">laurus --index-dir ./tutorial_data search "+body:rust -body:web"
 </code></pre>
 <p>“rust” を含み “web” を含まない <code>doc001</code> のみが返されます。</p>
 <h3 id="フレーズ検索"><a class="header" href="#フレーズ検索">フレーズ検索</a></h3>
 <p>完全一致するフレーズを検索します:</p>
-<pre><code class="language-bash">laurus --data-dir ./tutorial_data search 'body:"data science"'
+<pre><code class="language-bash">laurus --index-dir ./tutorial_data search 'body:"data science"'
 </code></pre>
 <p><code>doc003</code> のみが返されます。</p>
 <h3 id="あいまい検索"><a class="header" href="#あいまい検索">あいまい検索</a></h3>
 <p><code>~</code> を使ってタイプミスに対応した検索を行います:</p>
-<pre><code class="language-bash">laurus --data-dir ./tutorial_data search "body:programing~1"
+<pre><code class="language-bash">laurus --index-dir ./tutorial_data search "body:programing~1"
 </code></pre>
 <p>タイプミスがあっても “programming” にマッチします。</p>
 <h3 id="json-出力"><a class="header" href="#json-出力">JSON 出力</a></h3>
 <p>プログラムでの利用に向けて JSON 形式で結果を取得します:</p>
-<pre><code class="language-bash">laurus --data-dir ./tutorial_data --format json search "rust"
+<pre><code class="language-bash">laurus --index-dir ./tutorial_data --format json search "rust"
 </code></pre>
 <h2 id="step-6-ドキュメントの取得"><a class="header" href="#step-6-ドキュメントの取得">Step 6: ドキュメントの取得</a></h2>
 <p>ID を指定して特定のドキュメントを取得します:</p>
-<pre><code class="language-bash">laurus --data-dir ./tutorial_data get doc --id doc001
+<pre><code class="language-bash">laurus --index-dir ./tutorial_data get doc --id doc001
 </code></pre>
 <h2 id="step-7-ドキュメントの削除"><a class="header" href="#step-7-ドキュメントの削除">Step 7: ドキュメントの削除</a></h2>
 <p>ドキュメントを削除してコミットします:</p>
-<pre><code class="language-bash">laurus --data-dir ./tutorial_data delete doc --id doc003
-laurus --data-dir ./tutorial_data commit
+<pre><code class="language-bash">laurus --index-dir ./tutorial_data delete doc --id doc003
+laurus --index-dir ./tutorial_data commit
 </code></pre>
 <p>削除されたことを確認します:</p>
-<pre><code class="language-bash">laurus --data-dir ./tutorial_data search "python"
+<pre><code class="language-bash">laurus --index-dir ./tutorial_data search "python"
 </code></pre>
 <p>結果は返されません。</p>
 <h2 id="step-8-repl-を使う"><a class="header" href="#step-8-repl-を使う">Step 8: REPL を使う</a></h2>
 <p>REPL はインデックスを対話的に操作するためのインタラクティブセッションです:</p>
-<pre><code class="language-bash">laurus --data-dir ./tutorial_data repl
+<pre><code class="language-bash">laurus --index-dir ./tutorial_data repl
 </code></pre>
 <p>REPL で以下のコマンドを試してみてください:</p>
 <pre><code class="language-text">&gt; stats
@@ -5274,13 +5288,13 @@ laurus --data-dir ./tutorial_data commit
 <tr><th style="text-align: left">オプション</th><th style="text-align: left">環境変数</th><th style="text-align: left">デフォルト</th><th style="text-align: left">説明</th></tr>
 </thead>
 <tbody>
-<tr><td style="text-align: left"><code>--data-dir &lt;PATH&gt;</code></td><td style="text-align: left"><code>LAURUS_DATA_DIR</code></td><td style="text-align: left"><code>./laurus_data</code></td><td style="text-align: left">インデックスデータディレクトリのパス</td></tr>
+<tr><td style="text-align: left"><code>--index-dir &lt;PATH&gt;</code></td><td style="text-align: left"><code>LAURUS_INDEX_DIR</code></td><td style="text-align: left"><code>./laurus_index</code></td><td style="text-align: left">インデックスデータディレクトリのパス</td></tr>
 <tr><td style="text-align: left"><code>--format &lt;FORMAT&gt;</code></td><td style="text-align: left">—</td><td style="text-align: left"><code>table</code></td><td style="text-align: left">出力形式: <code>table</code> または <code>json</code></td></tr>
 </tbody>
 </table>
 </div>
 <pre><code class="language-bash"># 例: カスタムデータディレクトリで JSON 出力を使用
-laurus --data-dir /var/data/my_index --format json search "title:rust"
+laurus --index-dir /var/data/my_index --format json search "title:rust"
 </code></pre>
 <hr>
 <h2 id="create--リソースの作成"><a class="header" href="#create--リソースの作成"><code>create</code> — リソースの作成</a></h2>
@@ -5316,7 +5330,7 @@ stored = true
 indexed = true
 </code></pre>
 <p><strong>例:</strong></p>
-<pre><code class="language-bash">laurus --data-dir ./my_index create index --schema schema.toml
+<pre><code class="language-bash">laurus --index-dir ./my_index create index --schema schema.toml
 # Index created at ./my_index.
 </code></pre>
 <blockquote>
@@ -5377,9 +5391,9 @@ laurus create index --schema schema.toml
 </code></pre>
 <hr>
 <h2 id="get--リソースの取得"><a class="header" href="#get--リソースの取得"><code>get</code> — リソースの取得</a></h2>
-<h3 id="get-index"><a class="header" href="#get-index"><code>get index</code></a></h3>
+<h3 id="get-stats"><a class="header" href="#get-stats"><code>get stats</code></a></h3>
 <p>インデックスの統計情報を表示します。</p>
-<pre><code class="language-bash">laurus get index
+<pre><code class="language-bash">laurus get stats
 </code></pre>
 <p><strong>テーブル出力の例:</strong></p>
 <pre><code class="language-text">Document count: 42
@@ -5392,7 +5406,7 @@ Vector fields:
 ╰──────────┴─────────┴───────────╯
 </code></pre>
 <p><strong>JSON 出力の例:</strong></p>
-<pre><code class="language-bash">laurus --format json get index
+<pre><code class="language-bash">laurus --format json get stats
 </code></pre>
 <pre><code class="language-json">{
   "document_count": 42,
@@ -5403,6 +5417,18 @@ Vector fields:
     }
   }
 }
+</code></pre>
+<h3 id="get-schema"><a class="header" href="#get-schema"><code>get schema</code></a></h3>
+<p>現在のインデックスのスキーマを JSON 形式で表示します。</p>
+<pre><code class="language-bash">laurus get schema
+</code></pre>
+<p><strong>例:</strong></p>
+<pre><code class="language-bash">laurus get schema
+# {
+#   "fields": { ... },
+#   "default_fields": ["title", "body"],
+#   ...
+# }
 </code></pre>
 <h3 id="get-doc"><a class="header" href="#get-doc"><code>get doc</code></a></h3>
 <p>外部 ID でドキュメント（およびすべてのチャンク）を取得します。</p>
@@ -5462,7 +5488,7 @@ Vector fields:
 </blockquote>
 <h3 id="add-field"><a class="header" href="#add-field"><code>add field</code></a></h3>
 <p>既存のインデックスにフィールドを動的に追加します。</p>
-<pre><code class="language-bash">laurus add field --data-dir ./data \
+<pre><code class="language-bash">laurus add field --index-dir ./data \
     --name category \
     --field-option '{"Text": {"indexed": true, "stored": true}}'
 </code></pre>
@@ -5470,6 +5496,14 @@ Vector fields:
 フィールド追加後、スキーマは自動的に永続化されます。</p>
 <hr>
 <h2 id="delete--リソースの削除"><a class="header" href="#delete--リソースの削除"><code>delete</code> — リソースの削除</a></h2>
+<h3 id="delete-field"><a class="header" href="#delete-field"><code>delete field</code></a></h3>
+<p>スキーマからフィールドを動的に削除します。既にインデックスされたデータは残りますが、削除されたフィールドにはアクセスできなくなります。</p>
+<pre><code class="language-bash">laurus delete field --name &lt;FIELD_NAME&gt;
+</code></pre>
+<p><strong>例:</strong></p>
+<pre><code class="language-bash">laurus delete field --name category
+# Field 'category' deleted.
+</code></pre>
 <h3 id="delete-doc"><a class="header" href="#delete-doc"><code>delete doc</code></a></h3>
 <p>外部 ID でドキュメント（およびすべてのチャンク）を削除します。</p>
 <pre><code class="language-bash">laurus delete doc --id &lt;ID&gt;
@@ -5484,7 +5518,7 @@ Vector fields:
 <pre><code class="language-bash">laurus commit
 </code></pre>
 <p><strong>例:</strong></p>
-<pre><code class="language-bash">laurus --data-dir ./my_index commit
+<pre><code class="language-bash">laurus --index-dir ./my_index commit
 # Changes committed successfully.
 </code></pre>
 <hr>
@@ -5958,31 +5992,34 @@ let schema: Schema = toml::from_str(&amp;toml_str)?;
 <h1 id="repl対話モード"><a class="header" href="#repl対話モード">REPL（対話モード）</a></h1>
 <p>REPL は、毎回 <code>laurus</code> コマンドをフルで入力することなく、インデックスを操作できる対話型セッションを提供します。</p>
 <h2 id="repl-の起動"><a class="header" href="#repl-の起動">REPL の起動</a></h2>
-<pre><code class="language-bash">laurus --data-dir ./my_index repl
+<pre><code class="language-bash">laurus --index-dir ./my_index repl
 </code></pre>
 <pre><code class="language-text">Laurus REPL (type 'help' for commands, 'quit' to exit)
 laurus&gt;
 </code></pre>
 <p>REPL は起動時にインデックスを開き、セッション中ロードされた状態を維持します。</p>
 <h2 id="利用可能なコマンド"><a class="header" href="#利用可能なコマンド">利用可能なコマンド</a></h2>
+<p>コマンドは CLI と同じ <code>&lt;操作&gt; &lt;リソース&gt;</code> の順序に従います。</p>
 <div class="table-wrapper">
 <table>
 <thead>
 <tr><th style="text-align: left">コマンド</th><th style="text-align: left">説明</th></tr>
 </thead>
 <tbody>
-<tr><td style="text-align: left"><code>search &lt;query&gt;</code></td><td style="text-align: left">インデックスを検索（最大10件の結果を返す）</td></tr>
-<tr><td style="text-align: left"><code>doc add &lt;id&gt; &lt;json&gt;</code></td><td style="text-align: left">ドキュメントを追加</td></tr>
-<tr><td style="text-align: left"><code>doc get &lt;id&gt;</code></td><td style="text-align: left">ID でドキュメントを取得</td></tr>
-<tr><td style="text-align: left"><code>doc delete &lt;id&gt;</code></td><td style="text-align: left">ID でドキュメントを削除</td></tr>
+<tr><td style="text-align: left"><code>search &lt;query&gt;</code></td><td style="text-align: left">インデックスを検索</td></tr>
+<tr><td style="text-align: left"><code>add field &lt;name&gt; &lt;json&gt;</code></td><td style="text-align: left">スキーマにフィールドを追加</td></tr>
+<tr><td style="text-align: left"><code>add doc &lt;id&gt; &lt;json&gt;</code></td><td style="text-align: left">ドキュメントを追加</td></tr>
+<tr><td style="text-align: left"><code>get stats</code></td><td style="text-align: left">インデックスの統計情報を表示</td></tr>
+<tr><td style="text-align: left"><code>get schema</code></td><td style="text-align: left">現在のスキーマを表示</td></tr>
+<tr><td style="text-align: left"><code>get doc &lt;id&gt;</code></td><td style="text-align: left">ID でドキュメントを取得</td></tr>
+<tr><td style="text-align: left"><code>delete field &lt;name&gt;</code></td><td style="text-align: left">スキーマからフィールドを削除</td></tr>
+<tr><td style="text-align: left"><code>delete doc &lt;id&gt;</code></td><td style="text-align: left">ID でドキュメントを削除</td></tr>
 <tr><td style="text-align: left"><code>commit</code></td><td style="text-align: left">保留中の変更をコミット</td></tr>
-<tr><td style="text-align: left"><code>stats</code></td><td style="text-align: left">インデックスの統計情報を表示</td></tr>
 <tr><td style="text-align: left"><code>help</code></td><td style="text-align: left">利用可能なコマンドを表示</td></tr>
 <tr><td style="text-align: left"><code>quit</code> / <code>exit</code></td><td style="text-align: left">REPL を終了</td></tr>
 </tbody>
 </table>
 </div>
-<p>search コマンドは常に最大10件の結果を返します。REPL ではこの上限は現在変更できません。</p>
 <h2 id="使用例"><a class="header" href="#使用例">使用例</a></h2>
 <h3 id="検索-1"><a class="header" href="#検索-1">検索</a></h3>
 <pre><code class="language-text">laurus&gt; search body:rust
@@ -5992,14 +6029,29 @@ laurus&gt;
 │ doc1 │ 0.8532 │ body: Rust is a systems..., title… │
 ╰──────┴────────┴────────────────────────────────────╯
 </code></pre>
+<h3 id="フィールドの管理"><a class="header" href="#フィールドの管理">フィールドの管理</a></h3>
+<pre><code class="language-text">laurus&gt; add field category {"Text": {"indexed": true, "stored": true}}
+Field 'category' added.
+laurus&gt; delete field category
+Field 'category' deleted.
+</code></pre>
 <h3 id="ドキュメントの追加とコミット"><a class="header" href="#ドキュメントの追加とコミット">ドキュメントの追加とコミット</a></h3>
-<pre><code class="language-text">laurus&gt; doc add doc4 {"title":"New Document","body":"Some content here."}
+<pre><code class="language-text">laurus&gt; add doc doc4 {"title":"New Document","body":"Some content here."}
 Document 'doc4' added.
 laurus&gt; commit
 Changes committed.
 </code></pre>
-<h3 id="ドキュメントの取得-1"><a class="header" href="#ドキュメントの取得-1">ドキュメントの取得</a></h3>
-<pre><code class="language-text">laurus&gt; doc get doc4
+<h3 id="情報の取得"><a class="header" href="#情報の取得">情報の取得</a></h3>
+<pre><code class="language-text">laurus&gt; get stats
+Document count: 3
+
+laurus&gt; get schema
+{
+  "fields": { ... },
+  "default_fields": ["title", "body"]
+}
+
+laurus&gt; get doc doc4
 ╭──────┬───────────────────────────────────────────────╮
 │ ID   │ Fields                                        │
 ├──────┼───────────────────────────────────────────────┤
@@ -6007,14 +6059,10 @@ Changes committed.
 ╰──────┴───────────────────────────────────────────────╯
 </code></pre>
 <h3 id="ドキュメントの削除-2"><a class="header" href="#ドキュメントの削除-2">ドキュメントの削除</a></h3>
-<pre><code class="language-text">laurus&gt; doc delete doc4
+<pre><code class="language-text">laurus&gt; delete doc doc4
 Document 'doc4' deleted.
 laurus&gt; commit
 Changes committed.
-</code></pre>
-<h3 id="統計情報の表示"><a class="header" href="#統計情報の表示">統計情報の表示</a></h3>
-<pre><code class="language-text">laurus&gt; stats
-Document count: 3
 </code></pre>
 <h2 id="機能-1"><a class="header" href="#機能-1">機能</a></h2>
 <ul>
@@ -6087,12 +6135,12 @@ laurus serve --config config.toml
 </div>
 <p>ログの詳細度は標準の <code>RUST_LOG</code> 環境変数で制御します（デフォルト: <code>info</code>）。
 <code>RUST_LOG=laurus=debug,tonic=warn</code> のようなフィルタディレクティブの詳細は <a href="https://docs.rs/env_logger/latest/env_logger/#enabling-logging">env_logger の構文</a>を参照してください。</p>
-<p>グローバルオプション <code>--data-dir</code>（環境変数: <code>LAURUS_DATA_DIR</code>）でインデックスデータのディレクトリを指定します。</p>
+<p>グローバルオプション <code>--index-dir</code>（環境変数: <code>LAURUS_INDEX_DIR</code>）でインデックスデータのディレクトリを指定します。</p>
 <pre><code class="language-bash"># CLI 引数を使用
-laurus --data-dir ./my_index serve --port 8080
+laurus --index-dir ./my_index serve --port 8080
 
 # 環境変数を使用
-export LAURUS_DATA_DIR=./my_index
+export LAURUS_INDEX_DIR=./my_index
 export LAURUS_PORT=8080
 export RUST_LOG=debug
 laurus serve
@@ -6159,7 +6207,7 @@ grpcurl -plaintext -d '{"query": "body:test", "limit": 10}' \
 </ul>
 <h2 id="step-1-サーバーの起動"><a class="header" href="#step-1-サーバーの起動">Step 1: サーバーの起動</a></h2>
 <p>HTTP Gateway を有効にして laurus-server を起動します:</p>
-<pre><code class="language-bash">laurus --data-dir /tmp/laurus/tutorial serve --port 50051 --http-port 8080
+<pre><code class="language-bash">laurus --index-dir /tmp/laurus/tutorial serve --port 50051 --http-port 8080
 </code></pre>
 <p>gRPC サーバー（ポート 50051）と HTTP Gateway（ポート 8080）が起動したことを示すログが表示されます。</p>
 <p>サーバーが正常に動作しているか確認します:</p>
@@ -6584,7 +6632,7 @@ port = 50051
 http_port = 8080  # オプション: HTTP ゲートウェイを有効化
 
 [index]
-data_dir = "./laurus_data"
+data_dir = "./laurus_index"
 </code></pre>
 <p>ログの詳細度は設定ファイルではなく、<code>RUST_LOG</code> 環境変数で制御します（デフォルト: <code>info</code>）。</p>
 <h3 id="フィールドリファレンス"><a class="header" href="#フィールドリファレンス">フィールドリファレンス</a></h3>
@@ -6608,7 +6656,7 @@ data_dir = "./laurus_data"
 <tr><th style="text-align: left">フィールド</th><th style="text-align: left">型</th><th style="text-align: left">デフォルト</th><th style="text-align: left">説明</th></tr>
 </thead>
 <tbody>
-<tr><td style="text-align: left"><code>data_dir</code></td><td style="text-align: left">String</td><td style="text-align: left"><code>"./laurus_data"</code></td><td style="text-align: left">インデックスデータディレクトリのパス</td></tr>
+<tr><td style="text-align: left"><code>data_dir</code></td><td style="text-align: left">String</td><td style="text-align: left"><code>"./laurus_index"</code></td><td style="text-align: left">インデックスデータディレクトリのパス</td></tr>
 </tbody>
 </table>
 </div>
@@ -6622,7 +6670,7 @@ data_dir = "./laurus_data"
 <tr><td style="text-align: left"><code>LAURUS_HOST</code></td><td style="text-align: left"><code>server.host</code></td><td style="text-align: left">リッスンアドレス</td></tr>
 <tr><td style="text-align: left"><code>LAURUS_PORT</code></td><td style="text-align: left"><code>server.port</code></td><td style="text-align: left">gRPC リッスンポート</td></tr>
 <tr><td style="text-align: left"><code>LAURUS_HTTP_PORT</code></td><td style="text-align: left"><code>server.http_port</code></td><td style="text-align: left">HTTP ゲートウェイポート</td></tr>
-<tr><td style="text-align: left"><code>LAURUS_DATA_DIR</code></td><td style="text-align: left"><code>index.data_dir</code></td><td style="text-align: left">インデックスデータディレクトリ</td></tr>
+<tr><td style="text-align: left"><code>LAURUS_INDEX_DIR</code></td><td style="text-align: left"><code>index.data_dir</code></td><td style="text-align: left">インデックスデータディレクトリ</td></tr>
 <tr><td style="text-align: left"><code>RUST_LOG</code></td><td style="text-align: left">–</td><td style="text-align: left">ログフィルタディレクティブ（例: <code>info</code>, <code>debug</code>, <code>laurus=debug,tonic=warn</code>）</td></tr>
 <tr><td style="text-align: left"><code>LAURUS_CONFIG</code></td><td style="text-align: left">–</td><td style="text-align: left">TOML 設定ファイルのパス</td></tr>
 </tbody>
@@ -6639,7 +6687,7 @@ data_dir = "./laurus_data"
 <tr><td style="text-align: left"><code>--host &lt;HOST&gt;</code></td><td style="text-align: left"><code>-H</code></td><td style="text-align: left"><code>0.0.0.0</code></td><td style="text-align: left">リッスンアドレス</td></tr>
 <tr><td style="text-align: left"><code>--port &lt;PORT&gt;</code></td><td style="text-align: left"><code>-p</code></td><td style="text-align: left"><code>50051</code></td><td style="text-align: left">gRPC リッスンポート</td></tr>
 <tr><td style="text-align: left"><code>--http-port &lt;PORT&gt;</code></td><td style="text-align: left">–</td><td style="text-align: left">–</td><td style="text-align: left">HTTP ゲートウェイポート</td></tr>
-<tr><td style="text-align: left"><code>--data-dir &lt;PATH&gt;</code></td><td style="text-align: left">–</td><td style="text-align: left"><code>./laurus_data</code></td><td style="text-align: left">インデックスデータディレクトリ（グローバルオプション）</td></tr>
+<tr><td style="text-align: left"><code>--index-dir &lt;PATH&gt;</code></td><td style="text-align: left">–</td><td style="text-align: left"><code>./laurus_index</code></td><td style="text-align: left">インデックスデータディレクトリ（グローバルオプション）</td></tr>
 </tbody>
 </table>
 </div>
@@ -6664,7 +6712,7 @@ http_port = 8080
 data_dir = "/var/lib/laurus/data"
 </code></pre>
 <h3 id="最小構成環境変数のみ"><a class="header" href="#最小構成環境変数のみ">最小構成（環境変数のみ）</a></h3>
-<pre><code class="language-bash">export LAURUS_DATA_DIR=/var/lib/laurus/data
+<pre><code class="language-bash">export LAURUS_INDEX_DIR=/var/lib/laurus/data
 export LAURUS_PORT=50051
 export LAURUS_HTTP_PORT=8080
 export RUST_LOG=info
@@ -6681,7 +6729,7 @@ laurus serve
 </thead>
 <tbody>
 <tr><td style="text-align: left"><code>HealthService</code></td><td style="text-align: left"><code>Check</code></td><td style="text-align: left">ヘルスチェック</td></tr>
-<tr><td style="text-align: left"><code>IndexService</code></td><td style="text-align: left"><code>CreateIndex</code>, <code>GetIndex</code>, <code>GetSchema</code>, <code>AddField</code></td><td style="text-align: left">インデックスのライフサイクルとスキーマ</td></tr>
+<tr><td style="text-align: left"><code>IndexService</code></td><td style="text-align: left"><code>CreateIndex</code>, <code>GetIndex</code>, <code>GetSchema</code>, <code>AddField</code>, <code>DeleteField</code></td><td style="text-align: left">インデックスのライフサイクルとスキーマ</td></tr>
 <tr><td style="text-align: left"><code>DocumentService</code></td><td style="text-align: left"><code>PutDocument</code>, <code>AddDocument</code>, <code>GetDocuments</code>, <code>DeleteDocuments</code>, <code>Commit</code></td><td style="text-align: left">ドキュメント CRUD とコミット</td></tr>
 <tr><td style="text-align: left"><code>SearchService</code></td><td style="text-align: left"><code>Search</code>, <code>SearchStream</code></td><td style="text-align: left">単発検索とストリーミング検索</td></tr>
 </tbody>
@@ -6843,6 +6891,8 @@ laurus serve
 </div>
 <h3 id="addfield"><a class="header" href="#addfield">AddField</a></h3>
 <p>稼働中のインデックスにフィールドを動的に追加します。</p>
+<pre><code class="language-protobuf">rpc AddField(AddFieldRequest) returns (AddFieldResponse);
+</code></pre>
 <div class="table-wrapper">
 <table>
 <thead>
@@ -6851,6 +6901,30 @@ laurus serve
 <tbody>
 <tr><td style="text-align: left"><code>name</code></td><td style="text-align: left"><code>string</code></td><td style="text-align: left">フィールド名</td></tr>
 <tr><td style="text-align: left"><code>field_option</code></td><td style="text-align: left"><code>FieldOption</code></td><td style="text-align: left">フィールド設定</td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>レスポンス:</strong> 更新後の <code>Schema</code> を返します。</p>
+<h3 id="deletefield"><a class="header" href="#deletefield">DeleteField</a></h3>
+<p>稼働中のインデックスからフィールドを動的に削除します。既にインデックスされたデータは残りますが、削除されたフィールドにはアクセスできなくなります。</p>
+<pre><code class="language-protobuf">rpc DeleteField(DeleteFieldRequest) returns (DeleteFieldResponse);
+
+message DeleteFieldRequest {
+  string name = 1;
+}
+
+message DeleteFieldResponse {
+  Schema schema = 1;
+}
+</code></pre>
+<p><strong>リクエストフィールド:</strong></p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">フィールド</th><th style="text-align: left">型</th><th style="text-align: left">必須</th><th style="text-align: left">説明</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>name</code></td><td style="text-align: left"><code>string</code></td><td style="text-align: left">はい</td><td style="text-align: left">削除するフィールド名</td></tr>
 </tbody>
 </table>
 </div>
@@ -7115,6 +7189,8 @@ laurus serve --config config.toml
 <tr><td style="text-align: left">GET</td><td style="text-align: left"><code>/v1/documents/:id</code></td><td style="text-align: left"><code>DocumentService/GetDocuments</code></td><td style="text-align: left">ID でドキュメントを取得</td></tr>
 <tr><td style="text-align: left">DELETE</td><td style="text-align: left"><code>/v1/documents/:id</code></td><td style="text-align: left"><code>DocumentService/DeleteDocuments</code></td><td style="text-align: left">ID でドキュメントを削除</td></tr>
 <tr><td style="text-align: left">POST</td><td style="text-align: left"><code>/v1/commit</code></td><td style="text-align: left"><code>DocumentService/Commit</code></td><td style="text-align: left">保留中の変更をコミット</td></tr>
+<tr><td style="text-align: left">POST</td><td style="text-align: left"><code>/v1/schema/fields</code></td><td style="text-align: left"><code>IndexService/AddField</code></td><td style="text-align: left">フィールドの追加</td></tr>
+<tr><td style="text-align: left">DELETE</td><td style="text-align: left"><code>/v1/schema/fields/:name</code></td><td style="text-align: left"><code>IndexService/DeleteField</code></td><td style="text-align: left">フィールドの削除</td></tr>
 <tr><td style="text-align: left">POST</td><td style="text-align: left"><code>/v1/search</code></td><td style="text-align: left"><code>SearchService/Search</code></td><td style="text-align: left">検索（単発）</td></tr>
 <tr><td style="text-align: left">POST</td><td style="text-align: left"><code>/v1/search/stream</code></td><td style="text-align: left"><code>SearchService/SearchStream</code></td><td style="text-align: left">検索（Server-Sent Events）</td></tr>
 </tbody>
@@ -7169,7 +7245,7 @@ laurus serve --config config.toml
     }
   }'
 </code></pre>
-<h3 id="ドキュメントの取得-2"><a class="header" href="#ドキュメントの取得-2">ドキュメントの取得</a></h3>
+<h3 id="ドキュメントの取得-1"><a class="header" href="#ドキュメントの取得-1">ドキュメントの取得</a></h3>
 <pre><code class="language-bash">curl http://localhost:8080/v1/documents/doc1
 </code></pre>
 <h3 id="ドキュメントの削除-3"><a class="header" href="#ドキュメントの削除-3">ドキュメントの削除</a></h3>
@@ -7507,9 +7583,28 @@ document: {"title": "Hello World", "body": "これはテストドキュメント
 }
 </code></pre>
 <hr>
+<h2 id="delete_field"><a class="header" href="#delete_field">delete_field</a></h2>
+<p>インデックスからフィールドを削除します。既にインデックスされたデータは残りますが、削除されたフィールドにはアクセスできなくなります。</p>
+<h3 id="パラメーター-8"><a class="header" href="#パラメーター-8">パラメーター</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">名前</th><th style="text-align: left">型</th><th style="text-align: left">必須</th><th style="text-align: left">説明</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>name</code></td><td style="text-align: left">string</td><td style="text-align: left">はい</td><td style="text-align: left">削除するフィールド名</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="例-4"><a class="header" href="#例-4">例</a></h3>
+<pre><code class="language-text">Tool: delete_field
+name: "category"
+</code></pre>
+<p>結果: <code>Field 'category' deleted.</code></p>
+<hr>
 <h2 id="search-3"><a class="header" href="#search-3">search</a></h2>
 <p>laurus クエリ DSL を使用してドキュメントを検索します。</p>
-<h3 id="パラメーター-8"><a class="header" href="#パラメーター-8">パラメーター</a></h3>
+<h3 id="パラメーター-9"><a class="header" href="#パラメーター-9">パラメーター</a></h3>
 <div class="table-wrapper">
 <table>
 <thead>
@@ -7560,12 +7655,14 @@ document: {"title": "Hello World", "body": "これはテストドキュメント
 <h2 id="典型的なワークフロー"><a class="header" href="#典型的なワークフロー">典型的なワークフロー</a></h2>
 <pre><code class="language-text">1. connect         → 実行中の laurus-server に接続
 2. create_index    → スキーマを定義（インデックスが存在しない場合）
-3. add_document    → ドキュメントをインデックス（必要に応じて繰り返し）
-4. commit          → 変更をディスクに永続化
-5. search          → インデックスを検索
-6. add_document    → ドキュメントを更新
-7. delete_document → ドキュメントを削除
-8. commit          → 変更を永続化
+3. add_field       → フィールドを追加（必要に応じて）
+4. add_document    → ドキュメントをインデックス（必要に応じて繰り返し）
+5. commit          → 変更をディスクに永続化
+6. search          → インデックスを検索
+7. add_document    → ドキュメントを更新
+8. delete_document → ドキュメントを削除
+9. delete_field    → 不要なフィールドを削除（必要に応じて）
+10. commit         → 変更を永続化
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="ビルドとテスト"><a class="header" href="#ビルドとテスト">ビルドとテスト</a></h1>

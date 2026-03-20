@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-c30725f2.js";
+            window.path_to_searchindex_js = "../searchindex-5438fea2.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-d18ed058.js"></script>
@@ -189,13 +189,13 @@
 <tr><th style="text-align: left">オプション</th><th style="text-align: left">環境変数</th><th style="text-align: left">デフォルト</th><th style="text-align: left">説明</th></tr>
 </thead>
 <tbody>
-<tr><td style="text-align: left"><code>--data-dir &lt;PATH&gt;</code></td><td style="text-align: left"><code>LAURUS_DATA_DIR</code></td><td style="text-align: left"><code>./laurus_data</code></td><td style="text-align: left">インデックスデータディレクトリのパス</td></tr>
+<tr><td style="text-align: left"><code>--index-dir &lt;PATH&gt;</code></td><td style="text-align: left"><code>LAURUS_INDEX_DIR</code></td><td style="text-align: left"><code>./laurus_index</code></td><td style="text-align: left">インデックスデータディレクトリのパス</td></tr>
 <tr><td style="text-align: left"><code>--format &lt;FORMAT&gt;</code></td><td style="text-align: left">—</td><td style="text-align: left"><code>table</code></td><td style="text-align: left">出力形式: <code>table</code> または <code>json</code></td></tr>
 </tbody>
 </table>
 </div>
 <pre><code class="language-bash"># 例: カスタムデータディレクトリで JSON 出力を使用
-laurus --data-dir /var/data/my_index --format json search "title:rust"
+laurus --index-dir /var/data/my_index --format json search "title:rust"
 </code></pre>
 <hr>
 <h2 id="create--リソースの作成"><a class="header" href="#create--リソースの作成"><code>create</code> — リソースの作成</a></h2>
@@ -231,7 +231,7 @@ stored = true
 indexed = true
 </code></pre>
 <p><strong>例:</strong></p>
-<pre><code class="language-bash">laurus --data-dir ./my_index create index --schema schema.toml
+<pre><code class="language-bash">laurus --index-dir ./my_index create index --schema schema.toml
 # Index created at ./my_index.
 </code></pre>
 <blockquote>
@@ -292,9 +292,9 @@ laurus create index --schema schema.toml
 </code></pre>
 <hr>
 <h2 id="get--リソースの取得"><a class="header" href="#get--リソースの取得"><code>get</code> — リソースの取得</a></h2>
-<h3 id="get-index"><a class="header" href="#get-index"><code>get index</code></a></h3>
+<h3 id="get-stats"><a class="header" href="#get-stats"><code>get stats</code></a></h3>
 <p>インデックスの統計情報を表示します。</p>
-<pre><code class="language-bash">laurus get index
+<pre><code class="language-bash">laurus get stats
 </code></pre>
 <p><strong>テーブル出力の例:</strong></p>
 <pre><code class="language-text">Document count: 42
@@ -307,7 +307,7 @@ Vector fields:
 ╰──────────┴─────────┴───────────╯
 </code></pre>
 <p><strong>JSON 出力の例:</strong></p>
-<pre><code class="language-bash">laurus --format json get index
+<pre><code class="language-bash">laurus --format json get stats
 </code></pre>
 <pre><code class="language-json">{
   "document_count": 42,
@@ -318,6 +318,18 @@ Vector fields:
     }
   }
 }
+</code></pre>
+<h3 id="get-schema"><a class="header" href="#get-schema"><code>get schema</code></a></h3>
+<p>現在のインデックスのスキーマを JSON 形式で表示します。</p>
+<pre><code class="language-bash">laurus get schema
+</code></pre>
+<p><strong>例:</strong></p>
+<pre><code class="language-bash">laurus get schema
+# {
+#   "fields": { ... },
+#   "default_fields": ["title", "body"],
+#   ...
+# }
 </code></pre>
 <h3 id="get-doc"><a class="header" href="#get-doc"><code>get doc</code></a></h3>
 <p>外部 ID でドキュメント（およびすべてのチャンク）を取得します。</p>
@@ -377,7 +389,7 @@ Vector fields:
 </blockquote>
 <h3 id="add-field"><a class="header" href="#add-field"><code>add field</code></a></h3>
 <p>既存のインデックスにフィールドを動的に追加します。</p>
-<pre><code class="language-bash">laurus add field --data-dir ./data \
+<pre><code class="language-bash">laurus add field --index-dir ./data \
     --name category \
     --field-option '{"Text": {"indexed": true, "stored": true}}'
 </code></pre>
@@ -385,6 +397,14 @@ Vector fields:
 フィールド追加後、スキーマは自動的に永続化されます。</p>
 <hr>
 <h2 id="delete--リソースの削除"><a class="header" href="#delete--リソースの削除"><code>delete</code> — リソースの削除</a></h2>
+<h3 id="delete-field"><a class="header" href="#delete-field"><code>delete field</code></a></h3>
+<p>スキーマからフィールドを動的に削除します。既にインデックスされたデータは残りますが、削除されたフィールドにはアクセスできなくなります。</p>
+<pre><code class="language-bash">laurus delete field --name &lt;FIELD_NAME&gt;
+</code></pre>
+<p><strong>例:</strong></p>
+<pre><code class="language-bash">laurus delete field --name category
+# Field 'category' deleted.
+</code></pre>
 <h3 id="delete-doc"><a class="header" href="#delete-doc"><code>delete doc</code></a></h3>
 <p>外部 ID でドキュメント（およびすべてのチャンク）を削除します。</p>
 <pre><code class="language-bash">laurus delete doc --id &lt;ID&gt;
@@ -399,7 +419,7 @@ Vector fields:
 <pre><code class="language-bash">laurus commit
 </code></pre>
 <p><strong>例:</strong></p>
-<pre><code class="language-bash">laurus --data-dir ./my_index commit
+<pre><code class="language-bash">laurus --index-dir ./my_index commit
 # Changes committed successfully.
 </code></pre>
 <hr>

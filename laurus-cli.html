@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-d2cf4146.js";
+            window.path_to_searchindex_js = "searchindex-bfceb69b.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-710721a4.js"></script>
@@ -196,16 +196,16 @@ cargo install laurus-cli
 laurus create schema
 
 # Create an index from the schema
-laurus --data-dir ./my_index create index --schema schema.toml
+laurus --index-dir ./my_index create index --schema schema.toml
 
 # Add a document
-laurus --data-dir ./my_index add doc --id doc1 --data '{"title":"Hello","body":"World"}'
+laurus --index-dir ./my_index add doc --id doc1 --data '{"title":"Hello","body":"World"}'
 
 # Commit changes
-laurus --data-dir ./my_index commit
+laurus --index-dir ./my_index commit
 
 # Search
-laurus --data-dir ./my_index search "body:world"
+laurus --index-dir ./my_index search "body:world"
 </code></pre>
 <p>See the sub-sections for detailed documentation:</p>
 <ul>
