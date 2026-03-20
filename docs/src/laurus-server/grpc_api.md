@@ -7,7 +7,7 @@ All services are defined under the `laurus.v1` protobuf package.
 | Service | RPCs | Description |
 | :--- | :--- | :--- |
 | `HealthService` | `Check` | Health checking |
-| `IndexService` | `CreateIndex`, `GetIndex`, `GetSchema`, `AddField` | Index lifecycle and schema |
+| `IndexService` | `CreateIndex`, `GetIndex`, `GetSchema`, `AddField`, `DeleteField` | Index lifecycle and schema |
 | `DocumentService` | `PutDocument`, `AddDocument`, `GetDocuments`, `DeleteDocuments`, `Commit` | Document CRUD and commit |
 | `SearchService` | `Search`, `SearchStream` | Unary and streaming search |
 
@@ -153,6 +153,31 @@ Add a new field to the running index at runtime.
 | `field_option` | `FieldOption` | The field configuration |
 
 **Response:** Returns the updated `Schema`.
+
+### `DeleteField`
+
+Remove a field from the running index schema.
+
+```protobuf
+rpc DeleteField(DeleteFieldRequest) returns (DeleteFieldResponse);
+```
+
+**Request fields:**
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `name` | `string` | The field name to remove |
+
+**Response fields:**
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `schema` | `Schema` | The updated schema after removal |
+
+Existing indexed data for the field remains in storage but becomes
+inaccessible. Per-field analyzers and embedders are unregistered.
+
+**HTTP gateway:** `DELETE /v1/schema/fields/{name}`
 
 ### `GetSchema`
 

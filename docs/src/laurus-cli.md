@@ -21,16 +21,16 @@ cargo install laurus-cli
 laurus create schema
 
 # Create an index from the schema
-laurus --data-dir ./my_index create index --schema schema.toml
+laurus --index-dir ./my_index create index --schema schema.toml
 
 # Add a document
-laurus --data-dir ./my_index add doc --id doc1 --data '{"title":"Hello","body":"World"}'
+laurus --index-dir ./my_index add doc --id doc1 --data '{"title":"Hello","body":"World"}'
 
 # Commit changes
-laurus --data-dir ./my_index commit
+laurus --index-dir ./my_index commit
 
 # Search
-laurus --data-dir ./my_index search "body:world"
+laurus --index-dir ./my_index search "body:world"
 ```
 
 See the sub-sections for detailed documentation:

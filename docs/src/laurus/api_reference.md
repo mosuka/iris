@@ -20,6 +20,7 @@ The central coordinator for all indexing and search operations.
 | `engine.search(request).await?` | Execute a search request |
 | `engine.commit().await?` | Flush all pending changes to storage |
 | `engine.add_field(name, field_option).await?` | Dynamically add a new field to the schema at runtime |
+| `engine.delete_field(name).await?` | Remove a field from the schema at runtime |
 | `engine.schema()` | Return the current `Schema` |
 | `engine.stats()?` | Get index statistics |
 

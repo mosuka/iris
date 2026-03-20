@@ -37,6 +37,8 @@ laurus serve --config config.toml
 | GET | `/v1/documents/:id` | `DocumentService/GetDocuments` | ID でドキュメントを取得 |
 | DELETE | `/v1/documents/:id` | `DocumentService/DeleteDocuments` | ID でドキュメントを削除 |
 | POST | `/v1/commit` | `DocumentService/Commit` | 保留中の変更をコミット |
+| POST | `/v1/schema/fields` | `IndexService/AddField` | フィールドの追加 |
+| DELETE | `/v1/schema/fields/:name` | `IndexService/DeleteField` | フィールドの削除 |
 | POST | `/v1/search` | `SearchService/Search` | 検索（単発） |
 | POST | `/v1/search/stream` | `SearchService/SearchStream` | 検索（Server-Sent Events） |
 

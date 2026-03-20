@@ -134,6 +134,7 @@ graph LR
 | `commit()` | 保留中の変更をストレージにフラッシュ（ドキュメントが検索可能になる） |
 | `recover()` | クラッシュ後にWALをリプレイして未コミット状態を復元 |
 | `add_field(name, field_option)` | 稼働中のエンジンにフィールドを動的に追加し、更新後の `Schema` を返す |
+| `delete_field(name)` | 稼働中のエンジンからフィールドを動的に削除し、更新後の `Schema` を返す |
 | `schema()` | 現在の `Schema` への参照を返す |
 
 ### 検索

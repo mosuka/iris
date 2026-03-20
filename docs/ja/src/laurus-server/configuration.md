@@ -39,7 +39,7 @@ port = 50051
 http_port = 8080  # オプション: HTTP ゲートウェイを有効化
 
 [index]
-data_dir = "./laurus_data"
+data_dir = "./laurus_index"
 ```
 
 ログの詳細度は設定ファイルではなく、`RUST_LOG` 環境変数で制御します（デフォルト: `info`）。
@@ -58,7 +58,7 @@ data_dir = "./laurus_data"
 
 | フィールド | 型 | デフォルト | 説明 |
 | :--- | :--- | :--- | :--- |
-| `data_dir` | String | `"./laurus_data"` | インデックスデータディレクトリのパス |
+| `data_dir` | String | `"./laurus_index"` | インデックスデータディレクトリのパス |
 
 ## 環境変数
 
@@ -67,7 +67,7 @@ data_dir = "./laurus_data"
 | `LAURUS_HOST` | `server.host` | リッスンアドレス |
 | `LAURUS_PORT` | `server.port` | gRPC リッスンポート |
 | `LAURUS_HTTP_PORT` | `server.http_port` | HTTP ゲートウェイポート |
-| `LAURUS_DATA_DIR` | `index.data_dir` | インデックスデータディレクトリ |
+| `LAURUS_INDEX_DIR` | `index.data_dir` | インデックスデータディレクトリ |
 | `RUST_LOG` | -- | ログフィルタディレクティブ（例: `info`, `debug`, `laurus=debug,tonic=warn`） |
 | `LAURUS_CONFIG` | -- | TOML 設定ファイルのパス |
 
@@ -79,7 +79,7 @@ data_dir = "./laurus_data"
 | `--host <HOST>` | `-H` | `0.0.0.0` | リッスンアドレス |
 | `--port <PORT>` | `-p` | `50051` | gRPC リッスンポート |
 | `--http-port <PORT>` | -- | -- | HTTP ゲートウェイポート |
-| `--data-dir <PATH>` | -- | `./laurus_data` | インデックスデータディレクトリ（グローバルオプション） |
+| `--index-dir <PATH>` | -- | `./laurus_index` | インデックスデータディレクトリ（グローバルオプション） |
 
 ## よくある設定例
 
@@ -113,7 +113,7 @@ data_dir = "/var/lib/laurus/data"
 ### 最小構成（環境変数のみ）
 
 ```bash
-export LAURUS_DATA_DIR=/var/lib/laurus/data
+export LAURUS_INDEX_DIR=/var/lib/laurus/data
 export LAURUS_PORT=50051
 export LAURUS_HTTP_PORT=8080
 export RUST_LOG=info

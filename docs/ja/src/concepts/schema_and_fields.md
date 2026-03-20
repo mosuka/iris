@@ -231,12 +231,16 @@ let v: DataValue = vec![0.1f32, 0.2].into(); // Vector
 
 `_id` フィールドは Laurus の内部使用のために予約されています。外部ドキュメント ID を格納し、常に `KeywordAnalyzer`（完全一致）でインデクシングされます。スキーマに追加する必要はありません。自動的に管理されます。
 
-## 動的フィールド追加
+## 動的フィールド管理
+
+稼働中のエンジンに対して、フィールドの追加および削除を動的に行えます。
+フィールドの型変更はサポートされていません。
+
+### フィールドの追加
 
 `Engine::add_field()` を使用すると、稼働中のエンジンにフィールドを動的に追加できます。
-フィールドの追加のみサポートされており、削除や型の変更はできません。
 
-### Lexical フィールドの追加
+#### Lexical フィールドの追加
 
 ```rust,ignore
 let updated_schema = engine.add_field(
@@ -245,7 +249,7 @@ let updated_schema = engine.add_field(
 ).await?;
 ```
 
-### Vector フィールドの追加
+#### Vector フィールドの追加
 
 ```rust,ignore
 let updated_schema = engine.add_field(
@@ -255,6 +259,24 @@ let updated_schema = engine.add_field(
 ```
 
 既存のドキュメントには影響がありません（新しいフィールドの値が存在しないだけです）。
+
+### フィールドの削除
+
+`Engine::delete_field()` を使用すると、稼働中のエンジンからフィールドを動的に削除できます。
+
+```rust,ignore
+let updated_schema = engine.delete_field("category").await?;
+```
+
+フィールド削除時の動作は以下の通りです。
+
+- スキーマからフィールド定義が削除されます。
+- `default_fields` に含まれている場合、そこからも削除されます。
+- フィールドに紐づくアナライザーおよびエンベッダーの登録が解除されます。
+- 既にインデックスされたデータは物理的に残りますが、スキーマから削除されたフィールドにはアクセスできなくなります。
+
+### 共通の注意事項
+
 返却された `Schema` は呼び出し側で永続化する必要があります（例: `schema.toml` への書き出し）。
 
 ## スキーマ設計のヒント

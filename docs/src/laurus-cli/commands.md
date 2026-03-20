@@ -6,12 +6,12 @@ Every command accepts these options:
 
 | Option | Environment Variable | Default | Description |
 | :--- | :--- | :--- | :--- |
-| `--data-dir <PATH>` | `LAURUS_DATA_DIR` | `./laurus_data` | Path to the index data directory |
+| `--index-dir <PATH>` | `LAURUS_INDEX_DIR` | `./laurus_index` | Path to the index data directory |
 | `--format <FORMAT>` | — | `table` | Output format: `table` or `json` |
 
 ```bash
 # Example: use JSON output with a custom data directory
-laurus --data-dir /var/data/my_index --format json search "title:rust"
+laurus --index-dir /var/data/my_index --format json search "title:rust"
 ```
 
 ---
@@ -55,7 +55,7 @@ indexed = true
 **Example:**
 
 ```bash
-laurus --data-dir ./my_index create index --schema schema.toml
+laurus --index-dir ./my_index create index --schema schema.toml
 # Index created at ./my_index.
 ```
 
@@ -115,12 +115,12 @@ laurus create index --schema schema.toml
 
 ## `get` — Get a Resource
 
-### `get index`
+### `get stats`
 
 Display statistics about the index.
 
 ```bash
-laurus get index
+laurus get stats
 ```
 
 **Table output example:**
@@ -139,7 +139,7 @@ Vector fields:
 **JSON output example:**
 
 ```bash
-laurus --format json get index
+laurus --format json get stats
 ```
 
 ```json
@@ -152,6 +152,25 @@ laurus --format json get index
     }
   }
 }
+```
+
+### `get schema`
+
+Display the current index schema as JSON.
+
+```bash
+laurus get schema
+```
+
+**Example:**
+
+```bash
+laurus get schema
+# {
+#   "fields": { ... },
+#   "default_fields": ["title", "body"],
+#   ...
+# }
 ```
 
 ### `get doc`
@@ -233,7 +252,7 @@ laurus add doc --id doc1 --data '{"title":"Hello World","body":"This is a test d
 Dynamically add a new field to an existing index.
 
 ```bash
-laurus add field --data-dir ./data \
+laurus add field --index-dir ./data \
     --name category \
     --field-option '{"Text": {"indexed": true, "stored": true}}'
 ```
@@ -261,6 +280,24 @@ laurus delete doc --id doc1
 # Document 'doc1' deleted. Run 'commit' to persist changes.
 ```
 
+### `delete field`
+
+Remove a field from the index schema.
+
+```bash
+laurus delete field --name <FIELD_NAME>
+```
+
+**Example:**
+
+```bash
+laurus delete field --name category
+# Field 'category' deleted.
+```
+
+Existing indexed data for the field remains in storage but becomes
+inaccessible. Per-field analyzers and embedders are unregistered.
+
 ---
 
 ## `commit`
@@ -274,7 +311,7 @@ laurus commit
 **Example:**
 
 ```bash
-laurus --data-dir ./my_index commit
+laurus --index-dir ./my_index commit
 # Changes committed successfully.
 ```
 

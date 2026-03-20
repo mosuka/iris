@@ -39,7 +39,7 @@ port = 50051
 http_port = 8080  # Optional: enables HTTP Gateway
 
 [index]
-data_dir = "./laurus_data"
+data_dir = "./laurus_index"
 ```
 
 Log verbosity is controlled by the `RUST_LOG` environment variable (default: `info`), not through the config file.
@@ -58,7 +58,7 @@ Log verbosity is controlled by the `RUST_LOG` environment variable (default: `in
 
 | Field | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
-| `data_dir` | String | `"./laurus_data"` | Path to the index data directory |
+| `data_dir` | String | `"./laurus_index"` | Path to the index data directory |
 
 ## Environment Variables
 
@@ -67,7 +67,7 @@ Log verbosity is controlled by the `RUST_LOG` environment variable (default: `in
 | `LAURUS_HOST` | `server.host` | Listen address |
 | `LAURUS_PORT` | `server.port` | gRPC listen port |
 | `LAURUS_HTTP_PORT` | `server.http_port` | HTTP Gateway port |
-| `LAURUS_DATA_DIR` | `index.data_dir` | Index data directory |
+| `LAURUS_INDEX_DIR` | `index.data_dir` | Index data directory |
 | `RUST_LOG` | -- | Log filter directive (e.g. `info`, `debug`, `laurus=debug,tonic=warn`) |
 | `LAURUS_CONFIG` | -- | Path to TOML config file |
 
@@ -79,7 +79,7 @@ Log verbosity is controlled by the `RUST_LOG` environment variable (default: `in
 | `--host <HOST>` | `-H` | `0.0.0.0` | Listen address |
 | `--port <PORT>` | `-p` | `50051` | gRPC listen port |
 | `--http-port <PORT>` | -- | -- | HTTP Gateway port |
-| `--data-dir <PATH>` | -- | `./laurus_data` | Index data directory (global option) |
+| `--index-dir <PATH>` | -- | `./laurus_index` | Index data directory (global option) |
 
 ## Common Configurations
 
@@ -113,7 +113,7 @@ data_dir = "/var/lib/laurus/data"
 ### Minimal (environment variables only)
 
 ```bash
-export LAURUS_DATA_DIR=/var/lib/laurus/data
+export LAURUS_INDEX_DIR=/var/lib/laurus/data
 export LAURUS_PORT=50051
 export LAURUS_HTTP_PORT=8080
 export RUST_LOG=info

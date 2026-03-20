@@ -20,14 +20,14 @@ laurus serve [OPTIONS]
 Log verbosity is controlled by the standard `RUST_LOG` environment variable (default: `info`).
 See [env_logger syntax](https://docs.rs/env_logger/latest/env_logger/#enabling-logging) for filter directives such as `RUST_LOG=laurus=debug,tonic=warn`.
 
-The global `--data-dir` option (env: `LAURUS_DATA_DIR`) specifies the index data directory:
+The global `--index-dir` option (env: `LAURUS_INDEX_DIR`) specifies the index data directory:
 
 ```bash
 # Using CLI arguments
-laurus --data-dir ./my_index serve --port 8080
+laurus --index-dir ./my_index serve --port 8080
 
 # Using environment variables
-export LAURUS_DATA_DIR=./my_index
+export LAURUS_INDEX_DIR=./my_index
 export LAURUS_PORT=8080
 export RUST_LOG=debug
 laurus serve
