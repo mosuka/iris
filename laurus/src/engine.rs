@@ -354,6 +354,15 @@ impl Engine {
         self.schema.read().clone()
     }
 
+    /// Returns the embedder used by the vector store.
+    ///
+    /// This is useful for constructing a [`VectorQueryParser`] or
+    /// [`UnifiedQueryParser`] that shares the same embedder configuration
+    /// as the engine.
+    pub fn embedder(&self) -> Arc<dyn Embedder> {
+        self.vector.embedder()
+    }
+
     /// Dynamically add a new field to the engine at runtime.
     ///
     /// This method registers the field in both the engine schema and the

@@ -23,3 +23,12 @@ term_vectors = false
 [fields.release_date.Integer]
 indexed = true
 stored = true
+
+[embedders.clip_embedder]
+type = "candle_clip"
+model = "openai/clip-vit-base-patch32"
+
+[fields.poster_vec.Hnsw]
+dimension = 512
+distance = "Cosine"
+embedder = "clip_embedder"

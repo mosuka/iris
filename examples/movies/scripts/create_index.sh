@@ -7,8 +7,9 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 INDEX_DIR="$SCRIPT_DIR/../index"
 SCHEMA="$SCRIPT_DIR/../schema.toml"
 
-echo "==> Building laurus (release)..."
-cargo build --manifest-path "$PROJECT_ROOT/Cargo.toml" --release --bin laurus
+echo "==> Building laurus (release, embeddings-multimodal)..."
+cargo build --manifest-path "$PROJECT_ROOT/Cargo.toml" --release --bin laurus \
+  --features embeddings-multimodal
 LAURUS="$PROJECT_ROOT/target/release/laurus"
 
 echo "==> Creating movies index at $INDEX_DIR"
