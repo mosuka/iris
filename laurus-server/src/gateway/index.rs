@@ -116,3 +116,24 @@ pub async fn add_field(
 
     Ok(Json(json!({ "schema": schema_json })))
 }
+
+/// `DELETE /v1/schema/fields/:name` — Removes a field from the index schema.
+pub async fn delete_field(
+    State(mut state): State<GatewayState>,
+    axum::extract::Path(name): axum::extract::Path<String>,
+) -> Result<Json<Value>, Response> {
+    let response = state
+        .index_client
+        .delete_field(v1::DeleteFieldRequest { name })
+        .await
+        .map_err(|s| GatewayError(s).into_response())?;
+
+    let inner = response.into_inner();
+    let schema_json = inner
+        .schema
+        .as_ref()
+        .map(convert::proto_schema_to_json)
+        .unwrap_or(Value::Null);
+
+    Ok(Json(json!({ "schema": schema_json })))
+}

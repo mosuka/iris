@@ -182,6 +182,18 @@ impl PerFieldEmbedder {
         self.field_embedders.write().insert(field.into(), embedder);
     }
 
+    /// Remove the field-specific embedder for the given field.
+    ///
+    /// After removal, the field will fall back to the default embedder.
+    /// This method is a no-op if the field has no specific embedder configured.
+    ///
+    /// # Arguments
+    ///
+    /// * `field` - The field name whose embedder should be removed
+    pub fn remove_embedder(&self, field: &str) {
+        self.field_embedders.write().remove(field);
+    }
+
     /// Get the embedder for a specific field.
     ///
     /// Returns the field-specific embedder if configured, otherwise returns the default.

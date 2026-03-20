@@ -87,6 +87,18 @@ impl PerFieldAnalyzer {
         self.field_analyzers.write().insert(field.into(), analyzer);
     }
 
+    /// Remove the field-specific analyzer for the given field.
+    ///
+    /// After removal, the field will fall back to the default analyzer.
+    /// This method is a no-op if the field has no specific analyzer configured.
+    ///
+    /// # Arguments
+    ///
+    /// * `field` - The field name whose analyzer should be removed
+    pub fn remove_analyzer(&self, field: &str) {
+        self.field_analyzers.write().remove(field);
+    }
+
     /// Get the analyzer for a specific field.
     ///
     /// Returns the field-specific analyzer if configured, otherwise returns the default.

@@ -14,6 +14,9 @@ service IndexService {
 
   // Dynamically add a new field to the current index.
   rpc AddField(AddFieldRequest) returns (AddFieldResponse);
+
+  // Remove a field from the current index schema.
+  rpc DeleteField(DeleteFieldRequest) returns (DeleteFieldResponse);
 }
 
 // ---- Schema definitions ----
@@ -195,5 +198,15 @@ message AddFieldRequest {
 
 message AddFieldResponse {
   // The updated schema after the field has been added.
+  Schema schema = 1;
+}
+
+message DeleteFieldRequest {
+  // The name of the field to delete.
+  string name = 1;
+}
+
+message DeleteFieldResponse {
+  // The updated schema after the field has been removed.
   Schema schema = 1;
 }

@@ -11,7 +11,7 @@ mod index;
 mod search;
 
 use axum::Router;
-use axum::routing::{get, post, put};
+use axum::routing::{delete, get, post, put};
 use tonic::transport::Channel;
 
 use crate::proto::laurus::v1::document_service_client::DocumentServiceClient;
@@ -47,6 +47,7 @@ pub fn create_router(state: GatewayState) -> Router {
         .route("/v1/index", post(index::create).get(index::get_index))
         .route("/v1/schema", get(index::get_schema))
         .route("/v1/schema/fields", post(index::add_field))
+        .route("/v1/schema/fields/{name}", delete(index::delete_field))
         .route(
             "/v1/documents/{id}",
             put(document::put_document)

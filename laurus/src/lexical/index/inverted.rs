@@ -438,6 +438,14 @@ impl LexicalIndex for InvertedIndex {
         self.extra_fields.write().insert(name.to_string(), option);
         Ok(())
     }
+
+    fn delete_field(&self, name: &str) -> Result<()> {
+        // Only dynamically added fields (in extra_fields) can be removed at
+        // the index level. Fields from the initial config remain in the
+        // underlying index data but will be hidden from the engine-level schema.
+        self.extra_fields.write().remove(name);
+        Ok(())
+    }
 }
 
 #[cfg(test)]

@@ -20,7 +20,7 @@ use tracing::info;
 
 use laurus_server::proto::laurus::v1::{
     AddDocumentRequest, AddFieldRequest, CommitRequest, CreateIndexRequest, DeleteDocumentsRequest,
-    GetDocumentsRequest, GetIndexRequest, PutDocumentRequest, SearchRequest,
+    DeleteFieldRequest, GetDocumentsRequest, GetIndexRequest, PutDocumentRequest, SearchRequest,
     document_service_client::DocumentServiceClient, index_service_client::IndexServiceClient,
     search_service_client::SearchServiceClient,
 };
@@ -131,6 +131,13 @@ struct AddFieldParams {
     /// {"Integer": {}}
     /// ```
     field_option_json: String,
+}
+
+/// Parameters for the `delete_field` tool.
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+struct DeleteFieldParams {
+    /// The name of the field to remove from the index schema.
+    name: String,
 }
 
 // ── Server struct ─────────────────────────────────────────────────────────────
@@ -320,6 +327,49 @@ impl LaurusMcpServer {
                 )]))
             }
             Err(e) => Ok(Self::tool_error(format!("Failed to add field: {e}"))),
+        }
+    }
+
+    /// Remove a field from the index schema.
+    #[tool(
+        description = "Remove a field from the index schema. The field will no longer be available for indexing or searching, but existing data in the index is not deleted. Returns the updated schema."
+    )]
+    async fn delete_field(
+        &self,
+        Parameters(params): Parameters<DeleteFieldParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let channel = match self.channel.read().await.clone() {
+            Some(ch) => ch,
+            None => {
+                return Ok(Self::tool_error(
+                    "Not connected. Call the connect tool first.",
+                ));
+            }
+        };
+
+        let request = DeleteFieldRequest {
+            name: params.name.clone(),
+        };
+
+        match IndexServiceClient::new(channel).delete_field(request).await {
+            Ok(resp) => {
+                let r = resp.into_inner();
+                let output = if let Some(schema) = r.schema {
+                    let field_names: Vec<&String> = schema.fields.keys().collect();
+                    json!({
+                        "message": format!("Field '{}' deleted successfully.", params.name),
+                        "fields": field_names,
+                    })
+                } else {
+                    json!({
+                        "message": format!("Field '{}' deleted successfully.", params.name),
+                    })
+                };
+                Ok(CallToolResult::success(vec![Content::text(
+                    output.to_string(),
+                )]))
+            }
+            Err(e) => Ok(Self::tool_error(format!("Failed to delete field: {e}"))),
         }
     }
 
@@ -537,7 +587,7 @@ impl ServerHandler for LaurusMcpServer {
             .with_server_info(Implementation::from_build_env())
             .with_instructions(
                 "Laurus search engine MCP server (gRPC client). \
-             Tools: connect, create_index, get_index, add_field, add_document, get_document, \
+             Tools: connect, create_index, get_index, add_field, delete_field, add_document, get_document, \
              delete_document, commit, search. \
              Start by calling connect(endpoint) to connect to a running laurus-server, \
              then use the other tools to manage and search the index."

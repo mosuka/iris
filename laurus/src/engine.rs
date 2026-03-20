@@ -473,6 +473,64 @@ impl Engine {
         Ok(self.schema.read().clone())
     }
 
+    /// Dynamically remove a field from the engine schema at runtime.
+    ///
+    /// This removes the field definition from the schema so that it is no longer
+    /// available for indexing or searching. Existing data already stored in the
+    /// index is **not** deleted; it simply becomes inaccessible through the
+    /// normal query path.
+    ///
+    /// For lexical fields, the field is also removed from the underlying
+    /// [`LexicalStore`] (if it was dynamically added) and any per-field analyzer
+    /// is unregistered. For vector fields, the per-field embedder is
+    /// unregistered and writer/searcher caches are invalidated.
+    ///
+    /// If the deleted field appears in [`Schema::default_fields`], it is removed
+    /// from that list as well.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The name of the field to delete
+    ///
+    /// # Returns
+    ///
+    /// The updated [`Schema`] after the field has been removed.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - No field with the given name exists in the schema.
+    /// - The underlying store rejects the deletion.
+    pub async fn delete_field(&self, name: &str) -> Result<Schema> {
+        // 1. Check that the field exists.
+        let option = {
+            let schema = self.schema.read();
+            schema.fields.get(name).cloned().ok_or_else(|| {
+                crate::error::LaurusError::invalid_argument(format!(
+                    "Field '{name}' does not exist in the schema"
+                ))
+            })?
+        };
+
+        // 2. Remove from the appropriate store.
+        if option.is_lexical() {
+            self.lexical.delete_field(name)?;
+        }
+
+        if option.is_vector() {
+            self.vector.delete_field(name).await;
+        }
+
+        // 3. Update the schema.
+        {
+            let mut schema = self.schema.write();
+            schema.fields.remove(name);
+            schema.default_fields.retain(|f| f != name);
+        }
+
+        Ok(self.schema.read().clone())
+    }
+
     /// Resolve a [`LexicalSearchQuery`] into a concrete [`Query`] object.
     ///
     /// If the query is already an `Obj` variant, it is returned as-is.
@@ -1468,5 +1526,100 @@ mod tests {
         // schema() should reflect the addition.
         let current = engine.schema();
         assert!(current.fields.contains_key("body"));
+    }
+
+    #[tokio::test]
+    async fn test_delete_lexical_field() {
+        let storage: Arc<dyn Storage> = Arc::new(MemoryStorage::new(Default::default()));
+
+        let schema = Schema::builder()
+            .add_field(
+                "title",
+                schema::FieldOption::Text(crate::lexical::core::field::TextOption::default()),
+            )
+            .build();
+
+        let engine = Engine::new(storage, schema).await.unwrap();
+
+        // Dynamically add a "category" field, then delete it.
+        engine
+            .add_field(
+                "category",
+                schema::FieldOption::Text(crate::lexical::core::field::TextOption::default()),
+            )
+            .await
+            .unwrap();
+        assert!(engine.schema().fields.contains_key("category"));
+
+        let updated = engine.delete_field("category").await.unwrap();
+        assert!(!updated.fields.contains_key("category"));
+        assert!(updated.fields.contains_key("title"));
+    }
+
+    #[tokio::test]
+    async fn test_delete_field_removes_from_default_fields() {
+        let storage: Arc<dyn Storage> = Arc::new(MemoryStorage::new(Default::default()));
+
+        let schema = Schema::builder()
+            .add_field(
+                "title",
+                schema::FieldOption::Text(crate::lexical::core::field::TextOption::default()),
+            )
+            .add_default_field("title")
+            .build();
+
+        let engine = Engine::new(storage, schema).await.unwrap();
+
+        let updated = engine.delete_field("title").await.unwrap();
+        assert!(!updated.fields.contains_key("title"));
+        assert!(!updated.default_fields.contains(&"title".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_delete_field_nonexistent_rejected() {
+        let storage: Arc<dyn Storage> = Arc::new(MemoryStorage::new(Default::default()));
+        let schema = Schema::new();
+
+        let engine = Engine::new(storage, schema).await.unwrap();
+
+        let result = engine.delete_field("nonexistent").await;
+        assert!(result.is_err(), "Deleting a nonexistent field should fail");
+    }
+
+    #[tokio::test]
+    async fn test_delete_vector_field() {
+        let storage: Arc<dyn Storage> = Arc::new(MemoryStorage::new(Default::default()));
+
+        let schema = Schema::builder()
+            .add_field(
+                "title",
+                schema::FieldOption::Text(crate::lexical::core::field::TextOption::default()),
+            )
+            .build();
+
+        let dummy_embedder = Arc::new(PrecomputedEmbedder::new());
+        let per_field = PerFieldEmbedder::new(dummy_embedder);
+
+        let engine = Engine::builder(storage, schema)
+            .embedder(Arc::new(per_field))
+            .build()
+            .await
+            .unwrap();
+
+        // Add then delete a vector field.
+        engine
+            .add_field(
+                "embedding",
+                schema::FieldOption::Hnsw(crate::vector::core::field::HnswOption {
+                    dimension: 4,
+                    ..Default::default()
+                }),
+            )
+            .await
+            .unwrap();
+        assert!(engine.schema().fields.contains_key("embedding"));
+
+        let updated = engine.delete_field("embedding").await.unwrap();
+        assert!(!updated.fields.contains_key("embedding"));
     }
 }
