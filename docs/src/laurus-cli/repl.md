@@ -8,12 +8,20 @@ The REPL provides an interactive session for exploring your index without typing
 laurus --index-dir ./my_index repl
 ```
 
+If an index already exists at the specified directory, it is opened automatically:
+
 ```text
 Laurus REPL (type 'help' for commands, 'quit' to exit)
 laurus>
 ```
 
-The REPL opens the index at startup and keeps it loaded throughout the session.
+If no index exists yet, the REPL starts without a loaded index and guides you to create one:
+
+```text
+Laurus REPL — no index found at ./my_index.
+Use 'create index <schema_path>' to create one, or 'help' for commands.
+laurus>
+```
 
 ## Available Commands
 
@@ -21,6 +29,8 @@ Commands follow the same `<operation> <resource>` ordering as the CLI.
 
 | Command | Description |
 | :--- | :--- |
+| `create index [schema_path]` | Create a new index (interactive wizard if no path given) |
+| `create schema <output_path>` | Interactive schema generation wizard |
 | `search <query>` | Search the index |
 | `add field <name> <json>` | Add a field to the schema |
 | `add doc <id> <json>` | Add a document |
@@ -33,7 +43,18 @@ Commands follow the same `<operation> <resource>` ordering as the CLI.
 | `help` | Show available commands |
 | `quit` / `exit` | Exit the REPL |
 
+> **Note:** Commands other than `create`, `help`, and `quit` require a loaded index. If no index is loaded, the REPL displays a message asking you to run `create index` first.
+
 ## Usage Examples
+
+### Creating an Index
+
+```text
+laurus> create index ./schema.toml
+Index created at ./my_index.
+laurus> add doc doc1 {"title":"Hello","body":"World"}
+Document 'doc1' added.
+```
 
 ### Searching
 

@@ -1,28 +1,36 @@
 //! Interactive Read-Eval-Print Loop (REPL) for the laurus search engine.
 //!
-//! Provides a terminal-based interactive session where users can search the
-//! index, add/get/delete fields and documents, commit changes, and view index
-//! statistics without restarting the CLI. Command history is supported via
-//! `rustyline`.
+//! Provides a terminal-based interactive session where users can create
+//! indexes, search the index, add/get/delete fields and documents, commit
+//! changes, and view index statistics without restarting the CLI. Command
+//! history is supported via `rustyline`.
 //!
 //! Commands follow the same `<operation> <resource>` ordering as the CLI
-//! (e.g. `add doc`, `delete field`, `get index`).
+//! (e.g. `add doc`, `delete field`, `get stats`).
+//!
+//! If no index exists in the configured `--index-dir`, the REPL starts
+//! without a loaded index and prompts the user to run `create index` or
+//! `create schema` first.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use laurus::lexical::query::parser::QueryParser;
 use laurus::{Document, Engine, FieldOption, LexicalSearchRequest, Schema, SearchRequestBuilder};
 use rustyline::DefaultEditor;
 
+use crate::commands::create;
 use crate::context;
 use crate::output::{self, OutputFormat};
 
+/// Error message shown when a command requires an open index but none is loaded.
+const NO_INDEX_MSG: &str = "No index loaded. Use 'create index <schema_path>' first.";
+
 /// Run the interactive REPL session.
 ///
-/// Opens the index and enters a read-eval-print loop that accepts commands
-/// from the user via a `rustyline` prompt. Supported commands mirror the CLI
-/// structure: `search`, `add`, `get`, `delete`, `commit`, `help`, and `quit`.
+/// If an index already exists at `index_dir`, it is opened automatically.
+/// Otherwise the REPL starts without a loaded index and the user can create
+/// one interactively via `create index` or `create schema`.
 ///
 /// # Arguments
 ///
@@ -36,21 +44,22 @@ use crate::output::{self, OutputFormat};
 ///
 /// # Errors
 ///
-/// Returns an error if:
-/// - The index cannot be opened.
-/// - The schema file cannot be read or parsed.
-/// - The readline editor fails to initialise.
+/// Returns an error if the readline editor fails to initialise.
 pub async fn run(index_dir: &Path, format: OutputFormat) -> Result<()> {
-    let engine = context::open_index(index_dir).await?;
-
-    // Read schema for default fields.
-    let schema_toml = std::fs::read_to_string(index_dir.join("schema.toml"))
-        .context("Failed to read schema file")?;
-    let schema: Schema = toml::from_str(&schema_toml).context("Failed to parse schema TOML")?;
+    // Try to open an existing index; if it fails, start without one.
+    let (mut engine, mut schema) = match try_open_index(index_dir).await {
+        Some((e, s)) => (Some(e), Some(s)),
+        None => (None, None),
+    };
 
     let mut rl = DefaultEditor::new()?;
 
-    println!("Laurus REPL (type 'help' for commands, 'quit' to exit)");
+    if engine.is_some() {
+        println!("Laurus REPL (type 'help' for commands, 'quit' to exit)");
+    } else {
+        println!("Laurus REPL — no index found at {}.", index_dir.display());
+        println!("Use 'create index <schema_path>' to create one, or 'help' for commands.");
+    }
 
     loop {
         let line = match rl.readline("laurus> ") {
@@ -79,37 +88,75 @@ pub async fn run(index_dir: &Path, format: OutputFormat) -> Result<()> {
                 Ok(())
             }
             "quit" | "exit" => break,
+            "create" => {
+                if parts.len() < 2 {
+                    eprintln!("Usage: create <index|schema> ...");
+                    continue;
+                }
+                handle_create(
+                    index_dir,
+                    parts[1],
+                    parts.get(2).copied(),
+                    &mut engine,
+                    &mut schema,
+                )
+                .await
+            }
             "search" => {
                 if parts.len() < 2 {
                     eprintln!("Usage: search <query>");
                     continue;
                 }
+                let Some(ref eng) = engine else {
+                    eprintln!("{NO_INDEX_MSG}");
+                    continue;
+                };
+                let Some(ref sch) = schema else {
+                    eprintln!("{NO_INDEX_MSG}");
+                    continue;
+                };
                 let query_str = parts[1..].join(" ");
-                handle_search(&engine, &schema, &query_str, format).await
+                handle_search(eng, sch, &query_str, format).await
             }
             "add" => {
                 if parts.len() < 2 {
                     eprintln!("Usage: add <field|doc> ...");
                     continue;
                 }
-                handle_add(&engine, index_dir, parts[1], parts.get(2).copied()).await
+                let Some(ref eng) = engine else {
+                    eprintln!("{NO_INDEX_MSG}");
+                    continue;
+                };
+                handle_add(eng, index_dir, parts[1], parts.get(2).copied()).await
             }
             "get" => {
                 if parts.len() < 2 {
                     eprintln!("Usage: get <stats|schema|doc> ...");
                     continue;
                 }
-                handle_get(&engine, index_dir, parts[1], parts.get(2).copied(), format).await
+                let Some(ref eng) = engine else {
+                    eprintln!("{NO_INDEX_MSG}");
+                    continue;
+                };
+                handle_get(eng, index_dir, parts[1], parts.get(2).copied(), format).await
             }
             "delete" => {
                 if parts.len() < 2 {
                     eprintln!("Usage: delete <field|doc> ...");
                     continue;
                 }
-                handle_delete(&engine, index_dir, parts[1], parts.get(2).copied()).await
+                let Some(ref eng) = engine else {
+                    eprintln!("{NO_INDEX_MSG}");
+                    continue;
+                };
+                handle_delete(eng, index_dir, parts[1], parts.get(2).copied()).await
             }
             "commit" => {
-                engine.commit().await?;
+                let Some(ref eng) = engine else {
+                    eprintln!("{NO_INDEX_MSG}");
+                    continue;
+                };
+                eng.commit().await?;
                 println!("Changes committed.");
                 Ok(())
             }
@@ -131,10 +178,34 @@ pub async fn run(index_dir: &Path, format: OutputFormat) -> Result<()> {
     Ok(())
 }
 
+/// Try to open an existing index. Returns `None` if the index does not exist.
+async fn try_open_index(index_dir: &Path) -> Option<(Engine, Schema)> {
+    let schema_path = index_dir.join("schema.toml");
+    if !schema_path.exists() {
+        return None;
+    }
+
+    match context::open_index(index_dir).await {
+        Ok(engine) => match context::read_schema(index_dir) {
+            Ok(schema) => Some((engine, schema)),
+            Err(e) => {
+                eprintln!("Warning: failed to read schema: {e:#}");
+                None
+            }
+        },
+        Err(e) => {
+            eprintln!("Warning: failed to open index: {e:#}");
+            None
+        }
+    }
+}
+
 fn print_help() {
     println!(
         "\
 Available commands:
+  create index [schema_path]   Create a new index (interactive wizard if no path given)
+  create schema <output_path>  Interactive schema generation wizard
   search <query>               Search the index
   add field <name> <json>      Add a field to the schema
   add doc <id> <json>          Add a document
@@ -147,6 +218,64 @@ Available commands:
   help                         Show this help
   quit                         Exit the REPL"
     );
+}
+
+/// Handle `create index ...` and `create schema ...` commands.
+///
+/// # Arguments
+///
+/// * `index_dir` - Path to the index directory.
+/// * `resource` - The resource type (`index` or `schema`).
+/// * `rest` - Remaining arguments (file path).
+/// * `engine` - Mutable reference to the optional engine slot.
+/// * `schema` - Mutable reference to the optional schema slot.
+async fn handle_create(
+    index_dir: &Path,
+    resource: &str,
+    rest: Option<&str>,
+    engine: &mut Option<Engine>,
+    schema: &mut Option<Schema>,
+) -> Result<()> {
+    match resource {
+        "index" => {
+            match rest {
+                Some(schema_path_str) => {
+                    let schema_path = PathBuf::from(schema_path_str);
+                    context::create_index(index_dir, &schema_path).await?;
+                }
+                None => {
+                    // If schema.toml already exists, use it directly instead
+                    // of launching the wizard (recovery for missing store/).
+                    if index_dir.join("schema.toml").exists() {
+                        let existing = context::read_schema(index_dir)?;
+                        context::create_index_from_schema(index_dir, existing).await?;
+                    } else {
+                        let new_schema = create::build_schema_interactive()?;
+                        context::create_index_from_schema(index_dir, new_schema).await?;
+                    }
+                }
+            }
+
+            // Open the newly created index.
+            let eng = context::open_index(index_dir).await?;
+            let sch = context::read_schema(index_dir)?;
+            *engine = Some(eng);
+            *schema = Some(sch);
+
+            println!("Index created at {}.", index_dir.display());
+            Ok(())
+        }
+        "schema" => {
+            let output_str = rest.context("Usage: create schema <output_path>")?;
+            let output = PathBuf::from(output_str);
+            create::run_schema(&output)?;
+            Ok(())
+        }
+        _ => {
+            eprintln!("Unknown resource: '{resource}'. Use index or schema.");
+            Ok(())
+        }
+    }
 }
 
 async fn handle_search(
@@ -211,7 +340,7 @@ async fn handle_add(
     }
 }
 
-/// Handle `get index`, `get schema`, and `get doc ...` commands.
+/// Handle `get stats`, `get schema`, and `get doc ...` commands.
 async fn handle_get(
     engine: &Engine,
     index_dir: &Path,
