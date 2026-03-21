@@ -23,7 +23,7 @@ test: ## Test the project
 	cargo test --workspace
 
 build: ## Build the project
-	cargo build --release
+	cargo build --release --all-features
 
 bench: ## Benchmark the project
 	cargo bench --bench bench
