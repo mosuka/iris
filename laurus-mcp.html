@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-fa2a7027.js";
+            window.path_to_searchindex_js = "searchindex-6f488e78.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-710721a4.js"></script>
@@ -202,10 +202,10 @@ tool calls to a <code>laurus-server</code> instance via gRPC. The <code>laurus-s
 started separately before (or after) the MCP server.</p>
 <h2 id="quick-start"><a class="header" href="#quick-start">Quick Start</a></h2>
 <pre><code class="language-bash"># Step 1: Start the laurus-server
-laurus serve --grpc-port 50051
+laurus serve --port 50051
 
 # Step 2: Configure Claude Code and start the MCP server
-claude mcp add laurus laurus mcp --endpoint http://localhost:50051
+claude mcp add laurus -- laurus mcp --endpoint http://localhost:50051
 </code></pre>
 <p>Or with a manual configuration:</p>
 <pre><code class="language-json">{

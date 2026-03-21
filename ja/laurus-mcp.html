@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-bade8331.js";
+            window.path_to_searchindex_js = "searchindex-354913be.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-d18ed058.js"></script>
@@ -203,10 +203,10 @@
 <p>MCP サーバーは AI クライアントによって起動される子プロセスとして動作します。すべてのツール呼び出しを gRPC 経由で <code>laurus-server</code> インスタンスにプロキシします。<code>laurus-server</code> は MCP サーバーとは別途、事前に起動しておく必要があります。</p>
 <h2 id="クイックスタート"><a class="header" href="#クイックスタート">クイックスタート</a></h2>
 <pre><code class="language-bash"># ステップ 1: laurus-server を起動
-laurus serve --grpc-port 50051
+laurus serve --port 50051
 
 # ステップ 2: Claude Code で MCP サーバーを設定
-claude mcp add laurus laurus mcp --endpoint http://localhost:50051
+claude mcp add laurus -- laurus mcp --endpoint http://localhost:50051
 </code></pre>
 <p>または手動で設定ファイルを編集：</p>
 <pre><code class="language-json">{

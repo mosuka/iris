@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-bade8331.js";
+            window.path_to_searchindex_js = "../searchindex-354913be.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-d18ed058.js"></script>
@@ -189,12 +189,12 @@
 </ul>
 <h2 id="設定"><a class="header" href="#設定">設定</a></h2>
 <h3 id="ステップ-1-laurus-server-を起動"><a class="header" href="#ステップ-1-laurus-server-を起動">ステップ 1: laurus-server を起動</a></h3>
-<pre><code class="language-bash">laurus serve --grpc-port 50051
+<pre><code class="language-bash">laurus serve --port 50051
 </code></pre>
 <h3 id="ステップ-2-mcp-クライアントの設定"><a class="header" href="#ステップ-2-mcp-クライアントの設定">ステップ 2: MCP クライアントの設定</a></h3>
 <h4 id="claude-code"><a class="header" href="#claude-code">Claude Code</a></h4>
 <p>CLI コマンドで追加する方法（推奨）：</p>
-<pre><code class="language-bash">claude mcp add laurus laurus mcp --endpoint http://localhost:50051
+<pre><code class="language-bash">claude mcp add laurus -- laurus mcp --endpoint http://localhost:50051
 </code></pre>
 <p>または <code>~/.claude/settings.json</code> を直接編集：</p>
 <pre><code class="language-json">{
@@ -207,8 +207,12 @@
 }
 </code></pre>
 <h4 id="claude-desktop"><a class="header" href="#claude-desktop">Claude Desktop</a></h4>
-<p>macOS の場合は <code>~/Library/Application Support/Claude/claude_desktop_config.json</code>、
-Windows の場合は <code>%APPDATA%\Claude\claude_desktop_config.json</code> を編集：</p>
+<p>以下の設定ファイルを編集：</p>
+<ul>
+<li><strong>macOS:</strong> <code>~/Library/Application Support/Claude/claude_desktop_config.json</code></li>
+<li><strong>Windows:</strong> <code>%APPDATA%\Claude\claude_desktop_config.json</code></li>
+<li><strong>Linux:</strong> <code>~/.config/Claude/claude_desktop_config.json</code></li>
+</ul>
 <pre><code class="language-json">{
   "mcpServers": {
     "laurus": {
@@ -231,31 +235,49 @@ Text = { indexed = true, stored = true }
 EOF
 
 # ステップ 2: サーバーを起動してインデックスを作成
-laurus serve --grpc-port 50051 &amp;
+laurus serve --port 50051 &amp;
 laurus create index --schema schema.toml
 
-# ステップ 3: MCP サーバーを起動（Claude が自動的に起動）
-laurus mcp --endpoint http://localhost:50051
+# ステップ 3: MCP サーバーを Claude Code に登録
+claude mcp add laurus -- laurus mcp --endpoint http://localhost:50051
 </code></pre>
 <h3 id="ワークフロー-2-ai-主導のインデックス作成"><a class="header" href="#ワークフロー-2-ai-主導のインデックス作成">ワークフロー 2: AI 主導のインデックス作成</a></h3>
-<p>インデックスを事前に作成せず MCP サーバーを起動し、AI にインデックスを作成させます：</p>
-<pre><code class="language-bash"># laurus-server を起動（インデックス不要）
-laurus serve --grpc-port 50051
+<p>laurus-server を起動してから MCP サーバーを登録し、AI にインデックスを作成させます：</p>
+<pre><code class="language-bash"># ステップ 1: laurus-server を起動（インデックス不要）
+laurus serve --port 50051
+
+# ステップ 2: MCP サーバーを Claude Code に登録
+claude mcp add laurus -- laurus mcp --endpoint http://localhost:50051
 </code></pre>
 <p>次に Claude に依頼します：</p>
 <blockquote>
 <p>「ブログ記事用の検索インデックスを作成してください。タイトルと本文テキストで検索できるようにして、著者と公開日も保存したいです。」</p>
 </blockquote>
-<p>Claude は <code>connect</code> ツールを呼び出して接続し、スキーマを設計して <code>create_index</code> を自動的に呼び出します。</p>
+<p>Claude はスキーマを設計して <code>create_index</code> を自動的に呼び出します。</p>
 <h3 id="ワークフロー-3-実行時に接続する"><a class="header" href="#ワークフロー-3-実行時に接続する">ワークフロー 3: 実行時に接続する</a></h3>
-<p>エンドポイントを指定せずに MCP サーバーを起動します：</p>
-<pre><code class="language-bash">laurus mcp
+<p>エンドポイントを指定せずに MCP サーバーを登録します：</p>
+<pre><code class="language-bash">claude mcp add laurus -- laurus mcp
+</code></pre>
+<p>または設定ファイルを直接編集：</p>
+<pre><code class="language-json">{
+  "mcpServers": {
+    "laurus": {
+      "command": "laurus",
+      "args": ["mcp"]
+    }
+  }
+}
 </code></pre>
 <p>次に Claude に接続を依頼します：</p>
 <blockquote>
 <p>「<code>http://localhost:50051</code> の laurus サーバーに接続してください」</p>
 </blockquote>
 <p>Claude は他のツールを使用する前に <code>connect</code> を呼び出します。</p>
+<h2 id="mcp-サーバーの削除"><a class="header" href="#mcp-サーバーの削除">MCP サーバーの削除</a></h2>
+<p>Claude Code から登録済みの MCP サーバーを削除するには：</p>
+<pre><code class="language-bash">claude mcp remove laurus
+</code></pre>
+<p>Claude Desktop の場合は、設定ファイルから <code>laurus</code> エントリを削除してアプリケーションを再起動してください。</p>
 <h2 id="ライフサイクル"><a class="header" href="#ライフサイクル">ライフサイクル</a></h2>
 <pre><code class="language-text">laurus-server 起動（別プロセス）
   └─ gRPC ポート 50051 でリッスン

@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-fa2a7027.js";
+            window.path_to_searchindex_js = "../searchindex-6f488e78.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-710721a4.js"></script>
@@ -186,12 +186,12 @@
 </ul>
 <h2 id="configuration"><a class="header" href="#configuration">Configuration</a></h2>
 <h3 id="step-1-start-laurus-server"><a class="header" href="#step-1-start-laurus-server">Step 1: Start laurus-server</a></h3>
-<pre><code class="language-bash">laurus serve --grpc-port 50051
+<pre><code class="language-bash">laurus serve --port 50051
 </code></pre>
 <h3 id="step-2-configure-the-mcp-client"><a class="header" href="#step-2-configure-the-mcp-client">Step 2: Configure the MCP client</a></h3>
 <h4 id="claude-code"><a class="header" href="#claude-code">Claude Code</a></h4>
 <p>Use the CLI command (recommended):</p>
-<pre><code class="language-bash">claude mcp add laurus laurus mcp --endpoint http://localhost:50051
+<pre><code class="language-bash">claude mcp add laurus -- laurus mcp --endpoint http://localhost:50051
 </code></pre>
 <p>Or edit <code>~/.claude/settings.json</code> directly:</p>
 <pre><code class="language-json">{
@@ -204,8 +204,12 @@
 }
 </code></pre>
 <h4 id="claude-desktop"><a class="header" href="#claude-desktop">Claude Desktop</a></h4>
-<p>Edit <code>~/Library/Application Support/Claude/claude_desktop_config.json</code> (macOS)
-or <code>%APPDATA%\Claude\claude_desktop_config.json</code> (Windows):</p>
+<p>Edit the configuration file for your platform:</p>
+<ul>
+<li><strong>macOS:</strong> <code>~/Library/Application Support/Claude/claude_desktop_config.json</code></li>
+<li><strong>Windows:</strong> <code>%APPDATA%\Claude\claude_desktop_config.json</code></li>
+<li><strong>Linux:</strong> <code>~/.config/Claude/claude_desktop_config.json</code></li>
+</ul>
 <pre><code class="language-json">{
   "mcpServers": {
     "laurus": {
@@ -228,33 +232,50 @@ Text = { indexed = true, stored = true }
 EOF
 
 # Step 2: Start the server and create the index
-laurus serve --grpc-port 50051 &amp;
+laurus serve --port 50051 &amp;
 laurus create index --schema schema.toml
 
-# Step 3: Start the MCP server (done automatically by Claude)
-laurus mcp --endpoint http://localhost:50051
+# Step 3: Register the MCP server with Claude Code
+claude mcp add laurus -- laurus mcp --endpoint http://localhost:50051
 </code></pre>
 <h3 id="workflow-2-ai-driven-index-creation"><a class="header" href="#workflow-2-ai-driven-index-creation">Workflow 2: AI-driven index creation</a></h3>
-<p>Start the MCP server without a pre-created index, then ask the AI to create one:</p>
-<pre><code class="language-bash"># Start laurus-server (no index required)
-laurus serve --grpc-port 50051
+<p>Start laurus-server first, then register the MCP server and let the AI create the index:</p>
+<pre><code class="language-bash"># Step 1: Start laurus-server (no index required)
+laurus serve --port 50051
+
+# Step 2: Register the MCP server with Claude Code
+claude mcp add laurus -- laurus mcp --endpoint http://localhost:50051
 </code></pre>
 <p>Then ask Claude:</p>
 <blockquote>
 <p>“Create a search index for blog posts. I need to search by title and body text,
 and I want to store the author and publication date.”</p>
 </blockquote>
-<p>Claude will call the <code>connect</code> tool (if not already connected), then design the
-schema and call <code>create_index</code> automatically.</p>
+<p>Claude will design the schema and call <code>create_index</code> automatically.</p>
 <h3 id="workflow-3-connect-at-runtime"><a class="header" href="#workflow-3-connect-at-runtime">Workflow 3: Connect at runtime</a></h3>
-<p>Start the MCP server without specifying an endpoint:</p>
-<pre><code class="language-bash">laurus mcp
+<p>Register the MCP server without specifying an endpoint:</p>
+<pre><code class="language-bash">claude mcp add laurus -- laurus mcp
+</code></pre>
+<p>Or edit the settings file directly:</p>
+<pre><code class="language-json">{
+  "mcpServers": {
+    "laurus": {
+      "command": "laurus",
+      "args": ["mcp"]
+    }
+  }
+}
 </code></pre>
 <p>Then ask Claude to connect:</p>
 <blockquote>
 <p>“Connect to the laurus server at <code>http://localhost:50051</code>”</p>
 </blockquote>
 <p>Claude will call <code>connect(endpoint: "http://localhost:50051")</code> before using other tools.</p>
+<h2 id="removing-the-mcp-server"><a class="header" href="#removing-the-mcp-server">Removing the MCP Server</a></h2>
+<p>To remove the registered MCP server from Claude Code:</p>
+<pre><code class="language-bash">claude mcp remove laurus
+</code></pre>
+<p>For Claude Desktop, remove the <code>laurus</code> entry from the configuration file and restart the application.</p>
 <h2 id="lifecycle"><a class="header" href="#lifecycle">Lifecycle</a></h2>
 <pre><code class="language-text">laurus-server starts (separate process)
   └─ listens on gRPC port 50051
