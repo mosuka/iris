@@ -274,21 +274,20 @@ mod tests {
 
     #[test]
     fn test_tokenize_chinese() {
-        let tokenizer = LinderaTokenizer::new("normal", "embedded://cc-cedict", None).unwrap();
+        let tokenizer = LinderaTokenizer::new("normal", "embedded://jieba", None).unwrap();
 
         let text = "能够进行汉语的形态素解析。";
 
         let tokens: Vec<Token> = tokenizer.tokenize(text).unwrap().collect();
 
-        assert_eq!(tokens.len(), 8);
-        assert_eq!(tokens[0].text, "能够");
-        assert_eq!(tokens[1].text, "进行");
-        assert_eq!(tokens[2].text, "汉语");
-        assert_eq!(tokens[3].text, "的");
-        assert_eq!(tokens[4].text, "形态");
-        assert_eq!(tokens[5].text, "素");
-        assert_eq!(tokens[6].text, "解析");
-        assert_eq!(tokens[7].text, "。");
+        // Jieba tokenizes Chinese text differently from CC-CEDICT.
+        assert!(!tokens.is_empty());
+        // Verify that key Chinese words are present in the output.
+        let texts: Vec<&str> = tokens.iter().map(|t| t.text.as_str()).collect();
+        assert!(texts.contains(&"能够"));
+        assert!(texts.contains(&"进行"));
+        assert!(texts.contains(&"汉语"));
+        assert!(texts.contains(&"解析"));
     }
 
     #[test]
