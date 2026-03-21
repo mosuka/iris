@@ -6,7 +6,7 @@ description = "gRPC server for the Laurus search engine"
 documentation.workspace = true
 homepage.workspace = true
 repository.workspace = true
-readme.workspace = true
+readme = "README.md"
 keywords.workspace = true
 categories.workspace = true
 license.workspace = true
@@ -19,6 +19,7 @@ path = "src/lib.rs"
 anyhow = { workspace = true }
 axum = { workspace = true }
 chrono = { workspace = true }
+laurus = { workspace = true }
 prost = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -29,8 +30,6 @@ tonic = { workspace = true }
 tonic-prost = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
-
-laurus = { workspace = true }
 
 [build-dependencies]
 tonic-build = { workspace = true }

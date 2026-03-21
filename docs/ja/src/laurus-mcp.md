@@ -29,10 +29,10 @@ MCP サーバーは AI クライアントによって起動される子プロセ
 
 ```bash
 # ステップ 1: laurus-server を起動
-laurus serve --grpc-port 50051
+laurus serve --port 50051
 
 # ステップ 2: Claude Code で MCP サーバーを設定
-claude mcp add laurus laurus mcp --endpoint http://localhost:50051
+claude mcp add laurus -- laurus mcp --endpoint http://localhost:50051
 ```
 
 または手動で設定ファイルを編集：

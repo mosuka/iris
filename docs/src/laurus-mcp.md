@@ -31,10 +31,10 @@ started separately before (or after) the MCP server.
 
 ```bash
 # Step 1: Start the laurus-server
-laurus serve --grpc-port 50051
+laurus serve --port 50051
 
 # Step 2: Configure Claude Code and start the MCP server
-claude mcp add laurus laurus mcp --endpoint http://localhost:50051
+claude mcp add laurus -- laurus mcp --endpoint http://localhost:50051
 ```
 
 Or with a manual configuration:

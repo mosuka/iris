@@ -6,7 +6,7 @@ description = "MCP (Model Context Protocol) server for the Laurus search engine"
 documentation.workspace = true
 homepage.workspace = true
 repository.workspace = true
-readme.workspace = true
+readme = "README.md"
 keywords = ["search", "mcp", "model-context-protocol", "indexing"]
 categories = ["text-processing"]
 license.workspace = true
@@ -18,6 +18,8 @@ path = "src/lib.rs"
 [dependencies]
 anyhow = { workspace = true }
 chrono = { workspace = true }
+laurus = { workspace = true }
+laurus-server = { workspace = true }
 rmcp = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -25,9 +27,6 @@ thiserror = { workspace = true }
 tokio = { workspace = true }
 tonic = { workspace = true }
 tracing = { workspace = true }
-
-laurus = { workspace = true }
-laurus-server = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
