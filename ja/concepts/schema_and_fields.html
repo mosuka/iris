@@ -183,7 +183,7 @@
                         <h1 id="スキーマとフィールド"><a class="header" href="#スキーマとフィールド">スキーマとフィールド</a></h1>
 <p><code>Schema</code> はドキュメントの構造を定義します。どのフィールドが存在し、各フィールドがどのようにインデクシングされるかを指定します。Schema は Engine にとって唯一の情報源です。</p>
 <blockquote>
-<p>CLI で使用される TOML ファイル形式については、<a href="../cli/schema_format.html">スキーマフォーマットリファレンス</a>を参照してください。</p>
+<p>CLI で使用される TOML ファイル形式については、<a href="../laurus-cli/schema_format.html">スキーマフォーマットリファレンス</a>を参照してください。</p>
 </blockquote>
 <h2 id="schema"><a class="header" href="#schema">Schema</a></h2>
 <p><code>Schema</code> は名前付きフィールドのコレクションです。各フィールドは<strong>Lexical フィールド</strong>（キーワード検索用）または <strong>Vector フィールド</strong>（類似度検索用）のいずれかです。</p>
@@ -454,7 +454,7 @@ let v: DataValue = vec![0.1f32, 0.2].into(); // Vector
 <p><strong>デフォルトフィールドを設定する</strong> — Query DSL を使用する場合、デフォルトフィールドを設定することで、ユーザーは <code>body:hello</code> の代わりに <code>hello</code> と記述できます。</p>
 </li>
 <li>
-<p><strong>スキーマジェネレータを使用する</strong> — <code>laurus create schema</code> を実行して、手書きの代わりにインタラクティブにスキーマ TOML ファイルを構築できます。詳細は <a href="../cli/commands.html#create-schema">CLI コマンド</a>を参照。</p>
+<p><strong>スキーマジェネレータを使用する</strong> — <code>laurus create schema</code> を実行して、手書きの代わりにインタラクティブにスキーマ TOML ファイルを構築できます。詳細は <a href="../laurus-cli/commands.html#create-schema">CLI コマンド</a>を参照。</p>
 </li>
 </ol>
 

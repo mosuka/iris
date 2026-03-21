@@ -241,9 +241,9 @@
 <tr><td style="text-align: left"><a href="#インデキシングindexing">インデクシング</a></td><td style="text-align: left">転置インデックスと Vector インデックスの内部動作</td></tr>
 <tr><td style="text-align: left"><a href="#検索search">検索</a></td><td style="text-align: left">クエリの種類、Vector 検索、ハイブリッド融合</td></tr>
 <tr><td style="text-align: left"><a href="#query-dsl-2">Query DSL</a></td><td style="text-align: left">すべての検索タイプに対応した人間が読みやすいクエリ構文</td></tr>
-<tr><td style="text-align: left"><a href="laurus/overview.html">ライブラリ (laurus)</a></td><td style="text-align: left">Engine の内部構造、スコアリング、ファセット、拡張性</td></tr>
-<tr><td style="text-align: left"><a href="cli/overview.html">CLI (laurus-cli)</a></td><td style="text-align: left">インデックス管理と検索のためのコマンドラインツール</td></tr>
-<tr><td style="text-align: left"><a href="server/overview.html">サーバー (laurus-server)</a></td><td style="text-align: left">HTTP Gateway を備えた gRPC サーバー</td></tr>
+<tr><td style="text-align: left"><a href="#ライブラリ概要">ライブラリ (laurus)</a></td><td style="text-align: left">Engine の内部構造、スコアリング、ファセット、拡張性</td></tr>
+<tr><td style="text-align: left"><a href="#cli-概要">CLI (laurus-cli)</a></td><td style="text-align: left">インデックス管理と検索のためのコマンドラインツール</td></tr>
+<tr><td style="text-align: left"><a href="#サーバー概要">サーバー (laurus-server)</a></td><td style="text-align: left">HTTP Gateway を備えた gRPC サーバー</td></tr>
 <tr><td style="text-align: left"><a href="#ビルドとテスト">開発ガイド</a></td><td style="text-align: left">Laurus のビルド、テスト、コントリビュート</td></tr>
 </tbody>
 </table>
@@ -322,9 +322,9 @@ async fn main() -&gt; Result&lt;()&gt; {
 </div>
 <p>各クレートの詳細については以下を参照してください。</p>
 <ul>
-<li><a href="laurus/overview.html">ライブラリ概要</a></li>
-<li><a href="cli/overview.html">CLI 概要</a></li>
-<li><a href="server/overview.html">サーバー概要</a></li>
+<li><a href="#ライブラリ概要">ライブラリ概要</a></li>
+<li><a href="#cli-概要">CLI 概要</a></li>
+<li><a href="#サーバー概要">サーバー概要</a></li>
 </ul>
 <h2 id="全体概要"><a class="header" href="#全体概要">全体概要</a></h2>
 <p>Laurus は単一の <code>Engine</code> を中心に構成されており、4 つの内部コンポーネントを統括します。</p>
@@ -883,7 +883,7 @@ cargo run --example search_with_openai --features embeddings-openai
 <h1 id="スキーマとフィールド"><a class="header" href="#スキーマとフィールド">スキーマとフィールド</a></h1>
 <p><code>Schema</code> はドキュメントの構造を定義します。どのフィールドが存在し、各フィールドがどのようにインデクシングされるかを指定します。Schema は Engine にとって唯一の情報源です。</p>
 <blockquote>
-<p>CLI で使用される TOML ファイル形式については、<a href="cli/schema_format.html">スキーマフォーマットリファレンス</a>を参照してください。</p>
+<p>CLI で使用される TOML ファイル形式については、<a href="#スキーマフォーマットリファレンス">スキーマフォーマットリファレンス</a>を参照してください。</p>
 </blockquote>
 <h2 id="schema"><a class="header" href="#schema">Schema</a></h2>
 <p><code>Schema</code> は名前付きフィールドのコレクションです。各フィールドは<strong>Lexical フィールド</strong>（キーワード検索用）または <strong>Vector フィールド</strong>（類似度検索用）のいずれかです。</p>
@@ -1154,7 +1154,7 @@ let v: DataValue = vec![0.1f32, 0.2].into(); // Vector
 <p><strong>デフォルトフィールドを設定する</strong> — Query DSL を使用する場合、デフォルトフィールドを設定することで、ユーザーは <code>body:hello</code> の代わりに <code>hello</code> と記述できます。</p>
 </li>
 <li>
-<p><strong>スキーマジェネレータを使用する</strong> — <code>laurus create schema</code> を実行して、手書きの代わりにインタラクティブにスキーマ TOML ファイルを構築できます。詳細は <a href="cli/commands.html#create-schema">CLI コマンド</a>を参照。</p>
+<p><strong>スキーマジェネレータを使用する</strong> — <code>laurus create schema</code> を実行して、手書きの代わりにインタラクティブにスキーマ TOML ファイルを構築できます。詳細は <a href="#create-schema">CLI コマンド</a>を参照。</p>
 </li>
 </ol>
 <div style="break-before: page; page-break-before: always;"></div>
@@ -3451,17 +3451,17 @@ laurus = { version = "0.1.0", features = ["embeddings-all"] }
 </code></pre>
 <h2 id="セクション"><a class="header" href="#セクション">セクション</a></h2>
 <ul>
-<li><a href="engine.html">Engine</a> – EngineとEngineBuilderの内部構造</li>
-<li><a href="scoring.html">スコアリングとランキング</a> – BM25、TF-IDF、およびベクトル類似度スコアリング</li>
-<li><a href="faceting.html">ファセット</a> – 階層的なファセット検索</li>
-<li><a href="highlighting.html">ハイライト</a> – 検索結果のハイライト表示</li>
-<li><a href="spelling_correction.html">スペル修正</a> – スペル候補の提案と自動修正</li>
-<li><a href="id_management.html">ID管理</a> – 二層構造のドキュメントID管理</li>
-<li><a href="persistence.html">永続化とWAL</a> – Write-Ahead Loggingとデータの耐久性</li>
-<li><a href="deletions.html">削除とコンパクション</a> – 論理削除と領域の再利用</li>
-<li><a href="error_handling.html">エラーハンドリング</a> – LaurusErrorとResult型</li>
-<li><a href="extensibility.html">拡張性</a> – カスタムAnalyzer、Embedder、Storageバックエンド</li>
-<li><a href="api_reference.html">APIリファレンス</a> – 主要な型とメソッドの一覧</li>
+<li><a href="#engine">Engine</a> – EngineとEngineBuilderの内部構造</li>
+<li><a href="#スコアリングとランキング">スコアリングとランキング</a> – BM25、TF-IDF、およびベクトル類似度スコアリング</li>
+<li><a href="#ファセット">ファセット</a> – 階層的なファセット検索</li>
+<li><a href="#ハイライト">ハイライト</a> – 検索結果のハイライト表示</li>
+<li><a href="#スペル修正">スペル修正</a> – スペル候補の提案と自動修正</li>
+<li><a href="#id管理">ID管理</a> – 二層構造のドキュメントID管理</li>
+<li><a href="#永続化とwal">永続化とWAL</a> – Write-Ahead Loggingとデータの耐久性</li>
+<li><a href="#削除とコンパクション">削除とコンパクション</a> – 論理削除と領域の再利用</li>
+<li><a href="#エラーハンドリング">エラーハンドリング</a> – LaurusErrorとResult型</li>
+<li><a href="#拡張性">拡張性</a> – カスタムAnalyzer、Embedder、Storageバックエンド</li>
+<li><a href="#apiリファレンス">APIリファレンス</a> – 主要な型とメソッドの一覧</li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="engine"><a class="header" href="#engine">Engine</a></h1>
@@ -4520,7 +4520,7 @@ fn validate_dimension(dim: usize) -&gt; Result&lt;()&gt; {
 <h2 id="次のステップ-11"><a class="header" href="#次のステップ-11">次のステップ</a></h2>
 <ul>
 <li><a href="#拡張性">拡張性</a> – 適切なエラーハンドリングでカスタムトレイトを実装</li>
-<li><a href="api_reference.html">APIリファレンス</a> – 完全なメソッドシグネチャと戻り値の型</li>
+<li><a href="#apiリファレンス">APIリファレンス</a> – 完全なメソッドシグネチャと戻り値の型</li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="拡張性"><a class="header" href="#拡張性">拡張性</a></h1>
@@ -4829,7 +4829,7 @@ impl Storage for S3Storage {
 </table>
 </div>
 <blockquote>
-<p><strong><code>put_document</code> と <code>add_document</code> の違い:</strong> <code>put_document</code> はUpsertを実行します。同じ外部IDのドキュメントが既に存在する場合、削除して置き換えます。<code>add_document</code> は常に追加し、複数のドキュメントチャンクが同じ外部IDを共有できます。詳細は <a href="laurus/concepts/schema_and_fields.html#indexing-documents">Schema &amp; Fields – ドキュメントのインデキシング</a> を参照してください。</p>
+<p><strong><code>put_document</code> と <code>add_document</code> の違い:</strong> <code>put_document</code> はUpsertを実行します。同じ外部IDのドキュメントが既に存在する場合、削除して置き換えます。<code>add_document</code> は常に追加し、複数のドキュメントチャンクが同じ外部IDを共有できます。詳細は <a href="#indexing-documents">Schema &amp; Fields – ドキュメントのインデキシング</a> を参照してください。</p>
 </blockquote>
 <h3 id="enginebuilder-1"><a class="header" href="#enginebuilder-1">EngineBuilder</a></h3>
 <div class="table-wrapper">
@@ -5009,9 +5009,9 @@ impl Storage for S3Storage {
 <tr><td style="text-align: left"><code>BooleanQueryBuilder::new()</code></td><td style="text-align: left">ブール結合</td><td style="text-align: left"><code>.must(q1).should(q2).must_not(q3).build()</code></td></tr>
 <tr><td style="text-align: left"><code>FuzzyQuery::new(field, term)</code></td><td style="text-align: left">あいまい一致（デフォルト max_edits=2）</td><td style="text-align: left"><code>FuzzyQuery::new("body", "programing").max_edits(1)</code></td></tr>
 <tr><td style="text-align: left"><code>WildcardQuery::new(field, pattern)</code></td><td style="text-align: left">ワイルドカード</td><td style="text-align: left"><code>WildcardQuery::new("file", "*.pdf")</code></td></tr>
-<tr><td style="text-align: left"><code>NumericRangeQuery::new(...)</code></td><td style="text-align: left">数値範囲</td><td style="text-align: left"><a href="laurus/search/lexical_search.html">Lexical Search</a> を参照</td></tr>
-<tr><td style="text-align: left"><code>GeoQuery::within_radius(...)</code></td><td style="text-align: left">地理半径</td><td style="text-align: left"><a href="laurus/search/lexical_search.html">Lexical Search</a> を参照</td></tr>
-<tr><td style="text-align: left"><code>SpanNearQuery::new(...)</code></td><td style="text-align: left">近接</td><td style="text-align: left"><a href="laurus/search/lexical_search.html">Lexical Search</a> を参照</td></tr>
+<tr><td style="text-align: left"><code>NumericRangeQuery::new(...)</code></td><td style="text-align: left">数値範囲</td><td style="text-align: left"><a href="#検索search">Lexical Search</a> を参照</td></tr>
+<tr><td style="text-align: left"><code>GeoQuery::within_radius(...)</code></td><td style="text-align: left">地理半径</td><td style="text-align: left"><a href="#検索search">Lexical Search</a> を参照</td></tr>
+<tr><td style="text-align: left"><code>SpanNearQuery::new(...)</code></td><td style="text-align: left">近接</td><td style="text-align: left"><a href="#検索search">Lexical Search</a> を参照</td></tr>
 <tr><td style="text-align: left"><code>PrefixQuery::new(field, prefix)</code></td><td style="text-align: left">前方一致</td><td style="text-align: left"><code>PrefixQuery::new("body", "pro")</code></td></tr>
 <tr><td style="text-align: left"><code>RegexpQuery::new(field, pattern)?</code></td><td style="text-align: left">正規表現一致</td><td style="text-align: left"><code>RegexpQuery::new("body", "^pro.*ing$")?</code></td></tr>
 </tbody>
@@ -5101,10 +5101,10 @@ impl Storage for S3Storage {
 <ul>
 <li><strong>インデックス管理</strong> – TOML スキーマファイルからインデックスを作成・検査。対話式スキーマジェネレーター付き</li>
 <li><strong>ドキュメント CRUD</strong> – JSON によるドキュメントの追加、取得、削除</li>
-<li><strong>検索</strong> – <a href="../concepts/query_dsl.html">Query DSL</a> を使用したクエリ実行</li>
+<li><strong>検索</strong> – <a href="#query-dsl-2">Query DSL</a> を使用したクエリ実行</li>
 <li><strong>デュアル出力</strong> – 人間が読みやすいテーブル形式または機械処理向け JSON 形式</li>
 <li><strong>対話型 REPL</strong> – ライブセッションでインデックスを操作</li>
-<li><strong>gRPC サーバー</strong> – <code>laurus serve</code> で <a href="../server/overview.html">gRPC サーバー</a>を起動</li>
+<li><strong>gRPC サーバー</strong> – <code>laurus serve</code> で <a href="#サーバー概要">gRPC サーバー</a>を起動</li>
 </ul>
 <h2 id="はじめに-1"><a class="header" href="#はじめに-1">はじめに</a></h2>
 <pre><code class="language-bash"># インストール
@@ -5127,10 +5127,10 @@ laurus --index-dir ./my_index search "body:world"
 </code></pre>
 <p>詳細はサブセクションを参照してください:</p>
 <ul>
-<li><a href="installation.html">インストール</a> – CLI のインストール方法</li>
-<li><a href="commands.html">コマンドリファレンス</a> – 全コマンドの詳細</li>
-<li><a href="schema_format.html">スキーマフォーマット</a> – スキーマ TOML フォーマットのリファレンス</li>
-<li><a href="repl.html">REPL</a> – 対話モード</li>
+<li><a href="#インストール-1">インストール</a> – CLI のインストール方法</li>
+<li><a href="#コマンドリファレンス">コマンドリファレンス</a> – 全コマンドの詳細</li>
+<li><a href="#スキーマフォーマットリファレンス">スキーマフォーマット</a> – スキーマ TOML フォーマットのリファレンス</li>
+<li><a href="#repl対話モード">REPL</a> – 対話モード</li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="インストール-1"><a class="header" href="#インストール-1">インストール</a></h1>
@@ -6159,10 +6159,10 @@ laurus serve --config config.toml
 </code></pre>
 <h2 id="セクション-1"><a class="header" href="#セクション-1">セクション</a></h2>
 <ul>
-<li><a href="#はじめに">はじめに</a> – 起動オプションと最初のステップ</li>
-<li><a href="configuration.html">設定</a> – TOML 設定、環境変数、優先順位</li>
-<li><a href="grpc_api.html">gRPC API リファレンス</a> – 全サービスと RPC の完全な API ドキュメント</li>
-<li><a href="http_gateway.html">HTTP ゲートウェイ</a> – HTTP/JSON エンドポイントリファレンス</li>
+<li><a href="#grpc-サーバーをはじめる">はじめに</a> – 起動オプションと最初のステップ</li>
+<li><a href="#設定-2">設定</a> – TOML 設定、環境変数、優先順位</li>
+<li><a href="#grpc-api-リファレンス">gRPC API リファレンス</a> – 全サービスと RPC の完全な API ドキュメント</li>
+<li><a href="#http-ゲートウェイ-1">HTTP ゲートウェイ</a> – HTTP/JSON エンドポイントリファレンス</li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="grpc-サーバーをはじめる"><a class="header" href="#grpc-サーバーをはじめる">gRPC サーバーをはじめる</a></h1>

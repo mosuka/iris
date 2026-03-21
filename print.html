@@ -241,9 +241,9 @@
 <tr><td style="text-align: left"><a href="#indexing">Indexing</a></td><td style="text-align: left">How inverted indexes and vector indexes work internally</td></tr>
 <tr><td style="text-align: left"><a href="#search">Search</a></td><td style="text-align: left">Query types, vector search, and hybrid fusion</td></tr>
 <tr><td style="text-align: left"><a href="#query-dsl-2">Query DSL</a></td><td style="text-align: left">Human-readable query syntax for all search types</td></tr>
-<tr><td style="text-align: left"><a href="laurus/overview.html">Library (laurus)</a></td><td style="text-align: left">Engine internals, scoring, faceting, and extensibility</td></tr>
-<tr><td style="text-align: left"><a href="cli/overview.html">CLI (laurus-cli)</a></td><td style="text-align: left">Command-line tool for index management and search</td></tr>
-<tr><td style="text-align: left"><a href="server/overview.html">Server (laurus-server)</a></td><td style="text-align: left">gRPC server with HTTP Gateway</td></tr>
+<tr><td style="text-align: left"><a href="#library-overview">Library (laurus)</a></td><td style="text-align: left">Engine internals, scoring, faceting, and extensibility</td></tr>
+<tr><td style="text-align: left"><a href="#cli-overview">CLI (laurus-cli)</a></td><td style="text-align: left">Command-line tool for index management and search</td></tr>
+<tr><td style="text-align: left"><a href="#server-overview">Server (laurus-server)</a></td><td style="text-align: left">gRPC server with HTTP Gateway</td></tr>
 <tr><td style="text-align: left"><a href="#build--test">Development Guide</a></td><td style="text-align: left">Build, test, and contribute to Laurus</td></tr>
 </tbody>
 </table>
@@ -322,9 +322,9 @@ async fn main() -&gt; Result&lt;()&gt; {
 </div>
 <p>For details on each crate, see:</p>
 <ul>
-<li><a href="laurus/overview.html">Library Overview</a></li>
-<li><a href="cli/overview.html">CLI Overview</a></li>
-<li><a href="server/overview.html">Server Overview</a></li>
+<li><a href="#library-overview">Library Overview</a></li>
+<li><a href="#cli-overview">CLI Overview</a></li>
+<li><a href="#server-overview">Server Overview</a></li>
 </ul>
 <h2 id="high-level-overview"><a class="header" href="#high-level-overview">High-Level Overview</a></h2>
 <p>Laurus is organized around a single <code>Engine</code> that coordinates four internal components:</p>
@@ -883,7 +883,7 @@ cargo run --example search_with_openai --features embeddings-openai
 <h1 id="schema--fields"><a class="header" href="#schema--fields">Schema &amp; Fields</a></h1>
 <p>The <code>Schema</code> defines the structure of your documents — what fields exist and how each field is indexed. It is the single source of truth for the Engine.</p>
 <blockquote>
-<p>For the TOML file format used by the CLI, see <a href="cli/schema_format.html">Schema Format Reference</a>.</p>
+<p>For the TOML file format used by the CLI, see <a href="#schema-format-reference">Schema Format Reference</a>.</p>
 </blockquote>
 <h2 id="schema"><a class="header" href="#schema">Schema</a></h2>
 <p>A <code>Schema</code> is a collection of named fields. Each field is either a <strong>lexical field</strong> (for keyword search) or a <strong>vector field</strong> (for similarity search).</p>
@@ -1157,7 +1157,7 @@ unregistered.</li>
 <p><strong>Set default fields</strong> — if you use the Query DSL, set default fields so users can write <code>hello</code> instead of <code>body:hello</code>.</p>
 </li>
 <li>
-<p><strong>Use the schema generator</strong> — run <code>laurus create schema</code> to interactively build a schema TOML file instead of writing it by hand. See <a href="cli/commands.html#create-schema">CLI Commands</a>.</p>
+<p><strong>Use the schema generator</strong> — run <code>laurus create schema</code> to interactively build a schema TOML file instead of writing it by hand. See <a href="#create-schema">CLI Commands</a>.</p>
 </li>
 </ol>
 <div style="break-before: page; page-break-before: always;"></div>
@@ -3454,17 +3454,17 @@ laurus = { version = "0.1.0", features = ["embeddings-all"] }
 </code></pre>
 <h2 id="sections"><a class="header" href="#sections">Sections</a></h2>
 <ul>
-<li><a href="engine.html">Engine</a> – Engine and EngineBuilder internals</li>
-<li><a href="scoring.html">Scoring &amp; Ranking</a> – BM25, TF-IDF, and vector similarity scoring</li>
-<li><a href="faceting.html">Faceting</a> – Hierarchical facet search</li>
-<li><a href="highlighting.html">Highlighting</a> – Search result highlighting</li>
-<li><a href="spelling_correction.html">Spelling Correction</a> – Spelling suggestions and auto-correction</li>
-<li><a href="id_management.html">ID Management</a> – Dual-tiered document identity</li>
-<li><a href="persistence.html">Persistence &amp; WAL</a> – Write-ahead logging and durability</li>
-<li><a href="deletions.html">Deletions &amp; Compaction</a> – Logical deletion and space reclamation</li>
-<li><a href="error_handling.html">Error Handling</a> – LaurusError and Result types</li>
-<li><a href="extensibility.html">Extensibility</a> – Custom analyzers, embedders, and storage backends</li>
-<li><a href="api_reference.html">API Reference</a> – Key types and methods at a glance</li>
+<li><a href="#engine">Engine</a> – Engine and EngineBuilder internals</li>
+<li><a href="#scoring--ranking">Scoring &amp; Ranking</a> – BM25, TF-IDF, and vector similarity scoring</li>
+<li><a href="#faceting">Faceting</a> – Hierarchical facet search</li>
+<li><a href="#highlighting">Highlighting</a> – Search result highlighting</li>
+<li><a href="#spelling-correction">Spelling Correction</a> – Spelling suggestions and auto-correction</li>
+<li><a href="#id-management">ID Management</a> – Dual-tiered document identity</li>
+<li><a href="#persistence--wal">Persistence &amp; WAL</a> – Write-ahead logging and durability</li>
+<li><a href="#deletions--compaction">Deletions &amp; Compaction</a> – Logical deletion and space reclamation</li>
+<li><a href="#error-handling">Error Handling</a> – LaurusError and Result types</li>
+<li><a href="#extensibility">Extensibility</a> – Custom analyzers, embedders, and storage backends</li>
+<li><a href="#api-reference">API Reference</a> – Key types and methods at a glance</li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="engine"><a class="header" href="#engine">Engine</a></h1>
@@ -4523,7 +4523,7 @@ fn validate_dimension(dim: usize) -&gt; Result&lt;()&gt; {
 <h2 id="next-steps-11"><a class="header" href="#next-steps-11">Next Steps</a></h2>
 <ul>
 <li><a href="#extensibility">Extensibility</a> — implement custom traits with proper error handling</li>
-<li><a href="api_reference.html">API Reference</a> — full method signatures and return types</li>
+<li><a href="#api-reference">API Reference</a> — full method signatures and return types</li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="extensibility"><a class="header" href="#extensibility">Extensibility</a></h1>
@@ -4833,7 +4833,7 @@ impl Storage for S3Storage {
 </table>
 </div>
 <blockquote>
-<p><strong><code>put_document</code> vs <code>add_document</code>:</strong> <code>put_document</code> performs an upsert — if a document with the same external ID already exists, it is deleted and replaced. <code>add_document</code> always appends, allowing multiple document chunks to share the same external ID. See <a href="laurus/concepts/schema_and_fields.html#indexing-documents">Schema &amp; Fields — Indexing Documents</a> for details.</p>
+<p><strong><code>put_document</code> vs <code>add_document</code>:</strong> <code>put_document</code> performs an upsert — if a document with the same external ID already exists, it is deleted and replaced. <code>add_document</code> always appends, allowing multiple document chunks to share the same external ID. See <a href="#indexing-documents">Schema &amp; Fields — Indexing Documents</a> for details.</p>
 </blockquote>
 <h3 id="enginebuilder-1"><a class="header" href="#enginebuilder-1">EngineBuilder</a></h3>
 <div class="table-wrapper">
@@ -5013,9 +5013,9 @@ impl Storage for S3Storage {
 <tr><td style="text-align: left"><code>BooleanQueryBuilder::new()</code></td><td style="text-align: left">Boolean combination</td><td style="text-align: left"><code>.must(q1).should(q2).must_not(q3).build()</code></td></tr>
 <tr><td style="text-align: left"><code>FuzzyQuery::new(field, term)</code></td><td style="text-align: left">Fuzzy match (default max_edits=2)</td><td style="text-align: left"><code>FuzzyQuery::new("body", "programing").max_edits(1)</code></td></tr>
 <tr><td style="text-align: left"><code>WildcardQuery::new(field, pattern)</code></td><td style="text-align: left">Wildcard</td><td style="text-align: left"><code>WildcardQuery::new("file", "*.pdf")</code></td></tr>
-<tr><td style="text-align: left"><code>NumericRangeQuery::new(...)</code></td><td style="text-align: left">Numeric range</td><td style="text-align: left">See <a href="laurus/search/lexical_search.html">Lexical Search</a></td></tr>
-<tr><td style="text-align: left"><code>GeoQuery::within_radius(...)</code></td><td style="text-align: left">Geo radius</td><td style="text-align: left">See <a href="laurus/search/lexical_search.html">Lexical Search</a></td></tr>
-<tr><td style="text-align: left"><code>SpanNearQuery::new(...)</code></td><td style="text-align: left">Proximity</td><td style="text-align: left">See <a href="laurus/search/lexical_search.html">Lexical Search</a></td></tr>
+<tr><td style="text-align: left"><code>NumericRangeQuery::new(...)</code></td><td style="text-align: left">Numeric range</td><td style="text-align: left">See <a href="#search">Lexical Search</a></td></tr>
+<tr><td style="text-align: left"><code>GeoQuery::within_radius(...)</code></td><td style="text-align: left">Geo radius</td><td style="text-align: left">See <a href="#search">Lexical Search</a></td></tr>
+<tr><td style="text-align: left"><code>SpanNearQuery::new(...)</code></td><td style="text-align: left">Proximity</td><td style="text-align: left">See <a href="#search">Lexical Search</a></td></tr>
 <tr><td style="text-align: left"><code>PrefixQuery::new(field, prefix)</code></td><td style="text-align: left">Prefix match</td><td style="text-align: left"><code>PrefixQuery::new("body", "pro")</code></td></tr>
 <tr><td style="text-align: left"><code>RegexpQuery::new(field, pattern)?</code></td><td style="text-align: left">Regex match</td><td style="text-align: left"><code>RegexpQuery::new("body", "^pro.*ing$")?</code></td></tr>
 </tbody>
@@ -5105,10 +5105,10 @@ impl Storage for S3Storage {
 <ul>
 <li><strong>Index management</strong> – Create and inspect indexes from TOML schema files, with an interactive schema generator</li>
 <li><strong>Document CRUD</strong> – Add, retrieve, and delete documents via JSON</li>
-<li><strong>Search</strong> – Execute queries using the <a href="../concepts/query_dsl.html">Query DSL</a></li>
+<li><strong>Search</strong> – Execute queries using the <a href="#query-dsl-2">Query DSL</a></li>
 <li><strong>Dual output</strong> – Human-readable tables or machine-parseable JSON</li>
 <li><strong>Interactive REPL</strong> – Explore your index in a live session</li>
-<li><strong>gRPC server</strong> – Start a <a href="../server/overview.html">gRPC server</a> with <code>laurus serve</code></li>
+<li><strong>gRPC server</strong> – Start a <a href="#server-overview">gRPC server</a> with <code>laurus serve</code></li>
 </ul>
 <h2 id="getting-started-1"><a class="header" href="#getting-started-1">Getting Started</a></h2>
 <pre><code class="language-bash"># Install
@@ -5131,10 +5131,10 @@ laurus --index-dir ./my_index search "body:world"
 </code></pre>
 <p>See the sub-sections for detailed documentation:</p>
 <ul>
-<li><a href="installation.html">Installation</a> – How to install the CLI</li>
-<li><a href="commands.html">Commands</a> – Full command reference</li>
-<li><a href="schema_format.html">Schema Format</a> – Schema TOML format reference</li>
-<li><a href="repl.html">REPL</a> – Interactive mode</li>
+<li><a href="#installation-1">Installation</a> – How to install the CLI</li>
+<li><a href="#command-reference">Commands</a> – Full command reference</li>
+<li><a href="#schema-format-reference">Schema Format</a> – Schema TOML format reference</li>
+<li><a href="#repl-interactive-mode">REPL</a> – Interactive mode</li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="installation-1"><a class="header" href="#installation-1">Installation</a></h1>
@@ -6166,10 +6166,10 @@ laurus serve --config config.toml
 </code></pre>
 <h2 id="sections-1"><a class="header" href="#sections-1">Sections</a></h2>
 <ul>
-<li><a href="#getting-started">Getting Started</a> – Startup options and first steps</li>
-<li><a href="configuration.html">Configuration</a> – TOML configuration, environment variables, and priority</li>
-<li><a href="grpc_api.html">gRPC API Reference</a> – Full API documentation for all services and RPCs</li>
-<li><a href="http_gateway.html">HTTP Gateway</a> – HTTP/JSON endpoint reference</li>
+<li><a href="#getting-started-with-the-grpc-server">Getting Started</a> – Startup options and first steps</li>
+<li><a href="#configuration-2">Configuration</a> – TOML configuration, environment variables, and priority</li>
+<li><a href="#grpc-api-reference">gRPC API Reference</a> – Full API documentation for all services and RPCs</li>
+<li><a href="#http-gateway-1">HTTP Gateway</a> – HTTP/JSON endpoint reference</li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="getting-started-with-the-grpc-server"><a class="header" href="#getting-started-with-the-grpc-server">Getting Started with the gRPC Server</a></h1>
