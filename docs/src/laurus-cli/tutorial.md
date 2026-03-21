@@ -158,7 +158,7 @@ laurus --index-dir ./tutorial_data --format json search "rust"
 Fetch a specific document by ID:
 
 ```bash
-laurus --index-dir ./tutorial_data get doc --id doc001
+laurus --index-dir ./tutorial_data get docs --id doc001
 ```
 
 ## Step 7: Delete a Document
@@ -166,7 +166,7 @@ laurus --index-dir ./tutorial_data get doc --id doc001
 Delete a document and commit the change:
 
 ```bash
-laurus --index-dir ./tutorial_data delete doc --id doc003
+laurus --index-dir ./tutorial_data delete docs --id doc003
 laurus --index-dir ./tutorial_data commit
 ```
 
@@ -189,13 +189,13 @@ laurus --index-dir ./tutorial_data repl
 Try these commands in the REPL:
 
 ```text
-> stats
+> get stats
 > search rust
-> doc add doc004 {"title":"Go Programming","body":"Go is a statically typed language designed for simplicity and efficiency.","category":"programming"}
+> add doc doc004 {"title":"Go Programming","body":"Go is a statically typed language designed for simplicity and efficiency.","category":"programming"}
 > commit
 > search programming
-> doc get doc004
-> doc delete doc004
+> get docs doc004
+> delete docs doc004
 > commit
 > quit
 ```

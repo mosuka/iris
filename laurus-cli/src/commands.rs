@@ -8,6 +8,7 @@
 //! - [`delete`] - Delete a resource (field or document).
 //! - [`get`] - Retrieve a resource (index stats or document).
 //! - [`mcp`] - MCP (Model Context Protocol) server on stdio.
+//! - [`put`] - Put (upsert) a resource (document).
 //! - [`repl`] - Interactive Read-Eval-Print Loop session.
 //! - [`search`] - One-shot search query execution.
 //! - [`serve`] - gRPC (and optional HTTP gateway) server.
@@ -18,6 +19,7 @@ pub mod create;
 pub mod delete;
 pub mod get;
 pub mod mcp;
+pub mod put;
 pub mod repl;
 pub mod search;
 pub mod serve;

@@ -4,7 +4,7 @@
 //!
 //! - [`run_stats`] - Show index statistics.
 //! - [`run_schema`] - Show the current schema.
-//! - [`run_doc`] - Get a document by ID.
+//! - [`run_docs`] - Get all documents (including chunks) by ID.
 
 use std::path::Path;
 
@@ -56,10 +56,10 @@ pub fn run_schema(index_dir: &Path) -> Result<()> {
     Ok(())
 }
 
-/// Execute the `get doc` command.
+/// Execute the `get docs` command.
 ///
-/// Opens the index at `index_dir` and retrieves the document with the
-/// given external ID.
+/// Opens the index at `index_dir` and retrieves all documents (including
+/// chunks) with the given external ID.
 ///
 /// # Arguments
 ///
@@ -71,8 +71,8 @@ pub fn run_schema(index_dir: &Path) -> Result<()> {
 ///
 /// Returns an error if:
 /// - The index cannot be opened.
-/// - The document cannot be retrieved.
-pub async fn run_doc(id: &str, index_dir: &Path, format: OutputFormat) -> Result<()> {
+/// - The documents cannot be retrieved.
+pub async fn run_docs(id: &str, index_dir: &Path, format: OutputFormat) -> Result<()> {
     let engine = context::open_index(index_dir).await?;
     let documents = engine.get_documents(id).await?;
     output::print_documents(id, &documents, format);

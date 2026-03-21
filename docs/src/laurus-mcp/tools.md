@@ -112,9 +112,9 @@ Result: `Field 'category' deleted successfully.`
 
 ---
 
-## get_index
+## get_stats
 
-Get statistics for the current search index.
+Get statistics for the current search index, including document count and vector field information.
 
 ### Parameters
 
@@ -131,9 +131,32 @@ None.
 
 ---
 
-## add_document
+## get_schema
 
-Add or upsert a document in the index. Call `commit` after adding documents.
+Get the current index schema, including all field definitions and their configurations.
+
+### Parameters
+
+None.
+
+### Result
+
+```json
+{
+  "fields": {
+    "title": { "Text": { "indexed": true, "stored": true } },
+    "body": { "Text": {} },
+    "embedding": { "Hnsw": { "dimension": 384 } }
+  },
+  "default_fields": ["title", "body"]
+}
+```
+
+---
+
+## put_document
+
+Put (upsert) a document into the index. If a document with the same ID already exists, all its chunks are deleted before the new document is indexed. Call `commit` after adding documents.
 
 ### Parameters
 
@@ -141,28 +164,45 @@ Add or upsert a document in the index. Call `commit` after adding documents.
 | :--- | :--- | :--- | :--- |
 | `id` | string | Yes | External document identifier |
 | `document` | object | Yes | Document fields as a JSON object |
-| `mode` | string | No | `"put"` (default, upsert) or `"add"` (append chunk) |
 
-### Modes
+### Example
 
-- `put` (default): Delete any existing document with the same `id`, then index the new one.
-- `add`: Append as a new chunk. Multiple chunks can share the same `id` (useful for splitting large documents).
+```text
+Tool: put_document
+id: "doc-1"
+document: {"title": "Hello World", "body": "This is a test document."}
+```
+
+Result: `Document 'doc-1' put (upserted). Call commit to persist changes.`
+
+---
+
+## add_document
+
+Add a document as a new chunk to the index. Unlike `put_document`, this appends without deleting existing documents with the same ID. Useful for splitting large documents into chunks. Call `commit` after adding documents.
+
+### Parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `id` | string | Yes | External document identifier |
+| `document` | object | Yes | Document fields as a JSON object |
 
 ### Example
 
 ```text
 Tool: add_document
 id: "doc-1"
-document: {"title": "Hello World", "body": "This is a test document."}
+document: {"title": "Hello World - Part 2", "body": "This is a continuation."}
 ```
 
-Result: `Document 'doc-1' added. Call commit to persist changes.`
+Result: `Document 'doc-1' added as chunk. Call commit to persist changes.`
 
 ---
 
-## get_document
+## get_documents
 
-Retrieve stored document(s) by external ID.
+Retrieve all stored documents (including chunks) by external ID.
 
 ### Parameters
 
@@ -183,9 +223,9 @@ Retrieve stored document(s) by external ID.
 
 ---
 
-## delete_document
+## delete_documents
 
-Delete document(s) by external ID. Call `commit` after deletion.
+Delete all documents and chunks sharing the given external ID from the index. Call `commit` after deletion.
 
 ### Parameters
 
@@ -193,13 +233,13 @@ Delete document(s) by external ID. Call `commit` after deletion.
 | :--- | :--- | :--- | :--- |
 | `id` | string | Yes | External document identifier |
 
-Result: `Document 'doc-1' deleted. Call commit to persist changes.`
+Result: `Documents 'doc-1' deleted. Call commit to persist changes.`
 
 ---
 
 ## commit
 
-Commit pending changes to disk. Must be called after `add_document` or `delete_document` to make changes searchable and durable.
+Commit pending changes to disk. Must be called after `put_document`, `add_document`, or `delete_documents` to make changes searchable and durable.
 
 ### Parameters
 
@@ -258,14 +298,15 @@ Search documents using the laurus query DSL.
 ## Typical Workflow
 
 ```text
-1. connect         → connect to a running laurus-server
-2. create_index    → define the schema (if index does not exist)
-3. add_field       → dynamically add fields (optional)
-   delete_field    → remove fields (optional)
-4. add_document    → index documents (repeat as needed)
-5. commit          → persist changes to disk
-6. search          → query the index
-7. add_document    → update documents
-8. delete_document → remove documents
-9. commit          → persist changes
+1. connect          → connect to a running laurus-server
+2. create_index     → define the schema (if index does not exist)
+3. add_field        → dynamically add fields (optional)
+   delete_field     → remove fields (optional)
+4. put_document     → upsert documents (repeat as needed)
+   add_document     → append document chunks (optional)
+5. commit           → persist changes to disk
+6. search           → query the index
+7. get_documents    → retrieve documents by ID
+8. delete_documents → remove documents
+9. commit           → persist changes
 ```

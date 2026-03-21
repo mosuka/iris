@@ -181,12 +181,12 @@ laurus get schema
 # }
 ```
 
-### `get doc`
+### `get docs`
 
-外部 ID でドキュメント（およびすべてのチャンク）を取得します。
+外部 ID で全ドキュメント（チャンクを含む）を取得します。
 
 ```bash
-laurus get doc --id <ID>
+laurus get docs --id <ID>
 ```
 
 **テーブル出力の例:**
@@ -202,7 +202,7 @@ laurus get doc --id <ID>
 **JSON 出力の例:**
 
 ```bash
-laurus --format json get doc --id doc1
+laurus --format json get docs --id doc1
 ```
 
 ```json
@@ -255,6 +255,36 @@ laurus add doc --id doc1 --data '{"title":"Hello World","body":"This is a test d
 
 > **ヒント:** 複数のドキュメントが同じ外部 ID を共有できます（チャンキングパターン）。各チャンクに対して `add doc` を使用してください。
 
+---
+
+## `put` — リソースの上書き（Upsert）
+
+### `put doc`
+
+インデックスにドキュメントを上書き（upsert）します。同じ ID のドキュメントが既に存在する場合、全チャンクが削除されてから新しいドキュメントがインデックスされます。ドキュメントは `commit` を実行するまで検索対象になりません。
+
+```bash
+laurus put doc --id <ID> --data <JSON>
+```
+
+**引数:**
+
+| フラグ | 必須 | 説明 |
+| :--- | :--- | :--- |
+| `--id <ID>` | はい | 外部ドキュメント ID（文字列） |
+| `--data <JSON>` | はい | JSON 文字列としてのドキュメントフィールド |
+
+**例:**
+
+```bash
+laurus put doc --id doc1 --data '{"title":"Updated Title","body":"This replaces the existing document."}'
+# Document 'doc1' put (upserted). Run 'commit' to persist changes.
+```
+
+> **注意:** `add doc` とは異なり、`put doc` は指定 ID の既存チャンクをすべて置き換えます。チャンクを追記したい場合は `add doc` を、ドキュメント全体を置き換えたい場合は `put doc` を使用してください。
+
+---
+
 ### `add field`
 
 既存のインデックスにフィールドを動的に追加します。
@@ -287,19 +317,19 @@ laurus delete field --name category
 # Field 'category' deleted.
 ```
 
-### `delete doc`
+### `delete docs`
 
-外部 ID でドキュメント（およびすべてのチャンク）を削除します。
+外部 ID で全ドキュメント（チャンクを含む）を削除します。
 
 ```bash
-laurus delete doc --id <ID>
+laurus delete docs --id <ID>
 ```
 
 **例:**
 
 ```bash
-laurus delete doc --id doc1
-# Document 'doc1' deleted. Run 'commit' to persist changes.
+laurus delete docs --id doc1
+# Documents 'doc1' deleted. Run 'commit' to persist changes.
 ```
 
 ---

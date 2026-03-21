@@ -33,12 +33,13 @@ Commands follow the same `<operation> <resource>` ordering as the CLI.
 | `create schema <output_path>` | Interactive schema generation wizard |
 | `search <query>` | Search the index |
 | `add field <name> <json>` | Add a field to the schema |
-| `add doc <id> <json>` | Add a document |
+| `add doc <id> <json>` | Add a document (append, allows multiple chunks per ID) |
+| `put doc <id> <json>` | Put (upsert) a document (replaces existing with same ID) |
 | `get stats` | Show index statistics |
 | `get schema` | Show the current schema |
-| `get doc <id>` | Get a document by ID |
+| `get docs <id>` | Get all documents (including chunks) by ID |
 | `delete field <name>` | Remove a field from the schema |
-| `delete doc <id>` | Delete a document by ID |
+| `delete docs <id>` | Delete all documents (including chunks) by ID |
 | `commit` | Commit pending changes |
 | `help` | Show available commands |
 | `quit` / `exit` | Exit the REPL |
@@ -97,7 +98,7 @@ laurus> get schema
   "default_fields": ["title", "body"]
 }
 
-laurus> get doc doc4
+laurus> get docs doc4
 ╭──────┬───────────────────────────────────────────────╮
 │ ID   │ Fields                                        │
 ├──────┼───────────────────────────────────────────────┤
@@ -108,8 +109,8 @@ laurus> get doc doc4
 ### Deleting Documents
 
 ```text
-laurus> delete doc doc4
-Document 'doc4' deleted.
+laurus> delete docs doc4
+Documents 'doc4' deleted.
 laurus> commit
 Changes committed.
 ```

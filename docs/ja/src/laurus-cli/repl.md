@@ -33,12 +33,13 @@ laurus>
 | `create schema <output_path>` | 対話型スキーマ生成ウィザード |
 | `search <query>` | インデックスを検索 |
 | `add field <name> <json>` | スキーマにフィールドを追加 |
-| `add doc <id> <json>` | ドキュメントを追加 |
+| `add doc <id> <json>` | ドキュメントを追加（追記、同一 ID で複数チャンク可） |
+| `put doc <id> <json>` | ドキュメントを上書き（同一 ID の既存チャンクを置換） |
 | `get stats` | インデックスの統計情報を表示 |
 | `get schema` | 現在のスキーマを表示 |
-| `get doc <id>` | ID でドキュメントを取得 |
+| `get docs <id>` | ID で全ドキュメント（チャンクを含む）を取得 |
 | `delete field <name>` | スキーマからフィールドを削除 |
-| `delete doc <id>` | ID でドキュメントを削除 |
+| `delete docs <id>` | ID で全ドキュメント（チャンクを含む）を削除 |
 | `commit` | 保留中の変更をコミット |
 | `help` | 利用可能なコマンドを表示 |
 | `quit` / `exit` | REPL を終了 |
@@ -97,7 +98,7 @@ laurus> get schema
   "default_fields": ["title", "body"]
 }
 
-laurus> get doc doc4
+laurus> get docs doc4
 ╭──────┬───────────────────────────────────────────────╮
 │ ID   │ Fields                                        │
 ├──────┼───────────────────────────────────────────────┤
@@ -108,8 +109,8 @@ laurus> get doc doc4
 ### ドキュメントの削除
 
 ```text
-laurus> delete doc doc4
-Document 'doc4' deleted.
+laurus> delete docs doc4
+Documents 'doc4' deleted.
 laurus> commit
 Changes committed.
 ```

@@ -129,9 +129,20 @@ pub async fn run(index_dir: &Path, format: OutputFormat) -> Result<()> {
                 };
                 handle_add(eng, index_dir, parts[1], parts.get(2).copied()).await
             }
+            "put" => {
+                if parts.len() < 2 {
+                    eprintln!("Usage: put <doc> ...");
+                    continue;
+                }
+                let Some(ref eng) = engine else {
+                    eprintln!("{NO_INDEX_MSG}");
+                    continue;
+                };
+                handle_put(eng, parts[1], parts.get(2).copied()).await
+            }
             "get" => {
                 if parts.len() < 2 {
-                    eprintln!("Usage: get <stats|schema|doc> ...");
+                    eprintln!("Usage: get <stats|schema|docs> ...");
                     continue;
                 }
                 let Some(ref eng) = engine else {
@@ -142,7 +153,7 @@ pub async fn run(index_dir: &Path, format: OutputFormat) -> Result<()> {
             }
             "delete" => {
                 if parts.len() < 2 {
-                    eprintln!("Usage: delete <field|doc> ...");
+                    eprintln!("Usage: delete <field|docs> ...");
                     continue;
                 }
                 let Some(ref eng) = engine else {
@@ -208,12 +219,13 @@ Available commands:
   create schema <output_path>  Interactive schema generation wizard
   search <query>               Search the index
   add field <name> <json>      Add a field to the schema
-  add doc <id> <json>          Add a document
+  add doc <id> <json>          Add a document (append, allows multiple chunks per ID)
+  put doc <id> <json>          Put (upsert) a document (replaces existing with same ID)
   get stats                    Show index statistics
   get schema                   Show current schema
-  get doc <id>                 Get a document by ID
+  get docs <id>                Get all documents (including chunks) by ID
   delete field <name>          Remove a field from the schema
-  delete doc <id>              Delete a document by ID
+  delete docs <id>             Delete all documents (including chunks) by ID
   commit                       Commit pending changes
   help                         Show this help
   quit                         Exit the REPL"
@@ -340,7 +352,36 @@ async fn handle_add(
     }
 }
 
-/// Handle `get stats`, `get schema`, and `get doc ...` commands.
+/// Handle `put doc ...` command.
+///
+/// Upserts a document into the index. If a document with the same ID
+/// already exists, all its chunks are deleted before the new document
+/// is indexed.
+///
+/// # Arguments
+///
+/// * `engine` - Reference to the search engine instance.
+/// * `resource` - The resource type (currently only `doc`).
+/// * `rest` - Remaining arguments (`<id> <json>`).
+async fn handle_put(engine: &Engine, resource: &str, rest: Option<&str>) -> Result<()> {
+    match resource {
+        "doc" => {
+            let rest = rest.context("Usage: put doc <id> <json>")?;
+            let (id, json_str) = rest.split_once(' ').context("Usage: put doc <id> <json>")?;
+            let doc: Document =
+                serde_json::from_str(json_str).context("Failed to parse document JSON")?;
+            engine.put_document(id, doc).await?;
+            println!("Document '{id}' put (upserted).");
+            Ok(())
+        }
+        _ => {
+            eprintln!("Unknown resource: '{resource}'. Use doc.");
+            Ok(())
+        }
+    }
+}
+
+/// Handle `get stats`, `get schema`, and `get docs ...` commands.
 async fn handle_get(
     engine: &Engine,
     index_dir: &Path,
@@ -361,20 +402,20 @@ async fn handle_get(
             println!("{json}");
             Ok(())
         }
-        "doc" => {
-            let id = rest.context("Usage: get doc <id>")?;
+        "docs" => {
+            let id = rest.context("Usage: get docs <id>")?;
             let documents = engine.get_documents(id).await?;
             output::print_documents(id, &documents, format);
             Ok(())
         }
         _ => {
-            eprintln!("Unknown resource: '{resource}'. Use stats, schema, or doc.");
+            eprintln!("Unknown resource: '{resource}'. Use stats, schema, or docs.");
             Ok(())
         }
     }
 }
 
-/// Handle `delete field ...` and `delete doc ...` commands.
+/// Handle `delete field ...` and `delete docs ...` commands.
 async fn handle_delete(
     engine: &Engine,
     index_dir: &Path,
@@ -392,14 +433,14 @@ async fn handle_delete(
             println!("Field '{name}' deleted.");
             Ok(())
         }
-        "doc" => {
-            let id = rest.context("Usage: delete doc <id>")?;
+        "docs" => {
+            let id = rest.context("Usage: delete docs <id>")?;
             engine.delete_documents(id).await?;
-            println!("Document '{id}' deleted.");
+            println!("Documents '{id}' deleted.");
             Ok(())
         }
         _ => {
-            eprintln!("Unknown resource: '{resource}'. Use field or doc.");
+            eprintln!("Unknown resource: '{resource}'. Use field or docs.");
             Ok(())
         }
     }

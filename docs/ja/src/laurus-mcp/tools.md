@@ -62,9 +62,9 @@ schema_json: {"fields": {"title": {"Text": {}}, "body": {"Text": {}}}}
 
 ---
 
-## get_index
+## get_stats
 
-現在の検索インデックスの統計情報を取得します。
+現在の検索インデックスの統計情報（ドキュメント数、ベクトルフィールド情報など）を取得します。
 
 ### パラメーター
 
@@ -81,9 +81,32 @@ schema_json: {"fields": {"title": {"Text": {}}, "body": {"Text": {}}}}
 
 ---
 
-## add_document
+## get_schema
 
-インデックスにドキュメントを追加またはアップサートします。ドキュメントを追加した後は `commit` を呼び出してください。
+現在のインデックスのスキーマ（全フィールド定義と設定）を取得します。
+
+### パラメーター
+
+なし。
+
+### 結果
+
+```json
+{
+  "fields": {
+    "title": { "Text": { "indexed": true, "stored": true } },
+    "body": { "Text": {} },
+    "embedding": { "Hnsw": { "dimension": 384 } }
+  },
+  "default_fields": ["title", "body"]
+}
+```
+
+---
+
+## put_document
+
+インデックスにドキュメントを上書き（upsert）します。同じ ID のドキュメントが既に存在する場合、全チャンクが削除されてから新しいドキュメントがインデックスされます。ドキュメント追加後は `commit` を呼び出してください。
 
 ### パラメーター
 
@@ -91,28 +114,45 @@ schema_json: {"fields": {"title": {"Text": {}}, "body": {"Text": {}}}}
 | :--- | :--- | :--- | :--- |
 | `id` | string | はい | 外部ドキュメント識別子 |
 | `document` | object | はい | JSON オブジェクトとしてのドキュメントフィールド |
-| `mode` | string | いいえ | `"put"`（デフォルト、アップサート）または `"add"`（チャンク追加） |
 
-### モード
+### 例
 
-- `put`（デフォルト）: 同じ `id` を持つ既存のドキュメントを削除してから新しいものをインデックスします。
-- `add`: 新しいチャンクとして追加します。複数のチャンクが同じ `id` を持てます（大きなドキュメントの分割に便利）。
+```text
+Tool: put_document
+id: "doc-1"
+document: {"title": "Hello World", "body": "これはテストドキュメントです。"}
+```
+
+結果: `Document 'doc-1' put (upserted). Call commit to persist changes.`
+
+---
+
+## add_document
+
+インデックスにドキュメントを新しいチャンクとして追加します。`put_document` とは異なり、同じ ID の既存ドキュメントを削除せずに追記します。大きなドキュメントをチャンクに分割する際に便利です。ドキュメント追加後は `commit` を呼び出してください。
+
+### パラメーター
+
+| 名前 | 型 | 必須 | 説明 |
+| :--- | :--- | :--- | :--- |
+| `id` | string | はい | 外部ドキュメント識別子 |
+| `document` | object | はい | JSON オブジェクトとしてのドキュメントフィールド |
 
 ### 例
 
 ```text
 Tool: add_document
 id: "doc-1"
-document: {"title": "Hello World", "body": "これはテストドキュメントです。"}
+document: {"title": "Hello World - Part 2", "body": "これは続きです。"}
 ```
 
-結果: `Document 'doc-1' added. Call commit to persist changes.`
+結果: `Document 'doc-1' added as chunk. Call commit to persist changes.`
 
 ---
 
-## get_document
+## get_documents
 
-外部 ID でドキュメントを取得します。
+外部 ID で全ドキュメント（チャンクを含む）を取得します。
 
 ### パラメーター
 
@@ -133,9 +173,9 @@ document: {"title": "Hello World", "body": "これはテストドキュメント
 
 ---
 
-## delete_document
+## delete_documents
 
-外部 ID でドキュメントを削除します。削除後は `commit` を呼び出してください。
+外部 ID で全ドキュメント（チャンクを含む）を削除します。削除後は `commit` を呼び出してください。
 
 ### パラメーター
 
@@ -143,13 +183,13 @@ document: {"title": "Hello World", "body": "これはテストドキュメント
 | :--- | :--- | :--- | :--- |
 | `id` | string | はい | 外部ドキュメント識別子 |
 
-結果: `Document 'doc-1' deleted. Call commit to persist changes.`
+結果: `Documents 'doc-1' deleted. Call commit to persist changes.`
 
 ---
 
 ## commit
 
-保留中の変更をディスクにコミットします。変更を検索可能かつ永続的にするため、`add_document` または `delete_document` の後に必ず呼び出してください。
+保留中の変更をディスクにコミットします。変更を検索可能かつ永続的にするため、`put_document`、`add_document`、または `delete_documents` の後に必ず呼び出してください。
 
 ### パラメーター
 
@@ -251,14 +291,15 @@ laurus クエリ DSL を使用してドキュメントを検索します。
 ## 典型的なワークフロー
 
 ```text
-1. connect         → 実行中の laurus-server に接続
-2. create_index    → スキーマを定義（インデックスが存在しない場合）
-3. add_field       → フィールドを追加（必要に応じて）
-4. add_document    → ドキュメントをインデックス（必要に応じて繰り返し）
-5. commit          → 変更をディスクに永続化
-6. search          → インデックスを検索
-7. add_document    → ドキュメントを更新
-8. delete_document → ドキュメントを削除
-9. delete_field    → 不要なフィールドを削除（必要に応じて）
-10. commit         → 変更を永続化
+1. connect          → 実行中の laurus-server に接続
+2. create_index     → スキーマを定義（インデックスが存在しない場合）
+3. add_field        → フィールドを追加（必要に応じて）
+   delete_field     → フィールドを削除（必要に応じて）
+4. put_document     → ドキュメントを上書き（必要に応じて繰り返し）
+   add_document     → ドキュメントチャンクを追記（必要に応じて）
+5. commit           → 変更をディスクに永続化
+6. search           → インデックスを検索
+7. get_documents    → ID でドキュメントを取得
+8. delete_documents → ドキュメントを削除
+9. commit           → 変更を永続化
 ```
