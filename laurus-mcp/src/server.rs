@@ -20,9 +20,9 @@ use tracing::info;
 
 use laurus_server::proto::laurus::v1::{
     AddDocumentRequest, AddFieldRequest, CommitRequest, CreateIndexRequest, DeleteDocumentsRequest,
-    DeleteFieldRequest, GetDocumentsRequest, GetIndexRequest, PutDocumentRequest, SearchRequest,
-    document_service_client::DocumentServiceClient, index_service_client::IndexServiceClient,
-    search_service_client::SearchServiceClient,
+    DeleteFieldRequest, GetDocumentsRequest, GetIndexRequest, GetSchemaRequest, PutDocumentRequest,
+    SearchRequest, document_service_client::DocumentServiceClient,
+    index_service_client::IndexServiceClient, search_service_client::SearchServiceClient,
 };
 
 use crate::convert;
@@ -63,6 +63,18 @@ struct CreateIndexParams {
     schema_json: String,
 }
 
+/// Parameters for the `put_document` tool.
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+struct PutDocumentParams {
+    /// External document identifier (used for retrieval and deduplication).
+    id: String,
+
+    /// Document fields as a JSON object.
+    ///
+    /// Field names and value types must match the index schema.
+    document: Value,
+}
+
 /// Parameters for the `add_document` tool.
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 struct AddDocumentParams {
@@ -73,26 +85,18 @@ struct AddDocumentParams {
     ///
     /// Field names and value types must match the index schema.
     document: Value,
-
-    /// Indexing mode.
-    ///
-    /// - `"put"` (default): upsert — delete any existing document with the
-    ///   same `id` before indexing the new one.
-    /// - `"add"`: append — allow multiple chunks to share the same `id`
-    ///   (useful for splitting large documents into paragraphs / pages).
-    mode: Option<String>,
 }
 
-/// Parameters for the `get_document` tool.
+/// Parameters for the `get_documents` tool.
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
-struct GetDocumentParams {
+struct GetDocumentsParams {
     /// External document identifier to look up.
     id: String,
 }
 
-/// Parameters for the `delete_document` tool.
+/// Parameters for the `delete_documents` tool.
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
-struct DeleteDocumentParams {
+struct DeleteDocumentsParams {
     /// External document identifier to delete.
     id: String,
 }
@@ -246,7 +250,7 @@ impl LaurusMcpServer {
     #[tool(
         description = "Get statistics for the current search index, including document count and vector field information."
     )]
-    async fn get_index(&self) -> Result<CallToolResult, McpError> {
+    async fn get_stats(&self) -> Result<CallToolResult, McpError> {
         let channel = match self.channel.read().await.clone() {
             Some(ch) => ch,
             None => {
@@ -271,6 +275,47 @@ impl LaurusMcpServer {
                 )]))
             }
             Err(e) => Ok(Self::tool_error(format!("Failed to get index stats: {e}"))),
+        }
+    }
+
+    /// Get the current index schema.
+    #[tool(
+        description = "Get the current index schema, including all field definitions and their configurations. Returns the schema as a JSON object."
+    )]
+    async fn get_schema(&self) -> Result<CallToolResult, McpError> {
+        let channel = match self.channel.read().await.clone() {
+            Some(ch) => ch,
+            None => {
+                return Ok(Self::tool_error(
+                    "Not connected. Call the connect tool first.",
+                ));
+            }
+        };
+
+        match IndexServiceClient::new(channel)
+            .get_schema(GetSchemaRequest {})
+            .await
+        {
+            Ok(resp) => {
+                let r = resp.into_inner();
+                match r.schema {
+                    Some(proto_schema) => {
+                        match laurus_server::convert::schema::from_proto(&proto_schema) {
+                            Ok(schema) => {
+                                let json = serde_json::to_value(&schema).unwrap_or_default();
+                                Ok(CallToolResult::success(vec![Content::text(
+                                    json.to_string(),
+                                )]))
+                            }
+                            Err(e) => {
+                                Ok(Self::tool_error(format!("Failed to convert schema: {e}")))
+                            }
+                        }
+                    }
+                    None => Ok(Self::tool_error("No schema returned by server.")),
+                }
+            }
+            Err(e) => Ok(Self::tool_error(format!("Failed to get schema: {e}"))),
         }
     }
 
@@ -375,9 +420,54 @@ impl LaurusMcpServer {
 
     // ── Document tools ────────────────────────────────────────────────────────
 
-    /// Add or upsert a document in the index.
+    /// Put (upsert) a document into the index.
+    ///
+    /// If a document with the same ID already exists, all its chunks are
+    /// deleted before the new document is indexed.
     #[tool(
-        description = "Add a document to the index. Use mode='put' (default) to upsert (replace existing document with the same id), or mode='add' to append as a new chunk. Call commit after adding documents to persist changes."
+        description = "Put (upsert) a document into the index. If a document with the same id already exists, it is replaced. Call commit after adding documents to persist changes."
+    )]
+    async fn put_document(
+        &self,
+        Parameters(params): Parameters<PutDocumentParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let channel = match self.channel.read().await.clone() {
+            Some(ch) => ch,
+            None => {
+                return Ok(Self::tool_error(
+                    "Not connected. Call the connect tool first.",
+                ));
+            }
+        };
+
+        let doc = match convert::json_to_document(params.document) {
+            Ok(d) => d,
+            Err(e) => {
+                return Ok(Self::tool_error(format!("Invalid document: {e}")));
+            }
+        };
+
+        match DocumentServiceClient::new(channel)
+            .put_document(PutDocumentRequest {
+                id: params.id.clone(),
+                document: Some(doc),
+            })
+            .await
+        {
+            Ok(_) => Ok(CallToolResult::success(vec![Content::text(format!(
+                "Document '{}' put (upserted). Call commit to persist changes.",
+                params.id
+            ))])),
+            Err(e) => Ok(Self::tool_error(format!("Failed to put document: {e}"))),
+        }
+    }
+
+    /// Add a document as a new chunk (append, never deletes existing).
+    ///
+    /// Multiple chunks can share the same ID, which is useful for indexing
+    /// parts of a large document (e.g. paragraphs or pages) separately.
+    #[tool(
+        description = "Add a document as a new chunk to the index. Unlike put_document, this appends without deleting existing documents with the same id. Useful for splitting large documents into chunks. Call commit after adding documents to persist changes."
     )]
     async fn add_document(
         &self,
@@ -399,27 +489,15 @@ impl LaurusMcpServer {
             }
         };
 
-        let mode = params.mode.as_deref().unwrap_or("put");
-        let result = match mode {
-            "add" => DocumentServiceClient::new(channel)
-                .add_document(AddDocumentRequest {
-                    id: params.id.clone(),
-                    document: Some(doc),
-                })
-                .await
-                .map(|_| ()),
-            _ => DocumentServiceClient::new(channel)
-                .put_document(PutDocumentRequest {
-                    id: params.id.clone(),
-                    document: Some(doc),
-                })
-                .await
-                .map(|_| ()),
-        };
-
-        match result {
-            Ok(()) => Ok(CallToolResult::success(vec![Content::text(format!(
-                "Document '{}' added. Call commit to persist changes.",
+        match DocumentServiceClient::new(channel)
+            .add_document(AddDocumentRequest {
+                id: params.id.clone(),
+                document: Some(doc),
+            })
+            .await
+        {
+            Ok(_) => Ok(CallToolResult::success(vec![Content::text(format!(
+                "Document '{}' added as chunk. Call commit to persist changes.",
                 params.id
             ))])),
             Err(e) => Ok(Self::tool_error(format!("Failed to add document: {e}"))),
@@ -428,11 +506,11 @@ impl LaurusMcpServer {
 
     /// Get all stored documents for a given ID.
     #[tool(
-        description = "Retrieve stored document(s) by external ID. Returns a JSON array of documents matching the ID."
+        description = "Retrieve all stored documents (including chunks) by external ID. Returns a JSON array of documents matching the ID."
     )]
-    async fn get_document(
+    async fn get_documents(
         &self,
-        Parameters(params): Parameters<GetDocumentParams>,
+        Parameters(params): Parameters<GetDocumentsParams>,
     ) -> Result<CallToolResult, McpError> {
         let channel = match self.channel.read().await.clone() {
             Some(ch) => ch,
@@ -464,17 +542,17 @@ impl LaurusMcpServer {
                     output.to_string(),
                 )]))
             }
-            Err(e) => Ok(Self::tool_error(format!("Failed to get document: {e}"))),
+            Err(e) => Ok(Self::tool_error(format!("Failed to get documents: {e}"))),
         }
     }
 
-    /// Delete all documents with the given external ID.
+    /// Delete all documents (including chunks) with the given external ID.
     #[tool(
-        description = "Delete document(s) by external ID from the index. Removes all chunks sharing the same ID. Call commit to persist changes."
+        description = "Delete all documents and chunks sharing the given external ID from the index. Call commit to persist changes."
     )]
-    async fn delete_document(
+    async fn delete_documents(
         &self,
-        Parameters(params): Parameters<DeleteDocumentParams>,
+        Parameters(params): Parameters<DeleteDocumentsParams>,
     ) -> Result<CallToolResult, McpError> {
         let channel = match self.channel.read().await.clone() {
             Some(ch) => ch,
@@ -492,16 +570,16 @@ impl LaurusMcpServer {
             .await
         {
             Ok(_) => Ok(CallToolResult::success(vec![Content::text(format!(
-                "Document '{}' deleted. Call commit to persist changes.",
+                "Documents '{}' deleted. Call commit to persist changes.",
                 params.id
             ))])),
-            Err(e) => Ok(Self::tool_error(format!("Failed to delete document: {e}"))),
+            Err(e) => Ok(Self::tool_error(format!("Failed to delete documents: {e}"))),
         }
     }
 
     /// Commit pending changes to disk.
     #[tool(
-        description = "Commit pending changes to disk. Must be called after add_document or delete_document to make changes searchable and durable."
+        description = "Commit pending changes to disk. Must be called after put_document, add_document, or delete_documents to make changes searchable and durable."
     )]
     async fn commit(&self) -> Result<CallToolResult, McpError> {
         let channel = match self.channel.read().await.clone() {
@@ -587,8 +665,8 @@ impl ServerHandler for LaurusMcpServer {
             .with_server_info(Implementation::from_build_env())
             .with_instructions(
                 "Laurus search engine MCP server (gRPC client). \
-             Tools: connect, create_index, get_index, add_field, delete_field, add_document, get_document, \
-             delete_document, commit, search. \
+             Tools: connect, create_index, get_stats, get_schema, add_field, delete_field, \
+             put_document, add_document, get_documents, delete_documents, commit, search. \
              Start by calling connect(endpoint) to connect to a running laurus-server, \
              then use the other tools to manage and search the index."
                     .to_string(),

@@ -24,9 +24,9 @@ use anyhow::Result;
 use clap::Parser;
 
 use crate::cli::{
-    AddResource, Cli, Command, CreateResource, DeleteResource, GetResource, McpCommand,
+    AddResource, Cli, Command, CreateResource, DeleteResource, GetResource, McpCommand, PutResource,
 };
-use crate::commands::{add, commit, create, delete, get, mcp, repl, search, serve};
+use crate::commands::{add, commit, create, delete, get, mcp, put, repl, search, serve};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -44,7 +44,7 @@ async fn main() -> Result<()> {
         Command::Get(cmd) => match cmd.resource {
             GetResource::Stats => get::run_stats(&index_dir, format).await,
             GetResource::Schema => get::run_schema(&index_dir),
-            GetResource::Doc { id } => get::run_doc(&id, &index_dir, format).await,
+            GetResource::Docs { id } => get::run_docs(&id, &index_dir, format).await,
         },
         Command::Add(cmd) => match cmd.resource {
             AddResource::Doc { id, data } => add::run_doc(&id, &data, &index_dir).await,
@@ -52,8 +52,11 @@ async fn main() -> Result<()> {
                 add::run_field(&name, &field_option, &index_dir).await
             }
         },
+        Command::Put(cmd) => match cmd.resource {
+            PutResource::Doc { id, data } => put::run_doc(&id, &data, &index_dir).await,
+        },
         Command::Delete(cmd) => match cmd.resource {
-            DeleteResource::Doc { id } => delete::run_doc(&id, &index_dir).await,
+            DeleteResource::Docs { id } => delete::run_docs(&id, &index_dir).await,
             DeleteResource::Field { name } => delete::run_field(&name, &index_dir).await,
         },
         Command::Commit => commit::run(&index_dir).await,

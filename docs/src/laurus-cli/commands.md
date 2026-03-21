@@ -181,12 +181,12 @@ laurus get schema
 # }
 ```
 
-### `get doc`
+### `get docs`
 
-Retrieve a document (and all its chunks) by external ID.
+Retrieve all documents (including chunks) by external ID.
 
 ```bash
-laurus get doc --id <ID>
+laurus get docs --id <ID>
 ```
 
 **Table output example:**
@@ -202,7 +202,7 @@ laurus get doc --id <ID>
 **JSON output example:**
 
 ```bash
-laurus --format json get doc --id doc1
+laurus --format json get docs --id doc1
 ```
 
 ```json
@@ -255,6 +255,36 @@ laurus add doc --id doc1 --data '{"title":"Hello World","body":"This is a test d
 
 > **Tip:** Multiple documents can share the same external ID (chunking pattern). Use `add doc` for each chunk.
 
+---
+
+## `put` — Put (Upsert) a Resource
+
+### `put doc`
+
+Put (upsert) a document into the index. If a document with the same ID already exists, all its chunks are deleted before the new document is indexed. Documents are not searchable until `commit` is called.
+
+```bash
+laurus put doc --id <ID> --data <JSON>
+```
+
+**Arguments:**
+
+| Flag | Required | Description |
+| :--- | :--- | :--- |
+| `--id <ID>` | Yes | External document ID (string) |
+| `--data <JSON>` | Yes | Document fields as a JSON string |
+
+**Example:**
+
+```bash
+laurus put doc --id doc1 --data '{"title":"Updated Title","body":"This replaces the existing document."}'
+# Document 'doc1' put (upserted). Run 'commit' to persist changes.
+```
+
+> **Note:** Unlike `add doc`, `put doc` replaces all existing chunks for the given ID. Use `add doc` when you want to append chunks, and `put doc` when you want to replace the entire document.
+
+---
+
 ### `add field`
 
 Dynamically add a new field to an existing index.
@@ -273,19 +303,19 @@ persisted after the field is added.
 
 ## `delete` — Delete a Resource
 
-### `delete doc`
+### `delete docs`
 
-Delete a document (and all its chunks) by external ID.
+Delete all documents (including chunks) by external ID.
 
 ```bash
-laurus delete doc --id <ID>
+laurus delete docs --id <ID>
 ```
 
 **Example:**
 
 ```bash
-laurus delete doc --id doc1
-# Document 'doc1' deleted. Run 'commit' to persist changes.
+laurus delete docs --id doc1
+# Documents 'doc1' deleted. Run 'commit' to persist changes.
 ```
 
 ### `delete field`

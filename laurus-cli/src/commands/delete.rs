@@ -3,7 +3,7 @@
 //! Handles deleting resources from an existing index:
 //!
 //! - [`run_field`] - Remove a field from the schema.
-//! - [`run_doc`] - Delete a document by ID.
+//! - [`run_docs`] - Delete all documents (including chunks) by ID.
 
 use std::path::Path;
 
@@ -42,10 +42,11 @@ pub async fn run_field(name: &str, index_dir: &Path) -> Result<()> {
     Ok(())
 }
 
-/// Execute the `delete doc` command.
+/// Execute the `delete docs` command.
 ///
-/// Opens the index at `index_dir` and marks the document for deletion.
-/// Changes are not committed automatically.
+/// Opens the index at `index_dir` and deletes all documents (including
+/// chunks) with the given external ID. Changes are not committed
+/// automatically.
 ///
 /// # Arguments
 ///
@@ -57,9 +58,9 @@ pub async fn run_field(name: &str, index_dir: &Path) -> Result<()> {
 /// Returns an error if:
 /// - The index cannot be opened.
 /// - The engine rejects the deletion.
-pub async fn run_doc(id: &str, index_dir: &Path) -> Result<()> {
+pub async fn run_docs(id: &str, index_dir: &Path) -> Result<()> {
     let engine = context::open_index(index_dir).await?;
     engine.delete_documents(id).await?;
-    println!("Document '{id}' deleted. Run 'commit' to persist changes.");
+    println!("Documents '{id}' deleted. Run 'commit' to persist changes.");
     Ok(())
 }

@@ -35,6 +35,8 @@ pub enum Command {
     Get(GetCommand),
     /// Add a resource.
     Add(AddCommand),
+    /// Put (upsert) a resource.
+    Put(PutCommand),
     /// Delete a resource.
     Delete(DeleteCommand),
     /// Commit pending changes.
@@ -95,8 +97,8 @@ pub enum GetResource {
     Stats,
     /// Show the current schema.
     Schema,
-    /// Get a document by ID.
-    Doc {
+    /// Get all documents (including chunks) by ID.
+    Docs {
         /// External document ID.
         #[arg(long)]
         id: String,
@@ -142,6 +144,33 @@ pub enum AddResource {
     },
 }
 
+// --- Put ---
+
+/// CLI arguments for the `put` subcommand.
+///
+/// Holds the target resource to put (upsert).
+#[derive(Parser)]
+pub struct PutCommand {
+    #[command(subcommand)]
+    pub resource: PutResource,
+}
+
+#[derive(Subcommand)]
+pub enum PutResource {
+    /// Put (upsert) a document into the index.
+    ///
+    /// If a document with the same ID already exists, all its chunks are
+    /// deleted before the new document is indexed.
+    Doc {
+        /// External document ID.
+        #[arg(long)]
+        id: String,
+        /// Document data as a JSON string.
+        #[arg(long)]
+        data: String,
+    },
+}
+
 // --- Delete ---
 
 /// CLI arguments for the `delete` subcommand.
@@ -155,8 +184,8 @@ pub struct DeleteCommand {
 
 #[derive(Subcommand)]
 pub enum DeleteResource {
-    /// Delete a document by ID.
-    Doc {
+    /// Delete all documents (including chunks) by ID.
+    Docs {
         /// External document ID.
         #[arg(long)]
         id: String,

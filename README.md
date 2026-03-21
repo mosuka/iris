@@ -38,6 +38,7 @@ Comprehensive documentation is available online:
   - [laurus (Library)](https://mosuka.github.io/laurus/laurus.html) — Engine, Scoring, Faceting, Highlighting, Spelling Correction, Persistence & WAL
   - [laurus-cli](https://mosuka.github.io/laurus/laurus-cli.html) — Command-line interface, REPL, Schema Format
   - [laurus-server](https://mosuka.github.io/laurus/laurus-server.html) — gRPC server, HTTP Gateway, Configuration
+  - [laurus-mcp](https://mosuka.github.io/laurus/laurus-mcp.html) — MCP server for AI assistants (Claude, etc.)
 - **Development**
   - [Build & Test](https://mosuka.github.io/laurus/development/build_and_test.html)
   - [Feature Flags](https://mosuka.github.io/laurus/development/feature_flags.html)
@@ -58,13 +59,14 @@ Comprehensive documentation is available online:
 
 ## Workspace Structure
 
-Laurus is organized as a Cargo workspace with 3 crates:
+Laurus is organized as a Cargo workspace with 4 crates:
 
 | Crate | Description |
 | --- | --- |
 | [`laurus`](laurus/) | Core search library — schema, analysis, indexing, search, and storage |
 | [`laurus-cli`](laurus-cli/) | Command-line interface with REPL for interactive search |
 | [`laurus-server`](laurus-server/) | gRPC server with HTTP gateway for deploying Laurus as a service |
+| [`laurus-mcp`](laurus-mcp/) | MCP server for AI assistants (Claude, etc.) via stdio transport |
 
 ## Feature Flags
 
