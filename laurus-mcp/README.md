@@ -26,10 +26,10 @@ AI Client (Claude, etc.)
 
 ```bash
 # Start laurus-server
-laurus serve --grpc-port 50051
+laurus serve --port 50051
 
 # Configure Claude Code
-claude mcp add laurus laurus mcp --endpoint http://localhost:50051
+claude mcp add laurus -- laurus mcp --endpoint http://localhost:50051
 ```
 
 ## MCP Tools

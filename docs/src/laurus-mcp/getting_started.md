@@ -11,7 +11,7 @@
 ### Step 1: Start laurus-server
 
 ```bash
-laurus serve --grpc-port 50051
+laurus serve --port 50051
 ```
 
 ### Step 2: Configure the MCP client
@@ -21,7 +21,7 @@ laurus serve --grpc-port 50051
 Use the CLI command (recommended):
 
 ```bash
-claude mcp add laurus laurus mcp --endpoint http://localhost:50051
+claude mcp add laurus -- laurus mcp --endpoint http://localhost:50051
 ```
 
 Or edit `~/.claude/settings.json` directly:
@@ -39,8 +39,11 @@ Or edit `~/.claude/settings.json` directly:
 
 #### Claude Desktop
 
-Edit `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS)
-or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
+Edit the configuration file for your platform:
+
+- **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
+- **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
+- **Linux:** `~/.config/Claude/claude_desktop_config.json`
 
 ```json
 {
@@ -70,11 +73,11 @@ Text = { indexed = true, stored = true }
 EOF
 
 # Step 2: Start the server and create the index
-laurus serve --grpc-port 50051 &
+laurus serve --port 50051 &
 laurus create index --schema schema.toml
 
 # Step 3: Register the MCP server with Claude Code
-claude mcp add laurus laurus mcp --endpoint http://localhost:50051
+claude mcp add laurus -- laurus mcp --endpoint http://localhost:50051
 ```
 
 ### Workflow 2: AI-driven index creation
@@ -83,10 +86,10 @@ Start laurus-server first, then register the MCP server and let the AI create th
 
 ```bash
 # Step 1: Start laurus-server (no index required)
-laurus serve --grpc-port 50051
+laurus serve --port 50051
 
 # Step 2: Register the MCP server with Claude Code
-claude mcp add laurus laurus mcp --endpoint http://localhost:50051
+claude mcp add laurus -- laurus mcp --endpoint http://localhost:50051
 ```
 
 Then ask Claude:
@@ -101,7 +104,7 @@ Claude will design the schema and call `create_index` automatically.
 Register the MCP server without specifying an endpoint:
 
 ```bash
-claude mcp add laurus laurus mcp
+claude mcp add laurus -- laurus mcp
 ```
 
 Or edit the settings file directly:
@@ -122,6 +125,16 @@ Then ask Claude to connect:
 > "Connect to the laurus server at `http://localhost:50051`"
 
 Claude will call `connect(endpoint: "http://localhost:50051")` before using other tools.
+
+## Removing the MCP Server
+
+To remove the registered MCP server from Claude Code:
+
+```bash
+claude mcp remove laurus
+```
+
+For Claude Desktop, remove the `laurus` entry from the configuration file and restart the application.
 
 ## Lifecycle
 

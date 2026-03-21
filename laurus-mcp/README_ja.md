@@ -26,10 +26,10 @@ AI クライアント（Claude など）
 
 ```bash
 # laurus-server を起動
-laurus serve --grpc-port 50051
+laurus serve --port 50051
 
 # Claude Code で設定
-claude mcp add laurus laurus mcp --endpoint http://localhost:50051
+claude mcp add laurus -- laurus mcp --endpoint http://localhost:50051
 ```
 
 ## MCP ツール
