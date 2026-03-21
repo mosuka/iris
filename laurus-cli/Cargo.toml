@@ -19,16 +19,15 @@ path = "src/main.rs"
 anyhow = { workspace = true }
 clap = { workspace = true }
 dialoguer = { workspace = true }
+laurus = { workspace = true }
+laurus-mcp = { workspace = true }
+laurus-server = { workspace = true }
 rustyline = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tabled = { workspace = true }
 tokio = { workspace = true }
 toml = { workspace = true }
-
-laurus = { workspace = true }
-laurus-server = { workspace = true }
-laurus-mcp = { workspace = true }
 
 [features]
 embeddings-multimodal = ["laurus/embeddings-multimodal"]
