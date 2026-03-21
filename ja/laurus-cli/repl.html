@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-5438fea2.js";
+            window.path_to_searchindex_js = "../searchindex-d4b01327.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-d18ed058.js"></script>
@@ -185,10 +185,15 @@
 <h2 id="repl-の起動"><a class="header" href="#repl-の起動">REPL の起動</a></h2>
 <pre><code class="language-bash">laurus --index-dir ./my_index repl
 </code></pre>
+<p>指定されたディレクトリにインデックスが存在する場合、自動的に開かれます:</p>
 <pre><code class="language-text">Laurus REPL (type 'help' for commands, 'quit' to exit)
 laurus&gt;
 </code></pre>
-<p>REPL は起動時にインデックスを開き、セッション中ロードされた状態を維持します。</p>
+<p>インデックスがまだ存在しない場合、インデックスなしで REPL が起動し、作成を案内します:</p>
+<pre><code class="language-text">Laurus REPL — no index found at ./my_index.
+Use 'create index &lt;schema_path&gt;' to create one, or 'help' for commands.
+laurus&gt;
+</code></pre>
 <h2 id="利用可能なコマンド"><a class="header" href="#利用可能なコマンド">利用可能なコマンド</a></h2>
 <p>コマンドは CLI と同じ <code>&lt;操作&gt; &lt;リソース&gt;</code> の順序に従います。</p>
 <div class="table-wrapper">
@@ -197,6 +202,8 @@ laurus&gt;
 <tr><th style="text-align: left">コマンド</th><th style="text-align: left">説明</th></tr>
 </thead>
 <tbody>
+<tr><td style="text-align: left"><code>create index [schema_path]</code></td><td style="text-align: left">インデックスを作成（パス省略時は対話型ウィザード）</td></tr>
+<tr><td style="text-align: left"><code>create schema &lt;output_path&gt;</code></td><td style="text-align: left">対話型スキーマ生成ウィザード</td></tr>
 <tr><td style="text-align: left"><code>search &lt;query&gt;</code></td><td style="text-align: left">インデックスを検索</td></tr>
 <tr><td style="text-align: left"><code>add field &lt;name&gt; &lt;json&gt;</code></td><td style="text-align: left">スキーマにフィールドを追加</td></tr>
 <tr><td style="text-align: left"><code>add doc &lt;id&gt; &lt;json&gt;</code></td><td style="text-align: left">ドキュメントを追加</td></tr>
@@ -211,7 +218,16 @@ laurus&gt;
 </tbody>
 </table>
 </div>
+<blockquote>
+<p><strong>注意:</strong> <code>create</code>、<code>help</code>、<code>quit</code> 以外のコマンドはインデックスがロードされている必要があります。インデックスがロードされていない場合、まず <code>create index</code> を実行するようメッセージが表示されます。</p>
+</blockquote>
 <h2 id="使用例"><a class="header" href="#使用例">使用例</a></h2>
+<h3 id="インデックスの作成"><a class="header" href="#インデックスの作成">インデックスの作成</a></h3>
+<pre><code class="language-text">laurus&gt; create index ./schema.toml
+Index created at ./my_index.
+laurus&gt; add doc doc1 {"title":"Hello","body":"World"}
+Document 'doc1' added.
+</code></pre>
 <h3 id="検索"><a class="header" href="#検索">検索</a></h3>
 <pre><code class="language-text">laurus&gt; search body:rust
 ╭──────┬────────┬────────────────────────────────────╮

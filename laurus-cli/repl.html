@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-bfceb69b.js";
+            window.path_to_searchindex_js = "../searchindex-0ae0be96.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-710721a4.js"></script>
@@ -182,10 +182,15 @@
 <h2 id="starting-the-repl"><a class="header" href="#starting-the-repl">Starting the REPL</a></h2>
 <pre><code class="language-bash">laurus --index-dir ./my_index repl
 </code></pre>
+<p>If an index already exists at the specified directory, it is opened automatically:</p>
 <pre><code class="language-text">Laurus REPL (type 'help' for commands, 'quit' to exit)
 laurus&gt;
 </code></pre>
-<p>The REPL opens the index at startup and keeps it loaded throughout the session.</p>
+<p>If no index exists yet, the REPL starts without a loaded index and guides you to create one:</p>
+<pre><code class="language-text">Laurus REPL — no index found at ./my_index.
+Use 'create index &lt;schema_path&gt;' to create one, or 'help' for commands.
+laurus&gt;
+</code></pre>
 <h2 id="available-commands"><a class="header" href="#available-commands">Available Commands</a></h2>
 <p>Commands follow the same <code>&lt;operation&gt; &lt;resource&gt;</code> ordering as the CLI.</p>
 <div class="table-wrapper">
@@ -194,6 +199,8 @@ laurus&gt;
 <tr><th style="text-align: left">Command</th><th style="text-align: left">Description</th></tr>
 </thead>
 <tbody>
+<tr><td style="text-align: left"><code>create index [schema_path]</code></td><td style="text-align: left">Create a new index (interactive wizard if no path given)</td></tr>
+<tr><td style="text-align: left"><code>create schema &lt;output_path&gt;</code></td><td style="text-align: left">Interactive schema generation wizard</td></tr>
 <tr><td style="text-align: left"><code>search &lt;query&gt;</code></td><td style="text-align: left">Search the index</td></tr>
 <tr><td style="text-align: left"><code>add field &lt;name&gt; &lt;json&gt;</code></td><td style="text-align: left">Add a field to the schema</td></tr>
 <tr><td style="text-align: left"><code>add doc &lt;id&gt; &lt;json&gt;</code></td><td style="text-align: left">Add a document</td></tr>
@@ -208,7 +215,16 @@ laurus&gt;
 </tbody>
 </table>
 </div>
+<blockquote>
+<p><strong>Note:</strong> Commands other than <code>create</code>, <code>help</code>, and <code>quit</code> require a loaded index. If no index is loaded, the REPL displays a message asking you to run <code>create index</code> first.</p>
+</blockquote>
 <h2 id="usage-examples"><a class="header" href="#usage-examples">Usage Examples</a></h2>
+<h3 id="creating-an-index"><a class="header" href="#creating-an-index">Creating an Index</a></h3>
+<pre><code class="language-text">laurus&gt; create index ./schema.toml
+Index created at ./my_index.
+laurus&gt; add doc doc1 {"title":"Hello","body":"World"}
+Document 'doc1' added.
+</code></pre>
 <h3 id="searching"><a class="header" href="#searching">Searching</a></h3>
 <pre><code class="language-text">laurus&gt; search body:rust
 ╭──────┬────────┬────────────────────────────────────╮

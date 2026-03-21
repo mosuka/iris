@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-5438fea2.js";
+            window.path_to_searchindex_js = "../searchindex-d4b01327.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-d18ed058.js"></script>
@@ -200,8 +200,8 @@ laurus --index-dir /var/data/my_index --format json search "title:rust"
 <hr>
 <h2 id="create--リソースの作成"><a class="header" href="#create--リソースの作成"><code>create</code> — リソースの作成</a></h2>
 <h3 id="create-index"><a class="header" href="#create-index"><code>create index</code></a></h3>
-<p>スキーマ TOML ファイルから新しいインデックスを作成します。</p>
-<pre><code class="language-bash">laurus create index --schema &lt;FILE&gt;
+<p>新しいインデックスを作成します。<code>--schema</code> が指定された場合はその TOML ファイルを使用し、省略された場合は対話型スキーマウィザードが起動します。</p>
+<pre><code class="language-bash">laurus create index [--schema &lt;FILE&gt;]
 </code></pre>
 <p><strong>引数:</strong></p>
 <div class="table-wrapper">
@@ -210,7 +210,7 @@ laurus --index-dir /var/data/my_index --format json search "title:rust"
 <tr><th style="text-align: left">フラグ</th><th style="text-align: left">必須</th><th style="text-align: left">説明</th></tr>
 </thead>
 <tbody>
-<tr><td style="text-align: left"><code>--schema &lt;FILE&gt;</code></td><td style="text-align: left">はい</td><td style="text-align: left">インデックススキーマを定義する TOML ファイルのパス</td></tr>
+<tr><td style="text-align: left"><code>--schema &lt;FILE&gt;</code></td><td style="text-align: left">いいえ</td><td style="text-align: left">インデックススキーマを定義する TOML ファイルのパス。省略時はインデックスディレクトリに既存の <code>schema.toml</code> があればそれを使用し、なければ対話型ウィザードが起動します。</td></tr>
 </tbody>
 </table>
 </div>
@@ -231,11 +231,19 @@ stored = true
 indexed = true
 </code></pre>
 <p><strong>例:</strong></p>
-<pre><code class="language-bash">laurus --index-dir ./my_index create index --schema schema.toml
+<pre><code class="language-bash"># スキーマファイルから作成
+laurus --index-dir ./my_index create index --schema schema.toml
+# Index created at ./my_index.
+
+# 対話型ウィザード（--schema フラグなし）
+laurus --index-dir ./my_index create index
+# === Laurus Schema Generator ===
+# Field name: title
+# ...
 # Index created at ./my_index.
 </code></pre>
 <blockquote>
-<p><strong>注意:</strong> インデックスが既に存在する場合はエラーが返されます。再作成するにはデータディレクトリを削除してください。</p>
+<p><strong>注意:</strong> <code>schema.toml</code> と <code>store/</code> の両方が存在する場合はエラーが返されます。再作成するにはインデックスディレクトリを削除してください。<code>schema.toml</code> のみ存在する場合（作成が中断された場合など）は、<code>--schema</code> なしで <code>create index</code> を実行すると既存スキーマからストレージが復旧されます。</p>
 </blockquote>
 <h3 id="create-schema"><a class="header" href="#create-schema"><code>create schema</code></a></h3>
 <p>対話式ウィザードを通じてスキーマ TOML ファイルを生成します。</p>
