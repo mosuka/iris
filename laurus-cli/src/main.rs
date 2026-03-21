@@ -36,7 +36,9 @@ async fn main() -> Result<()> {
 
     match cli.command {
         Command::Create(cmd) => match cmd.resource {
-            CreateResource::Index { schema } => create::run_index(&schema, &index_dir).await,
+            CreateResource::Index { schema } => {
+                create::run_index(schema.as_deref(), &index_dir).await
+            }
             CreateResource::Schema { output } => create::run_schema(&output),
         },
         Command::Get(cmd) => match cmd.resource {

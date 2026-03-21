@@ -35,34 +35,100 @@ const STORE_DIR: &str = "store";
 /// # Errors
 ///
 /// Returns an error if:
-/// - An index already exists in `index_dir` (i.e. `schema.toml` is present).
+/// - A complete index already exists in `index_dir` (both `schema.toml` and
+///   `store/` are present).
 /// - The schema file cannot be read or parsed.
 /// - The index directory cannot be created.
 /// - The engine or storage initialisation fails.
 pub async fn create_index(index_dir: &Path, schema_path: &Path) -> Result<()> {
-    if index_dir.join(SCHEMA_FILE).exists() {
+    // Read and parse the schema file.
+    let schema_content =
+        std::fs::read_to_string(schema_path).context("Failed to read schema file")?;
+    let schema: Schema = toml::from_str(&schema_content).context("Failed to parse schema TOML")?;
+
+    init_index(index_dir, schema).await
+}
+
+/// Create a new index in the given index directory from an in-memory schema.
+///
+/// Persists the schema as `schema.toml` inside `index_dir` and initialises
+/// the underlying storage and engine. This is used when the schema was built
+/// interactively rather than loaded from an existing TOML file.
+///
+/// # Arguments
+///
+/// * `index_dir` - Path to the index directory where the index will be stored.
+/// * `schema` - The schema to use for the new index.
+///
+/// # Returns
+///
+/// Returns `Ok(())` on success.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - A complete index already exists in `index_dir` (both `schema.toml` and
+///   `store/` are present).
+/// - The index directory cannot be created.
+/// - The engine or storage initialisation fails.
+pub async fn create_index_from_schema(index_dir: &Path, schema: Schema) -> Result<()> {
+    init_index(index_dir, schema).await
+}
+
+/// Shared implementation for index creation.
+///
+/// Behaviour depends on the current state of the index directory:
+///
+/// | `schema.toml` | `store/` | Action |
+/// |:---:|:---:|:---|
+/// | absent | absent | Write schema, create storage |
+/// | absent | present | Write schema, create storage (stale store overwritten) |
+/// | present | absent | **Use existing schema**, create storage (recovery) |
+/// | present | present | Error — index already exists |
+///
+/// When `schema.toml` already exists but `store/` does not, the function
+/// ignores the `schema` argument and reads the existing file instead so that
+/// a plain `create index` (without `--schema`) recovers correctly.
+///
+/// # Arguments
+///
+/// * `index_dir` - Path to the index directory.
+/// * `schema` - The schema to persist and use for initialisation. Ignored
+///   when an existing `schema.toml` is found without a `store/` directory.
+///
+/// # Errors
+///
+/// Returns an error if the index already fully exists, the directory cannot
+/// be created, or engine/storage initialisation fails.
+async fn init_index(index_dir: &Path, schema: Schema) -> Result<()> {
+    let schema_path = index_dir.join(SCHEMA_FILE);
+    let store_path = index_dir.join(STORE_DIR);
+    let schema_exists = schema_path.exists();
+    let store_exists = store_path.exists();
+
+    if schema_exists && store_exists {
         bail!(
             "Index already exists at {}. Delete the directory first to recreate.",
             index_dir.display()
         );
     }
 
-    // Read and parse the schema file.
-    let schema_content =
-        std::fs::read_to_string(schema_path).context("Failed to read schema file")?;
-    let schema: Schema = toml::from_str(&schema_content).context("Failed to parse schema TOML")?;
-
-    // Create the index directory.
-    std::fs::create_dir_all(index_dir).context("Failed to create index directory")?;
-
-    // Save schema to the index directory as TOML.
-    let schema_toml =
-        toml::to_string_pretty(&schema).context("Failed to serialize schema to TOML")?;
-    let schema_dest = index_dir.join(SCHEMA_FILE);
-    std::fs::write(&schema_dest, &schema_toml).context("Failed to write schema file")?;
+    // If schema.toml exists but store/ is missing, recover using the existing
+    // schema rather than the one passed in (which may come from the wizard).
+    let schema = if schema_exists && !store_exists {
+        let content =
+            std::fs::read_to_string(&schema_path).context("Failed to read existing schema file")?;
+        toml::from_str(&content).context("Failed to parse existing schema TOML")?
+    } else {
+        // Create the index directory and write the schema.
+        std::fs::create_dir_all(index_dir).context("Failed to create index directory")?;
+        let schema_toml =
+            toml::to_string_pretty(&schema).context("Failed to serialize schema to TOML")?;
+        std::fs::write(&schema_path, &schema_toml).context("Failed to write schema file")?;
+        schema
+    };
 
     // Create the storage and engine to initialize the index structure.
-    let store_path = index_dir.join(STORE_DIR);
     let storage_config = StorageConfig::File(FileStorageConfig::new(&store_path));
     let storage = StorageFactory::create(storage_config)?;
     let _engine = Engine::new(storage, schema).await?;
@@ -72,13 +138,15 @@ pub async fn create_index(index_dir: &Path, schema_path: &Path) -> Result<()> {
 
 /// Open an existing index from the given index directory.
 ///
-/// Reads the persisted `schema.toml`, opens the file-based storage backend,
-/// and constructs an [`Engine`] instance ready for querying and mutation.
+/// Reads the persisted `schema.toml` and opens the file-based storage
+/// backend. If `schema.toml` exists but the `store/` directory is missing
+/// (partial state from an interrupted creation), the storage is created
+/// automatically to recover.
 ///
 /// # Arguments
 ///
 /// * `index_dir` - Path to the index directory that contains an existing index
-///   (must have a `schema.toml` file and a `store/` subdirectory).
+///   (must have at least a `schema.toml` file).
 ///
 /// # Returns
 ///
@@ -89,12 +157,13 @@ pub async fn create_index(index_dir: &Path, schema_path: &Path) -> Result<()> {
 /// Returns an error if:
 /// - No `schema.toml` file is found in `index_dir`.
 /// - The schema file cannot be read or parsed.
-/// - The storage backend cannot be opened or the engine cannot be initialised.
+/// - The storage backend cannot be opened (or created) or the engine cannot
+///   be initialised.
 pub async fn open_index(index_dir: &Path) -> Result<Engine> {
     let schema_path = index_dir.join(SCHEMA_FILE);
     if !schema_path.exists() {
         bail!(
-            "No index found at {}. Run 'index create' first.",
+            "No index found at {}. Run 'create index' first.",
             index_dir.display()
         );
     }
@@ -104,28 +173,19 @@ pub async fn open_index(index_dir: &Path) -> Result<Engine> {
         std::fs::read_to_string(&schema_path).context("Failed to read schema file")?;
     let schema: Schema = toml::from_str(&schema_toml).context("Failed to parse schema TOML")?;
 
-    // Open storage and recover the engine.
+    // Open or create storage depending on whether the store directory exists.
     let store_path = index_dir.join(STORE_DIR);
     let storage_config = StorageConfig::File(FileStorageConfig::new(&store_path));
-    let storage = StorageFactory::open(storage_config)?;
+    let storage = if store_path.exists() {
+        StorageFactory::open(storage_config)?
+    } else {
+        StorageFactory::create(storage_config)?
+    };
     let engine = Engine::new(storage, schema).await?;
 
     Ok(engine)
 }
 
-/// Persist the current schema back to the index directory.
-///
-/// Serializes the given schema as TOML and writes it to `schema.toml`
-/// inside `index_dir`, overwriting the existing file.
-///
-/// # Arguments
-///
-/// * `index_dir` - Path to the index directory containing the index.
-/// * `schema` - The schema to persist.
-///
-/// # Errors
-///
-/// Returns an error if serialization or file write fails.
 /// Read the schema from the index directory.
 ///
 /// # Arguments

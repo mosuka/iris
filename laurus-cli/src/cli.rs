@@ -62,11 +62,13 @@ pub struct CreateCommand {
 
 #[derive(Subcommand)]
 pub enum CreateResource {
-    /// Create a new index from a schema TOML file.
+    /// Create a new index. If --schema is given, uses that TOML file;
+    /// otherwise launches the interactive schema wizard.
     Index {
-        /// Path to the schema TOML file.
+        /// Path to an existing schema TOML file. When omitted, the
+        /// interactive schema wizard is launched instead.
         #[arg(long)]
-        schema: PathBuf,
+        schema: Option<PathBuf>,
     },
     /// Interactively generate a schema TOML file.
     Schema {

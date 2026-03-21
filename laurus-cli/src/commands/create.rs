@@ -21,20 +21,41 @@ use crate::context;
 
 /// Execute the `create index` command.
 ///
-/// Creates a new index from a schema TOML file at the given index directory.
+/// If `schema_path` is `Some`, creates a new index from the given schema TOML
+/// file. If `None`, launches the interactive schema wizard to build a schema
+/// in-memory and then creates the index directly without writing a separate
+/// schema file (the schema is persisted inside the index directory as
+/// `schema.toml`).
 ///
 /// # Arguments
 ///
-/// * `schema_path` - Path to the schema TOML file.
+/// * `schema_path` - Optional path to a schema TOML file. When `None`, the
+///   interactive wizard is used instead.
 /// * `index_dir` - Path to the index directory for the new index.
 ///
 /// # Errors
 ///
 /// Returns an error if:
-/// - The schema file cannot be read or parsed.
+/// - The schema file cannot be read or parsed (when `schema_path` is given).
+/// - The interactive wizard fails (when `schema_path` is `None`).
 /// - The index cannot be created.
-pub async fn run_index(schema_path: &Path, index_dir: &Path) -> Result<()> {
-    context::create_index(index_dir, schema_path).await?;
+pub async fn run_index(schema_path: Option<&Path>, index_dir: &Path) -> Result<()> {
+    match schema_path {
+        Some(path) => {
+            context::create_index(index_dir, path).await?;
+        }
+        None => {
+            // If schema.toml already exists, use it directly instead of
+            // launching the wizard (recovery path for missing store/).
+            if index_dir.join("schema.toml").exists() {
+                let schema = context::read_schema(index_dir)?;
+                context::create_index_from_schema(index_dir, schema).await?;
+            } else {
+                let schema = build_schema_interactive()?;
+                context::create_index_from_schema(index_dir, schema).await?;
+            }
+        }
+    }
     println!("Index created at {}.", index_dir.display());
     Ok(())
 }
@@ -74,6 +95,39 @@ const DISTANCE_METRICS: &[&str] = &["Cosine", "Euclidean", "Manhattan", "DotProd
 /// - The schema cannot be serialised to TOML.
 /// - The output file cannot be written.
 pub fn run_schema(output: &Path) -> Result<()> {
+    let schema = build_schema_interactive()?;
+
+    // Show preview.
+    let toml_str = toml::to_string_pretty(&schema).context("Failed to serialize schema to TOML")?;
+    println!("\n--- Preview ---");
+    println!("{toml_str}");
+    println!("---------------\n");
+
+    if !Confirm::new()
+        .with_prompt(format!("Write to {}?", output.display()))
+        .default(true)
+        .interact()?
+    {
+        println!("Cancelled.");
+        return Ok(());
+    }
+
+    std::fs::write(output, &toml_str).context("Failed to write schema file")?;
+    println!("Schema written to {}.", output.display());
+
+    Ok(())
+}
+
+/// Run the interactive schema wizard and return the resulting [`Schema`].
+///
+/// Prompts the user to define fields one by one, then asks for default
+/// search fields among the lexical fields. Returns the built schema without
+/// writing it to disk.
+///
+/// # Errors
+///
+/// Returns an error if an interactive prompt fails (e.g. terminal I/O error).
+pub fn build_schema_interactive() -> Result<Schema> {
     println!("\n=== Laurus Schema Generator ===\n");
 
     let mut fields: HashMap<String, FieldOption> = HashMap::new();
@@ -115,32 +169,12 @@ pub fn run_schema(output: &Path) -> Result<()> {
         prompt_default_fields(&lexical_fields)?
     };
 
-    let schema = Schema {
+    Ok(Schema {
         analyzers: std::collections::HashMap::new(),
         embedders: std::collections::HashMap::new(),
         fields,
         default_fields,
-    };
-
-    // Show preview.
-    let toml_str = toml::to_string_pretty(&schema).context("Failed to serialize schema to TOML")?;
-    println!("\n--- Preview ---");
-    println!("{toml_str}");
-    println!("---------------\n");
-
-    if !Confirm::new()
-        .with_prompt(format!("Write to {}?", output.display()))
-        .default(true)
-        .interact()?
-    {
-        println!("Cancelled.");
-        return Ok(());
-    }
-
-    std::fs::write(output, &toml_str).context("Failed to write schema file")?;
-    println!("Schema written to {}.", output.display());
-
-    Ok(())
+    })
 }
 
 /// Prompt for a unique field name.

@@ -20,17 +20,17 @@ laurus --index-dir /var/data/my_index --format json search "title:rust"
 
 ### `create index`
 
-Create a new index from a schema TOML file.
+Create a new index. If `--schema` is given, uses that TOML file; otherwise launches the interactive schema wizard.
 
 ```bash
-laurus create index --schema <FILE>
+laurus create index [--schema <FILE>]
 ```
 
 **Arguments:**
 
 | Flag | Required | Description |
 | :--- | :--- | :--- |
-| `--schema <FILE>` | Yes | Path to a TOML file defining the index schema |
+| `--schema <FILE>` | No | Path to a TOML file defining the index schema. When omitted, the command checks if a `schema.toml` already exists in the index directory and uses it; otherwise the interactive wizard is launched. |
 
 **Schema file format:**
 
@@ -52,14 +52,22 @@ stored = true
 indexed = true
 ```
 
-**Example:**
+**Examples:**
 
 ```bash
+# From a schema file
 laurus --index-dir ./my_index create index --schema schema.toml
+# Index created at ./my_index.
+
+# Interactive wizard (no --schema flag)
+laurus --index-dir ./my_index create index
+# === Laurus Schema Generator ===
+# Field name: title
+# ...
 # Index created at ./my_index.
 ```
 
-> **Note:** An error is returned if the index already exists. Delete the data directory to recreate.
+> **Note:** If both `schema.toml` and `store/` already exist, an error is returned. Delete the index directory to recreate. If only `schema.toml` exists (e.g. after an interrupted creation), running `create index` without `--schema` recovers the index by creating the missing storage from the existing schema.
 
 ### `create schema`
 

@@ -20,17 +20,17 @@ laurus --index-dir /var/data/my_index --format json search "title:rust"
 
 ### `create index`
 
-スキーマ TOML ファイルから新しいインデックスを作成します。
+新しいインデックスを作成します。`--schema` が指定された場合はその TOML ファイルを使用し、省略された場合は対話型スキーマウィザードが起動します。
 
 ```bash
-laurus create index --schema <FILE>
+laurus create index [--schema <FILE>]
 ```
 
 **引数:**
 
 | フラグ | 必須 | 説明 |
 | :--- | :--- | :--- |
-| `--schema <FILE>` | はい | インデックススキーマを定義する TOML ファイルのパス |
+| `--schema <FILE>` | いいえ | インデックススキーマを定義する TOML ファイルのパス。省略時はインデックスディレクトリに既存の `schema.toml` があればそれを使用し、なければ対話型ウィザードが起動します。 |
 
 **スキーマファイルの形式:**
 
@@ -55,11 +55,19 @@ indexed = true
 **例:**
 
 ```bash
+# スキーマファイルから作成
 laurus --index-dir ./my_index create index --schema schema.toml
+# Index created at ./my_index.
+
+# 対話型ウィザード（--schema フラグなし）
+laurus --index-dir ./my_index create index
+# === Laurus Schema Generator ===
+# Field name: title
+# ...
 # Index created at ./my_index.
 ```
 
-> **注意:** インデックスが既に存在する場合はエラーが返されます。再作成するにはデータディレクトリを削除してください。
+> **注意:** `schema.toml` と `store/` の両方が存在する場合はエラーが返されます。再作成するにはインデックスディレクトリを削除してください。`schema.toml` のみ存在する場合（作成が中断された場合など）は、`--schema` なしで `create index` を実行すると既存スキーマからストレージが復旧されます。
 
 ### `create schema`
 
