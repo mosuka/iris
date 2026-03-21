@@ -73,17 +73,20 @@ EOF
 laurus serve --grpc-port 50051 &
 laurus create index --schema schema.toml
 
-# Step 3: Start the MCP server (done automatically by Claude)
-laurus mcp --endpoint http://localhost:50051
+# Step 3: Register the MCP server with Claude Code
+claude mcp add laurus laurus mcp --endpoint http://localhost:50051
 ```
 
 ### Workflow 2: AI-driven index creation
 
-Start the MCP server without a pre-created index, then ask the AI to create one:
+Start laurus-server first, then register the MCP server and let the AI create the index:
 
 ```bash
-# Start laurus-server (no index required)
+# Step 1: Start laurus-server (no index required)
 laurus serve --grpc-port 50051
+
+# Step 2: Register the MCP server with Claude Code
+claude mcp add laurus laurus mcp --endpoint http://localhost:50051
 ```
 
 Then ask Claude:
@@ -91,15 +94,27 @@ Then ask Claude:
 > "Create a search index for blog posts. I need to search by title and body text,
 > and I want to store the author and publication date."
 
-Claude will call the `connect` tool (if not already connected), then design the
-schema and call `create_index` automatically.
+Claude will design the schema and call `create_index` automatically.
 
 ### Workflow 3: Connect at runtime
 
-Start the MCP server without specifying an endpoint:
+Register the MCP server without specifying an endpoint:
 
 ```bash
-laurus mcp
+claude mcp add laurus laurus mcp
+```
+
+Or edit the settings file directly:
+
+```json
+{
+  "mcpServers": {
+    "laurus": {
+      "command": "laurus",
+      "args": ["mcp"]
+    }
+  }
+}
 ```
 
 Then ask Claude to connect:

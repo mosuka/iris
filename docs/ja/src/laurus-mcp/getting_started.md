@@ -73,31 +73,47 @@ EOF
 laurus serve --grpc-port 50051 &
 laurus create index --schema schema.toml
 
-# ステップ 3: MCP サーバーを起動（Claude が自動的に起動）
-laurus mcp --endpoint http://localhost:50051
+# ステップ 3: MCP サーバーを Claude Code に登録
+claude mcp add laurus laurus mcp --endpoint http://localhost:50051
 ```
 
 ### ワークフロー 2: AI 主導のインデックス作成
 
-インデックスを事前に作成せず MCP サーバーを起動し、AI にインデックスを作成させます：
+laurus-server を起動してから MCP サーバーを登録し、AI にインデックスを作成させます：
 
 ```bash
-# laurus-server を起動（インデックス不要）
+# ステップ 1: laurus-server を起動（インデックス不要）
 laurus serve --grpc-port 50051
+
+# ステップ 2: MCP サーバーを Claude Code に登録
+claude mcp add laurus laurus mcp --endpoint http://localhost:50051
 ```
 
 次に Claude に依頼します：
 
 > 「ブログ記事用の検索インデックスを作成してください。タイトルと本文テキストで検索できるようにして、著者と公開日も保存したいです。」
 
-Claude は `connect` ツールを呼び出して接続し、スキーマを設計して `create_index` を自動的に呼び出します。
+Claude はスキーマを設計して `create_index` を自動的に呼び出します。
 
 ### ワークフロー 3: 実行時に接続する
 
-エンドポイントを指定せずに MCP サーバーを起動します：
+エンドポイントを指定せずに MCP サーバーを登録します：
 
 ```bash
-laurus mcp
+claude mcp add laurus laurus mcp
+```
+
+または設定ファイルを直接編集：
+
+```json
+{
+  "mcpServers": {
+    "laurus": {
+      "command": "laurus",
+      "args": ["mcp"]
+    }
+  }
+}
 ```
 
 次に Claude に接続を依頼します：
