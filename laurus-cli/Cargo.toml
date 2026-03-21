@@ -6,6 +6,7 @@ description = "Command-line interface for the Laurus search engine"
 documentation = { workspace = true }
 homepage = { workspace = true }
 repository = { workspace = true }
+readme = "README.md"
 keywords = ["search", "cli", "indexing", "query"]
 categories = ["command-line-utilities"]
 license = { workspace = true }
