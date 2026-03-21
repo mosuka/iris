@@ -60,14 +60,14 @@ laurus = { version = "0.1.0", features = ["embeddings-all"] }
 
 ## セクション
 
-- [Engine](engine.md) -- EngineとEngineBuilderの内部構造
-- [スコアリングとランキング](scoring.md) -- BM25、TF-IDF、およびベクトル類似度スコアリング
-- [ファセット](faceting.md) -- 階層的なファセット検索
-- [ハイライト](highlighting.md) -- 検索結果のハイライト表示
-- [スペル修正](spelling_correction.md) -- スペル候補の提案と自動修正
-- [ID管理](id_management.md) -- 二層構造のドキュメントID管理
-- [永続化とWAL](persistence.md) -- Write-Ahead Loggingとデータの耐久性
-- [削除とコンパクション](deletions.md) -- 論理削除と領域の再利用
-- [エラーハンドリング](error_handling.md) -- LaurusErrorとResult型
-- [拡張性](extensibility.md) -- カスタムAnalyzer、Embedder、Storageバックエンド
-- [APIリファレンス](api_reference.md) -- 主要な型とメソッドの一覧
+- [Engine](laurus/engine.md) -- EngineとEngineBuilderの内部構造
+- [スコアリングとランキング](laurus/scoring.md) -- BM25、TF-IDF、およびベクトル類似度スコアリング
+- [ファセット](laurus/faceting.md) -- 階層的なファセット検索
+- [ハイライト](laurus/highlighting.md) -- 検索結果のハイライト表示
+- [スペル修正](laurus/spelling_correction.md) -- スペル候補の提案と自動修正
+- [ID管理](laurus/id_management.md) -- 二層構造のドキュメントID管理
+- [永続化とWAL](laurus/persistence.md) -- Write-Ahead Loggingとデータの耐久性
+- [削除とコンパクション](laurus/deletions.md) -- 論理削除と領域の再利用
+- [エラーハンドリング](laurus/error_handling.md) -- LaurusErrorとResult型
+- [拡張性](laurus/extensibility.md) -- カスタムAnalyzer、Embedder、Storageバックエンド
+- [APIリファレンス](laurus/api_reference.md) -- 主要な型とメソッドの一覧

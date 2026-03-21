@@ -24,9 +24,9 @@ graph TB
 
 For details on each crate, see:
 
-- [Library Overview](laurus/overview.md)
-- [CLI Overview](cli/overview.md)
-- [Server Overview](server/overview.md)
+- [Library Overview](laurus.md)
+- [CLI Overview](laurus-cli.md)
+- [Server Overview](laurus-server.md)
 
 ## High-Level Overview
 

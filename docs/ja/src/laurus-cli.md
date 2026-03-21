@@ -6,10 +6,10 @@ Laurus はコマンドラインツール `laurus` を提供しており、コー
 
 - **インデックス管理** -- TOML スキーマファイルからインデックスを作成・検査。対話式スキーマジェネレーター付き
 - **ドキュメント CRUD** -- JSON によるドキュメントの追加、取得、削除
-- **検索** -- [Query DSL](../concepts/query_dsl.md) を使用したクエリ実行
+- **検索** -- [Query DSL](concepts/query_dsl.md) を使用したクエリ実行
 - **デュアル出力** -- 人間が読みやすいテーブル形式または機械処理向け JSON 形式
 - **対話型 REPL** -- ライブセッションでインデックスを操作
-- **gRPC サーバー** -- `laurus serve` で [gRPC サーバー](../server/overview.md)を起動
+- **gRPC サーバー** -- `laurus serve` で [gRPC サーバー](laurus-server.md)を起動
 
 ## はじめに
 
@@ -35,7 +35,7 @@ laurus --index-dir ./my_index search "body:world"
 
 詳細はサブセクションを参照してください:
 
-- [インストール](installation.md) -- CLI のインストール方法
-- [コマンドリファレンス](commands.md) -- 全コマンドの詳細
-- [スキーマフォーマット](schema_format.md) -- スキーマ TOML フォーマットのリファレンス
-- [REPL](repl.md) -- 対話モード
+- [インストール](laurus-cli/installation.md) -- CLI のインストール方法
+- [コマンドリファレンス](laurus-cli/commands.md) -- 全コマンドの詳細
+- [スキーマフォーマット](laurus-cli/schema_format.md) -- スキーマ TOML フォーマットのリファレンス
+- [REPL](laurus-cli/repl.md) -- 対話モード

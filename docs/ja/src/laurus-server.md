@@ -44,7 +44,7 @@ laurus serve --config config.toml
 
 ## セクション
 
-- [はじめに](getting_started.md) -- 起動オプションと最初のステップ
-- [設定](configuration.md) -- TOML 設定、環境変数、優先順位
-- [gRPC API リファレンス](grpc_api.md) -- 全サービスと RPC の完全な API ドキュメント
-- [HTTP ゲートウェイ](http_gateway.md) -- HTTP/JSON エンドポイントリファレンス
+- [はじめに](laurus-server/getting_started.md) -- 起動オプションと最初のステップ
+- [設定](laurus-server/configuration.md) -- TOML 設定、環境変数、優先順位
+- [gRPC API リファレンス](laurus-server/grpc_api.md) -- 全サービスと RPC の完全な API ドキュメント
+- [HTTP ゲートウェイ](laurus-server/http_gateway.md) -- HTTP/JSON エンドポイントリファレンス

@@ -24,9 +24,9 @@ graph TB
 
 各クレートの詳細については以下を参照してください。
 
-- [ライブラリ概要](laurus/overview.md)
-- [CLI 概要](cli/overview.md)
-- [サーバー概要](server/overview.md)
+- [ライブラリ概要](laurus.md)
+- [CLI 概要](laurus-cli.md)
+- [サーバー概要](laurus-server.md)
 
 ## 全体概要
 

@@ -60,14 +60,14 @@ laurus = { version = "0.1.0", features = ["embeddings-all"] }
 
 ## Sections
 
-- [Engine](engine.md) -- Engine and EngineBuilder internals
-- [Scoring & Ranking](scoring.md) -- BM25, TF-IDF, and vector similarity scoring
-- [Faceting](faceting.md) -- Hierarchical facet search
-- [Highlighting](highlighting.md) -- Search result highlighting
-- [Spelling Correction](spelling_correction.md) -- Spelling suggestions and auto-correction
-- [ID Management](id_management.md) -- Dual-tiered document identity
-- [Persistence & WAL](persistence.md) -- Write-ahead logging and durability
-- [Deletions & Compaction](deletions.md) -- Logical deletion and space reclamation
-- [Error Handling](error_handling.md) -- LaurusError and Result types
-- [Extensibility](extensibility.md) -- Custom analyzers, embedders, and storage backends
-- [API Reference](api_reference.md) -- Key types and methods at a glance
+- [Engine](laurus/engine.md) -- Engine and EngineBuilder internals
+- [Scoring & Ranking](laurus/scoring.md) -- BM25, TF-IDF, and vector similarity scoring
+- [Faceting](laurus/faceting.md) -- Hierarchical facet search
+- [Highlighting](laurus/highlighting.md) -- Search result highlighting
+- [Spelling Correction](laurus/spelling_correction.md) -- Spelling suggestions and auto-correction
+- [ID Management](laurus/id_management.md) -- Dual-tiered document identity
+- [Persistence & WAL](laurus/persistence.md) -- Write-ahead logging and durability
+- [Deletions & Compaction](laurus/deletions.md) -- Logical deletion and space reclamation
+- [Error Handling](laurus/error_handling.md) -- LaurusError and Result types
+- [Extensibility](laurus/extensibility.md) -- Custom analyzers, embedders, and storage backends
+- [API Reference](laurus/api_reference.md) -- Key types and methods at a glance

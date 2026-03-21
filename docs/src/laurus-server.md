@@ -44,7 +44,7 @@ laurus serve --config config.toml
 
 ## Sections
 
-- [Getting Started](getting_started.md) -- Startup options and first steps
-- [Configuration](configuration.md) -- TOML configuration, environment variables, and priority
-- [gRPC API Reference](grpc_api.md) -- Full API documentation for all services and RPCs
-- [HTTP Gateway](http_gateway.md) -- HTTP/JSON endpoint reference
+- [Getting Started](laurus-server/getting_started.md) -- Startup options and first steps
+- [Configuration](laurus-server/configuration.md) -- TOML configuration, environment variables, and priority
+- [gRPC API Reference](laurus-server/grpc_api.md) -- Full API documentation for all services and RPCs
+- [HTTP Gateway](laurus-server/http_gateway.md) -- HTTP/JSON endpoint reference

@@ -58,9 +58,9 @@ graph LR
 | [Indexing](concepts/indexing.md) | How inverted indexes and vector indexes work internally |
 | [Search](concepts/search.md) | Query types, vector search, and hybrid fusion |
 | [Query DSL](concepts/query_dsl.md) | Human-readable query syntax for all search types |
-| [Library (laurus)](laurus/overview.md) | Engine internals, scoring, faceting, and extensibility |
-| [CLI (laurus-cli)](cli/overview.md) | Command-line tool for index management and search |
-| [Server (laurus-server)](server/overview.md) | gRPC server with HTTP Gateway |
+| [Library (laurus)](laurus.md) | Engine internals, scoring, faceting, and extensibility |
+| [CLI (laurus-cli)](laurus-cli.md) | Command-line tool for index management and search |
+| [Server (laurus-server)](laurus-server.md) | gRPC server with HTTP Gateway |
 | [Development Guide](development/build_and_test.md) | Build, test, and contribute to Laurus |
 
 ## Quick Example

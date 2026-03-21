@@ -183,4 +183,4 @@ fn validate_dimension(dim: usize) -> Result<()> {
 ## Next Steps
 
 - [Extensibility](extensibility.md) — implement custom traits with proper error handling
-- [API Reference](../api_reference.md) — full method signatures and return types
+- [API Reference](api_reference.md) — full method signatures and return types

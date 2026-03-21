@@ -23,7 +23,7 @@ cargo doc --open
 | `engine.schema()` | 現在のスキーマへの参照を取得 |
 | `engine.stats()?` | インデックス統計の取得 |
 
-> **`put_document` と `add_document` の違い:** `put_document` はUpsertを実行します。同じ外部IDのドキュメントが既に存在する場合、削除して置き換えます。`add_document` は常に追加し、複数のドキュメントチャンクが同じ外部IDを共有できます。詳細は [Schema & Fields -- ドキュメントのインデキシング](concepts/schema_and_fields.md#indexing-documents) を参照してください。
+> **`put_document` と `add_document` の違い:** `put_document` はUpsertを実行します。同じ外部IDのドキュメントが既に存在する場合、削除して置き換えます。`add_document` は常に追加し、複数のドキュメントチャンクが同じ外部IDを共有できます。詳細は [Schema & Fields -- ドキュメントのインデキシング](../concepts/schema_and_fields.md#indexing-documents) を参照してください。
 
 ### EngineBuilder
 
@@ -153,9 +153,9 @@ cargo doc --open
 | `BooleanQueryBuilder::new()` | ブール結合 | `.must(q1).should(q2).must_not(q3).build()` |
 | `FuzzyQuery::new(field, term)` | あいまい一致（デフォルト max_edits=2） | `FuzzyQuery::new("body", "programing").max_edits(1)` |
 | `WildcardQuery::new(field, pattern)` | ワイルドカード | `WildcardQuery::new("file", "*.pdf")` |
-| `NumericRangeQuery::new(...)` | 数値範囲 | [Lexical Search](search/lexical_search.md) を参照 |
-| `GeoQuery::within_radius(...)` | 地理半径 | [Lexical Search](search/lexical_search.md) を参照 |
-| `SpanNearQuery::new(...)` | 近接 | [Lexical Search](search/lexical_search.md) を参照 |
+| `NumericRangeQuery::new(...)` | 数値範囲 | [Lexical Search](../concepts/search.md) を参照 |
+| `GeoQuery::within_radius(...)` | 地理半径 | [Lexical Search](../concepts/search.md) を参照 |
+| `SpanNearQuery::new(...)` | 近接 | [Lexical Search](../concepts/search.md) を参照 |
 | `PrefixQuery::new(field, prefix)` | 前方一致 | `PrefixQuery::new("body", "pro")` |
 | `RegexpQuery::new(field, pattern)?` | 正規表現一致 | `RegexpQuery::new("body", "^pro.*ing$")?` |
 

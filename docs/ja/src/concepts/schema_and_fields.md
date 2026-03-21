@@ -2,7 +2,7 @@
 
 `Schema` はドキュメントの構造を定義します。どのフィールドが存在し、各フィールドがどのようにインデクシングされるかを指定します。Schema は Engine にとって唯一の情報源です。
 
-> CLI で使用される TOML ファイル形式については、[スキーマフォーマットリファレンス](../cli/schema_format.md)を参照してください。
+> CLI で使用される TOML ファイル形式については、[スキーマフォーマットリファレンス](../laurus-cli/schema_format.md)を参照してください。
 
 ## Schema
 
@@ -289,4 +289,4 @@ let updated_schema = engine.delete_field("category").await?;
 
 4. **デフォルトフィールドを設定する** — Query DSL を使用する場合、デフォルトフィールドを設定することで、ユーザーは `body:hello` の代わりに `hello` と記述できます。
 
-5. **スキーマジェネレータを使用する** — `laurus create schema` を実行して、手書きの代わりにインタラクティブにスキーマ TOML ファイルを構築できます。詳細は [CLI コマンド](../cli/commands.md#create-schema)を参照。
+5. **スキーマジェネレータを使用する** — `laurus create schema` を実行して、手書きの代わりにインタラクティブにスキーマ TOML ファイルを構築できます。詳細は [CLI コマンド](../laurus-cli/commands.md#create-schema)を参照。

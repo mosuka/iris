@@ -24,7 +24,7 @@ The central coordinator for all indexing and search operations.
 | `engine.schema()` | Return the current `Schema` |
 | `engine.stats()?` | Get index statistics |
 
-> **`put_document` vs `add_document`:** `put_document` performs an upsert — if a document with the same external ID already exists, it is deleted and replaced. `add_document` always appends, allowing multiple document chunks to share the same external ID. See [Schema & Fields — Indexing Documents](concepts/schema_and_fields.md#indexing-documents) for details.
+> **`put_document` vs `add_document`:** `put_document` performs an upsert — if a document with the same external ID already exists, it is deleted and replaced. `add_document` always appends, allowing multiple document chunks to share the same external ID. See [Schema & Fields — Indexing Documents](../concepts/schema_and_fields.md#indexing-documents) for details.
 
 ### EngineBuilder
 
@@ -154,9 +154,9 @@ A collection of named field values.
 | `BooleanQueryBuilder::new()` | Boolean combination | `.must(q1).should(q2).must_not(q3).build()` |
 | `FuzzyQuery::new(field, term)` | Fuzzy match (default max_edits=2) | `FuzzyQuery::new("body", "programing").max_edits(1)` |
 | `WildcardQuery::new(field, pattern)` | Wildcard | `WildcardQuery::new("file", "*.pdf")` |
-| `NumericRangeQuery::new(...)` | Numeric range | See [Lexical Search](search/lexical_search.md) |
-| `GeoQuery::within_radius(...)` | Geo radius | See [Lexical Search](search/lexical_search.md) |
-| `SpanNearQuery::new(...)` | Proximity | See [Lexical Search](search/lexical_search.md) |
+| `NumericRangeQuery::new(...)` | Numeric range | See [Lexical Search](../concepts/search.md) |
+| `GeoQuery::within_radius(...)` | Geo radius | See [Lexical Search](../concepts/search.md) |
+| `SpanNearQuery::new(...)` | Proximity | See [Lexical Search](../concepts/search.md) |
 | `PrefixQuery::new(field, prefix)` | Prefix match | `PrefixQuery::new("body", "pro")` |
 | `RegexpQuery::new(field, pattern)?` | Regex match | `RegexpQuery::new("body", "^pro.*ing$")?` |
 

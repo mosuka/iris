@@ -6,10 +6,10 @@ Laurus provides a command-line tool `laurus` that lets you create indexes, manag
 
 - **Index management** -- Create and inspect indexes from TOML schema files, with an interactive schema generator
 - **Document CRUD** -- Add, retrieve, and delete documents via JSON
-- **Search** -- Execute queries using the [Query DSL](../concepts/query_dsl.md)
+- **Search** -- Execute queries using the [Query DSL](concepts/query_dsl.md)
 - **Dual output** -- Human-readable tables or machine-parseable JSON
 - **Interactive REPL** -- Explore your index in a live session
-- **gRPC server** -- Start a [gRPC server](../server/overview.md) with `laurus serve`
+- **gRPC server** -- Start a [gRPC server](laurus-server.md) with `laurus serve`
 
 ## Getting Started
 
@@ -35,7 +35,7 @@ laurus --index-dir ./my_index search "body:world"
 
 See the sub-sections for detailed documentation:
 
-- [Installation](installation.md) -- How to install the CLI
-- [Commands](commands.md) -- Full command reference
-- [Schema Format](schema_format.md) -- Schema TOML format reference
-- [REPL](repl.md) -- Interactive mode
+- [Installation](laurus-cli/installation.md) -- How to install the CLI
+- [Commands](laurus-cli/commands.md) -- Full command reference
+- [Schema Format](laurus-cli/schema_format.md) -- Schema TOML format reference
+- [REPL](laurus-cli/repl.md) -- Interactive mode

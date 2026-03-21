@@ -183,4 +183,4 @@ fn validate_dimension(dim: usize) -> Result<()> {
 ## 次のステップ
 
 - [拡張性](extensibility.md) -- 適切なエラーハンドリングでカスタムトレイトを実装
-- [APIリファレンス](../api_reference.md) -- 完全なメソッドシグネチャと戻り値の型
+- [APIリファレンス](api_reference.md) -- 完全なメソッドシグネチャと戻り値の型

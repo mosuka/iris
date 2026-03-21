@@ -58,9 +58,9 @@ graph LR
 | [インデクシング](concepts/indexing.md) | 転置インデックスと Vector インデックスの内部動作 |
 | [検索](concepts/search.md) | クエリの種類、Vector 検索、ハイブリッド融合 |
 | [Query DSL](concepts/query_dsl.md) | すべての検索タイプに対応した人間が読みやすいクエリ構文 |
-| [ライブラリ (laurus)](laurus/overview.md) | Engine の内部構造、スコアリング、ファセット、拡張性 |
-| [CLI (laurus-cli)](cli/overview.md) | インデックス管理と検索のためのコマンドラインツール |
-| [サーバー (laurus-server)](server/overview.md) | HTTP Gateway を備えた gRPC サーバー |
+| [ライブラリ (laurus)](laurus.md) | Engine の内部構造、スコアリング、ファセット、拡張性 |
+| [CLI (laurus-cli)](laurus-cli.md) | インデックス管理と検索のためのコマンドラインツール |
+| [サーバー (laurus-server)](laurus-server.md) | HTTP Gateway を備えた gRPC サーバー |
 | [開発ガイド](development/build_and_test.md) | Laurus のビルド、テスト、コントリビュート |
 
 ## クイックサンプル

@@ -2,7 +2,7 @@
 
 The `Schema` defines the structure of your documents — what fields exist and how each field is indexed. It is the single source of truth for the Engine.
 
-> For the TOML file format used by the CLI, see [Schema Format Reference](../cli/schema_format.md).
+> For the TOML file format used by the CLI, see [Schema Format Reference](../laurus-cli/schema_format.md).
 
 ## Schema
 
@@ -290,4 +290,4 @@ When a field is deleted:
 
 4. **Set default fields** — if you use the Query DSL, set default fields so users can write `hello` instead of `body:hello`.
 
-5. **Use the schema generator** — run `laurus create schema` to interactively build a schema TOML file instead of writing it by hand. See [CLI Commands](../cli/commands.md#create-schema).
+5. **Use the schema generator** — run `laurus create schema` to interactively build a schema TOML file instead of writing it by hand. See [CLI Commands](../laurus-cli/commands.md#create-schema).
