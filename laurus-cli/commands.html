@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-0ae0be96.js";
+            window.path_to_searchindex_js = "../searchindex-fa2a7027.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-710721a4.js"></script>
@@ -336,9 +336,9 @@ Vector fields:
 #   ...
 # }
 </code></pre>
-<h3 id="get-doc"><a class="header" href="#get-doc"><code>get doc</code></a></h3>
-<p>Retrieve a document (and all its chunks) by external ID.</p>
-<pre><code class="language-bash">laurus get doc --id &lt;ID&gt;
+<h3 id="get-docs"><a class="header" href="#get-docs"><code>get docs</code></a></h3>
+<p>Retrieve all documents (including chunks) by external ID.</p>
+<pre><code class="language-bash">laurus get docs --id &lt;ID&gt;
 </code></pre>
 <p><strong>Table output example:</strong></p>
 <pre><code class="language-text">╭──────┬─────────────────────────────────────────╮
@@ -348,7 +348,7 @@ Vector fields:
 ╰──────┴─────────────────────────────────────────╯
 </code></pre>
 <p><strong>JSON output example:</strong></p>
-<pre><code class="language-bash">laurus --format json get doc --id doc1
+<pre><code class="language-bash">laurus --format json get docs --id doc1
 </code></pre>
 <pre><code class="language-json">[
   {
@@ -392,6 +392,32 @@ Vector fields:
 <blockquote>
 <p><strong>Tip:</strong> Multiple documents can share the same external ID (chunking pattern). Use <code>add doc</code> for each chunk.</p>
 </blockquote>
+<hr>
+<h2 id="put--put-upsert-a-resource"><a class="header" href="#put--put-upsert-a-resource"><code>put</code> — Put (Upsert) a Resource</a></h2>
+<h3 id="put-doc"><a class="header" href="#put-doc"><code>put doc</code></a></h3>
+<p>Put (upsert) a document into the index. If a document with the same ID already exists, all its chunks are deleted before the new document is indexed. Documents are not searchable until <code>commit</code> is called.</p>
+<pre><code class="language-bash">laurus put doc --id &lt;ID&gt; --data &lt;JSON&gt;
+</code></pre>
+<p><strong>Arguments:</strong></p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Flag</th><th style="text-align: left">Required</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>--id &lt;ID&gt;</code></td><td style="text-align: left">Yes</td><td style="text-align: left">External document ID (string)</td></tr>
+<tr><td style="text-align: left"><code>--data &lt;JSON&gt;</code></td><td style="text-align: left">Yes</td><td style="text-align: left">Document fields as a JSON string</td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>Example:</strong></p>
+<pre><code class="language-bash">laurus put doc --id doc1 --data '{"title":"Updated Title","body":"This replaces the existing document."}'
+# Document 'doc1' put (upserted). Run 'commit' to persist changes.
+</code></pre>
+<blockquote>
+<p><strong>Note:</strong> Unlike <code>add doc</code>, <code>put doc</code> replaces all existing chunks for the given ID. Use <code>add doc</code> when you want to append chunks, and <code>put doc</code> when you want to replace the entire document.</p>
+</blockquote>
+<hr>
 <h3 id="add-field"><a class="header" href="#add-field"><code>add field</code></a></h3>
 <p>Dynamically add a new field to an existing index.</p>
 <pre><code class="language-bash">laurus add field --index-dir ./data \
@@ -403,13 +429,13 @@ externally-tagged format as the schema file. The schema is automatically
 persisted after the field is added.</p>
 <hr>
 <h2 id="delete--delete-a-resource"><a class="header" href="#delete--delete-a-resource"><code>delete</code> — Delete a Resource</a></h2>
-<h3 id="delete-doc"><a class="header" href="#delete-doc"><code>delete doc</code></a></h3>
-<p>Delete a document (and all its chunks) by external ID.</p>
-<pre><code class="language-bash">laurus delete doc --id &lt;ID&gt;
+<h3 id="delete-docs"><a class="header" href="#delete-docs"><code>delete docs</code></a></h3>
+<p>Delete all documents (including chunks) by external ID.</p>
+<pre><code class="language-bash">laurus delete docs --id &lt;ID&gt;
 </code></pre>
 <p><strong>Example:</strong></p>
-<pre><code class="language-bash">laurus delete doc --id doc1
-# Document 'doc1' deleted. Run 'commit' to persist changes.
+<pre><code class="language-bash">laurus delete docs --id doc1
+# Documents 'doc1' deleted. Run 'commit' to persist changes.
 </code></pre>
 <h3 id="delete-field"><a class="header" href="#delete-field"><code>delete field</code></a></h3>
 <p>Remove a field from the index schema.</p>

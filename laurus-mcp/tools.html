@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-0ae0be96.js";
+            window.path_to_searchindex_js = "../searchindex-fa2a7027.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-710721a4.js"></script>
@@ -277,8 +277,8 @@ unregistered.</p>
 </code></pre>
 <p>Result: <code>Field 'category' deleted successfully.</code></p>
 <hr>
-<h2 id="get_index"><a class="header" href="#get_index">get_index</a></h2>
-<p>Get statistics for the current search index.</p>
+<h2 id="get_stats"><a class="header" href="#get_stats">get_stats</a></h2>
+<p>Get statistics for the current search index, including document count and vector field information.</p>
 <h3 id="parameters-4"><a class="header" href="#parameters-4">Parameters</a></h3>
 <p>None.</p>
 <h3 id="result"><a class="header" href="#result">Result</a></h3>
@@ -288,35 +288,23 @@ unregistered.</p>
 }
 </code></pre>
 <hr>
-<h2 id="add_document"><a class="header" href="#add_document">add_document</a></h2>
-<p>Add or upsert a document in the index. Call <code>commit</code> after adding documents.</p>
+<h2 id="get_schema"><a class="header" href="#get_schema">get_schema</a></h2>
+<p>Get the current index schema, including all field definitions and their configurations.</p>
 <h3 id="parameters-5"><a class="header" href="#parameters-5">Parameters</a></h3>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th style="text-align: left">Name</th><th style="text-align: left">Type</th><th style="text-align: left">Required</th><th style="text-align: left">Description</th></tr>
-</thead>
-<tbody>
-<tr><td style="text-align: left"><code>id</code></td><td style="text-align: left">string</td><td style="text-align: left">Yes</td><td style="text-align: left">External document identifier</td></tr>
-<tr><td style="text-align: left"><code>document</code></td><td style="text-align: left">object</td><td style="text-align: left">Yes</td><td style="text-align: left">Document fields as a JSON object</td></tr>
-<tr><td style="text-align: left"><code>mode</code></td><td style="text-align: left">string</td><td style="text-align: left">No</td><td style="text-align: left"><code>"put"</code> (default, upsert) or <code>"add"</code> (append chunk)</td></tr>
-</tbody>
-</table>
-</div>
-<h3 id="modes"><a class="header" href="#modes">Modes</a></h3>
-<ul>
-<li><code>put</code> (default): Delete any existing document with the same <code>id</code>, then index the new one.</li>
-<li><code>add</code>: Append as a new chunk. Multiple chunks can share the same <code>id</code> (useful for splitting large documents).</li>
-</ul>
-<h3 id="example-4"><a class="header" href="#example-4">Example</a></h3>
-<pre><code class="language-text">Tool: add_document
-id: "doc-1"
-document: {"title": "Hello World", "body": "This is a test document."}
+<p>None.</p>
+<h3 id="result-1"><a class="header" href="#result-1">Result</a></h3>
+<pre><code class="language-json">{
+  "fields": {
+    "title": { "Text": { "indexed": true, "stored": true } },
+    "body": { "Text": {} },
+    "embedding": { "Hnsw": { "dimension": 384 } }
+  },
+  "default_fields": ["title", "body"]
+}
 </code></pre>
-<p>Result: <code>Document 'doc-1' added. Call commit to persist changes.</code></p>
 <hr>
-<h2 id="get_document"><a class="header" href="#get_document">get_document</a></h2>
-<p>Retrieve stored document(s) by external ID.</p>
+<h2 id="put_document"><a class="header" href="#put_document">put_document</a></h2>
+<p>Put (upsert) a document into the index. If a document with the same ID already exists, all its chunks are deleted before the new document is indexed. Call <code>commit</code> after adding documents.</p>
 <h3 id="parameters-6"><a class="header" href="#parameters-6">Parameters</a></h3>
 <div class="table-wrapper">
 <table>
@@ -325,21 +313,41 @@ document: {"title": "Hello World", "body": "This is a test document."}
 </thead>
 <tbody>
 <tr><td style="text-align: left"><code>id</code></td><td style="text-align: left">string</td><td style="text-align: left">Yes</td><td style="text-align: left">External document identifier</td></tr>
+<tr><td style="text-align: left"><code>document</code></td><td style="text-align: left">object</td><td style="text-align: left">Yes</td><td style="text-align: left">Document fields as a JSON object</td></tr>
 </tbody>
 </table>
 </div>
-<h3 id="result-1"><a class="header" href="#result-1">Result</a></h3>
-<pre><code class="language-json">{
-  "id": "doc-1",
-  "documents": [
-    { "title": "Hello World", "body": "This is a test document." }
-  ]
-}
+<h3 id="example-4"><a class="header" href="#example-4">Example</a></h3>
+<pre><code class="language-text">Tool: put_document
+id: "doc-1"
+document: {"title": "Hello World", "body": "This is a test document."}
 </code></pre>
+<p>Result: <code>Document 'doc-1' put (upserted). Call commit to persist changes.</code></p>
 <hr>
-<h2 id="delete_document"><a class="header" href="#delete_document">delete_document</a></h2>
-<p>Delete document(s) by external ID. Call <code>commit</code> after deletion.</p>
+<h2 id="add_document"><a class="header" href="#add_document">add_document</a></h2>
+<p>Add a document as a new chunk to the index. Unlike <code>put_document</code>, this appends without deleting existing documents with the same ID. Useful for splitting large documents into chunks. Call <code>commit</code> after adding documents.</p>
 <h3 id="parameters-7"><a class="header" href="#parameters-7">Parameters</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Name</th><th style="text-align: left">Type</th><th style="text-align: left">Required</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>id</code></td><td style="text-align: left">string</td><td style="text-align: left">Yes</td><td style="text-align: left">External document identifier</td></tr>
+<tr><td style="text-align: left"><code>document</code></td><td style="text-align: left">object</td><td style="text-align: left">Yes</td><td style="text-align: left">Document fields as a JSON object</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="example-5"><a class="header" href="#example-5">Example</a></h3>
+<pre><code class="language-text">Tool: add_document
+id: "doc-1"
+document: {"title": "Hello World - Part 2", "body": "This is a continuation."}
+</code></pre>
+<p>Result: <code>Document 'doc-1' added as chunk. Call commit to persist changes.</code></p>
+<hr>
+<h2 id="get_documents"><a class="header" href="#get_documents">get_documents</a></h2>
+<p>Retrieve all stored documents (including chunks) by external ID.</p>
+<h3 id="parameters-8"><a class="header" href="#parameters-8">Parameters</a></h3>
 <div class="table-wrapper">
 <table>
 <thead>
@@ -350,17 +358,39 @@ document: {"title": "Hello World", "body": "This is a test document."}
 </tbody>
 </table>
 </div>
-<p>Result: <code>Document 'doc-1' deleted. Call commit to persist changes.</code></p>
+<h3 id="result-2"><a class="header" href="#result-2">Result</a></h3>
+<pre><code class="language-json">{
+  "id": "doc-1",
+  "documents": [
+    { "title": "Hello World", "body": "This is a test document." }
+  ]
+}
+</code></pre>
+<hr>
+<h2 id="delete_documents"><a class="header" href="#delete_documents">delete_documents</a></h2>
+<p>Delete all documents and chunks sharing the given external ID from the index. Call <code>commit</code> after deletion.</p>
+<h3 id="parameters-9"><a class="header" href="#parameters-9">Parameters</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Name</th><th style="text-align: left">Type</th><th style="text-align: left">Required</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>id</code></td><td style="text-align: left">string</td><td style="text-align: left">Yes</td><td style="text-align: left">External document identifier</td></tr>
+</tbody>
+</table>
+</div>
+<p>Result: <code>Documents 'doc-1' deleted. Call commit to persist changes.</code></p>
 <hr>
 <h2 id="commit"><a class="header" href="#commit">commit</a></h2>
-<p>Commit pending changes to disk. Must be called after <code>add_document</code> or <code>delete_document</code> to make changes searchable and durable.</p>
-<h3 id="parameters-8"><a class="header" href="#parameters-8">Parameters</a></h3>
+<p>Commit pending changes to disk. Must be called after <code>put_document</code>, <code>add_document</code>, or <code>delete_documents</code> to make changes searchable and durable.</p>
+<h3 id="parameters-10"><a class="header" href="#parameters-10">Parameters</a></h3>
 <p>None.</p>
 <p>Result: <code>Changes committed successfully.</code></p>
 <hr>
 <h2 id="search"><a class="header" href="#search">search</a></h2>
 <p>Search documents using the laurus query DSL.</p>
-<h3 id="parameters-9"><a class="header" href="#parameters-9">Parameters</a></h3>
+<h3 id="parameters-11"><a class="header" href="#parameters-11">Parameters</a></h3>
 <div class="table-wrapper">
 <table>
 <thead>
@@ -390,7 +420,7 @@ document: {"title": "Hello World", "body": "This is a test document."}
 </tbody>
 </table>
 </div>
-<h3 id="result-2"><a class="header" href="#result-2">Result</a></h3>
+<h3 id="result-3"><a class="header" href="#result-3">Result</a></h3>
 <pre><code class="language-json">{
   "total": 2,
   "results": [
@@ -409,16 +439,17 @@ document: {"title": "Hello World", "body": "This is a test document."}
 </code></pre>
 <hr>
 <h2 id="typical-workflow"><a class="header" href="#typical-workflow">Typical Workflow</a></h2>
-<pre><code class="language-text">1. connect         → connect to a running laurus-server
-2. create_index    → define the schema (if index does not exist)
-3. add_field       → dynamically add fields (optional)
-   delete_field    → remove fields (optional)
-4. add_document    → index documents (repeat as needed)
-5. commit          → persist changes to disk
-6. search          → query the index
-7. add_document    → update documents
-8. delete_document → remove documents
-9. commit          → persist changes
+<pre><code class="language-text">1. connect          → connect to a running laurus-server
+2. create_index     → define the schema (if index does not exist)
+3. add_field        → dynamically add fields (optional)
+   delete_field     → remove fields (optional)
+4. put_document     → upsert documents (repeat as needed)
+   add_document     → append document chunks (optional)
+5. commit           → persist changes to disk
+6. search           → query the index
+7. get_documents    → retrieve documents by ID
+8. delete_documents → remove documents
+9. commit           → persist changes
 </code></pre>
 
                     </main>

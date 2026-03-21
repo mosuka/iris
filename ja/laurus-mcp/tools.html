@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-d4b01327.js";
+            window.path_to_searchindex_js = "../searchindex-bade8331.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-d18ed058.js"></script>
@@ -234,8 +234,8 @@ schema_json: {"fields": {"title": {"Text": {}}, "body": {"Text": {}}}}
 </code></pre>
 <p>結果: <code>Index created successfully at /path/to/index.</code></p>
 <hr>
-<h2 id="get_index"><a class="header" href="#get_index">get_index</a></h2>
-<p>現在の検索インデックスの統計情報を取得します。</p>
+<h2 id="get_stats"><a class="header" href="#get_stats">get_stats</a></h2>
+<p>現在の検索インデックスの統計情報（ドキュメント数、ベクトルフィールド情報など）を取得します。</p>
 <h3 id="パラメーター-2"><a class="header" href="#パラメーター-2">パラメーター</a></h3>
 <p>なし。</p>
 <h3 id="結果"><a class="header" href="#結果">結果</a></h3>
@@ -245,35 +245,23 @@ schema_json: {"fields": {"title": {"Text": {}}, "body": {"Text": {}}}}
 }
 </code></pre>
 <hr>
-<h2 id="add_document"><a class="header" href="#add_document">add_document</a></h2>
-<p>インデックスにドキュメントを追加またはアップサートします。ドキュメントを追加した後は <code>commit</code> を呼び出してください。</p>
+<h2 id="get_schema"><a class="header" href="#get_schema">get_schema</a></h2>
+<p>現在のインデックスのスキーマ（全フィールド定義と設定）を取得します。</p>
 <h3 id="パラメーター-3"><a class="header" href="#パラメーター-3">パラメーター</a></h3>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th style="text-align: left">名前</th><th style="text-align: left">型</th><th style="text-align: left">必須</th><th style="text-align: left">説明</th></tr>
-</thead>
-<tbody>
-<tr><td style="text-align: left"><code>id</code></td><td style="text-align: left">string</td><td style="text-align: left">はい</td><td style="text-align: left">外部ドキュメント識別子</td></tr>
-<tr><td style="text-align: left"><code>document</code></td><td style="text-align: left">object</td><td style="text-align: left">はい</td><td style="text-align: left">JSON オブジェクトとしてのドキュメントフィールド</td></tr>
-<tr><td style="text-align: left"><code>mode</code></td><td style="text-align: left">string</td><td style="text-align: left">いいえ</td><td style="text-align: left"><code>"put"</code>（デフォルト、アップサート）または <code>"add"</code>（チャンク追加）</td></tr>
-</tbody>
-</table>
-</div>
-<h3 id="モード"><a class="header" href="#モード">モード</a></h3>
-<ul>
-<li><code>put</code>（デフォルト）: 同じ <code>id</code> を持つ既存のドキュメントを削除してから新しいものをインデックスします。</li>
-<li><code>add</code>: 新しいチャンクとして追加します。複数のチャンクが同じ <code>id</code> を持てます（大きなドキュメントの分割に便利）。</li>
-</ul>
-<h3 id="例-2"><a class="header" href="#例-2">例</a></h3>
-<pre><code class="language-text">Tool: add_document
-id: "doc-1"
-document: {"title": "Hello World", "body": "これはテストドキュメントです。"}
+<p>なし。</p>
+<h3 id="結果-1"><a class="header" href="#結果-1">結果</a></h3>
+<pre><code class="language-json">{
+  "fields": {
+    "title": { "Text": { "indexed": true, "stored": true } },
+    "body": { "Text": {} },
+    "embedding": { "Hnsw": { "dimension": 384 } }
+  },
+  "default_fields": ["title", "body"]
+}
 </code></pre>
-<p>結果: <code>Document 'doc-1' added. Call commit to persist changes.</code></p>
 <hr>
-<h2 id="get_document"><a class="header" href="#get_document">get_document</a></h2>
-<p>外部 ID でドキュメントを取得します。</p>
+<h2 id="put_document"><a class="header" href="#put_document">put_document</a></h2>
+<p>インデックスにドキュメントを上書き（upsert）します。同じ ID のドキュメントが既に存在する場合、全チャンクが削除されてから新しいドキュメントがインデックスされます。ドキュメント追加後は <code>commit</code> を呼び出してください。</p>
 <h3 id="パラメーター-4"><a class="header" href="#パラメーター-4">パラメーター</a></h3>
 <div class="table-wrapper">
 <table>
@@ -282,21 +270,41 @@ document: {"title": "Hello World", "body": "これはテストドキュメント
 </thead>
 <tbody>
 <tr><td style="text-align: left"><code>id</code></td><td style="text-align: left">string</td><td style="text-align: left">はい</td><td style="text-align: left">外部ドキュメント識別子</td></tr>
+<tr><td style="text-align: left"><code>document</code></td><td style="text-align: left">object</td><td style="text-align: left">はい</td><td style="text-align: left">JSON オブジェクトとしてのドキュメントフィールド</td></tr>
 </tbody>
 </table>
 </div>
-<h3 id="結果-1"><a class="header" href="#結果-1">結果</a></h3>
-<pre><code class="language-json">{
-  "id": "doc-1",
-  "documents": [
-    { "title": "Hello World", "body": "これはテストドキュメントです。" }
-  ]
-}
+<h3 id="例-2"><a class="header" href="#例-2">例</a></h3>
+<pre><code class="language-text">Tool: put_document
+id: "doc-1"
+document: {"title": "Hello World", "body": "これはテストドキュメントです。"}
 </code></pre>
+<p>結果: <code>Document 'doc-1' put (upserted). Call commit to persist changes.</code></p>
 <hr>
-<h2 id="delete_document"><a class="header" href="#delete_document">delete_document</a></h2>
-<p>外部 ID でドキュメントを削除します。削除後は <code>commit</code> を呼び出してください。</p>
+<h2 id="add_document"><a class="header" href="#add_document">add_document</a></h2>
+<p>インデックスにドキュメントを新しいチャンクとして追加します。<code>put_document</code> とは異なり、同じ ID の既存ドキュメントを削除せずに追記します。大きなドキュメントをチャンクに分割する際に便利です。ドキュメント追加後は <code>commit</code> を呼び出してください。</p>
 <h3 id="パラメーター-5"><a class="header" href="#パラメーター-5">パラメーター</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">名前</th><th style="text-align: left">型</th><th style="text-align: left">必須</th><th style="text-align: left">説明</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>id</code></td><td style="text-align: left">string</td><td style="text-align: left">はい</td><td style="text-align: left">外部ドキュメント識別子</td></tr>
+<tr><td style="text-align: left"><code>document</code></td><td style="text-align: left">object</td><td style="text-align: left">はい</td><td style="text-align: left">JSON オブジェクトとしてのドキュメントフィールド</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="例-3"><a class="header" href="#例-3">例</a></h3>
+<pre><code class="language-text">Tool: add_document
+id: "doc-1"
+document: {"title": "Hello World - Part 2", "body": "これは続きです。"}
+</code></pre>
+<p>結果: <code>Document 'doc-1' added as chunk. Call commit to persist changes.</code></p>
+<hr>
+<h2 id="get_documents"><a class="header" href="#get_documents">get_documents</a></h2>
+<p>外部 ID で全ドキュメント（チャンクを含む）を取得します。</p>
+<h3 id="パラメーター-6"><a class="header" href="#パラメーター-6">パラメーター</a></h3>
 <div class="table-wrapper">
 <table>
 <thead>
@@ -307,17 +315,39 @@ document: {"title": "Hello World", "body": "これはテストドキュメント
 </tbody>
 </table>
 </div>
-<p>結果: <code>Document 'doc-1' deleted. Call commit to persist changes.</code></p>
+<h3 id="結果-2"><a class="header" href="#結果-2">結果</a></h3>
+<pre><code class="language-json">{
+  "id": "doc-1",
+  "documents": [
+    { "title": "Hello World", "body": "これはテストドキュメントです。" }
+  ]
+}
+</code></pre>
+<hr>
+<h2 id="delete_documents"><a class="header" href="#delete_documents">delete_documents</a></h2>
+<p>外部 ID で全ドキュメント（チャンクを含む）を削除します。削除後は <code>commit</code> を呼び出してください。</p>
+<h3 id="パラメーター-7"><a class="header" href="#パラメーター-7">パラメーター</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">名前</th><th style="text-align: left">型</th><th style="text-align: left">必須</th><th style="text-align: left">説明</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>id</code></td><td style="text-align: left">string</td><td style="text-align: left">はい</td><td style="text-align: left">外部ドキュメント識別子</td></tr>
+</tbody>
+</table>
+</div>
+<p>結果: <code>Documents 'doc-1' deleted. Call commit to persist changes.</code></p>
 <hr>
 <h2 id="commit"><a class="header" href="#commit">commit</a></h2>
-<p>保留中の変更をディスクにコミットします。変更を検索可能かつ永続的にするため、<code>add_document</code> または <code>delete_document</code> の後に必ず呼び出してください。</p>
-<h3 id="パラメーター-6"><a class="header" href="#パラメーター-6">パラメーター</a></h3>
+<p>保留中の変更をディスクにコミットします。変更を検索可能かつ永続的にするため、<code>put_document</code>、<code>add_document</code>、または <code>delete_documents</code> の後に必ず呼び出してください。</p>
+<h3 id="パラメーター-8"><a class="header" href="#パラメーター-8">パラメーター</a></h3>
 <p>なし。</p>
 <p>結果: <code>Changes committed successfully.</code></p>
 <hr>
 <h2 id="add_field"><a class="header" href="#add_field">add_field</a></h2>
 <p>インデックスにフィールドを追加します。</p>
-<h3 id="パラメーター-7"><a class="header" href="#パラメーター-7">パラメーター</a></h3>
+<h3 id="パラメーター-9"><a class="header" href="#パラメーター-9">パラメーター</a></h3>
 <div class="table-wrapper">
 <table>
 <thead>
@@ -329,7 +359,7 @@ document: {"title": "Hello World", "body": "これはテストドキュメント
 </tbody>
 </table>
 </div>
-<h3 id="例-3"><a class="header" href="#例-3">例</a></h3>
+<h3 id="例-4"><a class="header" href="#例-4">例</a></h3>
 <pre><code class="language-json">{
   "name": "category",
   "field_option_json": "{\"Text\": {\"indexed\": true, \"stored\": true}}"
@@ -338,7 +368,7 @@ document: {"title": "Hello World", "body": "これはテストドキュメント
 <hr>
 <h2 id="delete_field"><a class="header" href="#delete_field">delete_field</a></h2>
 <p>インデックスからフィールドを削除します。既にインデックスされたデータは残りますが、削除されたフィールドにはアクセスできなくなります。</p>
-<h3 id="パラメーター-8"><a class="header" href="#パラメーター-8">パラメーター</a></h3>
+<h3 id="パラメーター-10"><a class="header" href="#パラメーター-10">パラメーター</a></h3>
 <div class="table-wrapper">
 <table>
 <thead>
@@ -349,7 +379,7 @@ document: {"title": "Hello World", "body": "これはテストドキュメント
 </tbody>
 </table>
 </div>
-<h3 id="例-4"><a class="header" href="#例-4">例</a></h3>
+<h3 id="例-5"><a class="header" href="#例-5">例</a></h3>
 <pre><code class="language-text">Tool: delete_field
 name: "category"
 </code></pre>
@@ -357,7 +387,7 @@ name: "category"
 <hr>
 <h2 id="search"><a class="header" href="#search">search</a></h2>
 <p>laurus クエリ DSL を使用してドキュメントを検索します。</p>
-<h3 id="パラメーター-9"><a class="header" href="#パラメーター-9">パラメーター</a></h3>
+<h3 id="パラメーター-11"><a class="header" href="#パラメーター-11">パラメーター</a></h3>
 <div class="table-wrapper">
 <table>
 <thead>
@@ -387,7 +417,7 @@ name: "category"
 </tbody>
 </table>
 </div>
-<h3 id="結果-2"><a class="header" href="#結果-2">結果</a></h3>
+<h3 id="結果-3"><a class="header" href="#結果-3">結果</a></h3>
 <pre><code class="language-json">{
   "total": 2,
   "results": [
@@ -406,16 +436,17 @@ name: "category"
 </code></pre>
 <hr>
 <h2 id="典型的なワークフロー"><a class="header" href="#典型的なワークフロー">典型的なワークフロー</a></h2>
-<pre><code class="language-text">1. connect         → 実行中の laurus-server に接続
-2. create_index    → スキーマを定義（インデックスが存在しない場合）
-3. add_field       → フィールドを追加（必要に応じて）
-4. add_document    → ドキュメントをインデックス（必要に応じて繰り返し）
-5. commit          → 変更をディスクに永続化
-6. search          → インデックスを検索
-7. add_document    → ドキュメントを更新
-8. delete_document → ドキュメントを削除
-9. delete_field    → 不要なフィールドを削除（必要に応じて）
-10. commit         → 変更を永続化
+<pre><code class="language-text">1. connect          → 実行中の laurus-server に接続
+2. create_index     → スキーマを定義（インデックスが存在しない場合）
+3. add_field        → フィールドを追加（必要に応じて）
+   delete_field     → フィールドを削除（必要に応じて）
+4. put_document     → ドキュメントを上書き（必要に応じて繰り返し）
+   add_document     → ドキュメントチャンクを追記（必要に応じて）
+5. commit           → 変更をディスクに永続化
+6. search           → インデックスを検索
+7. get_documents    → ID でドキュメントを取得
+8. delete_documents → ドキュメントを削除
+9. commit           → 変更を永続化
 </code></pre>
 
                     </main>

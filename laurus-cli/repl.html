@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-0ae0be96.js";
+            window.path_to_searchindex_js = "../searchindex-fa2a7027.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-710721a4.js"></script>
@@ -203,12 +203,13 @@ laurus&gt;
 <tr><td style="text-align: left"><code>create schema &lt;output_path&gt;</code></td><td style="text-align: left">Interactive schema generation wizard</td></tr>
 <tr><td style="text-align: left"><code>search &lt;query&gt;</code></td><td style="text-align: left">Search the index</td></tr>
 <tr><td style="text-align: left"><code>add field &lt;name&gt; &lt;json&gt;</code></td><td style="text-align: left">Add a field to the schema</td></tr>
-<tr><td style="text-align: left"><code>add doc &lt;id&gt; &lt;json&gt;</code></td><td style="text-align: left">Add a document</td></tr>
+<tr><td style="text-align: left"><code>add doc &lt;id&gt; &lt;json&gt;</code></td><td style="text-align: left">Add a document (append, allows multiple chunks per ID)</td></tr>
+<tr><td style="text-align: left"><code>put doc &lt;id&gt; &lt;json&gt;</code></td><td style="text-align: left">Put (upsert) a document (replaces existing with same ID)</td></tr>
 <tr><td style="text-align: left"><code>get stats</code></td><td style="text-align: left">Show index statistics</td></tr>
 <tr><td style="text-align: left"><code>get schema</code></td><td style="text-align: left">Show the current schema</td></tr>
-<tr><td style="text-align: left"><code>get doc &lt;id&gt;</code></td><td style="text-align: left">Get a document by ID</td></tr>
+<tr><td style="text-align: left"><code>get docs &lt;id&gt;</code></td><td style="text-align: left">Get all documents (including chunks) by ID</td></tr>
 <tr><td style="text-align: left"><code>delete field &lt;name&gt;</code></td><td style="text-align: left">Remove a field from the schema</td></tr>
-<tr><td style="text-align: left"><code>delete doc &lt;id&gt;</code></td><td style="text-align: left">Delete a document by ID</td></tr>
+<tr><td style="text-align: left"><code>delete docs &lt;id&gt;</code></td><td style="text-align: left">Delete all documents (including chunks) by ID</td></tr>
 <tr><td style="text-align: left"><code>commit</code></td><td style="text-align: left">Commit pending changes</td></tr>
 <tr><td style="text-align: left"><code>help</code></td><td style="text-align: left">Show available commands</td></tr>
 <tr><td style="text-align: left"><code>quit</code> / <code>exit</code></td><td style="text-align: left">Exit the REPL</td></tr>
@@ -255,7 +256,7 @@ laurus&gt; get schema
   "default_fields": ["title", "body"]
 }
 
-laurus&gt; get doc doc4
+laurus&gt; get docs doc4
 ╭──────┬───────────────────────────────────────────────╮
 │ ID   │ Fields                                        │
 ├──────┼───────────────────────────────────────────────┤
@@ -263,8 +264,8 @@ laurus&gt; get doc doc4
 ╰──────┴───────────────────────────────────────────────╯
 </code></pre>
 <h3 id="deleting-documents"><a class="header" href="#deleting-documents">Deleting Documents</a></h3>
-<pre><code class="language-text">laurus&gt; delete doc doc4
-Document 'doc4' deleted.
+<pre><code class="language-text">laurus&gt; delete docs doc4
+Documents 'doc4' deleted.
 laurus&gt; commit
 Changes committed.
 </code></pre>

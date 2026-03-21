@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-d4b01327.js";
+            window.path_to_searchindex_js = "../searchindex-bade8331.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-d18ed058.js"></script>
@@ -339,9 +339,9 @@ Vector fields:
 #   ...
 # }
 </code></pre>
-<h3 id="get-doc"><a class="header" href="#get-doc"><code>get doc</code></a></h3>
-<p>外部 ID でドキュメント（およびすべてのチャンク）を取得します。</p>
-<pre><code class="language-bash">laurus get doc --id &lt;ID&gt;
+<h3 id="get-docs"><a class="header" href="#get-docs"><code>get docs</code></a></h3>
+<p>外部 ID で全ドキュメント（チャンクを含む）を取得します。</p>
+<pre><code class="language-bash">laurus get docs --id &lt;ID&gt;
 </code></pre>
 <p><strong>テーブル出力の例:</strong></p>
 <pre><code class="language-text">╭──────┬─────────────────────────────────────────╮
@@ -351,7 +351,7 @@ Vector fields:
 ╰──────┴─────────────────────────────────────────╯
 </code></pre>
 <p><strong>JSON 出力の例:</strong></p>
-<pre><code class="language-bash">laurus --format json get doc --id doc1
+<pre><code class="language-bash">laurus --format json get docs --id doc1
 </code></pre>
 <pre><code class="language-json">[
   {
@@ -395,6 +395,32 @@ Vector fields:
 <blockquote>
 <p><strong>ヒント:</strong> 複数のドキュメントが同じ外部 ID を共有できます（チャンキングパターン）。各チャンクに対して <code>add doc</code> を使用してください。</p>
 </blockquote>
+<hr>
+<h2 id="put--リソースの上書きupsert"><a class="header" href="#put--リソースの上書きupsert"><code>put</code> — リソースの上書き（Upsert）</a></h2>
+<h3 id="put-doc"><a class="header" href="#put-doc"><code>put doc</code></a></h3>
+<p>インデックスにドキュメントを上書き（upsert）します。同じ ID のドキュメントが既に存在する場合、全チャンクが削除されてから新しいドキュメントがインデックスされます。ドキュメントは <code>commit</code> を実行するまで検索対象になりません。</p>
+<pre><code class="language-bash">laurus put doc --id &lt;ID&gt; --data &lt;JSON&gt;
+</code></pre>
+<p><strong>引数:</strong></p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">フラグ</th><th style="text-align: left">必須</th><th style="text-align: left">説明</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>--id &lt;ID&gt;</code></td><td style="text-align: left">はい</td><td style="text-align: left">外部ドキュメント ID（文字列）</td></tr>
+<tr><td style="text-align: left"><code>--data &lt;JSON&gt;</code></td><td style="text-align: left">はい</td><td style="text-align: left">JSON 文字列としてのドキュメントフィールド</td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>例:</strong></p>
+<pre><code class="language-bash">laurus put doc --id doc1 --data '{"title":"Updated Title","body":"This replaces the existing document."}'
+# Document 'doc1' put (upserted). Run 'commit' to persist changes.
+</code></pre>
+<blockquote>
+<p><strong>注意:</strong> <code>add doc</code> とは異なり、<code>put doc</code> は指定 ID の既存チャンクをすべて置き換えます。チャンクを追記したい場合は <code>add doc</code> を、ドキュメント全体を置き換えたい場合は <code>put doc</code> を使用してください。</p>
+</blockquote>
+<hr>
 <h3 id="add-field"><a class="header" href="#add-field"><code>add field</code></a></h3>
 <p>既存のインデックスにフィールドを動的に追加します。</p>
 <pre><code class="language-bash">laurus add field --index-dir ./data \
@@ -413,13 +439,13 @@ Vector fields:
 <pre><code class="language-bash">laurus delete field --name category
 # Field 'category' deleted.
 </code></pre>
-<h3 id="delete-doc"><a class="header" href="#delete-doc"><code>delete doc</code></a></h3>
-<p>外部 ID でドキュメント（およびすべてのチャンク）を削除します。</p>
-<pre><code class="language-bash">laurus delete doc --id &lt;ID&gt;
+<h3 id="delete-docs"><a class="header" href="#delete-docs"><code>delete docs</code></a></h3>
+<p>外部 ID で全ドキュメント（チャンクを含む）を削除します。</p>
+<pre><code class="language-bash">laurus delete docs --id &lt;ID&gt;
 </code></pre>
 <p><strong>例:</strong></p>
-<pre><code class="language-bash">laurus delete doc --id doc1
-# Document 'doc1' deleted. Run 'commit' to persist changes.
+<pre><code class="language-bash">laurus delete docs --id doc1
+# Documents 'doc1' deleted. Run 'commit' to persist changes.
 </code></pre>
 <hr>
 <h2 id="commit"><a class="header" href="#commit"><code>commit</code></a></h2>

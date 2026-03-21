@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-0ae0be96.js";
+            window.path_to_searchindex_js = "../searchindex-fa2a7027.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-710721a4.js"></script>
@@ -270,11 +270,11 @@ EOF
 </code></pre>
 <h2 id="step-6-retrieve-a-document"><a class="header" href="#step-6-retrieve-a-document">Step 6: Retrieve a Document</a></h2>
 <p>Fetch a specific document by ID:</p>
-<pre><code class="language-bash">laurus --index-dir ./tutorial_data get doc --id doc001
+<pre><code class="language-bash">laurus --index-dir ./tutorial_data get docs --id doc001
 </code></pre>
 <h2 id="step-7-delete-a-document"><a class="header" href="#step-7-delete-a-document">Step 7: Delete a Document</a></h2>
 <p>Delete a document and commit the change:</p>
-<pre><code class="language-bash">laurus --index-dir ./tutorial_data delete doc --id doc003
+<pre><code class="language-bash">laurus --index-dir ./tutorial_data delete docs --id doc003
 laurus --index-dir ./tutorial_data commit
 </code></pre>
 <p>Verify it was deleted:</p>
@@ -286,13 +286,13 @@ laurus --index-dir ./tutorial_data commit
 <pre><code class="language-bash">laurus --index-dir ./tutorial_data repl
 </code></pre>
 <p>Try these commands in the REPL:</p>
-<pre><code class="language-text">&gt; stats
+<pre><code class="language-text">&gt; get stats
 &gt; search rust
-&gt; doc add doc004 {"title":"Go Programming","body":"Go is a statically typed language designed for simplicity and efficiency.","category":"programming"}
+&gt; add doc doc004 {"title":"Go Programming","body":"Go is a statically typed language designed for simplicity and efficiency.","category":"programming"}
 &gt; commit
 &gt; search programming
-&gt; doc get doc004
-&gt; doc delete doc004
+&gt; get docs doc004
+&gt; delete docs doc004
 &gt; commit
 &gt; quit
 </code></pre>

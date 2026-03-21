@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-d4b01327.js";
+            window.path_to_searchindex_js = "../searchindex-bade8331.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-d18ed058.js"></script>
@@ -273,11 +273,11 @@ EOF
 </code></pre>
 <h2 id="step-6-ドキュメントの取得"><a class="header" href="#step-6-ドキュメントの取得">Step 6: ドキュメントの取得</a></h2>
 <p>ID を指定して特定のドキュメントを取得します:</p>
-<pre><code class="language-bash">laurus --index-dir ./tutorial_data get doc --id doc001
+<pre><code class="language-bash">laurus --index-dir ./tutorial_data get docs --id doc001
 </code></pre>
 <h2 id="step-7-ドキュメントの削除"><a class="header" href="#step-7-ドキュメントの削除">Step 7: ドキュメントの削除</a></h2>
 <p>ドキュメントを削除してコミットします:</p>
-<pre><code class="language-bash">laurus --index-dir ./tutorial_data delete doc --id doc003
+<pre><code class="language-bash">laurus --index-dir ./tutorial_data delete docs --id doc003
 laurus --index-dir ./tutorial_data commit
 </code></pre>
 <p>削除されたことを確認します:</p>
@@ -289,13 +289,13 @@ laurus --index-dir ./tutorial_data commit
 <pre><code class="language-bash">laurus --index-dir ./tutorial_data repl
 </code></pre>
 <p>REPL で以下のコマンドを試してみてください:</p>
-<pre><code class="language-text">&gt; stats
+<pre><code class="language-text">&gt; get stats
 &gt; search rust
-&gt; doc add doc004 {"title":"Go Programming","body":"Go is a statically typed language designed for simplicity and efficiency.","category":"programming"}
+&gt; add doc doc004 {"title":"Go Programming","body":"Go is a statically typed language designed for simplicity and efficiency.","category":"programming"}
 &gt; commit
 &gt; search programming
-&gt; doc get doc004
-&gt; doc delete doc004
+&gt; get docs doc004
+&gt; delete docs doc004
 &gt; commit
 &gt; quit
 </code></pre>

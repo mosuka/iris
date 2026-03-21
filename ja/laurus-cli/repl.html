@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-d4b01327.js";
+            window.path_to_searchindex_js = "../searchindex-bade8331.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-d18ed058.js"></script>
@@ -206,12 +206,13 @@ laurus&gt;
 <tr><td style="text-align: left"><code>create schema &lt;output_path&gt;</code></td><td style="text-align: left">対話型スキーマ生成ウィザード</td></tr>
 <tr><td style="text-align: left"><code>search &lt;query&gt;</code></td><td style="text-align: left">インデックスを検索</td></tr>
 <tr><td style="text-align: left"><code>add field &lt;name&gt; &lt;json&gt;</code></td><td style="text-align: left">スキーマにフィールドを追加</td></tr>
-<tr><td style="text-align: left"><code>add doc &lt;id&gt; &lt;json&gt;</code></td><td style="text-align: left">ドキュメントを追加</td></tr>
+<tr><td style="text-align: left"><code>add doc &lt;id&gt; &lt;json&gt;</code></td><td style="text-align: left">ドキュメントを追加（追記、同一 ID で複数チャンク可）</td></tr>
+<tr><td style="text-align: left"><code>put doc &lt;id&gt; &lt;json&gt;</code></td><td style="text-align: left">ドキュメントを上書き（同一 ID の既存チャンクを置換）</td></tr>
 <tr><td style="text-align: left"><code>get stats</code></td><td style="text-align: left">インデックスの統計情報を表示</td></tr>
 <tr><td style="text-align: left"><code>get schema</code></td><td style="text-align: left">現在のスキーマを表示</td></tr>
-<tr><td style="text-align: left"><code>get doc &lt;id&gt;</code></td><td style="text-align: left">ID でドキュメントを取得</td></tr>
+<tr><td style="text-align: left"><code>get docs &lt;id&gt;</code></td><td style="text-align: left">ID で全ドキュメント（チャンクを含む）を取得</td></tr>
 <tr><td style="text-align: left"><code>delete field &lt;name&gt;</code></td><td style="text-align: left">スキーマからフィールドを削除</td></tr>
-<tr><td style="text-align: left"><code>delete doc &lt;id&gt;</code></td><td style="text-align: left">ID でドキュメントを削除</td></tr>
+<tr><td style="text-align: left"><code>delete docs &lt;id&gt;</code></td><td style="text-align: left">ID で全ドキュメント（チャンクを含む）を削除</td></tr>
 <tr><td style="text-align: left"><code>commit</code></td><td style="text-align: left">保留中の変更をコミット</td></tr>
 <tr><td style="text-align: left"><code>help</code></td><td style="text-align: left">利用可能なコマンドを表示</td></tr>
 <tr><td style="text-align: left"><code>quit</code> / <code>exit</code></td><td style="text-align: left">REPL を終了</td></tr>
@@ -258,7 +259,7 @@ laurus&gt; get schema
   "default_fields": ["title", "body"]
 }
 
-laurus&gt; get doc doc4
+laurus&gt; get docs doc4
 ╭──────┬───────────────────────────────────────────────╮
 │ ID   │ Fields                                        │
 ├──────┼───────────────────────────────────────────────┤
@@ -266,8 +267,8 @@ laurus&gt; get doc doc4
 ╰──────┴───────────────────────────────────────────────╯
 </code></pre>
 <h3 id="ドキュメントの削除"><a class="header" href="#ドキュメントの削除">ドキュメントの削除</a></h3>
-<pre><code class="language-text">laurus&gt; delete doc doc4
-Document 'doc4' deleted.
+<pre><code class="language-text">laurus&gt; delete docs doc4
+Documents 'doc4' deleted.
 laurus&gt; commit
 Changes committed.
 </code></pre>
