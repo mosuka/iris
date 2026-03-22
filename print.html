@@ -36,7 +36,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-6f488e78.js";
+            window.path_to_searchindex_js = "searchindex-5d5c033a.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-710721a4.js"></script>
@@ -730,13 +730,14 @@ engine.commit().await?;
 <p>Use <code>SearchRequestBuilder</code> with a query to search the index:</p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use laurus::{SearchRequestBuilder, LexicalSearchRequest};
+</span>use laurus::SearchRequestBuilder;
 use laurus::lexical::TermQuery;
+use laurus::lexical::search::searcher::LexicalSearchQuery;
 
 // Search for "rust" in the "body" field
 let request = SearchRequestBuilder::new()
-    .lexical_search_request(
-        LexicalSearchRequest::new(
+    .lexical_query(
+        LexicalSearchQuery::Obj(
             Box::new(TermQuery::new("body", "rust"))
         )
     )
@@ -758,10 +759,11 @@ for result in &amp;results {
 <p>Here is the full program that you can copy, paste, and run:</p>
 <pre class="playground"><code class="language-rust">use std::sync::Arc;
 use laurus::{
-    Document, Engine, LexicalSearchRequest,
+    Document, Engine,
     Result, Schema, SearchRequestBuilder,
 };
 use laurus::lexical::{TextOption, TermQuery};
+use laurus::lexical::search::searcher::LexicalSearchQuery;
 use laurus::storage::memory::MemoryStorage;
 
 #[tokio::main]
@@ -795,8 +797,8 @@ async fn main() -&gt; Result&lt;()&gt; {
 
     // 5. Search
     let request = SearchRequestBuilder::new()
-        .lexical_search_request(
-            LexicalSearchRequest::new(
+        .lexical_query(
+            LexicalSearchQuery::Obj(
                 Box::new(TermQuery::new("body", "rust"))
             )
         )
@@ -2394,12 +2396,13 @@ async fn main() -&gt; laurus::Result&lt;()&gt; {
 <h2 id="basic-usage"><a class="header" href="#basic-usage">Basic Usage</a></h2>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use laurus::{SearchRequestBuilder, LexicalSearchRequest};
+</span>use laurus::SearchRequestBuilder;
 use laurus::lexical::TermQuery;
+use laurus::lexical::search::searcher::LexicalSearchQuery;
 
 let request = SearchRequestBuilder::new()
-    .lexical_search_request(
-        LexicalSearchRequest::new(
+    .lexical_query(
+        LexicalSearchQuery::Obj(
             Box::new(TermQuery::new("body", "rust"))
         )
     )
@@ -2573,48 +2576,53 @@ let query = SpanNearQuery::new(
 <li>Shorter documents are boosted relative to longer ones</li>
 </ul>
 <h3 id="field-boosts"><a class="header" href="#field-boosts">Field Boosts</a></h3>
-<p>You can boost specific fields to influence relevance:</p>
+<p>You can boost specific fields to influence relevance using the <code>SearchRequestBuilder</code>:</p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use laurus::LexicalSearchRequest;
+</span>use laurus::SearchRequestBuilder;
+use laurus::lexical::TermQuery;
+use laurus::lexical::search::searcher::LexicalSearchQuery;
 
-let mut request = LexicalSearchRequest::new(Box::new(query));
-request.field_boosts.insert("title".to_string(), 2.0);  // title matches count double
-request.field_boosts.insert("body".to_string(), 1.0);
+let request = SearchRequestBuilder::new()
+    .lexical_query(LexicalSearchQuery::Obj(Box::new(TermQuery::new("body", "rust"))))
+    .add_field_boost("title", 2.0)  // title matches count double
+    .add_field_boost("body", 1.0)
+    .build();
 <span class="boring">}</span></code></pre>
-<h2 id="lexicalsearchrequest-options"><a class="header" href="#lexicalsearchrequest-options">LexicalSearchRequest Options</a></h2>
+<h2 id="lexical-search-options"><a class="header" href="#lexical-search-options">Lexical Search Options</a></h2>
+<p>Lexical search behavior is controlled via <code>LexicalSearchOptions</code> on the <code>SearchRequest</code>, or by using builder methods on <code>SearchRequestBuilder</code>:</p>
 <div class="table-wrapper">
 <table>
 <thead>
 <tr><th style="text-align: left">Option</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr>
 </thead>
 <tbody>
-<tr><td style="text-align: left"><code>query</code></td><td style="text-align: left">(required)</td><td style="text-align: left">The query to execute</td></tr>
-<tr><td style="text-align: left"><code>limit</code></td><td style="text-align: left">10</td><td style="text-align: left">Maximum number of results</td></tr>
-<tr><td style="text-align: left"><code>load_documents</code></td><td style="text-align: left">true</td><td style="text-align: left">Whether to load full document content</td></tr>
+<tr><td style="text-align: left"><code>field_boosts</code></td><td style="text-align: left">empty</td><td style="text-align: left">Per-field score multipliers</td></tr>
 <tr><td style="text-align: left"><code>min_score</code></td><td style="text-align: left">0.0</td><td style="text-align: left">Minimum score threshold</td></tr>
 <tr><td style="text-align: left"><code>timeout_ms</code></td><td style="text-align: left">None</td><td style="text-align: left">Search timeout in milliseconds</td></tr>
 <tr><td style="text-align: left"><code>parallel</code></td><td style="text-align: left">false</td><td style="text-align: left">Enable parallel search across segments</td></tr>
 <tr><td style="text-align: left"><code>sort_by</code></td><td style="text-align: left"><code>Score</code></td><td style="text-align: left">Sort by relevance score, or by a field (<code>asc</code> / <code>desc</code>)</td></tr>
-<tr><td style="text-align: left"><code>field_boosts</code></td><td style="text-align: left">empty</td><td style="text-align: left">Per-field score multipliers</td></tr>
 </tbody>
 </table>
 </div>
 <h3 id="builder-methods"><a class="header" href="#builder-methods">Builder Methods</a></h3>
-<p><code>LexicalSearchRequest</code> supports a builder-style API for setting options:</p>
+<p><code>SearchRequestBuilder</code> provides convenience methods for lexical options:</p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use laurus::LexicalSearchRequest;
+</span>use laurus::SearchRequestBuilder;
 use laurus::lexical::TermQuery;
+use laurus::lexical::search::searcher::{LexicalSearchQuery, SortField, SortOrder};
 
-let request = LexicalSearchRequest::new(Box::new(TermQuery::new("body", "rust")))
+let request = SearchRequestBuilder::new()
+    .lexical_query(LexicalSearchQuery::Obj(Box::new(TermQuery::new("body", "rust"))))
+    .lexical_min_score(0.5)
+    .lexical_timeout_ms(5000)
+    .lexical_parallel(true)
+    .sort_by(SortField::Field { name: "date".to_string(), order: SortOrder::Desc })
+    .add_field_boost("title", 2.0)
+    .add_field_boost("body", 1.0)
     .limit(20)
-    .min_score(0.5)
-    .timeout_ms(5000)
-    .parallel(true)
-    .sort_by_field_desc("date")
-    .with_field_boost("title", 2.0)
-    .with_field_boost("body", 1.0);
+    .build();
 <span class="boring">}</span></code></pre>
 <h2 id="using-the-query-dsl"><a class="header" href="#using-the-query-dsl">Using the Query DSL</a></h2>
 <p>Instead of building queries programmatically, you can use the text-based Query DSL:</p>
@@ -2660,20 +2668,26 @@ let query = parser.parse("year:[2020 TO 2024]")?;
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>use laurus::SearchRequestBuilder;
-use laurus::vector::VectorSearchRequestBuilder;
+use laurus::vector::search::searcher::VectorSearchQuery;
+use laurus::vector::store::request::QueryPayload;
+use laurus::data::DataValue;
 
 let request = SearchRequestBuilder::new()
-    .vector_search_request(
-        VectorSearchRequestBuilder::new()
-            .add_text("embedding", "systems programming language")
-            .limit(10)
-            .build()
+    .vector_query(
+        VectorSearchQuery::Payloads(vec![
+            QueryPayload {
+                field: "embedding".to_string(),
+                payload: DataValue::Text("systems programming language".to_string()),
+                weight: 1.0,
+            },
+        ])
     )
+    .limit(10)
     .build();
 
 let results = engine.search(request).await?;
 <span class="boring">}</span></code></pre>
-<p>The <code>add_text()</code> method stores the text as a query payload. At search time, the engine embeds it using the configured embedder and then searches the vector index.</p>
+<p>The <code>QueryPayload</code> stores raw data (text, bytes, etc.) that will be embedded at search time using the configured embedder.</p>
 <h3 id="query-dsl"><a class="header" href="#query-dsl">Query DSL</a></h3>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
@@ -2684,55 +2698,91 @@ let parser = VectorQueryParser::new(embedder.clone())
 
 let request = parser.parse(r#"embedding:~"systems programming""#).await?;
 <span class="boring">}</span></code></pre>
-<h2 id="vectorsearchrequestbuilder"><a class="header" href="#vectorsearchrequestbuilder">VectorSearchRequestBuilder</a></h2>
-<p>The builder API provides fine-grained control:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use laurus::vector::VectorSearchRequestBuilder;
-use laurus::vector::store::request::QueryVector;
-
-let request = VectorSearchRequestBuilder::new()
-    // Text query (will be embedded at search time)
-    .add_text("text_vec", "machine learning")
-
-    // Or use a pre-computed vector directly
-    .add_vector("embedding", vec![0.1, 0.2, 0.3, /* ... */])
-
-    // Search parameters
-    .limit(20)
-
-    .build();
-<span class="boring">}</span></code></pre>
-<h3 id="methods"><a class="header" href="#methods">Methods</a></h3>
+<h2 id="vectorsearchquery"><a class="header" href="#vectorsearchquery">VectorSearchQuery</a></h2>
+<p>The vector search query is specified as a <code>VectorSearchQuery</code> enum:</p>
 <div class="table-wrapper">
 <table>
 <thead>
-<tr><th style="text-align: left">Method</th><th style="text-align: left">Description</th></tr>
+<tr><th style="text-align: left">Variant</th><th style="text-align: left">Description</th></tr>
 </thead>
 <tbody>
-<tr><td style="text-align: left"><code>add_text(field, text)</code></td><td style="text-align: left">Add a text query for a specific field (embedded at search time)</td></tr>
-<tr><td style="text-align: left"><code>add_vector(field, vector)</code></td><td style="text-align: left">Add a pre-computed query vector for a specific field</td></tr>
-<tr><td style="text-align: left"><code>add_vector_with_weight(field, vector, weight)</code></td><td style="text-align: left">Add a pre-computed vector with an explicit weight</td></tr>
-<tr><td style="text-align: left"><code>add_payload(field, payload)</code></td><td style="text-align: left">Add a generic <code>DataValue</code> payload to be embedded</td></tr>
-<tr><td style="text-align: left"><code>add_bytes(field, bytes, mime)</code></td><td style="text-align: left">Add a binary payload (e.g., image bytes for multimodal)</td></tr>
-<tr><td style="text-align: left"><code>field(name)</code></td><td style="text-align: left">Restrict search to a specific field</td></tr>
-<tr><td style="text-align: left"><code>fields(names)</code></td><td style="text-align: left">Restrict search to multiple fields</td></tr>
-<tr><td style="text-align: left"><code>limit(n)</code></td><td style="text-align: left">Maximum number of results (default: 10)</td></tr>
-<tr><td style="text-align: left"><code>score_mode(VectorScoreMode)</code></td><td style="text-align: left">Score combination mode (<code>WeightedSum</code>, <code>MaxSim</code>, <code>LateInteraction</code>)</td></tr>
-<tr><td style="text-align: left"><code>min_score(f32)</code></td><td style="text-align: left">Minimum score threshold (default: 0.0)</td></tr>
-<tr><td style="text-align: left"><code>overfetch(f32)</code></td><td style="text-align: left">Overfetch factor for better result quality (default: 1.0)</td></tr>
-<tr><td style="text-align: left"><code>build()</code></td><td style="text-align: left">Build the <code>VectorSearchRequest</code></td></tr>
+<tr><td style="text-align: left"><code>Payloads(Vec&lt;QueryPayload&gt;)</code></td><td style="text-align: left">Raw payloads (text, bytes, etc.) to be embedded at search time</td></tr>
+<tr><td style="text-align: left"><code>Vectors(Vec&lt;QueryVector&gt;)</code></td><td style="text-align: left">Pre-embedded query vectors ready for nearest-neighbor search</td></tr>
 </tbody>
 </table>
 </div>
+<h3 id="querypayload"><a class="header" href="#querypayload">QueryPayload</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Field</th><th style="text-align: left">Type</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>field</code></td><td style="text-align: left"><code>String</code></td><td style="text-align: left">Target vector field name</td></tr>
+<tr><td style="text-align: left"><code>payload</code></td><td style="text-align: left"><code>DataValue</code></td><td style="text-align: left">The payload to embed (e.g., <code>DataValue::Text(...)</code>)</td></tr>
+<tr><td style="text-align: left"><code>weight</code></td><td style="text-align: left"><code>f32</code></td><td style="text-align: left">Score weight (default: 1.0)</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="queryvector"><a class="header" href="#queryvector">QueryVector</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Field</th><th style="text-align: left">Type</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>vector</code></td><td style="text-align: left"><code>Vector</code></td><td style="text-align: left">Pre-computed dense vector embedding</td></tr>
+<tr><td style="text-align: left"><code>weight</code></td><td style="text-align: left"><code>f32</code></td><td style="text-align: left">Score weight (default: 1.0)</td></tr>
+<tr><td style="text-align: left"><code>fields</code></td><td style="text-align: left"><code>Option&lt;Vec&lt;String&gt;&gt;</code></td><td style="text-align: left">Optional field restriction</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="examples-2"><a class="header" href="#examples-2">Examples</a></h3>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use laurus::vector::search::searcher::VectorSearchQuery;
+use laurus::vector::store::request::{QueryPayload, QueryVector};
+use laurus::vector::core::vector::Vector;
+use laurus::data::DataValue;
+
+// Text query (will be embedded at search time)
+let query = VectorSearchQuery::Payloads(vec![
+    QueryPayload {
+        field: "text_vec".to_string(),
+        payload: DataValue::Text("machine learning".to_string()),
+        weight: 1.0,
+    },
+]);
+
+// Pre-computed vector
+let query = VectorSearchQuery::Vectors(vec![
+    QueryVector {
+        vector: Vector::from(vec![0.1, 0.2, 0.3]),
+        weight: 1.0,
+        fields: Some(vec!["embedding".to_string()]),
+    },
+]);
+<span class="boring">}</span></code></pre>
 <h2 id="multi-field-vector-search"><a class="header" href="#multi-field-vector-search">Multi-Field Vector Search</a></h2>
 <p>You can search across multiple vector fields in a single request:</p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>let request = VectorSearchRequestBuilder::new()
-    .add_text("text_vec", "cute kitten")
-    .add_text("image_vec", "fluffy cat")
-    .build();
+</span>use laurus::vector::search::searcher::VectorSearchQuery;
+use laurus::vector::store::request::QueryPayload;
+use laurus::data::DataValue;
+
+let query = VectorSearchQuery::Payloads(vec![
+    QueryPayload {
+        field: "text_vec".to_string(),
+        payload: DataValue::Text("cute kitten".to_string()),
+        weight: 1.0,
+    },
+    QueryPayload {
+        field: "image_vec".to_string(),
+        payload: DataValue::Text("fluffy cat".to_string()),
+        weight: 1.0,
+    },
+]);
 <span class="boring">}</span></code></pre>
 <p>Each clause produces a vector that is searched against its respective field. Results are combined using the configured score mode.</p>
 <h3 id="score-modes"><a class="header" href="#score-modes">Score Modes</a></h3>
@@ -2757,16 +2807,22 @@ let request = VectorSearchRequestBuilder::new()
 <p>You can apply lexical filters to narrow the vector search results:</p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use laurus::{SearchRequestBuilder, LexicalSearchRequest};
+</span>use laurus::SearchRequestBuilder;
 use laurus::lexical::TermQuery;
-use laurus::vector::VectorSearchRequestBuilder;
+use laurus::vector::search::searcher::VectorSearchQuery;
+use laurus::vector::store::request::QueryPayload;
+use laurus::data::DataValue;
 
 // Vector search with a category filter
 let request = SearchRequestBuilder::new()
-    .vector_search_request(
-        VectorSearchRequestBuilder::new()
-            .add_text("embedding", "machine learning")
-            .build()
+    .vector_query(
+        VectorSearchQuery::Payloads(vec![
+            QueryPayload {
+                field: "embedding".to_string(),
+                payload: DataValue::Text("machine learning".to_string()),
+                weight: 1.0,
+            },
+        ])
     )
     .filter_query(Box::new(TermQuery::new("category", "tutorial")))
     .limit(10)
@@ -2782,10 +2838,14 @@ let results = engine.search(request).await?;
 use laurus::lexical::core::field::NumericType;
 
 let request = SearchRequestBuilder::new()
-    .vector_search_request(
-        VectorSearchRequestBuilder::new()
-            .add_text("embedding", "type systems")
-            .build()
+    .vector_query(
+        VectorSearchQuery::Payloads(vec![
+            QueryPayload {
+                field: "embedding".to_string(),
+                payload: DataValue::Text("type systems".to_string()),
+                weight: 1.0,
+            },
+        ])
     )
     .filter_query(Box::new(NumericRangeQuery::new(
         "year", NumericType::Integer,
@@ -2815,7 +2875,9 @@ let request = SearchRequestBuilder::new()
 use laurus::{Document, Engine, Schema, SearchRequestBuilder, PerFieldEmbedder};
 use laurus::lexical::TextOption;
 use laurus::vector::HnswOption;
-use laurus::vector::VectorSearchRequestBuilder;
+use laurus::vector::search::searcher::VectorSearchQuery;
+use laurus::vector::store::request::QueryPayload;
+use laurus::data::DataValue;
 use laurus::storage::memory::MemoryStorage;
 
 #[tokio::main]
@@ -2851,10 +2913,14 @@ async fn main() -&gt; laurus::Result&lt;()&gt; {
     // Search by semantic similarity
     let results = engine.search(
         SearchRequestBuilder::new()
-            .vector_search_request(
-                VectorSearchRequestBuilder::new()
-                    .add_text("text_vec", "systems language")
-                    .build()
+            .vector_query(
+                VectorSearchQuery::Payloads(vec![
+                    QueryPayload {
+                        field: "text_vec".to_string(),
+                        payload: DataValue::Text("systems language".to_string()),
+                        weight: 1.0,
+                    },
+                ])
             )
             .limit(5)
             .build()
@@ -2914,22 +2980,29 @@ async fn main() -&gt; laurus::Result&lt;()&gt; {
 <h3 id="builder-api-1"><a class="header" href="#builder-api-1">Builder API</a></h3>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use laurus::{SearchRequestBuilder, LexicalSearchRequest, FusionAlgorithm};
+</span>use laurus::{SearchRequestBuilder, FusionAlgorithm};
 use laurus::lexical::TermQuery;
-use laurus::vector::VectorSearchRequestBuilder;
+use laurus::lexical::search::searcher::LexicalSearchQuery;
+use laurus::vector::search::searcher::VectorSearchQuery;
+use laurus::vector::store::request::QueryPayload;
+use laurus::data::DataValue;
 
 let request = SearchRequestBuilder::new()
     // Lexical component
-    .lexical_search_request(
-        LexicalSearchRequest::new(
+    .lexical_query(
+        LexicalSearchQuery::Obj(
             Box::new(TermQuery::new("body", "rust"))
         )
     )
     // Vector component
-    .vector_search_request(
-        VectorSearchRequestBuilder::new()
-            .add_text("text_vec", "systems programming")
-            .build()
+    .vector_query(
+        VectorSearchQuery::Payloads(vec![
+            QueryPayload {
+                field: "text_vec".to_string(),
+                payload: DataValue::Text("systems programming".to_string()),
+                weight: 1.0,
+            },
+        ])
     )
     // Fusion algorithm
     .fusion_algorithm(FusionAlgorithm::RRF { k: 60.0 })
@@ -2993,19 +3066,20 @@ let fusion = FusionAlgorithm::WeightedSum {
 <li>When you want explicit control over the balance between lexical and vector relevance</li>
 <li>When you know one signal is more important than the other</li>
 </ul>
-<h2 id="searchrequest-options"><a class="header" href="#searchrequest-options">SearchRequest Options</a></h2>
+<h2 id="searchrequest-fields"><a class="header" href="#searchrequest-fields">SearchRequest Fields</a></h2>
 <div class="table-wrapper">
 <table>
 <thead>
-<tr><th style="text-align: left">Option</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr>
+<tr><th style="text-align: left">Field</th><th style="text-align: left">Type</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr>
 </thead>
 <tbody>
-<tr><td style="text-align: left"><code>lexical_search_request</code></td><td style="text-align: left">None</td><td style="text-align: left">Lexical query component</td></tr>
-<tr><td style="text-align: left"><code>vector_search_request</code></td><td style="text-align: left">None</td><td style="text-align: left">Vector query component</td></tr>
-<tr><td style="text-align: left"><code>filter_query</code></td><td style="text-align: left">None</td><td style="text-align: left">Pre-filter using a lexical query (restricts both lexical and vector results)</td></tr>
-<tr><td style="text-align: left"><code>fusion_algorithm</code></td><td style="text-align: left"><code>None</code> (uses <code>RRF { k: 60.0 }</code> when both results exist)</td><td style="text-align: left">How to merge lexical and vector results</td></tr>
-<tr><td style="text-align: left"><code>limit</code></td><td style="text-align: left">10</td><td style="text-align: left">Maximum number of results to return</td></tr>
-<tr><td style="text-align: left"><code>offset</code></td><td style="text-align: left">0</td><td style="text-align: left">Number of results to skip (for pagination)</td></tr>
+<tr><td style="text-align: left"><code>query</code></td><td style="text-align: left"><code>SearchQuery</code></td><td style="text-align: left"><code>Dsl("")</code></td><td style="text-align: left">Search query (Dsl, Lexical, Vector, or Hybrid)</td></tr>
+<tr><td style="text-align: left"><code>limit</code></td><td style="text-align: left"><code>usize</code></td><td style="text-align: left">10</td><td style="text-align: left">Maximum number of results to return</td></tr>
+<tr><td style="text-align: left"><code>offset</code></td><td style="text-align: left"><code>usize</code></td><td style="text-align: left">0</td><td style="text-align: left">Number of results to skip (for pagination)</td></tr>
+<tr><td style="text-align: left"><code>fusion_algorithm</code></td><td style="text-align: left"><code>Option&lt;FusionAlgorithm&gt;</code></td><td style="text-align: left"><code>None</code> (uses <code>RRF { k: 60.0 }</code> when both results exist)</td><td style="text-align: left">How to merge lexical and vector results</td></tr>
+<tr><td style="text-align: left"><code>filter_query</code></td><td style="text-align: left"><code>Option&lt;Box&lt;dyn Query&gt;&gt;</code></td><td style="text-align: left">None</td><td style="text-align: left">Pre-filter using a lexical query (restricts both lexical and vector results)</td></tr>
+<tr><td style="text-align: left"><code>lexical_options</code></td><td style="text-align: left"><code>LexicalSearchOptions</code></td><td style="text-align: left">Default</td><td style="text-align: left">Parameters controlling lexical search behavior (field boosts, min score, timeout, etc.)</td></tr>
+<tr><td style="text-align: left"><code>vector_options</code></td><td style="text-align: left"><code>VectorSearchOptions</code></td><td style="text-align: left">Default</td><td style="text-align: left">Parameters controlling vector search behavior (score mode, min score)</td></tr>
 </tbody>
 </table>
 </div>
@@ -3028,13 +3102,17 @@ let fusion = FusionAlgorithm::WeightedSum {
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>let request = SearchRequestBuilder::new()
-    .lexical_search_request(
-        LexicalSearchRequest::new(Box::new(TermQuery::new("body", "rust")))
+    .lexical_query(
+        LexicalSearchQuery::Obj(Box::new(TermQuery::new("body", "rust")))
     )
-    .vector_search_request(
-        VectorSearchRequestBuilder::new()
-            .add_text("text_vec", "systems programming")
-            .build()
+    .vector_query(
+        VectorSearchQuery::Payloads(vec![
+            QueryPayload {
+                field: "text_vec".to_string(),
+                payload: DataValue::Text("systems programming".to_string()),
+                weight: 1.0,
+            },
+        ])
     )
     // Only search within "tutorial" category
     .filter_query(Box::new(TermQuery::new("category", "tutorial")))
@@ -3054,16 +3132,16 @@ let fusion = FusionAlgorithm::WeightedSum {
 </span><span class="boring">fn main() {
 </span>// Page 1: results 0-9
 let page1 = SearchRequestBuilder::new()
-    .lexical_search_request(/* ... */)
-    .vector_search_request(/* ... */)
+    .lexical_query(/* ... */)
+    .vector_query(/* ... */)
     .offset(0)
     .limit(10)
     .build();
 
 // Page 2: results 10-19
 let page2 = SearchRequestBuilder::new()
-    .lexical_search_request(/* ... */)
-    .vector_search_request(/* ... */)
+    .lexical_query(/* ... */)
+    .vector_query(/* ... */)
     .offset(10)
     .limit(10)
     .build();
@@ -3072,11 +3150,15 @@ let page2 = SearchRequestBuilder::new()
 <pre class="playground"><code class="language-rust">use std::sync::Arc;
 use laurus::{
     Document, Engine, Schema, SearchRequestBuilder,
-    LexicalSearchRequest, FusionAlgorithm, PerFieldEmbedder,
+    FusionAlgorithm, PerFieldEmbedder,
 };
 use laurus::lexical::{TextOption, TermQuery};
 use laurus::lexical::core::field::IntegerOption;
-use laurus::vector::{HnswOption, VectorSearchRequestBuilder};
+use laurus::lexical::search::searcher::LexicalSearchQuery;
+use laurus::vector::HnswOption;
+use laurus::vector::search::searcher::VectorSearchQuery;
+use laurus::vector::store::request::QueryPayload;
+use laurus::data::DataValue;
 use laurus::storage::memory::MemoryStorage;
 
 #[tokio::main]
@@ -3118,13 +3200,17 @@ async fn main() -&gt; laurus::Result&lt;()&gt; {
     // Hybrid search: keyword "rust" + semantic "systems language"
     let results = engine.search(
         SearchRequestBuilder::new()
-            .lexical_search_request(
-                LexicalSearchRequest::new(Box::new(TermQuery::new("body", "rust")))
+            .lexical_query(
+                LexicalSearchQuery::Obj(Box::new(TermQuery::new("body", "rust")))
             )
-            .vector_search_request(
-                VectorSearchRequestBuilder::new()
-                    .add_text("body_vec", "systems language")
-                    .build()
+            .vector_query(
+                VectorSearchQuery::Payloads(vec![
+                    QueryPayload {
+                        field: "body_vec".to_string(),
+                        payload: DataValue::Text("systems language".to_string()),
+                        weight: 1.0,
+                    },
+                ])
             )
             .fusion_algorithm(FusionAlgorithm::RRF { k: 60.0 })
             .limit(10)
@@ -3279,7 +3365,7 @@ metadata.embedding:~"text"
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>let mut request = parser.parse(r#"content:~"cats" image:~"dogs""#).await?;
-request.score_mode = VectorScoreMode::MaxSim;
+request.vector_options.score_mode = VectorScoreMode::MaxSim;
 <span class="boring">}</span></code></pre>
 <h3 id="vector-peg-grammar"><a class="header" href="#vector-peg-grammar">Vector PEG Grammar</a></h3>
 <p>The full vector grammar (<a href="https://github.com/mosuka/laurus/blob/main/laurus/src/vector/query/parser.pest">parser.pest</a>):</p>
@@ -3374,9 +3460,8 @@ let unified = UnifiedQueryParser::new(lexical_parser, vector_parser);
 let request = unified.parse(
     r#"title:hello content:~"cute kitten"^0.8"#
 ).await?;
-// request.lexical_search_request  -&gt; Some(...)  — lexical query
-// request.vector_search_request   -&gt; Some(...)  — vector query
-// request.fusion_algorithm        -&gt; Some(RRF)  — fusion algorithm
+// request.query              -&gt; SearchQuery::Hybrid { lexical, vector }
+// request.fusion_algorithm   -&gt; Some(RRF)  — fusion algorithm
 <span class="boring">}</span></code></pre>
 <h3 id="custom-fusion"><a class="header" href="#custom-fusion">Custom Fusion</a></h3>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
@@ -3613,21 +3698,22 @@ let engine = Engine::builder(storage, schema)
 <p>The <code>search()</code> method accepts a <code>SearchRequest</code> which can contain a lexical query, a vector query, or both. When both are present, results are merged using the specified <code>FusionAlgorithm</code>.</p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use laurus::{SearchRequestBuilder, LexicalSearchRequest, FusionAlgorithm};
+</span>use laurus::{SearchRequestBuilder, FusionAlgorithm};
 use laurus::lexical::TermQuery;
+use laurus::lexical::search::searcher::LexicalSearchQuery;
 
 // Lexical-only search
 let request = SearchRequestBuilder::new()
-    .lexical_search_request(
-        LexicalSearchRequest::new(Box::new(TermQuery::new("body", "rust")))
+    .lexical_query(
+        LexicalSearchQuery::Obj(Box::new(TermQuery::new("body", "rust")))
     )
     .limit(10)
     .build();
 
 // Hybrid search with RRF fusion
 let request = SearchRequestBuilder::new()
-    .lexical_search_request(lexical_req)
-    .vector_search_request(vector_req)
+    .lexical_query(lexical_query)
+    .vector_query(vector_query)
     .fusion_algorithm(FusionAlgorithm::RRF { k: 60.0 })
     .limit(10)
     .build();
@@ -3641,12 +3727,13 @@ let results = engine.search(request).await?;
 <tr><th style="text-align: left">Field</th><th style="text-align: left">Type</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr>
 </thead>
 <tbody>
-<tr><td style="text-align: left"><code>lexical_search_request</code></td><td style="text-align: left"><code>Option&lt;LexicalSearchRequest&gt;</code></td><td style="text-align: left">None</td><td style="text-align: left">Lexical query</td></tr>
-<tr><td style="text-align: left"><code>vector_search_request</code></td><td style="text-align: left"><code>Option&lt;VectorSearchRequest&gt;</code></td><td style="text-align: left">None</td><td style="text-align: left">Vector query</td></tr>
+<tr><td style="text-align: left"><code>query</code></td><td style="text-align: left"><code>SearchQuery</code></td><td style="text-align: left"><code>Dsl("")</code></td><td style="text-align: left">Search query specification (Dsl, Lexical, Vector, or Hybrid)</td></tr>
 <tr><td style="text-align: left"><code>limit</code></td><td style="text-align: left"><code>usize</code></td><td style="text-align: left">10</td><td style="text-align: left">Maximum results to return</td></tr>
 <tr><td style="text-align: left"><code>offset</code></td><td style="text-align: left"><code>usize</code></td><td style="text-align: left">0</td><td style="text-align: left">Pagination offset</td></tr>
 <tr><td style="text-align: left"><code>fusion_algorithm</code></td><td style="text-align: left"><code>Option&lt;FusionAlgorithm&gt;</code></td><td style="text-align: left">RRF (k=60)</td><td style="text-align: left">How to merge lexical + vector results</td></tr>
 <tr><td style="text-align: left"><code>filter_query</code></td><td style="text-align: left"><code>Option&lt;Box&lt;dyn Query&gt;&gt;</code></td><td style="text-align: left">None</td><td style="text-align: left">Filter applied to both search types</td></tr>
+<tr><td style="text-align: left"><code>lexical_options</code></td><td style="text-align: left"><code>LexicalSearchOptions</code></td><td style="text-align: left">Default</td><td style="text-align: left">Parameters controlling lexical search behavior</td></tr>
+<tr><td style="text-align: left"><code>vector_options</code></td><td style="text-align: left"><code>VectorSearchOptions</code></td><td style="text-align: left">Default</td><td style="text-align: left">Parameters controlling vector search behavior</td></tr>
 </tbody>
 </table>
 </div>
@@ -4926,53 +5013,45 @@ impl Storage for S3Storage {
 </thead>
 <tbody>
 <tr><td style="text-align: left"><code>SearchRequestBuilder::new()</code></td><td style="text-align: left">Create a new builder</td></tr>
-<tr><td style="text-align: left"><code>.lexical_search_request(req)</code></td><td style="text-align: left">Set the lexical search component</td></tr>
-<tr><td style="text-align: left"><code>.vector_search_request(req)</code></td><td style="text-align: left">Set the vector search component</td></tr>
+<tr><td style="text-align: left"><code>.query_dsl(dsl)</code></td><td style="text-align: left">Set a unified DSL string (parsed at search time)</td></tr>
+<tr><td style="text-align: left"><code>.lexical_query(query)</code></td><td style="text-align: left">Set the lexical search query (<code>LexicalSearchQuery</code>)</td></tr>
+<tr><td style="text-align: left"><code>.vector_query(query)</code></td><td style="text-align: left">Set the vector search query (<code>VectorSearchQuery</code>)</td></tr>
 <tr><td style="text-align: left"><code>.filter_query(query)</code></td><td style="text-align: left">Set a pre-filter query</td></tr>
 <tr><td style="text-align: left"><code>.fusion_algorithm(algo)</code></td><td style="text-align: left">Set the fusion algorithm (default: RRF)</td></tr>
 <tr><td style="text-align: left"><code>.limit(n)</code></td><td style="text-align: left">Maximum results (default: 10)</td></tr>
 <tr><td style="text-align: left"><code>.offset(n)</code></td><td style="text-align: left">Skip N results (default: 0)</td></tr>
+<tr><td style="text-align: left"><code>.add_field_boost(field, boost)</code></td><td style="text-align: left">Add a field-level boost for lexical search</td></tr>
+<tr><td style="text-align: left"><code>.lexical_min_score(f32)</code></td><td style="text-align: left">Set minimum score threshold for lexical search</td></tr>
+<tr><td style="text-align: left"><code>.lexical_timeout_ms(u64)</code></td><td style="text-align: left">Set lexical search timeout in milliseconds</td></tr>
+<tr><td style="text-align: left"><code>.lexical_parallel(bool)</code></td><td style="text-align: left">Enable parallel lexical search</td></tr>
+<tr><td style="text-align: left"><code>.sort_by(SortField)</code></td><td style="text-align: left">Set sort order for lexical search results</td></tr>
+<tr><td style="text-align: left"><code>.vector_score_mode(VectorScoreMode)</code></td><td style="text-align: left">Set score combination mode for vector search</td></tr>
+<tr><td style="text-align: left"><code>.vector_min_score(f32)</code></td><td style="text-align: left">Set minimum score threshold for vector search</td></tr>
 <tr><td style="text-align: left"><code>.build()</code></td><td style="text-align: left">Build the <code>SearchRequest</code></td></tr>
 </tbody>
 </table>
 </div>
-<h3 id="lexicalsearchrequest"><a class="header" href="#lexicalsearchrequest">LexicalSearchRequest</a></h3>
+<h3 id="lexicalsearchquery"><a class="header" href="#lexicalsearchquery">LexicalSearchQuery</a></h3>
 <div class="table-wrapper">
 <table>
 <thead>
-<tr><th style="text-align: left">Method</th><th style="text-align: left">Description</th></tr>
+<tr><th style="text-align: left">Variant</th><th style="text-align: left">Description</th></tr>
 </thead>
 <tbody>
-<tr><td style="text-align: left"><code>LexicalSearchRequest::new(query)</code></td><td style="text-align: left">Create with a query</td></tr>
-<tr><td style="text-align: left"><code>LexicalSearchRequest::from_dsl(query_str)</code></td><td style="text-align: left">Create from a DSL query string</td></tr>
-<tr><td style="text-align: left"><code>.limit(n)</code></td><td style="text-align: left">Maximum results</td></tr>
-<tr><td style="text-align: left"><code>.load_documents(bool)</code></td><td style="text-align: left">Whether to load document content</td></tr>
-<tr><td style="text-align: left"><code>.min_score(f32)</code></td><td style="text-align: left">Minimum score threshold</td></tr>
-<tr><td style="text-align: left"><code>.timeout_ms(u64)</code></td><td style="text-align: left">Search timeout in milliseconds</td></tr>
-<tr><td style="text-align: left"><code>.parallel(bool)</code></td><td style="text-align: left">Enable parallel search</td></tr>
-<tr><td style="text-align: left"><code>.sort_by_field_asc(field)</code></td><td style="text-align: left">Sort by field ascending</td></tr>
-<tr><td style="text-align: left"><code>.sort_by_field_desc(field)</code></td><td style="text-align: left">Sort by field descending</td></tr>
-<tr><td style="text-align: left"><code>.sort_by_score()</code></td><td style="text-align: left">Sort by relevance score (default)</td></tr>
-<tr><td style="text-align: left"><code>.with_field_boost(field, boost)</code></td><td style="text-align: left">Add field-level boost</td></tr>
+<tr><td style="text-align: left"><code>LexicalSearchQuery::Dsl(String)</code></td><td style="text-align: left">Query specified as a DSL string (parsed at search time)</td></tr>
+<tr><td style="text-align: left"><code>LexicalSearchQuery::Obj(Box&lt;dyn Query&gt;)</code></td><td style="text-align: left">Query specified as a pre-built Query object</td></tr>
 </tbody>
 </table>
 </div>
-<h3 id="vectorsearchrequestbuilder-1"><a class="header" href="#vectorsearchrequestbuilder-1">VectorSearchRequestBuilder</a></h3>
+<h3 id="vectorsearchquery-1"><a class="header" href="#vectorsearchquery-1">VectorSearchQuery</a></h3>
 <div class="table-wrapper">
 <table>
 <thead>
-<tr><th style="text-align: left">Method</th><th style="text-align: left">Description</th></tr>
+<tr><th style="text-align: left">Variant</th><th style="text-align: left">Description</th></tr>
 </thead>
 <tbody>
-<tr><td style="text-align: left"><code>VectorSearchRequestBuilder::new()</code></td><td style="text-align: left">Create a new builder</td></tr>
-<tr><td style="text-align: left"><code>.add_text(field, text)</code></td><td style="text-align: left">Add a text query for a field</td></tr>
-<tr><td style="text-align: left"><code>.add_vector(field, vector)</code></td><td style="text-align: left">Add a pre-computed query vector</td></tr>
-<tr><td style="text-align: left"><code>.add_bytes(field, bytes, mime)</code></td><td style="text-align: left">Add a binary payload (for multimodal)</td></tr>
-<tr><td style="text-align: left"><code>.limit(n)</code></td><td style="text-align: left">Maximum results</td></tr>
-<tr><td style="text-align: left"><code>.score_mode(VectorScoreMode)</code></td><td style="text-align: left">Score combination mode (WeightedSum, MaxSim)</td></tr>
-<tr><td style="text-align: left"><code>.min_score(f32)</code></td><td style="text-align: left">Minimum score threshold</td></tr>
-<tr><td style="text-align: left"><code>.field(name)</code></td><td style="text-align: left">Restrict search to a specific field</td></tr>
-<tr><td style="text-align: left"><code>.build()</code></td><td style="text-align: left">Build the request</td></tr>
+<tr><td style="text-align: left"><code>VectorSearchQuery::Payloads(Vec&lt;QueryPayload&gt;)</code></td><td style="text-align: left">Raw payloads (text, bytes, etc.) to be embedded at search time</td></tr>
+<tr><td style="text-align: left"><code>VectorSearchQuery::Vectors(Vec&lt;QueryVector&gt;)</code></td><td style="text-align: left">Pre-embedded query vectors ready for nearest-neighbor search</td></tr>
 </tbody>
 </table>
 </div>
@@ -5092,7 +5171,7 @@ impl Storage for S3Storage {
 <tr><td style="text-align: left"><code>DataValue::Float64(f64)</code></td><td style="text-align: left"><code>f64</code></td></tr>
 <tr><td style="text-align: left"><code>DataValue::Text(String)</code></td><td style="text-align: left"><code>String</code></td></tr>
 <tr><td style="text-align: left"><code>DataValue::Bytes(Vec&lt;u8&gt;, Option&lt;String&gt;)</code></td><td style="text-align: left"><code>(data, mime_type)</code></td></tr>
-<tr><td style="text-align: left"><code>DataValue::Vector(Vec&lt;f32&gt;)</code></td><td style="text-align: left"><code>Vec&lt;f32&gt;</code></td></tr>
+<tr><td style="text-align: left"><code>DataValue::Vector(Vector)</code></td><td style="text-align: left"><code>Vector</code></td></tr>
 <tr><td style="text-align: left"><code>DataValue::DateTime(DateTime&lt;Utc&gt;)</code></td><td style="text-align: left"><code>chrono::DateTime&lt;Utc&gt;</code></td></tr>
 <tr><td style="text-align: left"><code>DataValue::Geo(f64, f64)</code></td><td style="text-align: left"><code>(latitude, longitude)</code></td></tr>
 </tbody>
@@ -7090,7 +7169,7 @@ inaccessible. Per-field analyzers and embedders are unregistered.</p>
 <p>Execute a search query and stream results back one at a time.</p>
 <pre><code class="language-protobuf">rpc SearchStream(SearchRequest) returns (stream SearchResult);
 </code></pre>
-<h3 id="searchrequest-fields"><a class="header" href="#searchrequest-fields">SearchRequest Fields</a></h3>
+<h3 id="searchrequest-fields-1"><a class="header" href="#searchrequest-fields-1">SearchRequest Fields</a></h3>
 <div class="table-wrapper">
 <table>
 <thead>
@@ -7109,7 +7188,7 @@ inaccessible. Per-field analyzers and embedders are unregistered.</p>
 </table>
 </div>
 <p>At least one of <code>query</code> or <code>query_vectors</code> must be provided.</p>
-<h3 id="queryvector"><a class="header" href="#queryvector">QueryVector</a></h3>
+<h3 id="queryvector-1"><a class="header" href="#queryvector-1">QueryVector</a></h3>
 <div class="table-wrapper">
 <table>
 <thead>
@@ -7720,7 +7799,7 @@ document: {"title": "Hello World - Part 2", "body": "This is a continuation."}
 <p>Result: <code>Changes committed successfully.</code></p>
 <hr>
 <h2 id="search-6"><a class="header" href="#search-6">search</a></h2>
-<p>Search documents using the laurus query DSL.</p>
+<p>Search documents using the laurus unified query DSL. Supports lexical search, vector search, and hybrid search in a single query string.</p>
 <h3 id="parameters-11"><a class="header" href="#parameters-11">Parameters</a></h3>
 <div class="table-wrapper">
 <table>
@@ -7728,13 +7807,16 @@ document: {"title": "Hello World - Part 2", "body": "This is a continuation."}
 <tr><th style="text-align: left">Name</th><th style="text-align: left">Type</th><th style="text-align: left">Required</th><th style="text-align: left">Description</th></tr>
 </thead>
 <tbody>
-<tr><td style="text-align: left"><code>query</code></td><td style="text-align: left">string</td><td style="text-align: left">Yes</td><td style="text-align: left">Search query in laurus query DSL</td></tr>
+<tr><td style="text-align: left"><code>query</code></td><td style="text-align: left">string</td><td style="text-align: left">Yes</td><td style="text-align: left">Search query in laurus unified query DSL</td></tr>
 <tr><td style="text-align: left"><code>limit</code></td><td style="text-align: left">integer</td><td style="text-align: left">No</td><td style="text-align: left">Maximum results (default: 10)</td></tr>
 <tr><td style="text-align: left"><code>offset</code></td><td style="text-align: left">integer</td><td style="text-align: left">No</td><td style="text-align: left">Results to skip for pagination (default: 0)</td></tr>
+<tr><td style="text-align: left"><code>fusion</code></td><td style="text-align: left">string</td><td style="text-align: left">No</td><td style="text-align: left">Fusion algorithm as JSON (for hybrid search)</td></tr>
+<tr><td style="text-align: left"><code>field_boosts</code></td><td style="text-align: left">string</td><td style="text-align: left">No</td><td style="text-align: left">Per-field boost factors as JSON</td></tr>
 </tbody>
 </table>
 </div>
 <h3 id="query-dsl-examples"><a class="header" href="#query-dsl-examples">Query DSL examples</a></h3>
+<h4 id="lexical-search-2"><a class="header" href="#lexical-search-2">Lexical search</a></h4>
 <div class="table-wrapper">
 <table>
 <thead>
@@ -7751,6 +7833,40 @@ document: {"title": "Hello World - Part 2", "body": "This is a continuation."}
 </tbody>
 </table>
 </div>
+<h4 id="vector-search-3"><a class="header" href="#vector-search-3">Vector search</a></h4>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Query</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>content:~"cute kitten"</code></td><td style="text-align: left">Vector search on a specific field</td></tr>
+<tr><td style="text-align: left"><code>~"cute kitten"</code></td><td style="text-align: left">Vector search on default field</td></tr>
+<tr><td style="text-align: left"><code>content:~"cute kitten"^0.8</code></td><td style="text-align: left">Vector search with weight/boost</td></tr>
+<tr><td style="text-align: left"><code>a:~"cats" b:~"dogs"^0.5</code></td><td style="text-align: left">Multiple vector queries</td></tr>
+</tbody>
+</table>
+</div>
+<h4 id="hybrid-search-4"><a class="header" href="#hybrid-search-4">Hybrid search</a></h4>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Query</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>title:hello content:~"cute kitten"</code></td><td style="text-align: left">Lexical + vector in one query</td></tr>
+<tr><td style="text-align: left"><code>title:hello AND body:world content:~"cats"^0.8</code></td><td style="text-align: left">Boolean lexical + weighted vector</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="fusion-algorithm-examples"><a class="header" href="#fusion-algorithm-examples">Fusion algorithm examples</a></h3>
+<pre><code class="language-json">{"rrf": {"k": 60.0}}
+</code></pre>
+<pre><code class="language-json">{"weighted_sum": {"lexical_weight": 0.7, "vector_weight": 0.3}}
+</code></pre>
+<h3 id="field-boosts-example"><a class="header" href="#field-boosts-example">Field boosts example</a></h3>
+<pre><code class="language-json">{"title": 2.0, "body": 1.0}
+</code></pre>
 <h3 id="result-3"><a class="header" href="#result-3">Result</a></h3>
 <pre><code class="language-json">{
   "total": 2,

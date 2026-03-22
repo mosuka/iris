@@ -35,7 +35,7 @@
             const path_to_root = "../../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../../searchindex-354913be.js";
+            window.path_to_searchindex_js = "../../searchindex-cfe8b56a.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../../toc-d18ed058.js"></script>
@@ -222,19 +222,20 @@
 <h3 id="builder-api"><a class="header" href="#builder-api">Builder API</a></h3>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use laurus::{SearchRequestBuilder, LexicalSearchRequest, FusionAlgorithm};
+</span>use laurus::{SearchRequestBuilder, FusionAlgorithm};
 use laurus::lexical::TermQuery;
+use laurus::lexical::search::searcher::LexicalSearchQuery;
 use laurus::vector::VectorSearchRequestBuilder;
 
 let request = SearchRequestBuilder::new()
     // Lexical component
-    .lexical_search_request(
-        LexicalSearchRequest::new(
+    .lexical_query(
+        LexicalSearchQuery::Obj(
             Box::new(TermQuery::new("body", "rust"))
         )
     )
     // Vector component
-    .vector_search_request(
+    .vector_query(
         VectorSearchRequestBuilder::new()
             .add_text("text_vec", "systems programming")
             .build()
@@ -301,19 +302,20 @@ let fusion = FusionAlgorithm::WeightedSum {
 <li>Lexical と Vector の関連性のバランスを明示的に制御したい場合</li>
 <li>一方のシグナルが他方よりも重要であることがわかっている場合</li>
 </ul>
-<h2 id="searchrequest-のオプション"><a class="header" href="#searchrequest-のオプション">SearchRequest のオプション</a></h2>
+<h2 id="searchrequest-のフィールド"><a class="header" href="#searchrequest-のフィールド">SearchRequest のフィールド</a></h2>
 <div class="table-wrapper">
 <table>
 <thead>
-<tr><th style="text-align: left">オプション</th><th style="text-align: left">デフォルト</th><th style="text-align: left">説明</th></tr>
+<tr><th style="text-align: left">フィールド</th><th style="text-align: left">型</th><th style="text-align: left">デフォルト</th><th style="text-align: left">説明</th></tr>
 </thead>
 <tbody>
-<tr><td style="text-align: left"><code>lexical_search_request</code></td><td style="text-align: left">None</td><td style="text-align: left">Lexical クエリコンポーネント</td></tr>
-<tr><td style="text-align: left"><code>vector_search_request</code></td><td style="text-align: left">None</td><td style="text-align: left">Vector クエリコンポーネント</td></tr>
-<tr><td style="text-align: left"><code>filter_query</code></td><td style="text-align: left">None</td><td style="text-align: left">Lexical クエリによるプレフィルター（Lexical と Vector の両方の結果を制限）</td></tr>
-<tr><td style="text-align: left"><code>fusion_algorithm</code></td><td style="text-align: left"><code>None</code>（両方の結果が存在する場合 <code>RRF { k: 60.0 }</code> を使用）</td><td style="text-align: left">Lexical と Vector の結果をマージする方法</td></tr>
-<tr><td style="text-align: left"><code>limit</code></td><td style="text-align: left">10</td><td style="text-align: left">返される結果の最大件数</td></tr>
-<tr><td style="text-align: left"><code>offset</code></td><td style="text-align: left">0</td><td style="text-align: left">スキップする結果の数（ページネーション用）</td></tr>
+<tr><td style="text-align: left"><code>query</code></td><td style="text-align: left"><code>SearchQuery</code></td><td style="text-align: left"><code>Dsl("")</code></td><td style="text-align: left">検索クエリ仕様（Dsl / Lexical / Vector / Hybrid）</td></tr>
+<tr><td style="text-align: left"><code>limit</code></td><td style="text-align: left"><code>usize</code></td><td style="text-align: left">10</td><td style="text-align: left">返される結果の最大件数</td></tr>
+<tr><td style="text-align: left"><code>offset</code></td><td style="text-align: left"><code>usize</code></td><td style="text-align: left">0</td><td style="text-align: left">スキップする結果の数（ページネーション用）</td></tr>
+<tr><td style="text-align: left"><code>fusion_algorithm</code></td><td style="text-align: left"><code>Option&lt;FusionAlgorithm&gt;</code></td><td style="text-align: left">None（ハイブリッド時は <code>RRF { k: 60.0 }</code> を使用）</td><td style="text-align: left">Lexical と Vector の結果をマージする方法</td></tr>
+<tr><td style="text-align: left"><code>filter_query</code></td><td style="text-align: left"><code>Option&lt;Box&lt;dyn Query&gt;&gt;</code></td><td style="text-align: left">None</td><td style="text-align: left">Lexical クエリによるプレフィルター（Lexical と Vector の両方の結果を制限）</td></tr>
+<tr><td style="text-align: left"><code>lexical_options</code></td><td style="text-align: left"><code>LexicalSearchOptions</code></td><td style="text-align: left">デフォルト</td><td style="text-align: left">Lexical 検索の動作パラメータ</td></tr>
+<tr><td style="text-align: left"><code>vector_options</code></td><td style="text-align: left"><code>VectorSearchOptions</code></td><td style="text-align: left">デフォルト</td><td style="text-align: left">Vector 検索の動作パラメータ</td></tr>
 </tbody>
 </table>
 </div>
@@ -336,10 +338,10 @@ let fusion = FusionAlgorithm::WeightedSum {
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>let request = SearchRequestBuilder::new()
-    .lexical_search_request(
-        LexicalSearchRequest::new(Box::new(TermQuery::new("body", "rust")))
+    .lexical_query(
+        LexicalSearchQuery::Obj(Box::new(TermQuery::new("body", "rust")))
     )
-    .vector_search_request(
+    .vector_query(
         VectorSearchRequestBuilder::new()
             .add_text("text_vec", "systems programming")
             .build()
@@ -362,16 +364,16 @@ let fusion = FusionAlgorithm::WeightedSum {
 </span><span class="boring">fn main() {
 </span>// Page 1: results 0-9
 let page1 = SearchRequestBuilder::new()
-    .lexical_search_request(/* ... */)
-    .vector_search_request(/* ... */)
+    .lexical_query(/* ... */)
+    .vector_query(/* ... */)
     .offset(0)
     .limit(10)
     .build();
 
 // Page 2: results 10-19
 let page2 = SearchRequestBuilder::new()
-    .lexical_search_request(/* ... */)
-    .vector_search_request(/* ... */)
+    .lexical_query(/* ... */)
+    .vector_query(/* ... */)
     .offset(10)
     .limit(10)
     .build();
@@ -380,10 +382,11 @@ let page2 = SearchRequestBuilder::new()
 <pre class="playground"><code class="language-rust">use std::sync::Arc;
 use laurus::{
     Document, Engine, Schema, SearchRequestBuilder,
-    LexicalSearchRequest, FusionAlgorithm, PerFieldEmbedder,
+    FusionAlgorithm, PerFieldEmbedder,
 };
 use laurus::lexical::{TextOption, TermQuery};
 use laurus::lexical::core::field::IntegerOption;
+use laurus::lexical::search::searcher::LexicalSearchQuery;
 use laurus::vector::{HnswOption, VectorSearchRequestBuilder};
 use laurus::storage::memory::MemoryStorage;
 
@@ -426,10 +429,10 @@ async fn main() -&gt; laurus::Result&lt;()&gt; {
     // Hybrid search: keyword "rust" + semantic "systems language"
     let results = engine.search(
         SearchRequestBuilder::new()
-            .lexical_search_request(
-                LexicalSearchRequest::new(Box::new(TermQuery::new("body", "rust")))
+            .lexical_query(
+                LexicalSearchQuery::Obj(Box::new(TermQuery::new("body", "rust")))
             )
-            .vector_search_request(
+            .vector_query(
                 VectorSearchRequestBuilder::new()
                     .add_text("body_vec", "systems language")
                     .build()

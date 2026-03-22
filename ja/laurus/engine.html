@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-354913be.js";
+            window.path_to_searchindex_js = "../searchindex-cfe8b56a.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-d18ed058.js"></script>
@@ -326,21 +326,20 @@ let engine = Engine::builder(storage, schema)
 <p><code>search()</code> メソッドは <code>SearchRequest</code> を受け取ります。SearchRequestにはLexicalクエリ、Vectorクエリ、またはその両方を含めることができます。両方が指定された場合、結果は指定された <code>FusionAlgorithm</code> で統合されます。</p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use laurus::{SearchRequestBuilder, LexicalSearchRequest, FusionAlgorithm};
+</span>use laurus::{SearchRequestBuilder, FusionAlgorithm};
 use laurus::lexical::TermQuery;
+use laurus::lexical::search::searcher::LexicalSearchQuery;
 
 // Lexicalのみの検索
 let request = SearchRequestBuilder::new()
-    .lexical_search_request(
-        LexicalSearchRequest::new(Box::new(TermQuery::new("body", "rust")))
-    )
+    .lexical_query(LexicalSearchQuery::Obj(Box::new(TermQuery::new("body", "rust"))))
     .limit(10)
     .build();
 
 // RRFフュージョンによるハイブリッド検索
 let request = SearchRequestBuilder::new()
-    .lexical_search_request(lexical_req)
-    .vector_search_request(vector_req)
+    .lexical_query(lexical_query)
+    .vector_query(vector_query)
     .fusion_algorithm(FusionAlgorithm::RRF { k: 60.0 })
     .limit(10)
     .build();
@@ -354,12 +353,13 @@ let results = engine.search(request).await?;
 <tr><th style="text-align: left">フィールド</th><th style="text-align: left">型</th><th style="text-align: left">デフォルト</th><th style="text-align: left">説明</th></tr>
 </thead>
 <tbody>
-<tr><td style="text-align: left"><code>lexical_search_request</code></td><td style="text-align: left"><code>Option&lt;LexicalSearchRequest&gt;</code></td><td style="text-align: left">None</td><td style="text-align: left">Lexicalクエリ</td></tr>
-<tr><td style="text-align: left"><code>vector_search_request</code></td><td style="text-align: left"><code>Option&lt;VectorSearchRequest&gt;</code></td><td style="text-align: left">None</td><td style="text-align: left">Vectorクエリ</td></tr>
+<tr><td style="text-align: left"><code>query</code></td><td style="text-align: left"><code>SearchQuery</code></td><td style="text-align: left"><code>Dsl("")</code></td><td style="text-align: left">検索クエリ仕様（Dsl / Lexical / Vector / Hybrid）</td></tr>
 <tr><td style="text-align: left"><code>limit</code></td><td style="text-align: left"><code>usize</code></td><td style="text-align: left">10</td><td style="text-align: left">返却する最大結果数</td></tr>
 <tr><td style="text-align: left"><code>offset</code></td><td style="text-align: left"><code>usize</code></td><td style="text-align: left">0</td><td style="text-align: left">ページネーションのオフセット</td></tr>
-<tr><td style="text-align: left"><code>fusion_algorithm</code></td><td style="text-align: left"><code>Option&lt;FusionAlgorithm&gt;</code></td><td style="text-align: left">RRF (k=60)</td><td style="text-align: left">LexicalとVectorの結果を統合する方法</td></tr>
+<tr><td style="text-align: left"><code>fusion_algorithm</code></td><td style="text-align: left"><code>Option&lt;FusionAlgorithm&gt;</code></td><td style="text-align: left">None（ハイブリッド時はRRF k=60）</td><td style="text-align: left">LexicalとVectorの結果を統合する方法</td></tr>
 <tr><td style="text-align: left"><code>filter_query</code></td><td style="text-align: left"><code>Option&lt;Box&lt;dyn Query&gt;&gt;</code></td><td style="text-align: left">None</td><td style="text-align: left">両方の検索タイプに適用されるフィルタ</td></tr>
+<tr><td style="text-align: left"><code>lexical_options</code></td><td style="text-align: left"><code>LexicalSearchOptions</code></td><td style="text-align: left">デフォルト</td><td style="text-align: left">Lexical検索の動作パラメータ（ブースト、タイムアウト等）</td></tr>
+<tr><td style="text-align: left"><code>vector_options</code></td><td style="text-align: left"><code>VectorSearchOptions</code></td><td style="text-align: left">デフォルト</td><td style="text-align: left">Vector検索の動作パラメータ（スコアモード等）</td></tr>
 </tbody>
 </table>
 </div>

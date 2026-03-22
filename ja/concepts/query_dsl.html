@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-354913be.js";
+            window.path_to_searchindex_js = "../searchindex-cfe8b56a.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-d18ed058.js"></script>
@@ -410,9 +410,8 @@ let unified = UnifiedQueryParser::new(lexical_parser, vector_parser);
 let request = unified.parse(
     r#"title:hello content:~"cute kitten"^0.8"#
 ).await?;
-// request.lexical_search_request  -&gt; Some(...)  — lexical query
-// request.vector_search_request   -&gt; Some(...)  — vector query
-// request.fusion_algorithm        -&gt; Some(RRF)  — fusion algorithm
+// request.query  -&gt; SearchQuery::Hybrid { lexical: ..., vector: ... }
+// request.fusion_algorithm  -&gt; Some(RRF)  — fusion algorithm
 <span class="boring">}</span></code></pre>
 <h3 id="カスタムフュージョン"><a class="header" href="#カスタムフュージョン">カスタムフュージョン</a></h3>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]

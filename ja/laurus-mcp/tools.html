@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-354913be.js";
+            window.path_to_searchindex_js = "../searchindex-cfe8b56a.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-d18ed058.js"></script>
@@ -386,7 +386,7 @@ name: "category"
 <p>結果: <code>Field 'category' deleted.</code></p>
 <hr>
 <h2 id="search"><a class="header" href="#search">search</a></h2>
-<p>laurus クエリ DSL を使用してドキュメントを検索します。</p>
+<p>laurus 統一クエリ DSL を使用してドキュメントを検索します。Lexical 検索、Vector 検索、ハイブリッド検索を単一のクエリ文字列でサポートします。</p>
 <h3 id="パラメーター-11"><a class="header" href="#パラメーター-11">パラメーター</a></h3>
 <div class="table-wrapper">
 <table>
@@ -394,13 +394,16 @@ name: "category"
 <tr><th style="text-align: left">名前</th><th style="text-align: left">型</th><th style="text-align: left">必須</th><th style="text-align: left">説明</th></tr>
 </thead>
 <tbody>
-<tr><td style="text-align: left"><code>query</code></td><td style="text-align: left">string</td><td style="text-align: left">はい</td><td style="text-align: left">laurus クエリ DSL による検索クエリ</td></tr>
+<tr><td style="text-align: left"><code>query</code></td><td style="text-align: left">string</td><td style="text-align: left">はい</td><td style="text-align: left">laurus 統一クエリ DSL による検索クエリ</td></tr>
 <tr><td style="text-align: left"><code>limit</code></td><td style="text-align: left">integer</td><td style="text-align: left">いいえ</td><td style="text-align: left">最大結果数（デフォルト: 10）</td></tr>
 <tr><td style="text-align: left"><code>offset</code></td><td style="text-align: left">integer</td><td style="text-align: left">いいえ</td><td style="text-align: left">ページネーション用スキップ数（デフォルト: 0）</td></tr>
+<tr><td style="text-align: left"><code>fusion</code></td><td style="text-align: left">string</td><td style="text-align: left">いいえ</td><td style="text-align: left">ハイブリッド検索用の融合アルゴリズム（JSON）</td></tr>
+<tr><td style="text-align: left"><code>field_boosts</code></td><td style="text-align: left">string</td><td style="text-align: left">いいえ</td><td style="text-align: left">フィールド毎のブースト係数（JSON）</td></tr>
 </tbody>
 </table>
 </div>
 <h3 id="クエリ-dsl-の例"><a class="header" href="#クエリ-dsl-の例">クエリ DSL の例</a></h3>
+<h4 id="lexical-検索"><a class="header" href="#lexical-検索">Lexical 検索</a></h4>
 <div class="table-wrapper">
 <table>
 <thead>
@@ -417,6 +420,40 @@ name: "category"
 </tbody>
 </table>
 </div>
+<h4 id="vector-検索"><a class="header" href="#vector-検索">Vector 検索</a></h4>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">クエリ</th><th style="text-align: left">説明</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>content:~"cute kitten"</code></td><td style="text-align: left">特定フィールドでの Vector 検索</td></tr>
+<tr><td style="text-align: left"><code>~"cute kitten"</code></td><td style="text-align: left">デフォルトフィールドでの Vector 検索</td></tr>
+<tr><td style="text-align: left"><code>content:~"cute kitten"^0.8</code></td><td style="text-align: left">重み付き Vector 検索</td></tr>
+<tr><td style="text-align: left"><code>a:~"cats" b:~"dogs"^0.5</code></td><td style="text-align: left">複数の Vector クエリ</td></tr>
+</tbody>
+</table>
+</div>
+<h4 id="ハイブリッド検索"><a class="header" href="#ハイブリッド検索">ハイブリッド検索</a></h4>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">クエリ</th><th style="text-align: left">説明</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>title:hello content:~"cute kitten"</code></td><td style="text-align: left">Lexical + Vector を 1 つのクエリで</td></tr>
+<tr><td style="text-align: left"><code>title:hello AND body:world content:~"cats"^0.8</code></td><td style="text-align: left">ブール Lexical + 重み付き Vector</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="融合アルゴリズムの例"><a class="header" href="#融合アルゴリズムの例">融合アルゴリズムの例</a></h3>
+<pre><code class="language-json">{"rrf": {"k": 60.0}}
+</code></pre>
+<pre><code class="language-json">{"weighted_sum": {"lexical_weight": 0.7, "vector_weight": 0.3}}
+</code></pre>
+<h3 id="フィールドブーストの例"><a class="header" href="#フィールドブーストの例">フィールドブーストの例</a></h3>
+<pre><code class="language-json">{"title": 2.0, "body": 1.0}
+</code></pre>
 <h3 id="結果-3"><a class="header" href="#結果-3">結果</a></h3>
 <pre><code class="language-json">{
   "total": 2,

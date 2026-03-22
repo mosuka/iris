@@ -35,7 +35,7 @@
             const path_to_root = "../../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../../searchindex-354913be.js";
+            window.path_to_searchindex_js = "../../searchindex-cfe8b56a.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../../toc-d18ed058.js"></script>
@@ -185,12 +185,13 @@
 <h2 id="基本的な使い方"><a class="header" href="#基本的な使い方">基本的な使い方</a></h2>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use laurus::{SearchRequestBuilder, LexicalSearchRequest};
+</span>use laurus::SearchRequestBuilder;
 use laurus::lexical::TermQuery;
+use laurus::lexical::search::searcher::LexicalSearchQuery;
 
 let request = SearchRequestBuilder::new()
-    .lexical_search_request(
-        LexicalSearchRequest::new(
+    .lexical_query(
+        LexicalSearchQuery::Obj(
             Box::new(TermQuery::new("body", "rust"))
         )
     )
@@ -367,45 +368,49 @@ let query = SpanNearQuery::new(
 <p>特定のフィールドをブーストして関連性に影響を与えることができます。</p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use laurus::LexicalSearchRequest;
+</span>use laurus::SearchRequestBuilder;
+use laurus::lexical::search::searcher::LexicalSearchQuery;
 
-let mut request = LexicalSearchRequest::new(Box::new(query));
-request.field_boosts.insert("title".to_string(), 2.0);  // title matches count double
-request.field_boosts.insert("body".to_string(), 1.0);
+let request = SearchRequestBuilder::new()
+    .lexical_query(LexicalSearchQuery::Obj(Box::new(query)))
+    .add_field_boost("title", 2.0)  // title matches count double
+    .add_field_boost("body", 1.0)
+    .build();
 <span class="boring">}</span></code></pre>
-<h2 id="lexicalsearchrequest-のオプション"><a class="header" href="#lexicalsearchrequest-のオプション">LexicalSearchRequest のオプション</a></h2>
+<h2 id="lexical-検索オプションsearchrequestbuilder-経由"><a class="header" href="#lexical-検索オプションsearchrequestbuilder-経由">Lexical 検索オプション（SearchRequestBuilder 経由）</a></h2>
+<p>Lexical 検索の動作パラメータは <code>SearchRequestBuilder</code> のメソッドで設定します。これらは <code>SearchRequest</code> の <code>lexical_options</code> フィールドに格納されます。</p>
 <div class="table-wrapper">
 <table>
 <thead>
 <tr><th style="text-align: left">オプション</th><th style="text-align: left">デフォルト</th><th style="text-align: left">説明</th></tr>
 </thead>
 <tbody>
-<tr><td style="text-align: left"><code>query</code></td><td style="text-align: left">（必須）</td><td style="text-align: left">実行するクエリ</td></tr>
-<tr><td style="text-align: left"><code>limit</code></td><td style="text-align: left">10</td><td style="text-align: left">結果の最大件数</td></tr>
-<tr><td style="text-align: left"><code>load_documents</code></td><td style="text-align: left">true</td><td style="text-align: left">ドキュメントの全内容をロードするかどうか</td></tr>
+<tr><td style="text-align: left"><code>field_boosts</code></td><td style="text-align: left">空</td><td style="text-align: left">フィールドごとのスコア倍率</td></tr>
 <tr><td style="text-align: left"><code>min_score</code></td><td style="text-align: left">0.0</td><td style="text-align: left">最小スコア閾値</td></tr>
 <tr><td style="text-align: left"><code>timeout_ms</code></td><td style="text-align: left">None</td><td style="text-align: left">検索タイムアウト（ミリ秒）</td></tr>
 <tr><td style="text-align: left"><code>parallel</code></td><td style="text-align: left">false</td><td style="text-align: left">セグメント間の並列検索を有効にする</td></tr>
 <tr><td style="text-align: left"><code>sort_by</code></td><td style="text-align: left"><code>Score</code></td><td style="text-align: left">関連性スコアでソート、またはフィールドでソート（<code>asc</code> / <code>desc</code>）</td></tr>
-<tr><td style="text-align: left"><code>field_boosts</code></td><td style="text-align: left">空</td><td style="text-align: left">フィールドごとのスコア倍率</td></tr>
 </tbody>
 </table>
 </div>
 <h3 id="ビルダーメソッド"><a class="header" href="#ビルダーメソッド">ビルダーメソッド</a></h3>
-<p><code>LexicalSearchRequest</code> はオプション設定のためのビルダースタイルの API をサポートします。</p>
+<p><code>SearchRequestBuilder</code> を使用してクエリとオプションを設定します。</p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use laurus::LexicalSearchRequest;
+</span>use laurus::SearchRequestBuilder;
 use laurus::lexical::TermQuery;
+use laurus::lexical::search::searcher::{LexicalSearchQuery, SortField};
 
-let request = LexicalSearchRequest::new(Box::new(TermQuery::new("body", "rust")))
+let request = SearchRequestBuilder::new()
+    .lexical_query(LexicalSearchQuery::Obj(Box::new(TermQuery::new("body", "rust"))))
     .limit(20)
-    .min_score(0.5)
-    .timeout_ms(5000)
-    .parallel(true)
-    .sort_by_field_desc("date")
-    .with_field_boost("title", 2.0)
-    .with_field_boost("body", 1.0);
+    .lexical_min_score(0.5)
+    .lexical_timeout_ms(5000)
+    .lexical_parallel(true)
+    .sort_by(SortField::FieldDesc("date".to_string()))
+    .add_field_boost("title", 2.0)
+    .add_field_boost("body", 1.0)
+    .build();
 <span class="boring">}</span></code></pre>
 <h2 id="query-dsl-の使用"><a class="header" href="#query-dsl-の使用">Query DSL の使用</a></h2>
 <p>プログラマティックにクエリを構築する代わりに、テキストベースの Query DSL を使用できます。</p>

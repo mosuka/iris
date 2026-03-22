@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-354913be.js";
+            window.path_to_searchindex_js = "../searchindex-cfe8b56a.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-d18ed058.js"></script>
@@ -299,34 +299,21 @@
 </thead>
 <tbody>
 <tr><td style="text-align: left"><code>SearchRequestBuilder::new()</code></td><td style="text-align: left">新しいBuilderを作成</td></tr>
-<tr><td style="text-align: left"><code>.lexical_search_request(req)</code></td><td style="text-align: left">Lexical検索コンポーネントを設定</td></tr>
-<tr><td style="text-align: left"><code>.vector_search_request(req)</code></td><td style="text-align: left">Vector検索コンポーネントを設定</td></tr>
+<tr><td style="text-align: left"><code>.query_dsl(dsl)</code></td><td style="text-align: left">統合DSLクエリ文字列を設定</td></tr>
+<tr><td style="text-align: left"><code>.lexical_query(query)</code></td><td style="text-align: left">Lexical検索クエリを設定（<code>LexicalSearchQuery</code>）</td></tr>
+<tr><td style="text-align: left"><code>.vector_query(query)</code></td><td style="text-align: left">Vector検索クエリを設定（<code>VectorSearchQuery</code>）</td></tr>
 <tr><td style="text-align: left"><code>.filter_query(query)</code></td><td style="text-align: left">プレフィルタクエリを設定</td></tr>
 <tr><td style="text-align: left"><code>.fusion_algorithm(algo)</code></td><td style="text-align: left">フュージョンアルゴリズムを設定（デフォルト: RRF）</td></tr>
 <tr><td style="text-align: left"><code>.limit(n)</code></td><td style="text-align: left">最大結果数（デフォルト: 10）</td></tr>
 <tr><td style="text-align: left"><code>.offset(n)</code></td><td style="text-align: left">N件スキップ（デフォルト: 0）</td></tr>
+<tr><td style="text-align: left"><code>.add_field_boost(field, boost)</code></td><td style="text-align: left">Lexical検索のフィールドブーストを追加</td></tr>
+<tr><td style="text-align: left"><code>.lexical_min_score(f32)</code></td><td style="text-align: left">Lexical検索の最小スコアしきい値</td></tr>
+<tr><td style="text-align: left"><code>.lexical_timeout_ms(u64)</code></td><td style="text-align: left">Lexical検索のタイムアウト（ミリ秒）</td></tr>
+<tr><td style="text-align: left"><code>.lexical_parallel(bool)</code></td><td style="text-align: left">Lexical検索の並列実行を有効化</td></tr>
+<tr><td style="text-align: left"><code>.sort_by(SortField)</code></td><td style="text-align: left">Lexical検索のソート順を設定</td></tr>
+<tr><td style="text-align: left"><code>.vector_score_mode(VectorScoreMode)</code></td><td style="text-align: left">Vector検索のスコア結合モードを設定</td></tr>
+<tr><td style="text-align: left"><code>.vector_min_score(f32)</code></td><td style="text-align: left">Vector検索の最小スコアしきい値</td></tr>
 <tr><td style="text-align: left"><code>.build()</code></td><td style="text-align: left"><code>SearchRequest</code> を構築</td></tr>
-</tbody>
-</table>
-</div>
-<h3 id="lexicalsearchrequest"><a class="header" href="#lexicalsearchrequest">LexicalSearchRequest</a></h3>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th style="text-align: left">メソッド</th><th style="text-align: left">説明</th></tr>
-</thead>
-<tbody>
-<tr><td style="text-align: left"><code>LexicalSearchRequest::new(query)</code></td><td style="text-align: left">クエリで作成</td></tr>
-<tr><td style="text-align: left"><code>LexicalSearchRequest::from_dsl(query_str)</code></td><td style="text-align: left">DSLクエリ文字列から作成</td></tr>
-<tr><td style="text-align: left"><code>.limit(n)</code></td><td style="text-align: left">最大結果数</td></tr>
-<tr><td style="text-align: left"><code>.load_documents(bool)</code></td><td style="text-align: left">ドキュメント内容をロードするかどうか</td></tr>
-<tr><td style="text-align: left"><code>.min_score(f32)</code></td><td style="text-align: left">最小スコアしきい値</td></tr>
-<tr><td style="text-align: left"><code>.timeout_ms(u64)</code></td><td style="text-align: left">検索タイムアウト（ミリ秒）</td></tr>
-<tr><td style="text-align: left"><code>.parallel(bool)</code></td><td style="text-align: left">並列検索を有効化</td></tr>
-<tr><td style="text-align: left"><code>.sort_by_field_asc(field)</code></td><td style="text-align: left">フィールドで昇順ソート</td></tr>
-<tr><td style="text-align: left"><code>.sort_by_field_desc(field)</code></td><td style="text-align: left">フィールドで降順ソート</td></tr>
-<tr><td style="text-align: left"><code>.sort_by_score()</code></td><td style="text-align: left">関連度スコアでソート（デフォルト）</td></tr>
-<tr><td style="text-align: left"><code>.with_field_boost(field, boost)</code></td><td style="text-align: left">フィールドレベルのブーストを追加</td></tr>
 </tbody>
 </table>
 </div>

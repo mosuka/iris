@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-6f488e78.js";
+            window.path_to_searchindex_js = "../searchindex-5d5c033a.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-710721a4.js"></script>
@@ -389,7 +389,7 @@ document: {"title": "Hello World - Part 2", "body": "This is a continuation."}
 <p>Result: <code>Changes committed successfully.</code></p>
 <hr>
 <h2 id="search"><a class="header" href="#search">search</a></h2>
-<p>Search documents using the laurus query DSL.</p>
+<p>Search documents using the laurus unified query DSL. Supports lexical search, vector search, and hybrid search in a single query string.</p>
 <h3 id="parameters-11"><a class="header" href="#parameters-11">Parameters</a></h3>
 <div class="table-wrapper">
 <table>
@@ -397,13 +397,16 @@ document: {"title": "Hello World - Part 2", "body": "This is a continuation."}
 <tr><th style="text-align: left">Name</th><th style="text-align: left">Type</th><th style="text-align: left">Required</th><th style="text-align: left">Description</th></tr>
 </thead>
 <tbody>
-<tr><td style="text-align: left"><code>query</code></td><td style="text-align: left">string</td><td style="text-align: left">Yes</td><td style="text-align: left">Search query in laurus query DSL</td></tr>
+<tr><td style="text-align: left"><code>query</code></td><td style="text-align: left">string</td><td style="text-align: left">Yes</td><td style="text-align: left">Search query in laurus unified query DSL</td></tr>
 <tr><td style="text-align: left"><code>limit</code></td><td style="text-align: left">integer</td><td style="text-align: left">No</td><td style="text-align: left">Maximum results (default: 10)</td></tr>
 <tr><td style="text-align: left"><code>offset</code></td><td style="text-align: left">integer</td><td style="text-align: left">No</td><td style="text-align: left">Results to skip for pagination (default: 0)</td></tr>
+<tr><td style="text-align: left"><code>fusion</code></td><td style="text-align: left">string</td><td style="text-align: left">No</td><td style="text-align: left">Fusion algorithm as JSON (for hybrid search)</td></tr>
+<tr><td style="text-align: left"><code>field_boosts</code></td><td style="text-align: left">string</td><td style="text-align: left">No</td><td style="text-align: left">Per-field boost factors as JSON</td></tr>
 </tbody>
 </table>
 </div>
 <h3 id="query-dsl-examples"><a class="header" href="#query-dsl-examples">Query DSL examples</a></h3>
+<h4 id="lexical-search"><a class="header" href="#lexical-search">Lexical search</a></h4>
 <div class="table-wrapper">
 <table>
 <thead>
@@ -420,6 +423,40 @@ document: {"title": "Hello World - Part 2", "body": "This is a continuation."}
 </tbody>
 </table>
 </div>
+<h4 id="vector-search"><a class="header" href="#vector-search">Vector search</a></h4>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Query</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>content:~"cute kitten"</code></td><td style="text-align: left">Vector search on a specific field</td></tr>
+<tr><td style="text-align: left"><code>~"cute kitten"</code></td><td style="text-align: left">Vector search on default field</td></tr>
+<tr><td style="text-align: left"><code>content:~"cute kitten"^0.8</code></td><td style="text-align: left">Vector search with weight/boost</td></tr>
+<tr><td style="text-align: left"><code>a:~"cats" b:~"dogs"^0.5</code></td><td style="text-align: left">Multiple vector queries</td></tr>
+</tbody>
+</table>
+</div>
+<h4 id="hybrid-search"><a class="header" href="#hybrid-search">Hybrid search</a></h4>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Query</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>title:hello content:~"cute kitten"</code></td><td style="text-align: left">Lexical + vector in one query</td></tr>
+<tr><td style="text-align: left"><code>title:hello AND body:world content:~"cats"^0.8</code></td><td style="text-align: left">Boolean lexical + weighted vector</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="fusion-algorithm-examples"><a class="header" href="#fusion-algorithm-examples">Fusion algorithm examples</a></h3>
+<pre><code class="language-json">{"rrf": {"k": 60.0}}
+</code></pre>
+<pre><code class="language-json">{"weighted_sum": {"lexical_weight": 0.7, "vector_weight": 0.3}}
+</code></pre>
+<h3 id="field-boosts-example"><a class="header" href="#field-boosts-example">Field boosts example</a></h3>
+<pre><code class="language-json">{"title": 2.0, "body": 1.0}
+</code></pre>
 <h3 id="result-3"><a class="header" href="#result-3">Result</a></h3>
 <pre><code class="language-json">{
   "total": 2,

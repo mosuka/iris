@@ -35,7 +35,7 @@
             const path_to_root = "../../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../../searchindex-354913be.js";
+            window.path_to_searchindex_js = "../../searchindex-cfe8b56a.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../../toc-d18ed058.js"></script>
@@ -190,7 +190,7 @@
 use laurus::vector::VectorSearchRequestBuilder;
 
 let request = SearchRequestBuilder::new()
-    .vector_search_request(
+    .vector_query(
         VectorSearchRequestBuilder::new()
             .add_text("embedding", "systems programming language")
             .limit(10)
@@ -284,13 +284,13 @@ let request = VectorSearchRequestBuilder::new()
 <p>Lexical フィルターを適用して Vector 検索の結果を絞り込むことができます。</p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use laurus::{SearchRequestBuilder, LexicalSearchRequest};
+</span>use laurus::SearchRequestBuilder;
 use laurus::lexical::TermQuery;
 use laurus::vector::VectorSearchRequestBuilder;
 
 // Vector search with a category filter
 let request = SearchRequestBuilder::new()
-    .vector_search_request(
+    .vector_query(
         VectorSearchRequestBuilder::new()
             .add_text("embedding", "machine learning")
             .build()
@@ -309,7 +309,7 @@ let results = engine.search(request).await?;
 use laurus::lexical::core::field::NumericType;
 
 let request = SearchRequestBuilder::new()
-    .vector_search_request(
+    .vector_query(
         VectorSearchRequestBuilder::new()
             .add_text("embedding", "type systems")
             .build()
@@ -378,7 +378,7 @@ async fn main() -&gt; laurus::Result&lt;()&gt; {
     // Search by semantic similarity
     let results = engine.search(
         SearchRequestBuilder::new()
-            .vector_search_request(
+            .vector_query(
                 VectorSearchRequestBuilder::new()
                     .add_text("text_vec", "systems language")
                     .build()
