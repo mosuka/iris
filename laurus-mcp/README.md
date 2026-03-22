@@ -37,7 +37,6 @@ claude mcp add laurus -- laurus mcp --endpoint http://localhost:50051
 Add the following to your Claude Desktop configuration file (`claude_desktop_config.json`):
 
 - **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
-- **Linux**: `~/.config/Claude/claude_desktop_config.json`
 - **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
 
 ```json
