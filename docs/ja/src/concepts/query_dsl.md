@@ -294,9 +294,8 @@ let unified = UnifiedQueryParser::new(lexical_parser, vector_parser);
 let request = unified.parse(
     r#"title:hello content:~"cute kitten"^0.8"#
 ).await?;
-// request.lexical_search_request  -> Some(...)  — lexical query
-// request.vector_search_request   -> Some(...)  — vector query
-// request.fusion_algorithm        -> Some(RRF)  — fusion algorithm
+// request.query  -> SearchQuery::Hybrid { lexical: ..., vector: ... }
+// request.fusion_algorithm  -> Some(RRF)  — fusion algorithm
 ```
 
 ### カスタムフュージョン

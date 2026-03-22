@@ -41,22 +41,29 @@ sequenceDiagram
 ### Builder API
 
 ```rust
-use laurus::{SearchRequestBuilder, LexicalSearchRequest, FusionAlgorithm};
+use laurus::{SearchRequestBuilder, FusionAlgorithm};
 use laurus::lexical::TermQuery;
-use laurus::vector::VectorSearchRequestBuilder;
+use laurus::lexical::search::searcher::LexicalSearchQuery;
+use laurus::vector::search::searcher::VectorSearchQuery;
+use laurus::vector::store::request::QueryPayload;
+use laurus::data::DataValue;
 
 let request = SearchRequestBuilder::new()
     // Lexical component
-    .lexical_search_request(
-        LexicalSearchRequest::new(
+    .lexical_query(
+        LexicalSearchQuery::Obj(
             Box::new(TermQuery::new("body", "rust"))
         )
     )
     // Vector component
-    .vector_search_request(
-        VectorSearchRequestBuilder::new()
-            .add_text("text_vec", "systems programming")
-            .build()
+    .vector_query(
+        VectorSearchQuery::Payloads(vec![
+            QueryPayload {
+                field: "text_vec".to_string(),
+                payload: DataValue::Text("systems programming".to_string()),
+                weight: 1.0,
+            },
+        ])
     )
     // Fusion algorithm
     .fusion_algorithm(FusionAlgorithm::RRF { k: 60.0 })
@@ -135,16 +142,17 @@ let fusion = FusionAlgorithm::WeightedSum {
 - When you want explicit control over the balance between lexical and vector relevance
 - When you know one signal is more important than the other
 
-## SearchRequest Options
+## SearchRequest Fields
 
-| Option | Default | Description |
-| :--- | :--- | :--- |
-| `lexical_search_request` | None | Lexical query component |
-| `vector_search_request` | None | Vector query component |
-| `filter_query` | None | Pre-filter using a lexical query (restricts both lexical and vector results) |
-| `fusion_algorithm` | `None` (uses `RRF { k: 60.0 }` when both results exist) | How to merge lexical and vector results |
-| `limit` | 10 | Maximum number of results to return |
-| `offset` | 0 | Number of results to skip (for pagination) |
+| Field | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `query` | `SearchQuery` | `Dsl("")` | Search query (Dsl, Lexical, Vector, or Hybrid) |
+| `limit` | `usize` | 10 | Maximum number of results to return |
+| `offset` | `usize` | 0 | Number of results to skip (for pagination) |
+| `fusion_algorithm` | `Option<FusionAlgorithm>` | `None` (uses `RRF { k: 60.0 }` when both results exist) | How to merge lexical and vector results |
+| `filter_query` | `Option<Box<dyn Query>>` | None | Pre-filter using a lexical query (restricts both lexical and vector results) |
+| `lexical_options` | `LexicalSearchOptions` | Default | Parameters controlling lexical search behavior (field boosts, min score, timeout, etc.) |
+| `vector_options` | `VectorSearchOptions` | Default | Parameters controlling vector search behavior (score mode, min score) |
 
 ## SearchResult
 
@@ -162,13 +170,17 @@ Apply a filter to restrict both lexical and vector results:
 
 ```rust
 let request = SearchRequestBuilder::new()
-    .lexical_search_request(
-        LexicalSearchRequest::new(Box::new(TermQuery::new("body", "rust")))
+    .lexical_query(
+        LexicalSearchQuery::Obj(Box::new(TermQuery::new("body", "rust")))
     )
-    .vector_search_request(
-        VectorSearchRequestBuilder::new()
-            .add_text("text_vec", "systems programming")
-            .build()
+    .vector_query(
+        VectorSearchQuery::Payloads(vec![
+            QueryPayload {
+                field: "text_vec".to_string(),
+                payload: DataValue::Text("systems programming".to_string()),
+                weight: 1.0,
+            },
+        ])
     )
     // Only search within "tutorial" category
     .filter_query(Box::new(TermQuery::new("category", "tutorial")))
@@ -190,16 +202,16 @@ Use `offset` and `limit` for pagination:
 ```rust
 // Page 1: results 0-9
 let page1 = SearchRequestBuilder::new()
-    .lexical_search_request(/* ... */)
-    .vector_search_request(/* ... */)
+    .lexical_query(/* ... */)
+    .vector_query(/* ... */)
     .offset(0)
     .limit(10)
     .build();
 
 // Page 2: results 10-19
 let page2 = SearchRequestBuilder::new()
-    .lexical_search_request(/* ... */)
-    .vector_search_request(/* ... */)
+    .lexical_query(/* ... */)
+    .vector_query(/* ... */)
     .offset(10)
     .limit(10)
     .build();
@@ -211,11 +223,15 @@ let page2 = SearchRequestBuilder::new()
 use std::sync::Arc;
 use laurus::{
     Document, Engine, Schema, SearchRequestBuilder,
-    LexicalSearchRequest, FusionAlgorithm, PerFieldEmbedder,
+    FusionAlgorithm, PerFieldEmbedder,
 };
 use laurus::lexical::{TextOption, TermQuery};
 use laurus::lexical::core::field::IntegerOption;
-use laurus::vector::{HnswOption, VectorSearchRequestBuilder};
+use laurus::lexical::search::searcher::LexicalSearchQuery;
+use laurus::vector::HnswOption;
+use laurus::vector::search::searcher::VectorSearchQuery;
+use laurus::vector::store::request::QueryPayload;
+use laurus::data::DataValue;
 use laurus::storage::memory::MemoryStorage;
 
 #[tokio::main]
@@ -257,13 +273,17 @@ async fn main() -> laurus::Result<()> {
     // Hybrid search: keyword "rust" + semantic "systems language"
     let results = engine.search(
         SearchRequestBuilder::new()
-            .lexical_search_request(
-                LexicalSearchRequest::new(Box::new(TermQuery::new("body", "rust")))
+            .lexical_query(
+                LexicalSearchQuery::Obj(Box::new(TermQuery::new("body", "rust")))
             )
-            .vector_search_request(
-                VectorSearchRequestBuilder::new()
-                    .add_text("body_vec", "systems language")
-                    .build()
+            .vector_query(
+                VectorSearchQuery::Payloads(vec![
+                    QueryPayload {
+                        field: "body_vec".to_string(),
+                        payload: DataValue::Text("systems language".to_string()),
+                        weight: 1.0,
+                    },
+                ])
             )
             .fusion_algorithm(FusionAlgorithm::RRF { k: 60.0 })
             .limit(10)

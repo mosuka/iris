@@ -22,7 +22,7 @@ cargo run --example <name> --features <flag>
 cargo run --example quickstart
 ```
 
-デモ内容: インメモリストレージ、`TextOption`、`TermQuery`、`LexicalSearchRequest`
+デモ内容: インメモリストレージ、`TextOption`、`TermQuery`、`LexicalSearchQuery`
 
 ### lexical_search
 

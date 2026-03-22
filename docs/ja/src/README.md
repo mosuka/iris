@@ -96,8 +96,8 @@ async fn main() -> Result<()> {
 
     // 5. Search
     let request = SearchRequestBuilder::new()
-        .lexical_search_request(
-            laurus::LexicalSearchRequest::new(
+        .lexical_query(
+            laurus::lexical::search::searcher::LexicalSearchQuery::Obj(
                 Box::new(TermQuery::new("body", "rust"))
             )
         )

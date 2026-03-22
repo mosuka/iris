@@ -41,19 +41,20 @@ sequenceDiagram
 ### Builder API
 
 ```rust
-use laurus::{SearchRequestBuilder, LexicalSearchRequest, FusionAlgorithm};
+use laurus::{SearchRequestBuilder, FusionAlgorithm};
 use laurus::lexical::TermQuery;
+use laurus::lexical::search::searcher::LexicalSearchQuery;
 use laurus::vector::VectorSearchRequestBuilder;
 
 let request = SearchRequestBuilder::new()
     // Lexical component
-    .lexical_search_request(
-        LexicalSearchRequest::new(
+    .lexical_query(
+        LexicalSearchQuery::Obj(
             Box::new(TermQuery::new("body", "rust"))
         )
     )
     // Vector component
-    .vector_search_request(
+    .vector_query(
         VectorSearchRequestBuilder::new()
             .add_text("text_vec", "systems programming")
             .build()
@@ -135,16 +136,17 @@ let fusion = FusionAlgorithm::WeightedSum {
 - Lexical と Vector の関連性のバランスを明示的に制御したい場合
 - 一方のシグナルが他方よりも重要であることがわかっている場合
 
-## SearchRequest のオプション
+## SearchRequest のフィールド
 
-| オプション | デフォルト | 説明 |
-| :--- | :--- | :--- |
-| `lexical_search_request` | None | Lexical クエリコンポーネント |
-| `vector_search_request` | None | Vector クエリコンポーネント |
-| `filter_query` | None | Lexical クエリによるプレフィルター（Lexical と Vector の両方の結果を制限） |
-| `fusion_algorithm` | `None`（両方の結果が存在する場合 `RRF { k: 60.0 }` を使用） | Lexical と Vector の結果をマージする方法 |
-| `limit` | 10 | 返される結果の最大件数 |
-| `offset` | 0 | スキップする結果の数（ページネーション用） |
+| フィールド | 型 | デフォルト | 説明 |
+| :--- | :--- | :--- | :--- |
+| `query` | `SearchQuery` | `Dsl("")` | 検索クエリ仕様（Dsl / Lexical / Vector / Hybrid） |
+| `limit` | `usize` | 10 | 返される結果の最大件数 |
+| `offset` | `usize` | 0 | スキップする結果の数（ページネーション用） |
+| `fusion_algorithm` | `Option<FusionAlgorithm>` | None（ハイブリッド時は `RRF { k: 60.0 }` を使用） | Lexical と Vector の結果をマージする方法 |
+| `filter_query` | `Option<Box<dyn Query>>` | None | Lexical クエリによるプレフィルター（Lexical と Vector の両方の結果を制限） |
+| `lexical_options` | `LexicalSearchOptions` | デフォルト | Lexical 検索の動作パラメータ |
+| `vector_options` | `VectorSearchOptions` | デフォルト | Vector 検索の動作パラメータ |
 
 ## SearchResult
 
@@ -162,10 +164,10 @@ let fusion = FusionAlgorithm::WeightedSum {
 
 ```rust
 let request = SearchRequestBuilder::new()
-    .lexical_search_request(
-        LexicalSearchRequest::new(Box::new(TermQuery::new("body", "rust")))
+    .lexical_query(
+        LexicalSearchQuery::Obj(Box::new(TermQuery::new("body", "rust")))
     )
-    .vector_search_request(
+    .vector_query(
         VectorSearchRequestBuilder::new()
             .add_text("text_vec", "systems programming")
             .build()
@@ -190,16 +192,16 @@ let request = SearchRequestBuilder::new()
 ```rust
 // Page 1: results 0-9
 let page1 = SearchRequestBuilder::new()
-    .lexical_search_request(/* ... */)
-    .vector_search_request(/* ... */)
+    .lexical_query(/* ... */)
+    .vector_query(/* ... */)
     .offset(0)
     .limit(10)
     .build();
 
 // Page 2: results 10-19
 let page2 = SearchRequestBuilder::new()
-    .lexical_search_request(/* ... */)
-    .vector_search_request(/* ... */)
+    .lexical_query(/* ... */)
+    .vector_query(/* ... */)
     .offset(10)
     .limit(10)
     .build();
@@ -211,10 +213,11 @@ let page2 = SearchRequestBuilder::new()
 use std::sync::Arc;
 use laurus::{
     Document, Engine, Schema, SearchRequestBuilder,
-    LexicalSearchRequest, FusionAlgorithm, PerFieldEmbedder,
+    FusionAlgorithm, PerFieldEmbedder,
 };
 use laurus::lexical::{TextOption, TermQuery};
 use laurus::lexical::core::field::IntegerOption;
+use laurus::lexical::search::searcher::LexicalSearchQuery;
 use laurus::vector::{HnswOption, VectorSearchRequestBuilder};
 use laurus::storage::memory::MemoryStorage;
 
@@ -257,10 +260,10 @@ async fn main() -> laurus::Result<()> {
     // Hybrid search: keyword "rust" + semantic "systems language"
     let results = engine.search(
         SearchRequestBuilder::new()
-            .lexical_search_request(
-                LexicalSearchRequest::new(Box::new(TermQuery::new("body", "rust")))
+            .lexical_query(
+                LexicalSearchQuery::Obj(Box::new(TermQuery::new("body", "rust")))
             )
-            .vector_search_request(
+            .vector_query(
                 VectorSearchRequestBuilder::new()
                     .add_text("body_vec", "systems language")
                     .build()

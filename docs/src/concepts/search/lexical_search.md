@@ -5,12 +5,13 @@ Lexical search finds documents by matching keywords against an inverted index. L
 ## Basic Usage
 
 ```rust
-use laurus::{SearchRequestBuilder, LexicalSearchRequest};
+use laurus::SearchRequestBuilder;
 use laurus::lexical::TermQuery;
+use laurus::lexical::search::searcher::LexicalSearchQuery;
 
 let request = SearchRequestBuilder::new()
-    .lexical_search_request(
-        LexicalSearchRequest::new(
+    .lexical_query(
+        LexicalSearchQuery::Obj(
             Box::new(TermQuery::new("body", "rust"))
         )
     )
@@ -201,45 +202,51 @@ Lexical search results are scored using **BM25**. The score reflects how relevan
 
 ### Field Boosts
 
-You can boost specific fields to influence relevance:
+You can boost specific fields to influence relevance using the `SearchRequestBuilder`:
 
 ```rust
-use laurus::LexicalSearchRequest;
+use laurus::SearchRequestBuilder;
+use laurus::lexical::TermQuery;
+use laurus::lexical::search::searcher::LexicalSearchQuery;
 
-let mut request = LexicalSearchRequest::new(Box::new(query));
-request.field_boosts.insert("title".to_string(), 2.0);  // title matches count double
-request.field_boosts.insert("body".to_string(), 1.0);
+let request = SearchRequestBuilder::new()
+    .lexical_query(LexicalSearchQuery::Obj(Box::new(TermQuery::new("body", "rust"))))
+    .add_field_boost("title", 2.0)  // title matches count double
+    .add_field_boost("body", 1.0)
+    .build();
 ```
 
-## LexicalSearchRequest Options
+## Lexical Search Options
+
+Lexical search behavior is controlled via `LexicalSearchOptions` on the `SearchRequest`, or by using builder methods on `SearchRequestBuilder`:
 
 | Option | Default | Description |
 | :--- | :--- | :--- |
-| `query` | (required) | The query to execute |
-| `limit` | 10 | Maximum number of results |
-| `load_documents` | true | Whether to load full document content |
+| `field_boosts` | empty | Per-field score multipliers |
 | `min_score` | 0.0 | Minimum score threshold |
 | `timeout_ms` | None | Search timeout in milliseconds |
 | `parallel` | false | Enable parallel search across segments |
 | `sort_by` | `Score` | Sort by relevance score, or by a field (`asc` / `desc`) |
-| `field_boosts` | empty | Per-field score multipliers |
 
 ### Builder Methods
 
-`LexicalSearchRequest` supports a builder-style API for setting options:
+`SearchRequestBuilder` provides convenience methods for lexical options:
 
 ```rust
-use laurus::LexicalSearchRequest;
+use laurus::SearchRequestBuilder;
 use laurus::lexical::TermQuery;
+use laurus::lexical::search::searcher::{LexicalSearchQuery, SortField, SortOrder};
 
-let request = LexicalSearchRequest::new(Box::new(TermQuery::new("body", "rust")))
+let request = SearchRequestBuilder::new()
+    .lexical_query(LexicalSearchQuery::Obj(Box::new(TermQuery::new("body", "rust"))))
+    .lexical_min_score(0.5)
+    .lexical_timeout_ms(5000)
+    .lexical_parallel(true)
+    .sort_by(SortField::Field { name: "date".to_string(), order: SortOrder::Desc })
+    .add_field_boost("title", 2.0)
+    .add_field_boost("body", 1.0)
     .limit(20)
-    .min_score(0.5)
-    .timeout_ms(5000)
-    .parallel(true)
-    .sort_by_field_desc("date")
-    .with_field_boost("title", 2.0)
-    .with_field_boost("body", 1.0);
+    .build();
 ```
 
 ## Using the Query DSL

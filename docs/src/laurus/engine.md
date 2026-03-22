@@ -146,21 +146,22 @@ graph LR
 The `search()` method accepts a `SearchRequest` which can contain a lexical query, a vector query, or both. When both are present, results are merged using the specified `FusionAlgorithm`.
 
 ```rust
-use laurus::{SearchRequestBuilder, LexicalSearchRequest, FusionAlgorithm};
+use laurus::{SearchRequestBuilder, FusionAlgorithm};
 use laurus::lexical::TermQuery;
+use laurus::lexical::search::searcher::LexicalSearchQuery;
 
 // Lexical-only search
 let request = SearchRequestBuilder::new()
-    .lexical_search_request(
-        LexicalSearchRequest::new(Box::new(TermQuery::new("body", "rust")))
+    .lexical_query(
+        LexicalSearchQuery::Obj(Box::new(TermQuery::new("body", "rust")))
     )
     .limit(10)
     .build();
 
 // Hybrid search with RRF fusion
 let request = SearchRequestBuilder::new()
-    .lexical_search_request(lexical_req)
-    .vector_search_request(vector_req)
+    .lexical_query(lexical_query)
+    .vector_query(vector_query)
     .fusion_algorithm(FusionAlgorithm::RRF { k: 60.0 })
     .limit(10)
     .build();
@@ -172,12 +173,13 @@ let results = engine.search(request).await?;
 
 | Field | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
-| `lexical_search_request` | `Option<LexicalSearchRequest>` | None | Lexical query |
-| `vector_search_request` | `Option<VectorSearchRequest>` | None | Vector query |
+| `query` | `SearchQuery` | `Dsl("")` | Search query specification (Dsl, Lexical, Vector, or Hybrid) |
 | `limit` | `usize` | 10 | Maximum results to return |
 | `offset` | `usize` | 0 | Pagination offset |
 | `fusion_algorithm` | `Option<FusionAlgorithm>` | RRF (k=60) | How to merge lexical + vector results |
 | `filter_query` | `Option<Box<dyn Query>>` | None | Filter applied to both search types |
+| `lexical_options` | `LexicalSearchOptions` | Default | Parameters controlling lexical search behavior |
+| `vector_options` | `VectorSearchOptions` | Default | Parameters controlling vector search behavior |
 
 ## FusionAlgorithm
 
