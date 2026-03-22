@@ -92,43 +92,35 @@ A collection of named field values.
 | Method | Description |
 | :--- | :--- |
 | `SearchRequestBuilder::new()` | Create a new builder |
-| `.lexical_search_request(req)` | Set the lexical search component |
-| `.vector_search_request(req)` | Set the vector search component |
+| `.query_dsl(dsl)` | Set a unified DSL string (parsed at search time) |
+| `.lexical_query(query)` | Set the lexical search query (`LexicalSearchQuery`) |
+| `.vector_query(query)` | Set the vector search query (`VectorSearchQuery`) |
 | `.filter_query(query)` | Set a pre-filter query |
 | `.fusion_algorithm(algo)` | Set the fusion algorithm (default: RRF) |
 | `.limit(n)` | Maximum results (default: 10) |
 | `.offset(n)` | Skip N results (default: 0) |
+| `.add_field_boost(field, boost)` | Add a field-level boost for lexical search |
+| `.lexical_min_score(f32)` | Set minimum score threshold for lexical search |
+| `.lexical_timeout_ms(u64)` | Set lexical search timeout in milliseconds |
+| `.lexical_parallel(bool)` | Enable parallel lexical search |
+| `.sort_by(SortField)` | Set sort order for lexical search results |
+| `.vector_score_mode(VectorScoreMode)` | Set score combination mode for vector search |
+| `.vector_min_score(f32)` | Set minimum score threshold for vector search |
 | `.build()` | Build the `SearchRequest` |
 
-### LexicalSearchRequest
+### LexicalSearchQuery
 
-| Method | Description |
+| Variant | Description |
 | :--- | :--- |
-| `LexicalSearchRequest::new(query)` | Create with a query |
-| `LexicalSearchRequest::from_dsl(query_str)` | Create from a DSL query string |
-| `.limit(n)` | Maximum results |
-| `.load_documents(bool)` | Whether to load document content |
-| `.min_score(f32)` | Minimum score threshold |
-| `.timeout_ms(u64)` | Search timeout in milliseconds |
-| `.parallel(bool)` | Enable parallel search |
-| `.sort_by_field_asc(field)` | Sort by field ascending |
-| `.sort_by_field_desc(field)` | Sort by field descending |
-| `.sort_by_score()` | Sort by relevance score (default) |
-| `.with_field_boost(field, boost)` | Add field-level boost |
+| `LexicalSearchQuery::Dsl(String)` | Query specified as a DSL string (parsed at search time) |
+| `LexicalSearchQuery::Obj(Box<dyn Query>)` | Query specified as a pre-built Query object |
 
-### VectorSearchRequestBuilder
+### VectorSearchQuery
 
-| Method | Description |
+| Variant | Description |
 | :--- | :--- |
-| `VectorSearchRequestBuilder::new()` | Create a new builder |
-| `.add_text(field, text)` | Add a text query for a field |
-| `.add_vector(field, vector)` | Add a pre-computed query vector |
-| `.add_bytes(field, bytes, mime)` | Add a binary payload (for multimodal) |
-| `.limit(n)` | Maximum results |
-| `.score_mode(VectorScoreMode)` | Score combination mode (WeightedSum, MaxSim) |
-| `.min_score(f32)` | Minimum score threshold |
-| `.field(name)` | Restrict search to a specific field |
-| `.build()` | Build the request |
+| `VectorSearchQuery::Payloads(Vec<QueryPayload>)` | Raw payloads (text, bytes, etc.) to be embedded at search time |
+| `VectorSearchQuery::Vectors(Vec<QueryVector>)` | Pre-embedded query vectors ready for nearest-neighbor search |
 
 ### SearchResult
 
@@ -208,6 +200,6 @@ A collection of named field values.
 | `DataValue::Float64(f64)` | `f64` |
 | `DataValue::Text(String)` | `String` |
 | `DataValue::Bytes(Vec<u8>, Option<String>)` | `(data, mime_type)` |
-| `DataValue::Vector(Vec<f32>)` | `Vec<f32>` |
+| `DataValue::Vector(Vector)` | `Vector` |
 | `DataValue::DateTime(DateTime<Utc>)` | `chrono::DateTime<Utc>` |
 | `DataValue::Geo(f64, f64)` | `(latitude, longitude)` |

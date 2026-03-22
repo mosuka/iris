@@ -105,6 +105,76 @@ fn json_to_proto_value(val: &Value) -> v1::Value {
     v1::Value { kind }
 }
 
+/// Parse a JSON string into a proto [`v1::FusionAlgorithm`].
+///
+/// Accepts two formats:
+/// - `{"rrf": {"k": 60.0}}`
+/// - `{"weighted_sum": {"lexical_weight": 0.7, "vector_weight": 0.3}}`
+///
+/// # Arguments
+///
+/// * `json_str` - JSON string representing the fusion algorithm.
+///
+/// # Errors
+///
+/// Returns an error if the JSON is malformed or does not match either format.
+pub fn json_to_fusion_algorithm(json_str: &str) -> anyhow::Result<v1::FusionAlgorithm> {
+    let val: Value = serde_json::from_str(json_str)?;
+
+    if let Some(rrf) = val.get("rrf") {
+        let k = rrf.get("k").and_then(|v| v.as_f64()).unwrap_or(60.0);
+        Ok(v1::FusionAlgorithm {
+            algorithm: Some(v1::fusion_algorithm::Algorithm::Rrf(v1::Rrf { k })),
+        })
+    } else if let Some(ws) = val.get("weighted_sum") {
+        let lexical_weight = ws
+            .get("lexical_weight")
+            .and_then(|v| v.as_f64())
+            .unwrap_or(0.5) as f32;
+        let vector_weight = ws
+            .get("vector_weight")
+            .and_then(|v| v.as_f64())
+            .unwrap_or(0.5) as f32;
+        Ok(v1::FusionAlgorithm {
+            algorithm: Some(v1::fusion_algorithm::Algorithm::WeightedSum(
+                v1::WeightedSum {
+                    lexical_weight,
+                    vector_weight,
+                },
+            )),
+        })
+    } else {
+        Err(anyhow::anyhow!(
+            "fusion must contain either \"rrf\" or \"weighted_sum\" key"
+        ))
+    }
+}
+
+/// Parse a JSON string into a field boost map for the proto
+/// [`SearchRequest`](v1::SearchRequest).
+///
+/// Expects a JSON object mapping field names to numeric boost values.
+///
+/// # Arguments
+///
+/// * `json_str` - JSON string like `{"title": 2.0, "body": 1.0}`.
+///
+/// # Errors
+///
+/// Returns an error if the JSON is malformed or not an object.
+pub fn json_to_field_boosts(
+    json_str: &str,
+) -> anyhow::Result<std::collections::HashMap<String, f32>> {
+    let val: Value = serde_json::from_str(json_str)?;
+    let obj = val
+        .as_object()
+        .ok_or_else(|| anyhow::anyhow!("field_boosts must be a JSON object"))?;
+    Ok(obj
+        .iter()
+        .filter_map(|(k, v)| v.as_f64().map(|f| (k.clone(), f as f32)))
+        .collect())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -140,6 +210,71 @@ mod tests {
         assert_eq!(json["title"], "hello");
         assert_eq!(json["score"], 1.5);
         assert_eq!(json["count"], 42);
+    }
+
+    #[test]
+    fn test_json_to_fusion_algorithm_rrf() {
+        let json = r#"{"rrf": {"k": 30.0}}"#;
+        let fusion = json_to_fusion_algorithm(json).unwrap();
+        match fusion.algorithm {
+            Some(v1::fusion_algorithm::Algorithm::Rrf(rrf)) => {
+                assert!((rrf.k - 30.0).abs() < f64::EPSILON);
+            }
+            _ => panic!("Expected RRF"),
+        }
+    }
+
+    #[test]
+    fn test_json_to_fusion_algorithm_rrf_default_k() {
+        let json = r#"{"rrf": {}}"#;
+        let fusion = json_to_fusion_algorithm(json).unwrap();
+        match fusion.algorithm {
+            Some(v1::fusion_algorithm::Algorithm::Rrf(rrf)) => {
+                assert!((rrf.k - 60.0).abs() < f64::EPSILON);
+            }
+            _ => panic!("Expected RRF with default k"),
+        }
+    }
+
+    #[test]
+    fn test_json_to_fusion_algorithm_weighted_sum() {
+        let json = r#"{"weighted_sum": {"lexical_weight": 0.7, "vector_weight": 0.3}}"#;
+        let fusion = json_to_fusion_algorithm(json).unwrap();
+        match fusion.algorithm {
+            Some(v1::fusion_algorithm::Algorithm::WeightedSum(ws)) => {
+                assert!((ws.lexical_weight - 0.7).abs() < f32::EPSILON);
+                assert!((ws.vector_weight - 0.3).abs() < f32::EPSILON);
+            }
+            _ => panic!("Expected WeightedSum"),
+        }
+    }
+
+    #[test]
+    fn test_json_to_fusion_algorithm_invalid() {
+        let json = r#"{"unknown": {}}"#;
+        assert!(json_to_fusion_algorithm(json).is_err());
+    }
+
+    #[test]
+    fn test_json_to_field_boosts() {
+        let json = r#"{"title": 2.0, "body": 1.0}"#;
+        let boosts = json_to_field_boosts(json).unwrap();
+        assert_eq!(boosts.len(), 2);
+        assert!((boosts["title"] - 2.0).abs() < f32::EPSILON);
+        assert!((boosts["body"] - 1.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn test_json_to_field_boosts_empty() {
+        let json = r#"{}"#;
+        let boosts = json_to_field_boosts(json).unwrap();
+        assert!(boosts.is_empty());
+    }
+
+    #[test]
+    fn test_json_to_field_boosts_invalid() {
+        let json = r#"[1, 2, 3]"#;
+        assert!(json_to_field_boosts(json).is_err());
     }
 
     #[test]

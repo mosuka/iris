@@ -6,7 +6,7 @@ use crate::error::Result;
 use crate::vector::core::vector::Vector;
 use crate::vector::reader::VectorIndexReader;
 use crate::vector::search::searcher::VectorIndexSearcher;
-use crate::vector::search::searcher::{VectorIndexSearchRequest, VectorIndexSearchResults};
+use crate::vector::search::searcher::{VectorIndexQuery, VectorIndexQueryResults};
 
 /// Flat vector searcher that performs exact (brute force) search.
 #[derive(Debug)]
@@ -22,11 +22,11 @@ impl FlatVectorSearcher {
 }
 
 impl VectorIndexSearcher for FlatVectorSearcher {
-    fn search(&self, request: &VectorIndexSearchRequest) -> Result<VectorIndexSearchResults> {
+    fn search(&self, request: &VectorIndexQuery) -> Result<VectorIndexQueryResults> {
         use std::time::Instant;
 
         let start = Instant::now();
-        let mut results = VectorIndexSearchResults::new();
+        let mut results = VectorIndexQueryResults::new();
 
         // Get all vectors from the index
         let vector_count = self.index_reader.vector_count();
@@ -83,7 +83,7 @@ impl VectorIndexSearcher for FlatVectorSearcher {
 
             results
                 .results
-                .push(crate::vector::search::searcher::VectorSearchResult {
+                .push(crate::vector::search::searcher::VectorIndexQueryResult {
                     doc_id,
                     field_name,
                     similarity,
@@ -96,7 +96,7 @@ impl VectorIndexSearcher for FlatVectorSearcher {
         Ok(results)
     }
 
-    fn count(&self, request: VectorIndexSearchRequest) -> Result<u64> {
+    fn count(&self, request: VectorIndexQuery) -> Result<u64> {
         // Get all vector IDs with field names
         let vector_ids = self.index_reader.vector_ids()?;
 

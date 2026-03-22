@@ -1,31 +1,152 @@
-use crate::lexical::query::Query;
-use crate::lexical::search::searcher::LexicalSearchRequest;
-use crate::vector::store::request::VectorSearchRequest;
+use std::collections::HashMap;
 
-/// Unified search request that can contain lexical, vector, or both queries.
+use crate::lexical::query::Query;
+use crate::lexical::search::searcher::{LexicalSearchQuery, SortField};
+// Re-export VectorSearchQuery so engine.rs and query.rs can refer to it
+// via `self::search::VectorSearchQuery` without reaching into vector internals.
+use crate::vector::VectorScoreMode;
+pub use crate::vector::search::searcher::VectorSearchQuery;
+
+// ── Query types (what to search for) ─────────────────────────────────────────
+
+/// Unified search query specification.
 ///
-/// Populate only `lexical_search_request` for pure lexical search, only
-/// `vector_search_request` for pure vector search, or both for hybrid
-/// search with fusion.
+/// Determines **what** to search for. Search parameters (limits, score
+/// thresholds, fusion, etc.) are separate fields on [`SearchRequest`].
+///
+/// Four variants cover all search modes:
+///
+/// - [`Dsl`](Self::Dsl) — unified query DSL string, parsed at search time.
+/// - [`Lexical`](Self::Lexical) — lexical (BM25) search only.
+/// - [`Vector`](Self::Vector) — vector (nearest-neighbor) search only.
+/// - [`Hybrid`](Self::Hybrid) — both lexical and vector search with fusion.
+#[derive(Debug)]
+#[allow(clippy::large_enum_variant)]
+pub enum SearchQuery {
+    /// Unified query DSL string — parsed at search time by
+    /// [`UnifiedQueryParser`](super::query::UnifiedQueryParser).
+    ///
+    /// Supports lexical, vector, and hybrid queries in a single string:
+    ///
+    /// - **Lexical**: `title:hello`, `"exact phrase"`, `AND`/`OR`, `term~2`,
+    ///   `[a TO z]`, etc.
+    /// - **Vector**: `field:~"text"`, `~"text"^0.8` (with boost).
+    /// - **Hybrid**: mix both — `title:hello content:~"cute kitten"^0.8`.
+    Dsl(String),
+
+    /// Pre-built lexical (BM25) search query.
+    Lexical(LexicalSearchQuery),
+
+    /// Pre-built vector (nearest-neighbor) search query.
+    Vector(VectorSearchQuery),
+
+    /// Hybrid search combining lexical and vector components.
+    ///
+    /// Results are merged using the [`fusion_algorithm`](SearchRequest::fusion_algorithm)
+    /// specified on the [`SearchRequest`].
+    Hybrid {
+        /// Lexical search component.
+        lexical: LexicalSearchQuery,
+        /// Vector search component.
+        vector: VectorSearchQuery,
+    },
+}
+
+// ── Option types (how to search) ─────────────────────────────────────────────
+
+/// Parameters controlling lexical search behavior.
+///
+/// These are separated from the query itself so that the same options can
+/// be applied regardless of how the query was specified (DSL string or
+/// pre-built query object).
+#[derive(Debug, Clone)]
+pub struct LexicalSearchOptions {
+    /// Per-field boost factors for relevance scoring.
+    ///
+    /// Example: `{"title": 2.0, "body": 1.0}` gives title matches twice
+    /// the weight of body matches.
+    pub field_boosts: HashMap<String, f32>,
+
+    /// Minimum score threshold. Results below this score are discarded.
+    /// Defaults to `0.0` (no threshold).
+    pub min_score: f32,
+
+    /// Timeout for the search operation in milliseconds.
+    /// `None` means no timeout.
+    pub timeout_ms: Option<u64>,
+
+    /// Enable parallel search across index segments for better performance
+    /// on multi-core systems. Defaults to `false`.
+    pub parallel: bool,
+
+    /// Sort results by field value or by relevance score.
+    /// Defaults to [`SortField::Score`].
+    pub sort_by: SortField,
+}
+
+impl Default for LexicalSearchOptions {
+    fn default() -> Self {
+        Self {
+            field_boosts: HashMap::new(),
+            min_score: 0.0,
+            timeout_ms: None,
+            parallel: false,
+            sort_by: SortField::Score,
+        }
+    }
+}
+
+/// Parameters controlling vector search behavior.
+///
+/// These are separated from the query itself so that the same options can
+/// be applied regardless of how the query was specified (payloads or
+/// pre-embedded vectors).
+#[derive(Debug, Clone)]
+pub struct VectorSearchOptions {
+    /// How to combine scores from multiple query vectors.
+    /// Defaults to [`VectorScoreMode::WeightedSum`].
+    pub score_mode: VectorScoreMode,
+
+    /// Minimum score threshold. Results below this score are discarded.
+    /// Defaults to `0.0` (no threshold).
+    pub min_score: f32,
+}
+
+impl Default for VectorSearchOptions {
+    fn default() -> Self {
+        Self {
+            score_mode: VectorScoreMode::WeightedSum,
+            min_score: 0.0,
+        }
+    }
+}
+
+// ── SearchRequest ────────────────────────────────────────────────────────────
+
+/// Unified search request combining query specification with pagination,
+/// options, and fusion settings.
+///
+/// The query specifies **what** to search for ([`SearchQuery`]), while
+/// [`lexical_options`](Self::lexical_options) and
+/// [`vector_options`](Self::vector_options) control **how** to search.
 ///
 /// Use [`SearchRequestBuilder`] for a fluent construction API.
 pub struct SearchRequest {
-    /// Optional lexical search component (BM25-scored inverted index search).
-    pub lexical_search_request: Option<LexicalSearchRequest>,
-
-    /// Optional vector search component (nearest-neighbor search).
-    pub vector_search_request: Option<VectorSearchRequest>,
+    /// The search query specification.
+    pub query: SearchQuery,
 
     /// Maximum number of results to return. Defaults to `10`.
     pub limit: usize,
 
-    /// Number of results to skip before returning (for pagination). Defaults to `0`.
+    /// Number of results to skip before returning (for pagination).
+    /// Defaults to `0`.
     pub offset: usize,
 
     /// Fusion algorithm for combining lexical and vector scores.
     ///
-    /// Only used when **both** `lexical_search_request` and
-    /// `vector_search_request` are present. Defaults to
+    /// Only used when both lexical and vector search components are
+    /// present (i.e., [`SearchQuery::Hybrid`] or a [`SearchQuery::Dsl`]
+    /// that contains both clause types). Defaults to
     /// [`FusionAlgorithm::RRF { k: 60.0 }`](FusionAlgorithm::RRF) when
     /// `None`.
     pub fusion_algorithm: Option<FusionAlgorithm>,
@@ -34,13 +155,13 @@ pub struct SearchRequest {
     ///
     /// When set, the filter is evaluated first and **both** lexical and
     /// vector searches are restricted to documents matching this filter.
-    /// For lexical search, the filter is combined with the user query via a
-    /// boolean `must` + `filter` clause. For vector search, it produces an
-    /// `allowed_ids` list that restricts candidate scoring.
-    ///
-    /// If the filter matches zero documents, the search returns an empty
-    /// result immediately.
     pub filter_query: Option<Box<dyn Query>>,
+
+    /// Parameters controlling lexical search behavior.
+    pub lexical_options: LexicalSearchOptions,
+
+    /// Parameters controlling vector search behavior.
+    pub vector_options: VectorSearchOptions,
 }
 
 /// Algorithm used to combine lexical and vector scores in hybrid search.
@@ -65,14 +186,11 @@ pub enum FusionAlgorithm {
     ///
     /// Before weighting, the engine independently normalizes lexical and
     /// vector scores to the `[0.0, 1.0]` range using min-max normalization
-    /// over their respective result sets. This means raw score magnitudes
-    /// do not need to be comparable.
+    /// over their respective result sets.
     WeightedSum {
-        /// Weight for the normalized lexical score (clamped to `0.0..=1.0`
-        /// by [`SearchRequestBuilder`]).
+        /// Weight for the normalized lexical score (clamped to `0.0..=1.0`).
         lexical_weight: f32,
-        /// Weight for the normalized vector score (clamped to `0.0..=1.0`
-        /// by [`SearchRequestBuilder`]).
+        /// Weight for the normalized vector score (clamped to `0.0..=1.0`).
         vector_weight: f32,
     },
 }
@@ -80,19 +198,43 @@ pub enum FusionAlgorithm {
 impl Default for SearchRequest {
     fn default() -> Self {
         Self {
-            lexical_search_request: None,
-            vector_search_request: None,
+            query: SearchQuery::Dsl(String::new()),
             limit: 10,
             offset: 0,
             fusion_algorithm: None,
             filter_query: None,
+            lexical_options: LexicalSearchOptions::default(),
+            vector_options: VectorSearchOptions::default(),
         }
     }
 }
 
+// ── SearchRequestBuilder ─────────────────────────────────────────────────────
+
 /// Fluent builder for constructing a [`SearchRequest`].
+///
+/// Supports three construction patterns:
+///
+/// 1. **DSL string** (via [`query_dsl`](Self::query_dsl)): Pass a unified
+///    query DSL string. The engine parses it at search time.
+/// 2. **Single mode** (via [`lexical_query`](Self::lexical_query) or
+///    [`vector_query`](Self::vector_query)): Set one search mode.
+/// 3. **Hybrid** (via both [`lexical_query`](Self::lexical_query) and
+///    [`vector_query`](Self::vector_query)): Set both for hybrid search.
+///
+/// If [`query_dsl`](Self::query_dsl) is called, the builder produces a
+/// [`SearchQuery::Dsl`] variant. Otherwise, it determines the variant from
+/// which query methods were called.
 pub struct SearchRequestBuilder {
-    request: SearchRequest,
+    dsl: Option<String>,
+    lexical_query: Option<LexicalSearchQuery>,
+    vector_query: Option<VectorSearchQuery>,
+    limit: usize,
+    offset: usize,
+    fusion_algorithm: Option<FusionAlgorithm>,
+    filter_query: Option<Box<dyn Query>>,
+    lexical_options: LexicalSearchOptions,
+    vector_options: VectorSearchOptions,
 }
 
 impl Default for SearchRequestBuilder {
@@ -102,44 +244,69 @@ impl Default for SearchRequestBuilder {
 }
 
 impl SearchRequestBuilder {
-    /// Create a new builder with default settings (limit 10, offset 0, no queries).
+    /// Create a new builder with default settings.
     pub fn new() -> Self {
         Self {
-            request: SearchRequest::default(),
+            dsl: None,
+            lexical_query: None,
+            vector_query: None,
+            limit: 10,
+            offset: 0,
+            fusion_algorithm: None,
+            filter_query: None,
+            lexical_options: LexicalSearchOptions::default(),
+            vector_options: VectorSearchOptions::default(),
         }
     }
 
-    /// Set the lexical search component.
-    pub fn lexical_search_request(mut self, request: LexicalSearchRequest) -> Self {
-        self.request.lexical_search_request = Some(request);
+    // ── Query setters ────────────────────────────────────────────────────
+
+    /// Set a unified query DSL string.
+    ///
+    /// When set, the built request uses [`SearchQuery::Dsl`] and any
+    /// lexical/vector queries set via other methods are ignored.
+    pub fn query_dsl(mut self, dsl: impl Into<String>) -> Self {
+        self.dsl = Some(dsl.into());
         self
     }
 
-    /// Set the vector search component.
-    pub fn vector_search_request(mut self, request: VectorSearchRequest) -> Self {
-        self.request.vector_search_request = Some(request);
+    /// Set the lexical search query.
+    ///
+    /// If [`vector_query`](Self::vector_query) is also set, the result is
+    /// [`SearchQuery::Hybrid`]. Otherwise [`SearchQuery::Lexical`].
+    pub fn lexical_query(mut self, query: LexicalSearchQuery) -> Self {
+        self.lexical_query = Some(query);
         self
     }
+
+    /// Set the vector search query.
+    ///
+    /// If [`lexical_query`](Self::lexical_query) is also set, the result is
+    /// [`SearchQuery::Hybrid`]. Otherwise [`SearchQuery::Vector`].
+    pub fn vector_query(mut self, query: VectorSearchQuery) -> Self {
+        self.vector_query = Some(query);
+        self
+    }
+
+    // ── Pagination & fusion ──────────────────────────────────────────────
 
     /// Set the maximum number of results to return.
     pub fn limit(mut self, limit: usize) -> Self {
-        self.request.limit = limit;
+        self.limit = limit;
         self
     }
 
     /// Set the number of results to skip (for pagination).
     pub fn offset(mut self, offset: usize) -> Self {
-        self.request.offset = offset;
+        self.offset = offset;
         self
     }
 
     /// Set the fusion algorithm for hybrid search.
     ///
-    /// For [`FusionAlgorithm::WeightedSum`], the `lexical_weight` and
-    /// `vector_weight` values are clamped to the `0.0..=1.0` range to
-    /// prevent NaN/Inf propagation.
+    /// For [`FusionAlgorithm::WeightedSum`], the weights are clamped to
+    /// `0.0..=1.0` to prevent NaN/Inf propagation.
     pub fn fusion_algorithm(mut self, fusion: FusionAlgorithm) -> Self {
-        // Clamp weights to valid range to prevent NaN/Inf propagation.
         let fusion = match fusion {
             FusionAlgorithm::WeightedSum {
                 lexical_weight,
@@ -150,36 +317,94 @@ impl SearchRequestBuilder {
             },
             other => other,
         };
-        self.request.fusion_algorithm = Some(fusion);
+        self.fusion_algorithm = Some(fusion);
         self
     }
 
     /// Set a filter query to restrict the search space.
     ///
-    /// The filter applies to **both** lexical and vector searches when
-    /// present. See [`SearchRequest::filter_query`] for details.
+    /// The filter applies to **both** lexical and vector searches.
     pub fn filter_query(mut self, query: Box<dyn Query>) -> Self {
-        self.request.filter_query = Some(query);
+        self.filter_query = Some(query);
         self
     }
 
+    // ── Lexical options ──────────────────────────────────────────────────
+
     /// Add a field-level boost for lexical search.
-    ///
-    /// Requires [`lexical_search_request`](Self::lexical_search_request) to
-    /// have been called first. If no lexical query has been set, this is a
-    /// no-op.
     pub fn add_field_boost(mut self, field: impl Into<String>, boost: f32) -> Self {
-        if let Some(ref mut lex) = self.request.lexical_search_request {
-            lex.field_boosts.insert(field.into(), boost);
-        }
+        self.lexical_options
+            .field_boosts
+            .insert(field.into(), boost);
         self
     }
+
+    /// Set the minimum score threshold for lexical search.
+    pub fn lexical_min_score(mut self, min_score: f32) -> Self {
+        self.lexical_options.min_score = min_score;
+        self
+    }
+
+    /// Set the timeout for lexical search in milliseconds.
+    pub fn lexical_timeout_ms(mut self, timeout_ms: u64) -> Self {
+        self.lexical_options.timeout_ms = Some(timeout_ms);
+        self
+    }
+
+    /// Enable or disable parallel lexical search.
+    pub fn lexical_parallel(mut self, parallel: bool) -> Self {
+        self.lexical_options.parallel = parallel;
+        self
+    }
+
+    /// Set the sort order for lexical search results.
+    pub fn sort_by(mut self, sort_by: SortField) -> Self {
+        self.lexical_options.sort_by = sort_by;
+        self
+    }
+
+    // ── Vector options ───────────────────────────────────────────────────
+
+    /// Set the score combination mode for vector search.
+    pub fn vector_score_mode(mut self, score_mode: VectorScoreMode) -> Self {
+        self.vector_options.score_mode = score_mode;
+        self
+    }
+
+    /// Set the minimum score threshold for vector search.
+    pub fn vector_min_score(mut self, min_score: f32) -> Self {
+        self.vector_options.min_score = min_score;
+        self
+    }
+
+    // ── Build ────────────────────────────────────────────────────────────
 
     /// Consume the builder and return the constructed [`SearchRequest`].
     pub fn build(self) -> SearchRequest {
-        self.request
+        let query = if let Some(dsl) = self.dsl {
+            SearchQuery::Dsl(dsl)
+        } else {
+            match (self.lexical_query, self.vector_query) {
+                (Some(lexical), Some(vector)) => SearchQuery::Hybrid { lexical, vector },
+                (Some(lexical), None) => SearchQuery::Lexical(lexical),
+                (None, Some(vector)) => SearchQuery::Vector(vector),
+                (None, None) => SearchQuery::Dsl(String::new()),
+            }
+        };
+
+        SearchRequest {
+            query,
+            limit: self.limit,
+            offset: self.offset,
+            fusion_algorithm: self.fusion_algorithm,
+            filter_query: self.filter_query,
+            lexical_options: self.lexical_options,
+            vector_options: self.vector_options,
+        }
     }
 }
+
+// ── SearchResult ─────────────────────────────────────────────────────────────
 
 /// A single result from an [`Engine`](super::Engine) search.
 #[derive(Debug, Clone)]

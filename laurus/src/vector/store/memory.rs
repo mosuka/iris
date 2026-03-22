@@ -362,7 +362,7 @@ impl VectorFieldReader for InMemoryFieldReader {
         };
 
         for query in &request.query_vectors {
-            let query_vector_data = &query.vector;
+            let query_vector_data = &query.vector.data;
             if query_vector_data.len() != dimension {
                 return Err(LaurusError::invalid_argument(format!(
                     "query vector dimension mismatch for field '{}': expected {}, got {}",
@@ -378,9 +378,10 @@ impl VectorFieldReader for InMemoryFieldReader {
 
             for (doc_id, entry) in &snapshot {
                 for vector in &entry.vectors {
-                    let similarity = distance_metric.similarity(&query.vector, &vector.data)?;
+                    let similarity =
+                        distance_metric.similarity(&query.vector.data, &vector.data)?;
                     let weighted_score = similarity * effective_weight;
-                    let distance = distance_metric.distance(&query.vector, &vector.data)?;
+                    let distance = distance_metric.distance(&query.vector.data, &vector.data)?;
 
                     match merged.entry(*doc_id) {
                         Entry::Vacant(slot) => {

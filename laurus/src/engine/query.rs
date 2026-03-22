@@ -19,28 +19,25 @@
 //!
 //! // Hybrid search
 //! let request = parser.parse(r#"title:hello content:~"cute kitten"^0.8"#).await?;
-//! assert!(request.lexical_search_request.is_some());
-//! assert!(request.vector_search_request.is_some());
+//! assert!(matches!(request.query, SearchQuery::Hybrid { .. }));
 //!
 //! // Lexical only
 //! let request = parser.parse("title:hello AND body:world").await?;
-//! assert!(request.lexical_search_request.is_some());
-//! assert!(request.vector_search_request.is_none());
+//! assert!(matches!(request.query, SearchQuery::Lexical(_)));
 //!
 //! // Vector only
 //! let request = parser.parse(r#"content:~"cats" image:~"dogs"^0.5"#).await?;
-//! assert!(request.lexical_search_request.is_none());
-//! assert!(request.vector_search_request.is_some());
+//! assert!(matches!(request.query, SearchQuery::Vector(_)));
 //! ```
 
 use std::sync::LazyLock;
 
 use regex::Regex;
 
-use crate::engine::search::{FusionAlgorithm, SearchRequest};
+use crate::engine::search::{FusionAlgorithm, SearchQuery, SearchRequest};
 use crate::error::{LaurusError, Result};
-use crate::lexical::query::parser::QueryParser;
-use crate::lexical::search::searcher::LexicalSearchRequest;
+use crate::lexical::query::parser::LexicalQueryParser;
+use crate::lexical::search::searcher::LexicalSearchQuery;
 use crate::vector::query::parser::VectorQueryParser;
 
 /// Unified query parser that composes lexical and vector parsers.
@@ -56,7 +53,7 @@ use crate::vector::query::parser::VectorQueryParser;
 /// (`AND`, `OR`) at the edges or in consecutive positions are cleaned up
 /// before the lexical portion is parsed.
 pub struct UnifiedQueryParser {
-    lexical_parser: QueryParser,
+    lexical_parser: LexicalQueryParser,
     vector_parser: VectorQueryParser,
     default_fusion: FusionAlgorithm,
 }
@@ -71,7 +68,7 @@ impl UnifiedQueryParser {
     ///
     /// - `lexical_parser` - Parser for lexical (text) query clauses.
     /// - `vector_parser` - Parser for vector (`~"text"`) query clauses.
-    pub fn new(lexical_parser: QueryParser, vector_parser: VectorQueryParser) -> Self {
+    pub fn new(lexical_parser: LexicalQueryParser, vector_parser: VectorQueryParser) -> Self {
         Self {
             lexical_parser,
             vector_parser,
@@ -147,9 +144,18 @@ impl UnifiedQueryParser {
             None
         };
 
+        let query = match (lexical, vector) {
+            (Some(lex_query), Some(vec_req)) => SearchQuery::Hybrid {
+                lexical: LexicalSearchQuery::Obj(lex_query),
+                vector: vec_req.query,
+            },
+            (Some(lex_query), None) => SearchQuery::Lexical(LexicalSearchQuery::Obj(lex_query)),
+            (None, Some(vec_req)) => SearchQuery::Vector(vec_req.query),
+            (None, None) => unreachable!(),
+        };
+
         Ok(SearchRequest {
-            lexical_search_request: lexical.map(LexicalSearchRequest::new),
-            vector_search_request: vector,
+            query,
             fusion_algorithm: fusion,
             ..Default::default()
         })
@@ -253,8 +259,10 @@ mod tests {
     use super::*;
     use crate::analysis::analyzer::standard::StandardAnalyzer;
     use crate::embedding::embedder::{EmbedInput, EmbedInputType, Embedder};
+    use crate::engine::search::VectorSearchQuery;
     use crate::error::Result as IrisResult;
     use crate::vector::core::vector::Vector;
+    use crate::vector::store::request::QueryVector;
 
     /// Mock embedder that returns a zero vector of dimension 4.
     #[derive(Debug)]
@@ -276,9 +284,40 @@ mod tests {
         }
     }
 
+    /// Assert that the request contains a lexical-only query.
+    fn assert_lexical_only(request: &SearchRequest) {
+        assert!(matches!(request.query, SearchQuery::Lexical(_)));
+    }
+
+    /// Assert that the request contains a vector-only query and return a
+    /// reference to the vector query.
+    fn assert_vector_only(request: &SearchRequest) -> &VectorSearchQuery {
+        match &request.query {
+            SearchQuery::Vector(v) => v,
+            _ => panic!("Expected SearchQuery::Vector"),
+        }
+    }
+
+    /// Assert that the request contains a hybrid query and return references
+    /// to the lexical and vector components.
+    fn assert_hybrid(request: &SearchRequest) -> (&LexicalSearchQuery, &VectorSearchQuery) {
+        match &request.query {
+            SearchQuery::Hybrid { lexical, vector } => (lexical, vector),
+            _ => panic!("Expected SearchQuery::Hybrid"),
+        }
+    }
+
+    /// Extract the query vectors from a vector search query.
+    fn get_vectors(vq: &VectorSearchQuery) -> &Vec<QueryVector> {
+        match vq {
+            VectorSearchQuery::Vectors(v) => v,
+            _ => panic!("Expected VectorSearchQuery::Vectors"),
+        }
+    }
+
     fn make_parser() -> UnifiedQueryParser {
         let analyzer = Arc::new(StandardAnalyzer::new().unwrap());
-        let lexical = QueryParser::new(analyzer).with_default_field("title");
+        let lexical = LexicalQueryParser::new(analyzer).with_default_field("title");
         let embedder: Arc<dyn Embedder> = Arc::new(MockEmbedder);
         let vector = VectorQueryParser::new(embedder).with_default_field("content");
         UnifiedQueryParser::new(lexical, vector)
@@ -289,8 +328,7 @@ mod tests {
         let parser = make_parser();
         let request = parser.parse("title:hello").await.unwrap();
 
-        assert!(request.lexical_search_request.is_some());
-        assert!(request.vector_search_request.is_none());
+        assert_lexical_only(&request);
         assert!(request.fusion_algorithm.is_none());
     }
 
@@ -299,16 +337,12 @@ mod tests {
         let parser = make_parser();
         let request = parser.parse(r#"content:~"cats""#).await.unwrap();
 
-        assert!(request.lexical_search_request.is_none());
-        assert!(request.vector_search_request.is_some());
+        let vq = assert_vector_only(&request);
         assert!(request.fusion_algorithm.is_none());
 
-        let vector = request.vector_search_request.unwrap();
-        assert_eq!(vector.query_vectors.len(), 1);
-        assert_eq!(
-            vector.query_vectors[0].fields.as_ref().unwrap()[0],
-            "content"
-        );
+        let vecs = get_vectors(vq);
+        assert_eq!(vecs.len(), 1);
+        assert_eq!(vecs[0].fields.as_ref().unwrap()[0], "content");
     }
 
     #[tokio::test]
@@ -319,8 +353,7 @@ mod tests {
             .await
             .unwrap();
 
-        assert!(request.lexical_search_request.is_some());
-        assert!(request.vector_search_request.is_some());
+        assert_hybrid(&request);
         assert!(request.fusion_algorithm.is_some());
 
         // Fusion defaults to RRF
@@ -336,8 +369,9 @@ mod tests {
         let parser = make_parser();
         let request = parser.parse(r#"content:~"text"^0.8"#).await.unwrap();
 
-        let vector = request.vector_search_request.unwrap();
-        assert!((vector.query_vectors[0].weight - 0.8).abs() < f32::EPSILON);
+        let vq = assert_vector_only(&request);
+        let vecs = get_vectors(vq);
+        assert!((vecs[0].weight - 0.8).abs() < f32::EPSILON);
     }
 
     #[tokio::test]
@@ -345,12 +379,12 @@ mod tests {
         let parser = make_parser();
         let request = parser.parse(r#"a:~"x" b:~"y"^0.5"#).await.unwrap();
 
-        assert!(request.lexical_search_request.is_none());
-        let vector = request.vector_search_request.unwrap();
-        assert_eq!(vector.query_vectors.len(), 2);
-        assert_eq!(vector.query_vectors[0].fields.as_ref().unwrap()[0], "a");
-        assert_eq!(vector.query_vectors[1].fields.as_ref().unwrap()[0], "b");
-        assert!((vector.query_vectors[1].weight - 0.5).abs() < f32::EPSILON);
+        let vq = assert_vector_only(&request);
+        let vecs = get_vectors(vq);
+        assert_eq!(vecs.len(), 2);
+        assert_eq!(vecs[0].fields.as_ref().unwrap()[0], "a");
+        assert_eq!(vecs[1].fields.as_ref().unwrap()[0], "b");
+        assert!((vecs[1].weight - 0.5).abs() < f32::EPSILON);
     }
 
     #[tokio::test]
@@ -361,8 +395,7 @@ mod tests {
             .await
             .unwrap();
 
-        assert!(request.lexical_search_request.is_some());
-        assert!(request.vector_search_request.is_some());
+        assert_hybrid(&request);
         assert!(request.fusion_algorithm.is_some());
     }
 
@@ -376,8 +409,7 @@ mod tests {
             .await
             .unwrap();
 
-        assert!(request.lexical_search_request.is_some());
-        assert!(request.vector_search_request.is_some());
+        assert_hybrid(&request);
     }
 
     #[tokio::test]
@@ -386,14 +418,9 @@ mod tests {
         // Lexical uses default field "title", vector uses default field "content"
         let request = parser.parse(r#"hello ~"cats""#).await.unwrap();
 
-        assert!(request.lexical_search_request.is_some());
-        assert!(request.vector_search_request.is_some());
-
-        let vector = request.vector_search_request.unwrap();
-        assert_eq!(
-            vector.query_vectors[0].fields.as_ref().unwrap()[0],
-            "content"
-        );
+        let (_, vq) = assert_hybrid(&request);
+        let vecs = get_vectors(vq);
+        assert_eq!(vecs[0].fields.as_ref().unwrap()[0], "content");
     }
 
     #[tokio::test]
@@ -406,7 +433,7 @@ mod tests {
     #[tokio::test]
     async fn test_custom_fusion() {
         let analyzer = Arc::new(StandardAnalyzer::new().unwrap());
-        let lexical = QueryParser::new(analyzer).with_default_field("title");
+        let lexical = LexicalQueryParser::new(analyzer).with_default_field("title");
         let embedder: Arc<dyn Embedder> = Arc::new(MockEmbedder);
         let vector = VectorQueryParser::new(embedder).with_default_field("content");
         let parser =
@@ -437,13 +464,11 @@ mod tests {
         let parser = make_parser();
         let request = parser.parse(r#"content:~"日本語テスト""#).await.unwrap();
 
-        let vector = request.vector_search_request.unwrap();
-        assert_eq!(vector.query_vectors.len(), 1);
-        assert_eq!(
-            vector.query_vectors[0].fields.as_ref().unwrap()[0],
-            "content"
-        );
-        assert_eq!(vector.query_vectors[0].vector.len(), 4);
+        let vq = assert_vector_only(&request);
+        let vecs = get_vectors(vq);
+        assert_eq!(vecs.len(), 1);
+        assert_eq!(vecs[0].fields.as_ref().unwrap()[0], "content");
+        assert_eq!(vecs[0].vector.dimension(), 4);
     }
 
     // -- Tests for clean_lexical_string helper --

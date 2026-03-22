@@ -98,13 +98,14 @@ engine.commit().await?;
 `SearchRequestBuilder` とクエリを使ってインデックスを検索します:
 
 ```rust
-use laurus::{SearchRequestBuilder, LexicalSearchRequest};
+use laurus::SearchRequestBuilder;
 use laurus::lexical::TermQuery;
+use laurus::lexical::search::searcher::LexicalSearchQuery;
 
 // Search for "rust" in the "body" field
 let request = SearchRequestBuilder::new()
-    .lexical_search_request(
-        LexicalSearchRequest::new(
+    .lexical_query(
+        LexicalSearchQuery::Obj(
             Box::new(TermQuery::new("body", "rust"))
         )
     )
@@ -130,10 +131,10 @@ for result in &results {
 ```rust
 use std::sync::Arc;
 use laurus::{
-    Document, Engine, LexicalSearchRequest,
-    Result, Schema, SearchRequestBuilder,
+    Document, Engine, Result, Schema, SearchRequestBuilder,
 };
 use laurus::lexical::{TextOption, TermQuery};
+use laurus::lexical::search::searcher::LexicalSearchQuery;
 use laurus::storage::memory::MemoryStorage;
 
 #[tokio::main]
@@ -167,8 +168,8 @@ async fn main() -> Result<()> {
 
     // 5. Search
     let request = SearchRequestBuilder::new()
-        .lexical_search_request(
-            LexicalSearchRequest::new(
+        .lexical_query(
+            LexicalSearchQuery::Obj(
                 Box::new(TermQuery::new("body", "rust"))
             )
         )

@@ -9,7 +9,7 @@ use crate::vector::index::hnsw::reader::HnswIndexReader;
 use crate::vector::reader::VectorIndexReader;
 use crate::vector::search::searcher::VectorIndexSearcher;
 use crate::vector::search::searcher::{
-    VectorIndexSearchRequest, VectorIndexSearchResults, VectorSearchResult,
+    VectorIndexQuery, VectorIndexQueryResult, VectorIndexQueryResults,
 };
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, HashSet};
@@ -39,7 +39,7 @@ impl HnswSearcher {
 }
 
 impl VectorIndexSearcher for HnswSearcher {
-    fn search(&self, request: &VectorIndexSearchRequest) -> Result<VectorIndexSearchResults> {
+    fn search(&self, request: &VectorIndexQuery) -> Result<VectorIndexQueryResults> {
         use std::time::Instant;
 
         let start = Instant::now();
@@ -56,7 +56,7 @@ impl VectorIndexSearcher for HnswSearcher {
         }
 
         // Fallback to Linear Scan (brute-force over all vectors)
-        let mut results = VectorIndexSearchResults::new();
+        let mut results = VectorIndexQueryResults::new();
 
         let mut vector_ids = self.index_reader.vector_ids()?;
 
@@ -102,7 +102,7 @@ impl VectorIndexSearcher for HnswSearcher {
 
             results
                 .results
-                .push(crate::vector::search::searcher::VectorSearchResult {
+                .push(crate::vector::search::searcher::VectorIndexQueryResult {
                     doc_id,
                     field_name,
                     similarity,
@@ -115,7 +115,7 @@ impl VectorIndexSearcher for HnswSearcher {
         Ok(results)
     }
 
-    fn count(&self, request: VectorIndexSearchRequest) -> Result<u64> {
+    fn count(&self, request: VectorIndexQuery) -> Result<u64> {
         // Get all vector IDs with field names
         let vector_ids = self.index_reader.vector_ids()?;
 
@@ -184,12 +184,12 @@ impl HnswSearcher {
         &self,
         reader: &HnswIndexReader,
         graph: &HnswGraph,
-        request: &VectorIndexSearchRequest,
+        request: &VectorIndexQuery,
         field_name: &str,
-    ) -> Result<VectorIndexSearchResults> {
+    ) -> Result<VectorIndexQueryResults> {
         let entry_point = match graph.entry_point {
             Some(ep) => ep,
-            None => return Ok(VectorIndexSearchResults::new()),
+            None => return Ok(VectorIndexQueryResults::new()),
         };
 
         let query = &request.query;
@@ -290,7 +290,7 @@ impl HnswSearcher {
                     continue;
                 }
 
-                final_results.push(VectorSearchResult {
+                final_results.push(VectorIndexQueryResult {
                     doc_id: c.id,
                     field_name: field_name.to_string(),
                     similarity,
@@ -315,7 +315,7 @@ impl HnswSearcher {
         let top_k = request.params.top_k.min(final_results.len());
         final_results.truncate(top_k);
 
-        Ok(VectorIndexSearchResults {
+        Ok(VectorIndexQueryResults {
             results: final_results,
             candidates_examined: visited.len(),
             search_time_ms: 0.0, // Set by caller

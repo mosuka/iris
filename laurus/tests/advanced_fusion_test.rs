@@ -7,9 +7,11 @@ use laurus::lexical::TextOption;
 use laurus::storage::file::FileStorageConfig;
 use laurus::storage::{StorageConfig, StorageFactory};
 use laurus::vector::HnswOption;
-use laurus::vector::VectorSearchRequestBuilder;
+use laurus::vector::Vector;
 use laurus::{FieldOption, Schema};
-use laurus::{FusionAlgorithm, LexicalSearchRequest, SearchRequestBuilder};
+use laurus::{
+    FusionAlgorithm, LexicalSearchQuery, QueryVector, SearchRequestBuilder, VectorSearchQuery,
+};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_advanced_fusion_normalization() -> laurus::Result<()> {
@@ -58,14 +60,14 @@ async fn test_advanced_fusion_normalization() -> laurus::Result<()> {
     let mut query_vec = vec![0.0; 128];
     query_vec[1] = 1.0;
     let request = SearchRequestBuilder::new()
-        .lexical_search_request(LexicalSearchRequest::new(Box::new(TermQuery::new(
+        .lexical_query(LexicalSearchQuery::Obj(Box::new(TermQuery::new(
             "title", "apple",
         ))))
-        .vector_search_request(
-            VectorSearchRequestBuilder::new()
-                .add_vector("embedding", query_vec)
-                .build(),
-        )
+        .vector_query(VectorSearchQuery::Vectors(vec![QueryVector {
+            vector: Vector::new(query_vec),
+            weight: 1.0,
+            fields: Some(vec!["embedding".into()]),
+        }]))
         .fusion_algorithm(FusionAlgorithm::WeightedSum {
             lexical_weight: 0.5,
             vector_weight: 0.5,
@@ -126,7 +128,7 @@ async fn test_field_boosts() -> laurus::Result<()> {
     // 4. Search for "rust" in both fields with different boosts
     // Case A: Boost title
     let req_a = SearchRequestBuilder::new()
-        .lexical_search_request(LexicalSearchRequest::new(Box::new(
+        .lexical_query(LexicalSearchQuery::Obj(Box::new(
             laurus::lexical::BooleanQueryBuilder::new()
                 .should(Box::new(TermQuery::new("title", "rust")))
                 .should(Box::new(TermQuery::new("body", "rust")))
@@ -148,7 +150,7 @@ async fn test_field_boosts() -> laurus::Result<()> {
 
     // Case B: Boost body
     let req_b = SearchRequestBuilder::new()
-        .lexical_search_request(LexicalSearchRequest::new(Box::new(
+        .lexical_query(LexicalSearchQuery::Obj(Box::new(
             laurus::lexical::BooleanQueryBuilder::new()
                 .should(Box::new(TermQuery::new("title", "rust")))
                 .should(Box::new(TermQuery::new("body", "rust")))

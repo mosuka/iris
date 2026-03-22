@@ -410,7 +410,7 @@ impl LexicalStore {
     /// # Example with QueryParser
     ///
     /// ```rust,no_run
-    /// use laurus::lexical::query::parser::QueryParser;
+    /// use laurus::lexical::query::parser::LexicalQueryParser;
     /// use laurus::lexical::search::searcher::LexicalSearchRequest;
     /// # use laurus::lexical::core::document::Document;
     /// # use laurus::lexical::store::LexicalStore;
@@ -424,7 +424,7 @@ impl LexicalStore {
     /// # let engine = LexicalStore::new(storage, LexicalIndexConfig::default()).unwrap();
     ///
     /// let analyzer = Arc::new(StandardAnalyzer::default());
-    /// let parser = QueryParser::new(analyzer).with_default_field("title");
+    /// let parser = LexicalQueryParser::new(analyzer).with_default_field("title");
     /// let query = parser.parse("rust AND programming").unwrap();
     /// let results = engine.search(LexicalSearchRequest::new(query)).unwrap();
     /// ```
@@ -558,9 +558,9 @@ impl LexicalStore {
     /// # Returns
     ///
     /// Returns `Result<QueryParser>` containing the configured parser.
-    pub fn query_parser(&self) -> Result<crate::lexical::query::parser::QueryParser> {
+    pub fn query_parser(&self) -> Result<crate::lexical::query::parser::LexicalQueryParser> {
         let analyzer = self.analyzer()?;
-        let mut parser = crate::lexical::query::parser::QueryParser::new(analyzer);
+        let mut parser = crate::lexical::query::parser::LexicalQueryParser::new(analyzer);
 
         if let Ok(fields) = self.index.default_fields()
             && !fields.is_empty()
@@ -950,8 +950,8 @@ mod tests {
         engine.commit().unwrap();
 
         // Search with QueryParser (Lucene style)
-        use crate::lexical::query::parser::QueryParser;
-        let parser = QueryParser::with_standard_analyzer()
+        use crate::lexical::query::parser::LexicalQueryParser;
+        let parser = LexicalQueryParser::with_standard_analyzer()
             .unwrap()
             .with_default_field("title");
 
@@ -976,9 +976,9 @@ mod tests {
 
         // Search specific field
         use crate::analysis::analyzer::standard::StandardAnalyzer;
-        use crate::lexical::query::parser::QueryParser;
+        use crate::lexical::query::parser::LexicalQueryParser;
         let analyzer = Arc::new(StandardAnalyzer::new().unwrap());
-        let parser = QueryParser::new(analyzer);
+        let parser = LexicalQueryParser::new(analyzer);
         let query = parser.parse_field("title", "hello world").unwrap();
         let results = engine.search(LexicalSearchRequest::new(query)).unwrap();
 

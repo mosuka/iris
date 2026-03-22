@@ -21,7 +21,7 @@ use crate::vector::index::hnsw::segment::manager::{ManagedSegmentInfo, SegmentMa
 use crate::vector::index::hnsw::segment::merge_engine::{MergeConfig, MergeEngine};
 use crate::vector::index::hnsw::writer::HnswIndexWriter;
 use crate::vector::search::searcher::{
-    VectorIndexSearchParams, VectorIndexSearchRequest, VectorIndexSearcher,
+    VectorIndexQuery, VectorIndexQueryParams, VectorIndexSearcher,
 };
 use crate::vector::store::config::VectorFieldConfig;
 use crate::vector::writer::VectorIndexWriterConfig;
@@ -371,12 +371,12 @@ impl SegmentedVectorField {
                 searcher.set_ef_search(opt.ef_construction.max(50) * 2);
             }
 
-            let params = VectorIndexSearchParams {
+            let params = VectorIndexQueryParams {
                 top_k: limit,
                 ..Default::default()
             };
 
-            let request = VectorIndexSearchRequest {
+            let request = VectorIndexQuery {
                 query: Vector::new(query.to_vec()),
                 params,
                 field_name: Some(self.name.clone()),
@@ -414,7 +414,7 @@ impl VectorFieldReader for SegmentedVectorField {
 
         for query in &request.query_vectors {
             let effective_weight = query.weight;
-            let query_vec = &query.vector;
+            let query_vec = &query.vector.data;
 
             // 1. Search Active
             let active_hits =

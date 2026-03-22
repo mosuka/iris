@@ -79,14 +79,14 @@ fn bench_hnsw_search(c: &mut Criterion) {
     let query_vector = generate_random_vector(dim);
 
     use laurus::vector::HnswSearcher;
-    use laurus::vector::VectorIndexSearchRequest;
+    use laurus::vector::VectorIndexQuery;
     use laurus::vector::VectorIndexSearcher;
 
     let searcher = HnswSearcher::new(reader).unwrap();
 
     group.bench_function("search_10_neighbors", |b| {
         b.iter(|| {
-            let request = VectorIndexSearchRequest::new(query_vector.clone()).top_k(10);
+            let request = VectorIndexQuery::new(query_vector.clone()).top_k(10);
             let _results = searcher.search(&request).unwrap();
         })
     });

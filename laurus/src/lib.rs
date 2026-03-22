@@ -90,7 +90,10 @@ pub use engine::schema::analyzer::{
 };
 pub use engine::schema::embedder::EmbedderDefinition;
 pub use engine::schema::{FieldOption, Schema};
-pub use engine::search::{FusionAlgorithm, SearchRequest, SearchRequestBuilder, SearchResult};
+pub use engine::search::{
+    FusionAlgorithm, LexicalSearchOptions, SearchQuery, SearchRequest, SearchRequestBuilder,
+    SearchResult, VectorSearchOptions, VectorSearchQuery,
+};
 pub use error::{LaurusError, Result};
 pub use lexical::core::field::{
     BooleanOption, BytesOption, DateTimeOption, FloatOption, GeoOption, IntegerOption, TextOption,
@@ -103,7 +106,9 @@ pub use storage::{Storage, StorageConfig, StorageFactory};
 pub use vector::core::distance::DistanceMetric;
 pub use vector::core::field::{FlatOption, HnswOption, IvfOption};
 pub use vector::core::quantization::QuantizationMethod;
-pub use vector::store::request::{QueryVector, VectorScoreMode, VectorSearchRequest};
+pub use vector::store::request::{
+    QueryPayload, QueryVector, VectorScoreMode, VectorSearchParams, VectorSearchRequest,
+};
 
 /// The crate version string, populated at compile time from `Cargo.toml`.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

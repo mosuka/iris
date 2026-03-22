@@ -187,7 +187,7 @@ Score mode cannot be set from DSL syntax. Use the Rust API to override:
 
 ```rust
 let mut request = parser.parse(r#"content:~"cats" image:~"dogs""#).await?;
-request.score_mode = VectorScoreMode::MaxSim;
+request.vector_options.score_mode = VectorScoreMode::MaxSim;
 ```
 
 ### Vector PEG Grammar
@@ -294,9 +294,8 @@ let unified = UnifiedQueryParser::new(lexical_parser, vector_parser);
 let request = unified.parse(
     r#"title:hello content:~"cute kitten"^0.8"#
 ).await?;
-// request.lexical_search_request  -> Some(...)  — lexical query
-// request.vector_search_request   -> Some(...)  — vector query
-// request.fusion_algorithm        -> Some(RRF)  — fusion algorithm
+// request.query              -> SearchQuery::Hybrid { lexical, vector }
+// request.fusion_algorithm   -> Some(RRF)  — fusion algorithm
 ```
 
 ### Custom Fusion

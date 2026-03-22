@@ -15,8 +15,8 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
-use laurus::lexical::query::parser::QueryParser;
-use laurus::{Document, Engine, FieldOption, LexicalSearchRequest, Schema, SearchRequestBuilder};
+use laurus::lexical::query::parser::LexicalQueryParser;
+use laurus::{Document, Engine, FieldOption, LexicalSearchQuery, Schema, SearchRequestBuilder};
 use rustyline::DefaultEditor;
 
 use crate::commands::create;
@@ -297,14 +297,14 @@ async fn handle_search(
     format: OutputFormat,
 ) -> Result<()> {
     let mut parser =
-        QueryParser::with_standard_analyzer().context("Failed to create query parser")?;
+        LexicalQueryParser::with_standard_analyzer().context("Failed to create query parser")?;
     if !schema.default_fields.is_empty() {
         parser = parser.with_default_fields(schema.default_fields.clone());
     }
 
     let query = parser.parse(query_str)?;
     let request = SearchRequestBuilder::new()
-        .lexical_search_request(LexicalSearchRequest::new(query))
+        .lexical_query(LexicalSearchQuery::Obj(query))
         .limit(10)
         .build();
 

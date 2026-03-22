@@ -363,6 +363,40 @@ impl Engine {
         self.vector.embedder()
     }
 
+    /// Create a [`UnifiedQueryParser`] configured for this engine.
+    ///
+    /// The returned parser uses the engine's analyzer for lexical queries
+    /// and the engine's embedder for vector queries. Default fields are
+    /// derived from the schema: `default_fields` for lexical queries, and
+    /// all vector fields for vector queries.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the lexical query parser cannot be constructed
+    /// (e.g. the analyzer is misconfigured).
+    pub fn unified_query_parser(&self) -> Result<self::query::UnifiedQueryParser> {
+        let lexical_parser = self.lexical.query_parser()?;
+        let embedder = self.embedder();
+
+        let schema = self.schema.read();
+        let vector_fields: Vec<String> = schema
+            .fields
+            .iter()
+            .filter(|(_, opt)| opt.is_vector())
+            .map(|(name, _)| name.clone())
+            .collect();
+
+        let mut vector_parser = crate::vector::query::parser::VectorQueryParser::new(embedder);
+        if !vector_fields.is_empty() {
+            vector_parser = vector_parser.with_default_fields(vector_fields);
+        }
+
+        Ok(self::query::UnifiedQueryParser::new(
+            lexical_parser,
+            vector_parser,
+        ))
+    }
+
     /// Dynamically add a new field to the engine at runtime.
     ///
     /// This method registers the field in both the engine schema and the
@@ -554,6 +588,112 @@ impl Engine {
                 let parser = self.lexical.query_parser()?;
                 parser.parse(&dsl)
             }
+        }
+    }
+
+    /// Resolve a [`SearchQuery`](self::search::SearchQuery) into internal
+    /// search request types for the lexical and vector stores.
+    ///
+    /// This method converts the public query enum variants into the
+    /// internal `LexicalSearchRequest` and `VectorSearchRequest` types,
+    /// applying the relevant options.
+    ///
+    /// # Parameters
+    ///
+    /// * `query` - The search query to resolve.
+    /// * `offset` - The pagination offset from the search request.
+    /// * `limit` - The result limit from the search request.
+    /// * `fusion_algorithm` - The caller-specified fusion algorithm, if any.
+    /// * `lexical_options` - Lexical search options.
+    /// * `vector_options` - Vector search options.
+    ///
+    /// # Errors
+    ///
+    /// Panics (via `unreachable!`) if called with `SearchQuery::Dsl`, which
+    /// must be resolved before calling this method.
+    fn resolve_search_query_from_parts(
+        &self,
+        query: self::search::SearchQuery,
+        offset: usize,
+        limit: usize,
+        fusion_algorithm: Option<FusionAlgorithm>,
+        lexical_options: &self::search::LexicalSearchOptions,
+        vector_options: &self::search::VectorSearchOptions,
+    ) -> Result<(
+        Option<crate::lexical::search::searcher::LexicalSearchRequest>,
+        Option<crate::vector::store::request::VectorSearchRequest>,
+        Option<FusionAlgorithm>,
+    )> {
+        let fetch_count = offset.saturating_add(limit);
+
+        match query {
+            self::search::SearchQuery::Dsl(_) => {
+                // DSL should be parsed by UnifiedQueryParser before calling this
+                unreachable!("DSL should be resolved before resolve_search_query_from_parts")
+            }
+            self::search::SearchQuery::Lexical(lexical_query) => {
+                let lex_req = crate::lexical::search::searcher::LexicalSearchRequest {
+                    query: lexical_query,
+                    params: crate::lexical::search::searcher::LexicalSearchParams {
+                        limit: 0, // Controlled by engine
+                        min_score: lexical_options.min_score,
+                        load_documents: true,
+                        timeout_ms: lexical_options.timeout_ms,
+                        parallel: lexical_options.parallel,
+                        sort_by: lexical_options.sort_by.clone(),
+                    },
+                    field_boosts: lexical_options.field_boosts.clone(),
+                };
+                Ok((Some(lex_req), None, None))
+            }
+            self::search::SearchQuery::Vector(vector_query) => {
+                let vec_req = self.build_vector_request(vector_query, vector_options, fetch_count);
+                Ok((None, Some(vec_req), None))
+            }
+            self::search::SearchQuery::Hybrid { lexical, vector } => {
+                let lex_req = crate::lexical::search::searcher::LexicalSearchRequest {
+                    query: lexical,
+                    params: crate::lexical::search::searcher::LexicalSearchParams {
+                        limit: 0, // Controlled by engine
+                        min_score: lexical_options.min_score,
+                        load_documents: true,
+                        timeout_ms: lexical_options.timeout_ms,
+                        parallel: lexical_options.parallel,
+                        sort_by: lexical_options.sort_by.clone(),
+                    },
+                    field_boosts: lexical_options.field_boosts.clone(),
+                };
+                let vec_req = self.build_vector_request(vector, vector_options, fetch_count);
+                let fusion = fusion_algorithm.or(Some(FusionAlgorithm::RRF { k: 60.0 }));
+                Ok((Some(lex_req), Some(vec_req), fusion))
+            }
+        }
+    }
+
+    /// Build a [`VectorSearchRequest`](crate::vector::store::request::VectorSearchRequest)
+    /// from a [`VectorSearchQuery`](self::search::VectorSearchQuery) and options.
+    ///
+    /// # Parameters
+    ///
+    /// * `query` - The vector search query (payloads or pre-embedded vectors).
+    /// * `opts` - Vector search options (score mode, min score).
+    /// * `limit` - Maximum number of results to fetch.
+    fn build_vector_request(
+        &self,
+        query: self::search::VectorSearchQuery,
+        opts: &self::search::VectorSearchOptions,
+        limit: usize,
+    ) -> crate::vector::store::request::VectorSearchRequest {
+        crate::vector::store::request::VectorSearchRequest {
+            query,
+            params: crate::vector::search::searcher::VectorSearchParams {
+                fields: None,
+                limit,
+                score_mode: opts.score_mode,
+                overfetch: 2.0,
+                min_score: opts.min_score,
+                allowed_ids: None,
+            },
         }
     }
 
@@ -750,7 +890,8 @@ impl Engine {
                 }
             }
 
-            Some(Arc::new(per_field) as Arc<dyn crate::embedding::embedder::Embedder>)
+            let emb: Arc<dyn crate::embedding::embedder::Embedder> = Arc::new(per_field);
+            Some(emb)
         } else {
             None
         };
@@ -773,17 +914,28 @@ impl Engine {
 
     /// Search the index.
     ///
-    /// Supports three modes depending on which fields of the
-    /// [`SearchRequest`](self::search::SearchRequest) are populated:
+    /// Supports three modes depending on how the
+    /// [`SearchRequest`](self::search::SearchRequest) is configured:
     ///
-    /// - **Lexical only**: When only `lexical_search_request` is set,
-    ///   performs BM25-scored lexical search.
-    /// - **Vector only**: When only `vector_search_request` is set,
-    ///   performs nearest-neighbor vector search. If `query_payloads` are
-    ///   present (raw text/bytes), they are embedded into vectors via the
-    ///   configured embedder before searching.
-    /// - **Hybrid**: When both are set, both searches run and results are
-    ///   merged using the configured `fusion_algorithm` (defaults to
+    /// - **Unified query DSL** (via `query_dsl`): The query string is
+    ///   parsed using [`UnifiedQueryParser`](self::query::UnifiedQueryParser)
+    ///   to automatically extract lexical and/or vector components. This is
+    ///   the recommended approach for external callers.
+    /// - **Structured fields** (via `lexical_search_request` /
+    ///   `vector_search_request`): Lower-level API for programmatic use.
+    ///
+    /// When `query_dsl` is set, it is parsed first, and the resulting
+    /// lexical/vector components replace any explicitly set fields. The
+    /// `fusion_algorithm`, `limit`, `offset`, and `filter_query` fields
+    /// from the original request are preserved.
+    ///
+    /// After resolving the query source, the engine executes the
+    /// appropriate search mode:
+    ///
+    /// - **Lexical only**: BM25-scored inverted index search.
+    /// - **Vector only**: Nearest-neighbor vector search.
+    /// - **Hybrid**: Both searches run and results are merged using the
+    ///   configured `fusion_algorithm` (defaults to
     ///   [`RRF { k: 60.0 }`](FusionAlgorithm::RRF)).
     ///
     /// When a `filter_query` is present, it is evaluated first to determine
@@ -805,67 +957,115 @@ impl Engine {
     ///
     /// # Errors
     ///
-    /// Returns an error if the filter query execution, lexical search,
-    /// vector search, embedding, or document retrieval fails.
+    /// Returns an error if the unified query parsing, filter query
+    /// execution, lexical search, vector search, embedding, or document
+    /// retrieval fails.
     pub async fn search(
         &self,
         request: self::search::SearchRequest,
     ) -> Result<Vec<self::search::SearchResult>> {
-        // 0. Pre-process Filter
-        let (allowed_ids, lexical_query_override) =
-            if let Some(filter_query) = &request.filter_query {
-                let req = crate::lexical::search::searcher::LexicalSearchRequest::new(
-                    filter_query.clone_box(),
-                )
-                .limit(1_000_000)
-                .load_documents(false);
+        // 0a. Resolve query to internal search components
+        //
+        // When the query is a DSL string, parse it with UnifiedQueryParser to
+        // extract both lexical and vector components. For other variants,
+        // construct the internal request types from the query + options.
+        //
+        // Destructure the request upfront so that `query` can be moved
+        // independently while the remaining fields stay available.
+        let self::search::SearchRequest {
+            query: request_query,
+            limit: request_limit,
+            offset: request_offset,
+            fusion_algorithm: request_fusion,
+            filter_query: request_filter,
+            lexical_options,
+            vector_options,
+        } = request;
 
-                let filter_hits = self.lexical.search(req)?.hits;
-                let ids: Vec<u64> = filter_hits.into_iter().map(|h| h.doc_id).collect();
+        let (lexical_search_request, vector_search_request, fusion_algorithm) = match request_query
+        {
+            self::search::SearchQuery::Dsl(ref dsl) => {
+                let parser = self.unified_query_parser()?;
+                let parser = if let Some(fusion) = request_fusion {
+                    parser.with_fusion(fusion)
+                } else {
+                    parser
+                };
+                let parsed = parser.parse(dsl).await?;
+                // UnifiedQueryParser now returns Lexical/Vector/Hybrid variants
+                self.resolve_search_query_from_parts(
+                    parsed.query,
+                    request_offset,
+                    request_limit,
+                    request_fusion,
+                    &lexical_options,
+                    &vector_options,
+                )?
+            }
+            other => self.resolve_search_query_from_parts(
+                other,
+                request_offset,
+                request_limit,
+                request_fusion,
+                &lexical_options,
+                &vector_options,
+            )?,
+        };
 
-                if ids.is_empty() {
-                    return Ok(Vec::new());
-                }
+        // 0b. Pre-process Filter
+        let (allowed_ids, lexical_query_override) = if let Some(filter_query) = &request_filter {
+            let req = crate::lexical::search::searcher::LexicalSearchRequest::new(
+                filter_query.clone_box(),
+            )
+            .limit(1_000_000)
+            .load_documents(false);
 
-                let new_lexical_query: Option<Box<dyn crate::lexical::query::Query>> =
-                    if let Some(lex_req) = &request.lexical_search_request {
-                        use crate::lexical::query::boolean::BooleanQueryBuilder;
-                        let user_query = self.resolve_query(lex_req.query.clone())?;
-                        let bool_query = BooleanQueryBuilder::new()
-                            .must(user_query)
-                            .filter(filter_query.clone_box())
-                            .build();
-                        Some(Box::new(bool_query))
-                    } else {
-                        None
-                    };
+            let filter_hits = self.lexical.search(req)?.hits;
+            let ids: Vec<u64> = filter_hits.into_iter().map(|h| h.doc_id).collect();
 
-                (Some(ids), new_lexical_query)
-            } else {
-                (None, None)
-            };
+            if ids.is_empty() {
+                return Ok(Vec::new());
+            }
+
+            let new_lexical_query: Option<Box<dyn crate::lexical::query::Query>> =
+                if let Some(lex_req) = &lexical_search_request {
+                    use crate::lexical::query::boolean::BooleanQueryBuilder;
+                    let user_query = self.resolve_query(lex_req.query.clone())?;
+                    let bool_query = BooleanQueryBuilder::new()
+                        .must(user_query)
+                        .filter(filter_query.clone_box())
+                        .build();
+                    Some(Box::new(bool_query))
+                } else {
+                    None
+                };
+
+            (Some(ids), new_lexical_query)
+        } else {
+            (None, None)
+        };
 
         // 1. Execute Lexical Search
         let mut lexical_query_to_use = if lexical_query_override.is_some() {
             lexical_query_override
-        } else if let Some(lex_req) = &request.lexical_search_request {
+        } else if let Some(lex_req) = &lexical_search_request {
             Some(self.resolve_query(lex_req.query.clone())?)
         } else {
             None
         };
 
         if let Some(query) = &mut lexical_query_to_use
-            && let Some(lex_req) = &request.lexical_search_request
+            && let Some(lex_req) = &lexical_search_request
             && !lex_req.field_boosts.is_empty()
         {
             query.apply_field_boosts(&lex_req.field_boosts);
         }
 
-        let fetch_count = request.offset.saturating_add(request.limit);
+        let fetch_count = request_offset.saturating_add(request_limit);
 
         let lexical_hits = if let Some(query) = &lexical_query_to_use {
             let q = query.clone_box();
-            let overfetch_limit = if request.vector_search_request.is_some() {
+            let overfetch_limit = if vector_search_request.is_some() {
                 fetch_count.saturating_mul(2)
             } else {
                 fetch_count
@@ -879,31 +1079,33 @@ impl Engine {
         };
 
         // 2. Execute Vector Search
-        let vector_hits = if let Some(vector_req) = &request.vector_search_request {
+        let vector_hits = if let Some(vector_req) = &vector_search_request {
             let mut vreq = vector_req.clone();
-            if request.lexical_search_request.is_some()
-                && vreq.limit < fetch_count.saturating_mul(2)
+            if lexical_search_request.is_some() && vreq.params.limit < fetch_count.saturating_mul(2)
             {
-                vreq.limit = fetch_count.saturating_mul(2);
+                vreq.params.limit = fetch_count.saturating_mul(2);
             }
             if let Some(ids) = &allowed_ids {
-                vreq.allowed_ids = Some(ids.clone());
+                vreq.params.allowed_ids = Some(ids.clone());
             }
-            // Embed query_payloads into query_vectors before searching.
-            // NOTE: When using VectorQueryParser, query_vectors are already populated
+            // Embed Payloads into Vectors before searching.
+            // NOTE: When using VectorQueryParser, query is already Vectors
             // at parse time, so this block is skipped. This fallback remains for
-            // VectorSearchRequestBuilder users who populate query_payloads directly.
-            if !vreq.query_payloads.is_empty() {
+            // VectorSearchRequestBuilder users who populate Payloads directly.
+            if let crate::vector::search::searcher::VectorSearchQuery::Payloads(ref payloads) =
+                vreq.query
+            {
                 use crate::data::DataValue;
                 use crate::embedding::embedder::EmbedInput;
                 use crate::embedding::per_field::PerFieldEmbedder;
                 use crate::vector::store::request::QueryVector;
 
                 let embedder = self.vector.embedder();
-                for payload in vreq.query_payloads.drain(..) {
-                    let (text_owned, bytes_owned, mime_owned) = match payload.payload {
-                        DataValue::Text(t) => (Some(t), None, None),
-                        DataValue::Bytes(b, m) => (None, Some(b), m),
+                let mut query_vectors = Vec::new();
+                for payload in payloads {
+                    let (text_owned, bytes_owned, mime_owned) = match &payload.payload {
+                        DataValue::Text(t) => (Some(t.clone()), None, None),
+                        DataValue::Bytes(b, m) => (None, Some(b.clone()), m.clone()),
                         _ => continue,
                     };
                     let field_name = payload.field.clone();
@@ -920,12 +1122,14 @@ impl Engine {
                         } else {
                             embedder.embed(&input).await?
                         };
-                    vreq.query_vectors.push(QueryVector {
-                        vector: vector.data,
+                    query_vectors.push(QueryVector {
+                        vector,
                         weight: payload.weight,
-                        fields: Some(vec![payload.field]),
+                        fields: Some(vec![payload.field.clone()]),
                     });
                 }
+                vreq.query =
+                    crate::vector::search::searcher::VectorSearchQuery::Vectors(query_vectors);
             }
             self.vector.search(vreq)?.hits
         } else {
@@ -933,24 +1137,22 @@ impl Engine {
         };
 
         // 3. Fusion
-        if request.lexical_search_request.is_some() && request.vector_search_request.is_some() {
-            let algorithm = request
-                .fusion_algorithm
-                .unwrap_or(FusionAlgorithm::RRF { k: 60.0 });
+        if lexical_search_request.is_some() && vector_search_request.is_some() {
+            let algorithm = fusion_algorithm.unwrap_or(FusionAlgorithm::RRF { k: 60.0 });
             let mut results =
                 self.fuse_results(lexical_hits, vector_hits, algorithm, fetch_count)?;
-            if request.offset > 0 {
-                results = results.into_iter().skip(request.offset).collect();
+            if request_offset > 0 {
+                results = results.into_iter().skip(request_offset).collect();
             }
-            results.truncate(request.limit);
+            results.truncate(request_limit);
             Ok(results)
         } else if !vector_hits.is_empty() {
             // Only vector results — resolve external IDs and load documents
-            let mut results = Vec::with_capacity(request.limit);
+            let mut results = Vec::with_capacity(request_limit);
             for hit in vector_hits
                 .into_iter()
-                .skip(request.offset)
-                .take(request.limit)
+                .skip(request_offset)
+                .take(request_limit)
             {
                 let external_id = self.resolve_external_id(hit.doc_id)?;
                 let document = self.get_document_by_internal_id(hit.doc_id)?;
@@ -963,11 +1165,11 @@ impl Engine {
             Ok(results)
         } else {
             // Only lexical results (or both empty)
-            let mut results = Vec::with_capacity(request.limit);
+            let mut results = Vec::with_capacity(request_limit);
             for hit in lexical_hits
                 .into_iter()
-                .skip(request.offset)
-                .take(request.limit)
+                .skip(request_offset)
+                .take(request_limit)
             {
                 let external_id = self.resolve_external_id(hit.doc_id)?;
                 results.push(SearchResult {
@@ -1260,7 +1462,7 @@ mod tests {
         use crate::data::DataValue;
         use crate::engine::schema::FieldOption;
         use crate::lexical::core::field::TextOption;
-        use crate::lexical::search::searcher::LexicalSearchRequest;
+        use crate::lexical::search::searcher::LexicalSearchQuery;
 
         let storage: Arc<dyn Storage> = Arc::new(MemoryStorage::new(Default::default()));
 
@@ -1288,7 +1490,7 @@ mod tests {
 
         // "Rust Lang" as keyword — exact match required.
         let request = crate::engine::search::SearchRequestBuilder::new()
-            .lexical_search_request(LexicalSearchRequest::from_dsl("category:\"Rust Lang\""))
+            .lexical_query(LexicalSearchQuery::from("category:\"Rust Lang\""))
             .limit(10)
             .build();
         let results = engine.search(request).await.unwrap();
@@ -1300,7 +1502,7 @@ mod tests {
 
         // Partial token "Rust" should NOT match keyword-analyzed category.
         let request = crate::engine::search::SearchRequestBuilder::new()
-            .lexical_search_request(LexicalSearchRequest::from_dsl("category:Rust"))
+            .lexical_query(LexicalSearchQuery::from("category:Rust"))
             .limit(10)
             .build();
         let results = engine.search(request).await.unwrap();
@@ -1311,7 +1513,7 @@ mod tests {
 
         // Standard-analyzed "body" field should match single token "rust".
         let request = crate::engine::search::SearchRequestBuilder::new()
-            .lexical_search_request(LexicalSearchRequest::from_dsl("body:rust"))
+            .lexical_query(LexicalSearchQuery::from("body:rust"))
             .limit(10)
             .build();
         let results = engine.search(request).await.unwrap();
@@ -1330,7 +1532,7 @@ mod tests {
             AnalyzerDefinition, CharFilterConfig, TokenFilterConfig, TokenizerConfig,
         };
         use crate::lexical::core::field::TextOption;
-        use crate::lexical::search::searcher::LexicalSearchRequest;
+        use crate::lexical::search::searcher::LexicalSearchQuery;
 
         let storage: Arc<dyn Storage> = Arc::new(MemoryStorage::new(Default::default()));
 
@@ -1365,7 +1567,7 @@ mod tests {
 
         // Search for "hello" should match (NFKC + lowercase).
         let request = crate::engine::search::SearchRequestBuilder::new()
-            .lexical_search_request(LexicalSearchRequest::from_dsl("content:hello"))
+            .lexical_query(LexicalSearchQuery::from("content:hello"))
             .limit(10)
             .build();
         let results = engine.search(request).await.unwrap();
@@ -1416,9 +1618,9 @@ mod tests {
         engine.commit().await.unwrap();
 
         // Search on the dynamically added field.
-        use crate::lexical::search::searcher::LexicalSearchRequest;
+        use crate::lexical::search::searcher::LexicalSearchQuery;
         let request = crate::engine::search::SearchRequestBuilder::new()
-            .lexical_search_request(LexicalSearchRequest::from_dsl("category:programming"))
+            .lexical_query(LexicalSearchQuery::from("category:programming"))
             .limit(10)
             .build();
         let results = engine.search(request).await.unwrap();

@@ -91,29 +91,21 @@ cargo doc --open
 | メソッド | 説明 |
 | :--- | :--- |
 | `SearchRequestBuilder::new()` | 新しいBuilderを作成 |
-| `.lexical_search_request(req)` | Lexical検索コンポーネントを設定 |
-| `.vector_search_request(req)` | Vector検索コンポーネントを設定 |
+| `.query_dsl(dsl)` | 統合DSLクエリ文字列を設定 |
+| `.lexical_query(query)` | Lexical検索クエリを設定（`LexicalSearchQuery`） |
+| `.vector_query(query)` | Vector検索クエリを設定（`VectorSearchQuery`） |
 | `.filter_query(query)` | プレフィルタクエリを設定 |
 | `.fusion_algorithm(algo)` | フュージョンアルゴリズムを設定（デフォルト: RRF） |
 | `.limit(n)` | 最大結果数（デフォルト: 10） |
 | `.offset(n)` | N件スキップ（デフォルト: 0） |
+| `.add_field_boost(field, boost)` | Lexical検索のフィールドブーストを追加 |
+| `.lexical_min_score(f32)` | Lexical検索の最小スコアしきい値 |
+| `.lexical_timeout_ms(u64)` | Lexical検索のタイムアウト（ミリ秒） |
+| `.lexical_parallel(bool)` | Lexical検索の並列実行を有効化 |
+| `.sort_by(SortField)` | Lexical検索のソート順を設定 |
+| `.vector_score_mode(VectorScoreMode)` | Vector検索のスコア結合モードを設定 |
+| `.vector_min_score(f32)` | Vector検索の最小スコアしきい値 |
 | `.build()` | `SearchRequest` を構築 |
-
-### LexicalSearchRequest
-
-| メソッド | 説明 |
-| :--- | :--- |
-| `LexicalSearchRequest::new(query)` | クエリで作成 |
-| `LexicalSearchRequest::from_dsl(query_str)` | DSLクエリ文字列から作成 |
-| `.limit(n)` | 最大結果数 |
-| `.load_documents(bool)` | ドキュメント内容をロードするかどうか |
-| `.min_score(f32)` | 最小スコアしきい値 |
-| `.timeout_ms(u64)` | 検索タイムアウト（ミリ秒） |
-| `.parallel(bool)` | 並列検索を有効化 |
-| `.sort_by_field_asc(field)` | フィールドで昇順ソート |
-| `.sort_by_field_desc(field)` | フィールドで降順ソート |
-| `.sort_by_score()` | 関連度スコアでソート（デフォルト） |
-| `.with_field_boost(field, boost)` | フィールドレベルのブーストを追加 |
 
 ### VectorSearchRequestBuilder
 

@@ -7,7 +7,7 @@
 use std::path::Path;
 
 use anyhow::{Context, Result};
-use laurus::lexical::query::parser::QueryParser;
+use laurus::lexical::query::parser::LexicalQueryParser;
 use laurus::vector::query::parser::VectorQueryParser;
 use laurus::{Schema, UnifiedQueryParser};
 
@@ -49,7 +49,7 @@ pub async fn run(cmd: SearchCommand, index_dir: &Path, format: OutputFormat) -> 
 
     // Build the lexical parser with default fields from the schema.
     let mut lexical_parser =
-        QueryParser::with_standard_analyzer().context("Failed to create query parser")?;
+        LexicalQueryParser::with_standard_analyzer().context("Failed to create query parser")?;
     if !schema.default_fields.is_empty() {
         lexical_parser = lexical_parser.with_default_fields(schema.default_fields);
     }

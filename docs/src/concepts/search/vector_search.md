@@ -8,21 +8,27 @@ Vector search finds documents by semantic similarity. Instead of matching keywor
 
 ```rust
 use laurus::SearchRequestBuilder;
-use laurus::vector::VectorSearchRequestBuilder;
+use laurus::vector::search::searcher::VectorSearchQuery;
+use laurus::vector::store::request::QueryPayload;
+use laurus::data::DataValue;
 
 let request = SearchRequestBuilder::new()
-    .vector_search_request(
-        VectorSearchRequestBuilder::new()
-            .add_text("embedding", "systems programming language")
-            .limit(10)
-            .build()
+    .vector_query(
+        VectorSearchQuery::Payloads(vec![
+            QueryPayload {
+                field: "embedding".to_string(),
+                payload: DataValue::Text("systems programming language".to_string()),
+                weight: 1.0,
+            },
+        ])
     )
+    .limit(10)
     .build();
 
 let results = engine.search(request).await?;
 ```
 
-The `add_text()` method stores the text as a query payload. At search time, the engine embeds it using the configured embedder and then searches the vector index.
+The `QueryPayload` stores raw data (text, bytes, etc.) that will be embedded at search time using the configured embedder.
 
 ### Query DSL
 
@@ -35,53 +41,79 @@ let parser = VectorQueryParser::new(embedder.clone())
 let request = parser.parse(r#"embedding:~"systems programming""#).await?;
 ```
 
-## VectorSearchRequestBuilder
+## VectorSearchQuery
 
-The builder API provides fine-grained control:
+The vector search query is specified as a `VectorSearchQuery` enum:
+
+| Variant | Description |
+| :--- | :--- |
+| `Payloads(Vec<QueryPayload>)` | Raw payloads (text, bytes, etc.) to be embedded at search time |
+| `Vectors(Vec<QueryVector>)` | Pre-embedded query vectors ready for nearest-neighbor search |
+
+### QueryPayload
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `field` | `String` | Target vector field name |
+| `payload` | `DataValue` | The payload to embed (e.g., `DataValue::Text(...)`) |
+| `weight` | `f32` | Score weight (default: 1.0) |
+
+### QueryVector
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `vector` | `Vector` | Pre-computed dense vector embedding |
+| `weight` | `f32` | Score weight (default: 1.0) |
+| `fields` | `Option<Vec<String>>` | Optional field restriction |
+
+### Examples
 
 ```rust
-use laurus::vector::VectorSearchRequestBuilder;
-use laurus::vector::store::request::QueryVector;
+use laurus::vector::search::searcher::VectorSearchQuery;
+use laurus::vector::store::request::{QueryPayload, QueryVector};
+use laurus::vector::core::vector::Vector;
+use laurus::data::DataValue;
 
-let request = VectorSearchRequestBuilder::new()
-    // Text query (will be embedded at search time)
-    .add_text("text_vec", "machine learning")
+// Text query (will be embedded at search time)
+let query = VectorSearchQuery::Payloads(vec![
+    QueryPayload {
+        field: "text_vec".to_string(),
+        payload: DataValue::Text("machine learning".to_string()),
+        weight: 1.0,
+    },
+]);
 
-    // Or use a pre-computed vector directly
-    .add_vector("embedding", vec![0.1, 0.2, 0.3, /* ... */])
-
-    // Search parameters
-    .limit(20)
-
-    .build();
+// Pre-computed vector
+let query = VectorSearchQuery::Vectors(vec![
+    QueryVector {
+        vector: Vector::from(vec![0.1, 0.2, 0.3]),
+        weight: 1.0,
+        fields: Some(vec!["embedding".to_string()]),
+    },
+]);
 ```
-
-### Methods
-
-| Method | Description |
-| :--- | :--- |
-| `add_text(field, text)` | Add a text query for a specific field (embedded at search time) |
-| `add_vector(field, vector)` | Add a pre-computed query vector for a specific field |
-| `add_vector_with_weight(field, vector, weight)` | Add a pre-computed vector with an explicit weight |
-| `add_payload(field, payload)` | Add a generic `DataValue` payload to be embedded |
-| `add_bytes(field, bytes, mime)` | Add a binary payload (e.g., image bytes for multimodal) |
-| `field(name)` | Restrict search to a specific field |
-| `fields(names)` | Restrict search to multiple fields |
-| `limit(n)` | Maximum number of results (default: 10) |
-| `score_mode(VectorScoreMode)` | Score combination mode (`WeightedSum`, `MaxSim`, `LateInteraction`) |
-| `min_score(f32)` | Minimum score threshold (default: 0.0) |
-| `overfetch(f32)` | Overfetch factor for better result quality (default: 1.0) |
-| `build()` | Build the `VectorSearchRequest` |
 
 ## Multi-Field Vector Search
 
 You can search across multiple vector fields in a single request:
 
 ```rust
-let request = VectorSearchRequestBuilder::new()
-    .add_text("text_vec", "cute kitten")
-    .add_text("image_vec", "fluffy cat")
-    .build();
+use laurus::vector::search::searcher::VectorSearchQuery;
+use laurus::vector::store::request::QueryPayload;
+use laurus::data::DataValue;
+
+let query = VectorSearchQuery::Payloads(vec![
+    QueryPayload {
+        field: "text_vec".to_string(),
+        payload: DataValue::Text("cute kitten".to_string()),
+        weight: 1.0,
+    },
+    QueryPayload {
+        field: "image_vec".to_string(),
+        payload: DataValue::Text("fluffy cat".to_string()),
+        weight: 1.0,
+    },
+]);
 ```
 
 Each clause produces a vector that is searched against its respective field. Results are combined using the configured score mode.
@@ -109,16 +141,22 @@ This means text similarity counts twice as much as image similarity.
 You can apply lexical filters to narrow the vector search results:
 
 ```rust
-use laurus::{SearchRequestBuilder, LexicalSearchRequest};
+use laurus::SearchRequestBuilder;
 use laurus::lexical::TermQuery;
-use laurus::vector::VectorSearchRequestBuilder;
+use laurus::vector::search::searcher::VectorSearchQuery;
+use laurus::vector::store::request::QueryPayload;
+use laurus::data::DataValue;
 
 // Vector search with a category filter
 let request = SearchRequestBuilder::new()
-    .vector_search_request(
-        VectorSearchRequestBuilder::new()
-            .add_text("embedding", "machine learning")
-            .build()
+    .vector_query(
+        VectorSearchQuery::Payloads(vec![
+            QueryPayload {
+                field: "embedding".to_string(),
+                payload: DataValue::Text("machine learning".to_string()),
+                weight: 1.0,
+            },
+        ])
     )
     .filter_query(Box::new(TermQuery::new("category", "tutorial")))
     .limit(10)
@@ -136,10 +174,14 @@ use laurus::lexical::NumericRangeQuery;
 use laurus::lexical::core::field::NumericType;
 
 let request = SearchRequestBuilder::new()
-    .vector_search_request(
-        VectorSearchRequestBuilder::new()
-            .add_text("embedding", "type systems")
-            .build()
+    .vector_query(
+        VectorSearchQuery::Payloads(vec![
+            QueryPayload {
+                field: "embedding".to_string(),
+                payload: DataValue::Text("type systems".to_string()),
+                weight: 1.0,
+            },
+        ])
     )
     .filter_query(Box::new(NumericRangeQuery::new(
         "year", NumericType::Integer,
@@ -168,7 +210,9 @@ use std::sync::Arc;
 use laurus::{Document, Engine, Schema, SearchRequestBuilder, PerFieldEmbedder};
 use laurus::lexical::TextOption;
 use laurus::vector::HnswOption;
-use laurus::vector::VectorSearchRequestBuilder;
+use laurus::vector::search::searcher::VectorSearchQuery;
+use laurus::vector::store::request::QueryPayload;
+use laurus::data::DataValue;
 use laurus::storage::memory::MemoryStorage;
 
 #[tokio::main]
@@ -204,10 +248,14 @@ async fn main() -> laurus::Result<()> {
     // Search by semantic similarity
     let results = engine.search(
         SearchRequestBuilder::new()
-            .vector_search_request(
-                VectorSearchRequestBuilder::new()
-                    .add_text("text_vec", "systems language")
-                    .build()
+            .vector_query(
+                VectorSearchQuery::Payloads(vec![
+                    QueryPayload {
+                        field: "text_vec".to_string(),
+                        payload: DataValue::Text("systems language".to_string()),
+                        weight: 1.0,
+                    },
+                ])
             )
             .limit(5)
             .build()

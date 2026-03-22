@@ -23,7 +23,7 @@ pub use boolean::{BooleanQuery, BooleanQueryBuilder};
 pub use fuzzy::FuzzyQuery;
 pub use geo::{GeoBoundingBox, GeoBoundingBoxQuery, GeoDistanceQuery, GeoPoint, GeoQuery};
 pub use multi_term::MultiTermQuery;
-pub use parser::QueryParser;
+pub use parser::LexicalQueryParser;
 pub use phrase::PhraseQuery;
 pub use prefix::PrefixQuery;
 pub use range::NumericRangeQuery;

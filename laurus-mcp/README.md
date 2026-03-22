@@ -65,7 +65,7 @@ Add the following to your Claude Desktop configuration file (`claude_desktop_con
 | `get_documents` | Retrieve all documents by ID |
 | `delete_documents` | Delete all documents by ID |
 | `commit` | Commit pending changes to disk |
-| `search` | Search documents using the Laurus query DSL |
+| `search` | Search documents using the Laurus unified query DSL (lexical, vector, hybrid) |
 
 ## Documentation
 

@@ -7,9 +7,9 @@ use laurus::lexical::TermQuery;
 use laurus::lexical::TextOption;
 use laurus::storage::file::FileStorageConfig;
 use laurus::storage::{StorageConfig, StorageFactory};
-use laurus::vector::VectorSearchRequestBuilder;
+use laurus::vector::Vector;
 use laurus::{DataValue, Document};
-use laurus::{FieldOption, LexicalSearchRequest, Schema};
+use laurus::{FieldOption, LexicalSearchQuery, QueryVector, Schema, VectorSearchQuery};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_unified_search_hybrid() -> laurus::Result<()> {
@@ -48,7 +48,7 @@ async fn test_unified_search_hybrid() -> laurus::Result<()> {
     // 4. Test Lexical Search (should find "doc1")
     let lexical_query = Box::new(TermQuery::new("title", "rust")) as Box<dyn Query>;
     let req = SearchRequestBuilder::new()
-        .lexical_search_request(LexicalSearchRequest::new(lexical_query))
+        .lexical_query(LexicalSearchQuery::Obj(lexical_query))
         .build();
 
     let results = engine.search(req).await?;
@@ -64,12 +64,12 @@ async fn test_unified_search_hybrid() -> laurus::Result<()> {
     );
 
     // 5. Test Vector Search (should find "doc2" which is closer to [0, 1, 0])
-    let vector_req = VectorSearchRequestBuilder::new()
-        .add_vector("embedding", vec![0.0, 1.0, 0.0])
-        .build();
-
     let req = SearchRequestBuilder::new()
-        .vector_search_request(vector_req)
+        .vector_query(VectorSearchQuery::Vectors(vec![QueryVector {
+            vector: Vector::new(vec![0.0, 1.0, 0.0]),
+            weight: 1.0,
+            fields: Some(vec!["embedding".into()]),
+        }]))
         .build();
 
     let results = engine.search(req).await?;
@@ -126,14 +126,14 @@ async fn test_unified_search_hybrid_fusion() -> laurus::Result<()> {
     // Search for "Rust" (Lexical) AND [0, 1, 0] (Vector - matches Doc 2)
     use laurus::FusionAlgorithm;
     let req = SearchRequestBuilder::new()
-        .lexical_search_request(LexicalSearchRequest::new(Box::new(TermQuery::new(
+        .lexical_query(LexicalSearchQuery::Obj(Box::new(TermQuery::new(
             "title", "rust",
         ))))
-        .vector_search_request(
-            VectorSearchRequestBuilder::new()
-                .add_vector("embedding", vec![0.0, 1.0, 0.0])
-                .build(),
-        )
+        .vector_query(VectorSearchQuery::Vectors(vec![QueryVector {
+            vector: Vector::new(vec![0.0, 1.0, 0.0]),
+            weight: 1.0,
+            fields: Some(vec!["embedding".into()]),
+        }]))
         .fusion_algorithm(FusionAlgorithm::RRF { k: 60.0 })
         .build();
 

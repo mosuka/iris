@@ -104,11 +104,24 @@ struct DeleteDocumentsParams {
 /// Parameters for the `search` tool.
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 struct SearchParams {
-    /// Search query string in the laurus query DSL.
+    /// Search query string in the laurus unified query DSL.
     ///
-    /// Supports term queries (`title:hello`), boolean operators (`AND`, `OR`,
-    /// `NOT`), phrase queries (`"exact phrase"`), fuzzy queries (`roam~2`),
-    /// range queries (`date:[2024-01-01 TO 2024-12-31]`), and more.
+    /// Supports three search modes in a single query string:
+    ///
+    /// **Lexical search** — standard text search syntax:
+    /// - Term queries: `title:hello`
+    /// - Boolean operators: `AND`, `OR`, `NOT`
+    /// - Phrase queries: `"exact phrase"`
+    /// - Fuzzy queries: `roam~2`
+    /// - Range queries: `date:[2024-01-01 TO 2024-12-31]`
+    ///
+    /// **Vector search** — semantic similarity using `~"text"` syntax:
+    /// - `content:~"cute kitten"` — vector search on a specific field
+    /// - `~"cute kitten"` — vector search on default field
+    /// - `content:~"cute kitten"^0.8` — with weight/boost
+    ///
+    /// **Hybrid search** — combine both in one query:
+    /// - `title:hello content:~"cute kitten"` — lexical + vector
     query: String,
 
     /// Maximum number of results to return. Defaults to `10`.
@@ -116,6 +129,20 @@ struct SearchParams {
 
     /// Number of results to skip for pagination. Defaults to `0`.
     offset: Option<u32>,
+
+    /// Fusion algorithm for hybrid search as a JSON string. Only used when
+    /// the query contains both lexical and vector clauses.
+    ///
+    /// Examples:
+    /// - `{"rrf": {"k": 60.0}}` — Reciprocal Rank Fusion (default)
+    /// - `{"weighted_sum": {"lexical_weight": 0.7, "vector_weight": 0.3}}`
+    fusion: Option<String>,
+
+    /// Per-field boost factors as a JSON string. Boosts the relevance score
+    /// of matches in specific fields for lexical search.
+    ///
+    /// Example: `{"title": 2.0, "body": 1.0}`
+    field_boosts: Option<String>,
 }
 
 /// Parameters for the `add_field` tool.
@@ -604,9 +631,9 @@ impl LaurusMcpServer {
 
     // ── Search tools ──────────────────────────────────────────────────────────
 
-    /// Search documents using the laurus query DSL.
+    /// Search documents using the laurus unified query DSL.
     #[tool(
-        description = "Search documents using the laurus query DSL. Supports term queries (field:value), boolean operators (AND, OR, NOT), phrase queries (\"exact phrase\"), fuzzy queries (term~2), and range queries (field:[from TO to]). Returns a JSON array of results with id, score, and document fields."
+        description = "Search documents using the laurus unified query DSL. Supports three modes: (1) Lexical search: term queries (title:hello), boolean operators (AND, OR, NOT), phrase queries (\"exact phrase\"), fuzzy queries (roam~2), range queries (field:[from TO to]). (2) Vector search: ~\"text\" syntax for semantic similarity (content:~\"cute kitten\", ~\"text\"^0.8). (3) Hybrid search: mix both in one query (title:hello content:~\"cute kitten\"). Returns JSON with total count and array of results (id, score, document)."
     )]
     async fn search(
         &self,
@@ -621,10 +648,32 @@ impl LaurusMcpServer {
             }
         };
 
+        // Parse optional fusion algorithm
+        let fusion = if let Some(ref fusion_json) = params.fusion {
+            match convert::json_to_fusion_algorithm(fusion_json) {
+                Ok(f) => Some(f),
+                Err(e) => return Ok(Self::tool_error(format!("Invalid fusion JSON: {e}"))),
+            }
+        } else {
+            None
+        };
+
+        // Parse optional field boosts
+        let field_boosts = if let Some(ref boosts_json) = params.field_boosts {
+            match convert::json_to_field_boosts(boosts_json) {
+                Ok(b) => b,
+                Err(e) => return Ok(Self::tool_error(format!("Invalid field_boosts JSON: {e}"))),
+            }
+        } else {
+            std::collections::HashMap::new()
+        };
+
         let request = SearchRequest {
             query: params.query,
             limit: params.limit.unwrap_or(10),
             offset: params.offset.unwrap_or(0),
+            fusion,
+            field_boosts,
             ..Default::default()
         };
 

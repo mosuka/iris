@@ -111,7 +111,7 @@ impl VectorFieldReader for FlatFieldReader {
         let mut merged: HashMap<u64, FieldHit> = HashMap::new();
         for query in &request.query_vectors {
             let effective_weight = query.weight;
-            let query_vec = Vector::new(query.vector.clone());
+            let query_vec = query.vector.clone();
             let hits = self.search_single_vector(
                 request.limit,
                 effective_weight,
@@ -172,7 +172,7 @@ mod tests {
 
     fn create_query_vector(data: Vec<f32>) -> QueryVector {
         QueryVector {
-            vector: data,
+            vector: Vector::new(data),
             weight: 1.0,
             fields: None,
         }

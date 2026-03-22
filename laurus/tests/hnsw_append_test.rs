@@ -1,7 +1,7 @@
 use laurus::storage::file::{FileStorage, FileStorageConfig};
 use laurus::vector::{
     DistanceMetric, HnswIndexConfig, HnswIndexReader, HnswIndexWriter, HnswSearcher, Vector,
-    VectorIndexSearchRequest, VectorIndexSearcher, VectorIndexWriter, VectorIndexWriterConfig,
+    VectorIndexQuery, VectorIndexSearcher, VectorIndexWriter, VectorIndexWriterConfig,
 };
 use std::sync::Arc;
 use tempfile::tempdir;
@@ -150,14 +150,14 @@ fn test_hnsw_append_search_verification() -> Result<(), Box<dyn std::error::Erro
         let searcher = HnswSearcher::new(reader)?;
 
         // Search for closest to [1.0, 0.0] -> should be doc1
-        let req1 = VectorIndexSearchRequest::new(Vector::new(vec![1.0f32, 0.0])).top_k(1);
+        let req1 = VectorIndexQuery::new(Vector::new(vec![1.0f32, 0.0])).top_k(1);
         let results1 = searcher.search(&req1)?;
         assert_eq!(results1.len(), 1, "Expected 1 result for doc1");
         assert_eq!(results1.results[0].doc_id, 1, "Expected doc1");
 
         // Search for closest to [0.0, 1.0] -> should be doc2
         // If append works, doc2 is in the graph.
-        let req2 = VectorIndexSearchRequest::new(Vector::new(vec![0.0f32, 1.0])).top_k(1);
+        let req2 = VectorIndexQuery::new(Vector::new(vec![0.0f32, 1.0])).top_k(1);
         let results2 = searcher.search(&req2)?;
         assert_eq!(results2.len(), 1, "Expected 1 result for doc2");
         assert_eq!(results2.results[0].doc_id, 2, "Expected doc2");

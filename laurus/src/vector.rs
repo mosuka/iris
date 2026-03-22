@@ -34,11 +34,10 @@ pub use index::hnsw::searcher::HnswSearcher;
 pub use index::hnsw::writer::HnswIndexWriter;
 pub use query::VectorQueryParser;
 pub use query::VectorSearchRequestBuilder;
-pub use search::searcher::{
-    VectorIndexSearchRequest, VectorIndexSearchResults, VectorIndexSearcher,
-};
+pub use search::searcher::{VectorIndexQuery, VectorIndexQueryResults, VectorIndexSearcher};
+pub use search::searcher::{VectorSearchQuery, VectorSearchRequest};
 pub use store::VectorStore;
 pub use store::config::{VectorFieldConfig, VectorIndexConfig};
-pub use store::request::{QueryVector, VectorScoreMode, VectorSearchRequest};
+pub use store::request::{QueryVector, VectorScoreMode};
 pub use store::response::VectorSearchResults;
 pub use writer::{VectorIndexWriter, VectorIndexWriterConfig};

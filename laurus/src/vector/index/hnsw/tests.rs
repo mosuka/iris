@@ -53,13 +53,13 @@ fn test_hnsw_integration() -> Result<()> {
 
     // Search using Graph
     use crate::vector::index::hnsw::searcher::HnswSearcher;
-    use crate::vector::search::searcher::{VectorIndexSearchRequest, VectorIndexSearcher};
+    use crate::vector::search::searcher::{VectorIndexQuery, VectorIndexSearcher};
 
     let searcher = HnswSearcher::new(reader.clone())?;
 
     // Query close to A (1,0,0)
     let query = Vector::new(vec![0.9, 0.1, 0.0]);
-    let request = VectorIndexSearchRequest::new(query)
+    let request = VectorIndexQuery::new(query)
         .top_k(1)
         .field_name("test".to_string());
 

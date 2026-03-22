@@ -146,21 +146,20 @@ graph LR
 `search()` メソッドは `SearchRequest` を受け取ります。SearchRequestにはLexicalクエリ、Vectorクエリ、またはその両方を含めることができます。両方が指定された場合、結果は指定された `FusionAlgorithm` で統合されます。
 
 ```rust
-use laurus::{SearchRequestBuilder, LexicalSearchRequest, FusionAlgorithm};
+use laurus::{SearchRequestBuilder, FusionAlgorithm};
 use laurus::lexical::TermQuery;
+use laurus::lexical::search::searcher::LexicalSearchQuery;
 
 // Lexicalのみの検索
 let request = SearchRequestBuilder::new()
-    .lexical_search_request(
-        LexicalSearchRequest::new(Box::new(TermQuery::new("body", "rust")))
-    )
+    .lexical_query(LexicalSearchQuery::Obj(Box::new(TermQuery::new("body", "rust"))))
     .limit(10)
     .build();
 
 // RRFフュージョンによるハイブリッド検索
 let request = SearchRequestBuilder::new()
-    .lexical_search_request(lexical_req)
-    .vector_search_request(vector_req)
+    .lexical_query(lexical_query)
+    .vector_query(vector_query)
     .fusion_algorithm(FusionAlgorithm::RRF { k: 60.0 })
     .limit(10)
     .build();
@@ -172,12 +171,13 @@ let results = engine.search(request).await?;
 
 | フィールド | 型 | デフォルト | 説明 |
 | :--- | :--- | :--- | :--- |
-| `lexical_search_request` | `Option<LexicalSearchRequest>` | None | Lexicalクエリ |
-| `vector_search_request` | `Option<VectorSearchRequest>` | None | Vectorクエリ |
+| `query` | `SearchQuery` | `Dsl("")` | 検索クエリ仕様（Dsl / Lexical / Vector / Hybrid） |
 | `limit` | `usize` | 10 | 返却する最大結果数 |
 | `offset` | `usize` | 0 | ページネーションのオフセット |
-| `fusion_algorithm` | `Option<FusionAlgorithm>` | RRF (k=60) | LexicalとVectorの結果を統合する方法 |
+| `fusion_algorithm` | `Option<FusionAlgorithm>` | None（ハイブリッド時はRRF k=60） | LexicalとVectorの結果を統合する方法 |
 | `filter_query` | `Option<Box<dyn Query>>` | None | 両方の検索タイプに適用されるフィルタ |
+| `lexical_options` | `LexicalSearchOptions` | デフォルト | Lexical検索の動作パラメータ（ブースト、タイムアウト等） |
+| `vector_options` | `VectorSearchOptions` | デフォルト | Vector検索の動作パラメータ（スコアモード等） |
 
 ## FusionAlgorithm
 

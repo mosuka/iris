@@ -8,8 +8,8 @@ use laurus::lexical::TextOption;
 use laurus::storage::file::FileStorageConfig;
 use laurus::storage::{StorageConfig, StorageFactory};
 use laurus::vector::HnswOption;
-use laurus::vector::VectorSearchRequestBuilder;
-use laurus::{FieldOption, LexicalSearchRequest, Schema};
+use laurus::vector::Vector;
+use laurus::{FieldOption, LexicalSearchQuery, QueryVector, Schema, VectorSearchQuery};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_engine_unified_deletion() -> laurus::Result<()> {
@@ -38,7 +38,7 @@ async fn test_engine_unified_deletion() -> laurus::Result<()> {
     // 4. Verify it exists in both
     // Lexical check
     let req_lexical = SearchRequestBuilder::new()
-        .lexical_search_request(LexicalSearchRequest::new(Box::new(TermQuery::new(
+        .lexical_query(LexicalSearchQuery::Obj(Box::new(TermQuery::new(
             "title", "hello",
         ))))
         .build();
@@ -47,11 +47,11 @@ async fn test_engine_unified_deletion() -> laurus::Result<()> {
 
     // Vector check
     let req_vector = SearchRequestBuilder::new()
-        .vector_search_request(
-            VectorSearchRequestBuilder::new()
-                .add_vector("embedding", vec![0.1; 128])
-                .build(),
-        )
+        .vector_query(VectorSearchQuery::Vectors(vec![QueryVector {
+            vector: Vector::new(vec![0.1; 128]),
+            weight: 1.0,
+            fields: Some(vec!["embedding".into()]),
+        }]))
         .build();
     let res_vector = engine.search(req_vector).await?;
     assert_eq!(res_vector.len(), 1, "Should be found via vector");
@@ -64,7 +64,7 @@ async fn test_engine_unified_deletion() -> laurus::Result<()> {
     let res_lexical_after = engine
         .search(
             SearchRequestBuilder::new()
-                .lexical_search_request(LexicalSearchRequest::new(Box::new(TermQuery::new(
+                .lexical_query(LexicalSearchQuery::Obj(Box::new(TermQuery::new(
                     "title", "hello",
                 ))))
                 .build(),
@@ -75,11 +75,11 @@ async fn test_engine_unified_deletion() -> laurus::Result<()> {
     let res_vector_after = engine
         .search(
             SearchRequestBuilder::new()
-                .vector_search_request(
-                    VectorSearchRequestBuilder::new()
-                        .add_vector("embedding", vec![0.1; 128])
-                        .build(),
-                )
+                .vector_query(VectorSearchQuery::Vectors(vec![QueryVector {
+                    vector: Vector::new(vec![0.1; 128]),
+                    weight: 1.0,
+                    fields: Some(vec!["embedding".into()]),
+                }]))
                 .build(),
         )
         .await?;
@@ -124,7 +124,7 @@ async fn test_engine_upsert() -> laurus::Result<()> {
     let res = engine
         .search(
             SearchRequestBuilder::new()
-                .lexical_search_request(LexicalSearchRequest::new(Box::new(TermQuery::new(
+                .lexical_query(LexicalSearchQuery::Obj(Box::new(TermQuery::new(
                     "title", "initial",
                 ))))
                 .build(),
@@ -146,7 +146,7 @@ async fn test_engine_upsert() -> laurus::Result<()> {
     let res_old = engine
         .search(
             SearchRequestBuilder::new()
-                .lexical_search_request(LexicalSearchRequest::new(Box::new(TermQuery::new(
+                .lexical_query(LexicalSearchQuery::Obj(Box::new(TermQuery::new(
                     "title", "initial",
                 ))))
                 .build(),
@@ -158,7 +158,7 @@ async fn test_engine_upsert() -> laurus::Result<()> {
     let res_new = engine
         .search(
             SearchRequestBuilder::new()
-                .lexical_search_request(LexicalSearchRequest::new(Box::new(TermQuery::new(
+                .lexical_query(LexicalSearchQuery::Obj(Box::new(TermQuery::new(
                     "title", "updated",
                 ))))
                 .build(),
@@ -170,11 +170,11 @@ async fn test_engine_upsert() -> laurus::Result<()> {
     let res_vec = engine
         .search(
             SearchRequestBuilder::new()
-                .vector_search_request(
-                    VectorSearchRequestBuilder::new()
-                        .add_vector("embedding", vec![0.0, 1.0])
-                        .build(),
-                )
+                .vector_query(VectorSearchQuery::Vectors(vec![QueryVector {
+                    vector: Vector::new(vec![0.0, 1.0]),
+                    weight: 1.0,
+                    fields: Some(vec!["embedding".into()]),
+                }]))
                 .build(),
         )
         .await?;
@@ -257,7 +257,7 @@ async fn test_engine_double_delete() -> laurus::Result<()> {
     let res = engine
         .search(
             SearchRequestBuilder::new()
-                .lexical_search_request(LexicalSearchRequest::new(Box::new(TermQuery::new(
+                .lexical_query(LexicalSearchQuery::Obj(Box::new(TermQuery::new(
                     "title", "hello",
                 ))))
                 .build(),

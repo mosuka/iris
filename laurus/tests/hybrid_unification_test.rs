@@ -9,11 +9,12 @@ use laurus::lexical::TermQuery;
 use laurus::lexical::TextOption;
 use laurus::storage::memory::MemoryStorage;
 use laurus::vector::FlatOption;
-use laurus::vector::{QueryVector, VectorSearchRequest};
+use laurus::vector::QueryVector;
+use laurus::vector::Vector;
 use laurus::{DataValue, Document};
 use laurus::{EmbedInput, EmbedInputType, Embedder};
 use laurus::{FieldOption, Schema};
-use laurus::{FusionAlgorithm, LexicalSearchRequest, SearchRequestBuilder};
+use laurus::{FusionAlgorithm, LexicalSearchQuery, SearchRequestBuilder, VectorSearchQuery};
 
 #[derive(Debug, Clone)]
 struct MockEmbedder {
@@ -129,15 +130,11 @@ async fn test_hybrid_search_unification() -> std::result::Result<(), Box<dyn std
 
     // Test 1: Vector Search (query closest to apple [0.9, 0.1, 0.0])
     let req_vector = SearchRequestBuilder::new()
-        .vector_search_request(VectorSearchRequest {
-            query_vectors: vec![QueryVector {
-                vector: vec![0.9, 0.1, 0.0],
-                weight: 1.0,
-                fields: None,
-            }],
-            limit: 10,
-            ..Default::default()
-        })
+        .vector_query(VectorSearchQuery::Vectors(vec![QueryVector {
+            vector: Vector::new(vec![0.9, 0.1, 0.0]),
+            weight: 1.0,
+            fields: None,
+        }]))
         .limit(10)
         .build();
 
@@ -147,7 +144,7 @@ async fn test_hybrid_search_unification() -> std::result::Result<(), Box<dyn std
 
     // Test 2: Lexical Search ("banana")
     let req_lexical = SearchRequestBuilder::new()
-        .lexical_search_request(LexicalSearchRequest::new(Box::new(TermQuery::new(
+        .lexical_query(LexicalSearchQuery::Obj(Box::new(TermQuery::new(
             "title", "banana",
         ))))
         .limit(10)
@@ -162,16 +159,12 @@ async fn test_hybrid_search_unification() -> std::result::Result<(), Box<dyn std
 
     // Test 3: Hybrid Search (RRF)
     let req_hybrid = SearchRequestBuilder::new()
-        .vector_search_request(VectorSearchRequest {
-            query_vectors: vec![QueryVector {
-                vector: vec![0.0, 1.0, 0.0],
-                weight: 1.0,
-                fields: None,
-            }],
-            limit: 10,
-            ..Default::default()
-        })
-        .lexical_search_request(LexicalSearchRequest::new(Box::new(TermQuery::new(
+        .vector_query(VectorSearchQuery::Vectors(vec![QueryVector {
+            vector: Vector::new(vec![0.0, 1.0, 0.0]),
+            weight: 1.0,
+            fields: None,
+        }]))
+        .lexical_query(LexicalSearchQuery::Obj(Box::new(TermQuery::new(
             "title", "banana",
         ))))
         .fusion_algorithm(FusionAlgorithm::RRF { k: 60.0 })

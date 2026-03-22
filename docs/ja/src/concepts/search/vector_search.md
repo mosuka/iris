@@ -11,7 +11,7 @@ use laurus::SearchRequestBuilder;
 use laurus::vector::VectorSearchRequestBuilder;
 
 let request = SearchRequestBuilder::new()
-    .vector_search_request(
+    .vector_query(
         VectorSearchRequestBuilder::new()
             .add_text("embedding", "systems programming language")
             .limit(10)
@@ -109,13 +109,13 @@ text_vec:~"cute kitten"^1.0 image_vec:~"fluffy cat"^0.5
 Lexical フィルターを適用して Vector 検索の結果を絞り込むことができます。
 
 ```rust
-use laurus::{SearchRequestBuilder, LexicalSearchRequest};
+use laurus::SearchRequestBuilder;
 use laurus::lexical::TermQuery;
 use laurus::vector::VectorSearchRequestBuilder;
 
 // Vector search with a category filter
 let request = SearchRequestBuilder::new()
-    .vector_search_request(
+    .vector_query(
         VectorSearchRequestBuilder::new()
             .add_text("embedding", "machine learning")
             .build()
@@ -136,7 +136,7 @@ use laurus::lexical::NumericRangeQuery;
 use laurus::lexical::core::field::NumericType;
 
 let request = SearchRequestBuilder::new()
-    .vector_search_request(
+    .vector_query(
         VectorSearchRequestBuilder::new()
             .add_text("embedding", "type systems")
             .build()
@@ -204,7 +204,7 @@ async fn main() -> laurus::Result<()> {
     // Search by semantic similarity
     let results = engine.search(
         SearchRequestBuilder::new()
-            .vector_search_request(
+            .vector_query(
                 VectorSearchRequestBuilder::new()
                     .add_text("text_vec", "systems language")
                     .build()
