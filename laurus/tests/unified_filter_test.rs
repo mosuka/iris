@@ -7,8 +7,8 @@ use laurus::lexical::TermQuery;
 use laurus::lexical::TextOption;
 use laurus::storage::file::FileStorageConfig;
 use laurus::storage::{StorageConfig, StorageFactory};
-use laurus::vector::VectorSearchRequestBuilder;
-use laurus::{FieldOption, Schema};
+use laurus::vector::Vector;
+use laurus::{FieldOption, QueryVector, Schema, VectorSearchQuery};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_unified_filtering() -> laurus::Result<()> {
@@ -70,14 +70,16 @@ async fn test_unified_filtering() -> laurus::Result<()> {
     engine.commit().await?;
 
     // 4. Test Filtering: Search for [1.0, 0.0] (Apple/Carrot) but filter for "vegetable"
-    let vector_req = VectorSearchRequestBuilder::new()
-        .add_vector("embedding", vec![1.0, 0.0])
-        .build();
+    let vector_query = VectorSearchQuery::Vectors(vec![QueryVector {
+        vector: Vector::new(vec![1.0, 0.0]),
+        weight: 1.0,
+        fields: Some(vec!["embedding".into()]),
+    }]);
 
     let filter_query = Box::new(TermQuery::new("category", "vegetable"));
 
     let req = SearchRequestBuilder::new()
-        .vector_search_request(vector_req.clone())
+        .vector_query(vector_query.clone())
         .filter_query(filter_query)
         .build();
 
@@ -96,7 +98,7 @@ async fn test_unified_filtering() -> laurus::Result<()> {
     // 5. Test Filtering: Search for "fruit"
     let filter_query_fruit = Box::new(TermQuery::new("category", "fruit"));
     let req_fruit = SearchRequestBuilder::new()
-        .vector_search_request(vector_req)
+        .vector_query(vector_query)
         .filter_query(filter_query_fruit)
         .build();
 
@@ -169,13 +171,15 @@ async fn test_unified_filtering_hnsw() -> laurus::Result<()> {
     engine.commit().await?;
 
     // 4. Test Filtering: Search for [1.0, 0.0] but filter for "vegetable"
-    let vector_req = VectorSearchRequestBuilder::new()
-        .add_vector("embedding", vec![1.0, 0.0])
-        .build();
+    let vector_query = VectorSearchQuery::Vectors(vec![QueryVector {
+        vector: Vector::new(vec![1.0, 0.0]),
+        weight: 1.0,
+        fields: Some(vec!["embedding".into()]),
+    }]);
 
     let filter_query = Box::new(TermQuery::new("category", "vegetable"));
     let req = SearchRequestBuilder::new()
-        .vector_search_request(vector_req)
+        .vector_query(vector_query)
         .filter_query(filter_query)
         .build();
 
@@ -244,13 +248,15 @@ async fn test_unified_filtering_ivf() -> laurus::Result<()> {
     engine.commit().await?;
 
     // 4. Test Filtering: Search for [1.0, 0.0] but filter for "vegetable"
-    let vector_req = VectorSearchRequestBuilder::new()
-        .add_vector("embedding", vec![1.0, 0.0])
-        .build();
+    let vector_query = VectorSearchQuery::Vectors(vec![QueryVector {
+        vector: Vector::new(vec![1.0, 0.0]),
+        weight: 1.0,
+        fields: Some(vec!["embedding".into()]),
+    }]);
 
     let filter_query = Box::new(TermQuery::new("category", "vegetable"));
     let req = SearchRequestBuilder::new()
-        .vector_search_request(vector_req)
+        .vector_query(vector_query)
         .filter_query(filter_query)
         .build();
 

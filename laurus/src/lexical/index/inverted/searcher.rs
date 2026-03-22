@@ -20,7 +20,7 @@ use crate::lexical::query::boolean::{BooleanQuery, Occur};
 use crate::lexical::query::collector::{
     Collector, CountCollector, TopDocsCollector, TopFieldCollector,
 };
-use crate::lexical::query::parser::QueryParser;
+use crate::lexical::query::parser::LexicalQueryParser;
 use crate::lexical::query::{LexicalSearchResults, SearchHit};
 use crate::lexical::reader::LexicalIndexReader;
 use crate::lexical::search::searcher::{
@@ -401,7 +401,7 @@ impl InvertedIndexSearcher {
                 };
 
                 // Parse DSL string into Query object
-                let mut parser = QueryParser::new(analyzer.clone());
+                let mut parser = LexicalQueryParser::new(analyzer.clone());
                 if !self.default_fields.is_empty() {
                     parser = parser.with_default_fields(self.default_fields.clone());
                 }

@@ -13,7 +13,9 @@ use crate::embedding::embedder::{EmbedInput, Embedder};
 use crate::embedding::per_field::PerFieldEmbedder;
 use crate::error::{LaurusError, Result};
 use crate::vector::core::vector::Vector;
-use crate::vector::store::request::{QueryPayload, QueryVector, VectorSearchRequest};
+use crate::vector::store::request::{
+    QueryPayload, QueryVector, VectorSearchQuery, VectorSearchRequest,
+};
 
 /// Pest grammar parser for vector query DSL.
 #[derive(Parser)]
@@ -44,7 +46,7 @@ struct VectorQueryStringParser;
 ///     .with_default_field("content");
 ///
 /// let request = parser.parse(r#"content:~"cute kitten""#).await.unwrap();
-/// assert_eq!(request.query_vectors.len(), 1);
+/// // request.query is VectorSearchQuery::Vectors(vec![...])
 /// ```
 pub struct VectorQueryParser {
     embedder: Arc<dyn Embedder>,
@@ -79,7 +81,7 @@ impl VectorQueryParser {
     ///
     /// Text payloads are embedded into vectors at parse time using the
     /// configured embedder. The resulting `VectorSearchRequest` contains
-    /// `query_vectors` (not `query_payloads`).
+    /// a `VectorSearchQuery::Vectors` query (not `Payloads`).
     pub async fn parse(&self, query_str: &str) -> Result<VectorSearchRequest> {
         let pairs = VectorQueryStringParser::parse(Rule::query, query_str).map_err(|e| {
             LaurusError::invalid_argument(format!("Failed to parse vector query: {}", e))
@@ -105,7 +107,7 @@ impl VectorQueryParser {
         }
 
         // Embed each text payload into a query vector.
-        let mut request = VectorSearchRequest::default();
+        let mut query_vectors = Vec::new();
         for payload in payloads {
             let input = match &payload.payload {
                 DataValue::Text(t) => EmbedInput::Text(t),
@@ -113,14 +115,17 @@ impl VectorQueryParser {
                 _ => continue,
             };
             let vector = self.embed_for_field(&payload.field, &input).await?;
-            request.query_vectors.push(QueryVector {
-                vector: vector.data,
+            query_vectors.push(QueryVector {
+                vector,
                 weight: payload.weight,
                 fields: Some(vec![payload.field]),
             });
         }
 
-        Ok(request)
+        Ok(VectorSearchRequest {
+            query: VectorSearchQuery::Vectors(query_vectors),
+            params: Default::default(),
+        })
     }
 
     /// Embed input for a specific field, using PerFieldEmbedder if available.
@@ -232,16 +237,26 @@ mod tests {
         Arc::new(MockEmbedder { dimension: 4 })
     }
 
+    /// Extract query vectors from a VectorSearchRequest, panicking if the
+    /// query is not the `Vectors` variant.
+    fn get_vectors(req: &VectorSearchRequest) -> &[QueryVector] {
+        match &req.query {
+            VectorSearchQuery::Vectors(v) => v,
+            _ => panic!("Expected VectorSearchQuery::Vectors"),
+        }
+    }
+
     #[tokio::test]
     async fn test_basic_query() {
         let parser = VectorQueryParser::new(mock_embedder());
         let request = parser.parse(r#"content:~"cute kitten""#).await.unwrap();
 
-        assert_eq!(request.query_vectors.len(), 1);
-        let qv = &request.query_vectors[0];
+        let vecs = get_vectors(&request);
+        assert_eq!(vecs.len(), 1);
+        let qv = &vecs[0];
         assert_eq!(qv.fields.as_ref().unwrap()[0], "content");
         assert_eq!(qv.weight, 1.0);
-        assert_eq!(qv.vector.len(), 4);
+        assert_eq!(qv.vector.dimension(), 4);
     }
 
     #[tokio::test]
@@ -249,8 +264,9 @@ mod tests {
         let parser = VectorQueryParser::new(mock_embedder());
         let request = parser.parse(r#"content:~"text"^0.8"#).await.unwrap();
 
-        assert_eq!(request.query_vectors.len(), 1);
-        let qv = &request.query_vectors[0];
+        let vecs = get_vectors(&request);
+        assert_eq!(vecs.len(), 1);
+        let qv = &vecs[0];
         assert_eq!(qv.fields.as_ref().unwrap()[0], "content");
         assert!((qv.weight - 0.8).abs() < f32::EPSILON);
     }
@@ -260,11 +276,9 @@ mod tests {
         let parser = VectorQueryParser::new(mock_embedder()).with_default_field("embedding");
         let request = parser.parse(r#"~"cute kitten""#).await.unwrap();
 
-        assert_eq!(request.query_vectors.len(), 1);
-        assert_eq!(
-            request.query_vectors[0].fields.as_ref().unwrap()[0],
-            "embedding"
-        );
+        let vecs = get_vectors(&request);
+        assert_eq!(vecs.len(), 1);
+        assert_eq!(vecs[0].fields.as_ref().unwrap()[0], "embedding");
     }
 
     #[tokio::test]
@@ -275,19 +289,14 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(request.query_vectors.len(), 2);
+        let vecs = get_vectors(&request);
+        assert_eq!(vecs.len(), 2);
 
-        assert_eq!(
-            request.query_vectors[0].fields.as_ref().unwrap()[0],
-            "content"
-        );
-        assert_eq!(request.query_vectors[0].weight, 1.0);
+        assert_eq!(vecs[0].fields.as_ref().unwrap()[0], "content");
+        assert_eq!(vecs[0].weight, 1.0);
 
-        assert_eq!(
-            request.query_vectors[1].fields.as_ref().unwrap()[0],
-            "image"
-        );
-        assert!((request.query_vectors[1].weight - 0.5).abs() < f32::EPSILON);
+        assert_eq!(vecs[1].fields.as_ref().unwrap()[0], "image");
+        assert!((vecs[1].weight - 0.5).abs() < f32::EPSILON);
     }
 
     #[tokio::test]
@@ -314,9 +323,10 @@ mod tests {
         let parser = VectorQueryParser::new(mock_embedder());
         let request = parser.parse(r#"content:~"日本語テスト""#).await.unwrap();
 
-        assert_eq!(request.query_vectors.len(), 1);
-        assert_eq!(qv_field(&request.query_vectors[0]), "content");
-        assert_eq!(request.query_vectors[0].vector.len(), 4);
+        let vecs = get_vectors(&request);
+        assert_eq!(vecs.len(), 1);
+        assert_eq!(qv_field(&vecs[0]), "content");
+        assert_eq!(vecs[0].vector.dimension(), 4);
     }
 
     #[tokio::test]
@@ -324,7 +334,8 @@ mod tests {
         let parser = VectorQueryParser::new(mock_embedder());
         let request = parser.parse(r#"content:~"text"^2"#).await.unwrap();
 
-        assert!((request.query_vectors[0].weight - 2.0).abs() < f32::EPSILON);
+        let vecs = get_vectors(&request);
+        assert!((vecs[0].weight - 2.0).abs() < f32::EPSILON);
     }
 
     #[tokio::test]
@@ -332,7 +343,8 @@ mod tests {
         let parser = VectorQueryParser::new(mock_embedder());
         let request = parser.parse(r#"my_field:~"text""#).await.unwrap();
 
-        assert_eq!(qv_field(&request.query_vectors[0]), "my_field");
+        let vecs = get_vectors(&request);
+        assert_eq!(qv_field(&vecs[0]), "my_field");
     }
 
     #[tokio::test]
@@ -340,7 +352,8 @@ mod tests {
         let parser = VectorQueryParser::new(mock_embedder());
         let request = parser.parse(r#"nested.field:~"text""#).await.unwrap();
 
-        assert_eq!(qv_field(&request.query_vectors[0]), "nested.field");
+        let vecs = get_vectors(&request);
+        assert_eq!(qv_field(&vecs[0]), "nested.field");
     }
 
     /// Helper to extract the first field name from a QueryVector.

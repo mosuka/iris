@@ -40,7 +40,7 @@ use crate::vector::core::vector::Vector;
 use crate::vector::index::VectorIndex;
 use crate::vector::index::config::VectorIndexTypeConfig;
 use crate::vector::index::factory::VectorIndexFactory;
-use crate::vector::search::searcher::{VectorIndexSearchRequest, VectorIndexSearcher};
+use crate::vector::search::searcher::{VectorIndexQuery, VectorIndexSearcher};
 use crate::vector::writer::VectorIndexWriter;
 
 use self::config::VectorIndexConfig;
@@ -380,31 +380,35 @@ impl VectorStore {
     /// Execute a low-level vector similarity search.
     pub fn search_index(
         &self,
-        request: &VectorIndexSearchRequest,
-    ) -> Result<crate::vector::search::searcher::VectorIndexSearchResults> {
+        request: &VectorIndexQuery,
+    ) -> Result<crate::vector::search::searcher::VectorIndexQueryResults> {
         let guard = self.acquire_searcher_guard()?;
         guard.as_ref().unwrap().search(request)
     }
 
     /// Execute a high-level vector search (compatible with Engine).
     ///
-    /// This method processes each entry in
-    /// [`query_vectors`](VectorSearchRequest::query_vectors), performs a
-    /// similarity search against the index, and aggregates the per-vector
-    /// scores according to the requested
-    /// [`score_mode`](VectorSearchRequest::score_mode). Results are filtered
-    /// by [`allowed_ids`](VectorSearchRequest::allowed_ids) and
-    /// [`min_score`](VectorSearchRequest::min_score), sorted by descending
-    /// score, and truncated to [`limit`](VectorSearchRequest::limit).
+    /// This method extracts query vectors from the
+    /// [`VectorSearchQuery`](crate::vector::search::searcher::VectorSearchQuery)
+    /// inside the request, performs a similarity search against the index, and
+    /// aggregates the per-vector scores according to the requested
+    /// [`score_mode`](crate::vector::search::searcher::VectorSearchParams::score_mode).
+    /// Results are filtered by
+    /// [`allowed_ids`](crate::vector::search::searcher::VectorSearchParams::allowed_ids)
+    /// and
+    /// [`min_score`](crate::vector::search::searcher::VectorSearchParams::min_score),
+    /// sorted by descending score, and truncated to
+    /// [`limit`](crate::vector::search::searcher::VectorSearchParams::limit).
     ///
     /// **Note:** The following request fields are currently **ignored** by this
     /// implementation:
-    /// - [`query_payloads`](VectorSearchRequest::query_payloads) -- callers
-    ///   must embed payloads into `query_vectors` before calling this method.
-    /// - [`fields`](VectorSearchRequest::fields) -- field-level filtering is
-    ///   not yet implemented; all indexed vectors are searched.
-    /// - [`overfetch`](VectorSearchRequest::overfetch) -- a hardcoded 2x
-    ///   overfetch (`limit * 2`) is used instead.
+    /// - `VectorSearchQuery::Payloads` -- callers must embed payloads into
+    ///   vectors before calling this method.
+    /// - [`fields`](crate::vector::search::searcher::VectorSearchParams::fields)
+    ///   -- field-level filtering is not yet implemented; all indexed vectors
+    ///   are searched.
+    /// - [`overfetch`](crate::vector::search::searcher::VectorSearchParams::overfetch)
+    ///   -- a hardcoded 2x overfetch (`limit * 2`) is used instead.
     ///
     /// # Arguments
     ///
@@ -418,9 +422,21 @@ impl VectorStore {
     /// # Errors
     ///
     /// Returns an error if obtaining the searcher or executing the underlying
-    /// index search fails.
+    /// index search fails, or if the query contains unresolved payloads.
     pub fn search(&self, request: VectorSearchRequest) -> Result<VectorSearchResults> {
-        if request.query_vectors.is_empty() {
+        use crate::vector::search::searcher::VectorSearchQuery;
+
+        let query_vectors = match &request.query {
+            VectorSearchQuery::Vectors(vecs) => vecs,
+            VectorSearchQuery::Payloads(_) => {
+                return Err(crate::error::LaurusError::invalid_argument(
+                    "VectorStore::search requires pre-embedded vectors; \
+                     Payloads must be embedded before calling this method",
+                ));
+            }
+        };
+
+        if query_vectors.is_empty() {
             return Ok(VectorSearchResults::default());
         }
 
@@ -429,9 +445,9 @@ impl VectorStore {
         let mut all_hits: std::collections::HashMap<u64, f32> = std::collections::HashMap::new();
 
         // Process each query vector
-        for qv in &request.query_vectors {
-            let index_request = VectorIndexSearchRequest::new(Vector::new(qv.vector.clone()))
-                .top_k(request.limit.saturating_mul(2)); // Overfetch for better results
+        for qv in query_vectors {
+            let index_request = VectorIndexQuery::new(qv.vector.clone())
+                .top_k(request.params.limit.saturating_mul(2)); // Overfetch for better results
 
             let results = searcher.search(&index_request)?;
 
@@ -439,6 +455,7 @@ impl VectorStore {
             for result in results.results {
                 // Apply allowed_ids filter if present
                 if request
+                    .params
                     .allowed_ids
                     .as_ref()
                     .is_some_and(|allowed| !allowed.contains(&result.doc_id))
@@ -447,14 +464,14 @@ impl VectorStore {
                 }
 
                 // Apply min_score filter
-                if result.similarity < request.min_score {
+                if result.similarity < request.params.min_score {
                     continue;
                 }
 
                 let weighted_score = result.similarity * qv.weight;
                 let entry = all_hits.entry(result.doc_id).or_insert(0.0);
 
-                match request.score_mode {
+                match request.params.score_mode {
                     VectorScoreMode::WeightedSum | VectorScoreMode::LateInteraction => {
                         // WeightedSum: sum of similarity * weight across all query vectors.
                         // LateInteraction: for each query vector, find the max similarity
@@ -490,8 +507,8 @@ impl VectorStore {
         });
 
         // Apply limit
-        if hits.len() > request.limit {
-            hits.truncate(request.limit);
+        if hits.len() > request.params.limit {
+            hits.truncate(request.params.limit);
         }
 
         Ok(VectorSearchResults { hits })
@@ -516,7 +533,7 @@ impl VectorStore {
     /// # Errors
     ///
     /// Returns an error if obtaining the searcher or executing the count fails.
-    pub fn count(&self, request: VectorIndexSearchRequest) -> Result<u64> {
+    pub fn count(&self, request: VectorIndexQuery) -> Result<u64> {
         let guard = self.acquire_searcher_guard()?;
         guard.as_ref().unwrap().count(request)
     }

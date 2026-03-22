@@ -6,7 +6,7 @@ use laurus::lexical::TermQuery;
 use laurus::lexical::TextOption;
 use laurus::storage::memory::MemoryStorageConfig;
 use laurus::storage::{StorageConfig, StorageFactory};
-use laurus::{FieldOption, LexicalSearchRequest, Schema};
+use laurus::{FieldOption, LexicalSearchQuery, Schema};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_schema_lexical_guardrails() -> Result<()> {
@@ -59,7 +59,7 @@ async fn test_schema_lexical_guardrails() -> Result<()> {
 
     // Case A: Search "indexed_and_stored" -> Should find it
     let req_a = SearchRequestBuilder::new()
-        .lexical_search_request(LexicalSearchRequest::new(Box::new(TermQuery::new(
+        .lexical_query(LexicalSearchQuery::Obj(Box::new(TermQuery::new(
             "indexed_and_stored",
             "value1",
         ))))
@@ -77,7 +77,7 @@ async fn test_schema_lexical_guardrails() -> Result<()> {
 
     // Case B: Search "indexed_only" -> Should find it but value should NOT be in get_documents results
     let req_b = SearchRequestBuilder::new()
-        .lexical_search_request(LexicalSearchRequest::new(Box::new(TermQuery::new(
+        .lexical_query(LexicalSearchQuery::Obj(Box::new(TermQuery::new(
             "indexed_only",
             "value2",
         ))))
@@ -93,7 +93,7 @@ async fn test_schema_lexical_guardrails() -> Result<()> {
 
     // Case C: Search "stored_only" -> Should NOT find it
     let req_c = SearchRequestBuilder::new()
-        .lexical_search_request(LexicalSearchRequest::new(Box::new(TermQuery::new(
+        .lexical_query(LexicalSearchQuery::Obj(Box::new(TermQuery::new(
             "stored_only",
             "value3",
         ))))
@@ -117,7 +117,7 @@ async fn test_schema_lexical_guardrails() -> Result<()> {
 
     // Case D: Search "unknown_field" -> Should NOT find it
     let req_d = SearchRequestBuilder::new()
-        .lexical_search_request(LexicalSearchRequest::new(Box::new(TermQuery::new(
+        .lexical_query(LexicalSearchQuery::Obj(Box::new(TermQuery::new(
             "unknown_field",
             "should",
         ))))

@@ -11,7 +11,7 @@
 mod common;
 
 use laurus::lexical::{TermQuery, TextOption};
-use laurus::{Document, Engine, LexicalSearchRequest, Schema, SearchRequestBuilder};
+use laurus::{Document, Engine, LexicalSearchQuery, Schema, SearchRequestBuilder};
 
 #[tokio::main]
 async fn main() -> laurus::Result<()> {
@@ -69,7 +69,7 @@ async fn main() -> laurus::Result<()> {
     let results = engine
         .search(
             SearchRequestBuilder::new()
-                .lexical_search_request(LexicalSearchRequest::new(Box::new(TermQuery::new(
+                .lexical_query(LexicalSearchQuery::Obj(Box::new(TermQuery::new(
                     "body", "rust",
                 ))))
                 .limit(5)
@@ -83,7 +83,7 @@ async fn main() -> laurus::Result<()> {
     let results = engine
         .search(
             SearchRequestBuilder::new()
-                .lexical_search_request(LexicalSearchRequest::new(Box::new(TermQuery::new(
+                .lexical_query(LexicalSearchQuery::Obj(Box::new(TermQuery::new(
                     "body", "language",
                 ))))
                 .limit(5)

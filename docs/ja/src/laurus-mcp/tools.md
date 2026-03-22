@@ -244,17 +244,21 @@ name: "category"
 
 ## search
 
-laurus クエリ DSL を使用してドキュメントを検索します。
+laurus 統一クエリ DSL を使用してドキュメントを検索します。Lexical 検索、Vector 検索、ハイブリッド検索を単一のクエリ文字列でサポートします。
 
 ### パラメーター
 
 | 名前 | 型 | 必須 | 説明 |
 | :--- | :--- | :--- | :--- |
-| `query` | string | はい | laurus クエリ DSL による検索クエリ |
+| `query` | string | はい | laurus 統一クエリ DSL による検索クエリ |
 | `limit` | integer | いいえ | 最大結果数（デフォルト: 10） |
 | `offset` | integer | いいえ | ページネーション用スキップ数（デフォルト: 0） |
+| `fusion` | string | いいえ | ハイブリッド検索用の融合アルゴリズム（JSON） |
+| `field_boosts` | string | いいえ | フィールド毎のブースト係数（JSON） |
 
 ### クエリ DSL の例
+
+#### Lexical 検索
 
 | クエリ | 説明 |
 | :--- | :--- |
@@ -265,6 +269,38 @@ laurus クエリ DSL を使用してドキュメントを検索します。
 | `roam~2` | ファジー検索（編集距離 2） |
 | `count:[1 TO 10]` | 範囲検索 |
 | `title:helo~1` | フィールド指定のファジー検索 |
+
+#### Vector 検索
+
+| クエリ | 説明 |
+| :--- | :--- |
+| `content:~"cute kitten"` | 特定フィールドでの Vector 検索 |
+| `~"cute kitten"` | デフォルトフィールドでの Vector 検索 |
+| `content:~"cute kitten"^0.8` | 重み付き Vector 検索 |
+| `a:~"cats" b:~"dogs"^0.5` | 複数の Vector クエリ |
+
+#### ハイブリッド検索
+
+| クエリ | 説明 |
+| :--- | :--- |
+| `title:hello content:~"cute kitten"` | Lexical + Vector を 1 つのクエリで |
+| `title:hello AND body:world content:~"cats"^0.8` | ブール Lexical + 重み付き Vector |
+
+### 融合アルゴリズムの例
+
+```json
+{"rrf": {"k": 60.0}}
+```
+
+```json
+{"weighted_sum": {"lexical_weight": 0.7, "vector_weight": 0.3}}
+```
+
+### フィールドブーストの例
+
+```json
+{"title": 2.0, "body": 1.0}
+```
 
 ### 結果
 

@@ -1,7 +1,9 @@
 //! Search gRPC service.
 //!
 //! Provides unary and server-streaming RPCs for executing lexical, vector,
-//! and hybrid search queries against the index.
+//! and hybrid search queries against the index. The unified query DSL
+//! (including vector clauses like `~"text"`) is handled by the engine
+//! internally — no query-syntax branching is needed in the service layer.
 
 use std::sync::Arc;
 

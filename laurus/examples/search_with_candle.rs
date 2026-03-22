@@ -19,13 +19,14 @@ use std::sync::Arc;
 #[cfg(feature = "embeddings-candle")]
 use laurus::lexical::core::field::{IntegerOption, NumericType};
 #[cfg(feature = "embeddings-candle")]
-use laurus::lexical::{NumericRangeQuery, QueryParser, TermQuery, TextOption};
+use laurus::lexical::{LexicalQueryParser, NumericRangeQuery, TermQuery, TextOption};
 #[cfg(feature = "embeddings-candle")]
-use laurus::vector::{FlatOption, VectorQueryParser, VectorSearchRequestBuilder};
+use laurus::vector::{FlatOption, VectorQueryParser};
 #[cfg(feature = "embeddings-candle")]
 use laurus::{
-    CandleBertEmbedder, Document, Engine, FusionAlgorithm, LexicalSearchRequest, PerFieldEmbedder,
-    Result, Schema, SearchRequestBuilder, UnifiedQueryParser,
+    CandleBertEmbedder, DataValue, Document, Engine, FusionAlgorithm, LexicalSearchQuery,
+    PerFieldEmbedder, QueryPayload, Result, Schema, SearchRequestBuilder, UnifiedQueryParser,
+    VectorSearchQuery,
 };
 #[cfg(feature = "embeddings-candle")]
 use serde_json::json;
@@ -131,11 +132,10 @@ async fn main() -> Result<()> {
     let results = engine
         .search(
             SearchRequestBuilder::new()
-                .vector_search_request(
-                    VectorSearchRequestBuilder::new()
-                        .add_text("text_vec", "memory safety")
-                        .build(),
-                )
+                .vector_query(VectorSearchQuery::Payloads(vec![QueryPayload::new(
+                    "text_vec",
+                    DataValue::Text("memory safety".into()),
+                )]))
                 .limit(3)
                 .build(),
         )
@@ -147,11 +147,10 @@ async fn main() -> Result<()> {
     let results = engine
         .search(
             SearchRequestBuilder::new()
-                .vector_search_request(
-                    VectorSearchRequestBuilder::new()
-                        .add_text("text_vec", "memory safety")
-                        .build(),
-                )
+                .vector_query(VectorSearchQuery::Payloads(vec![QueryPayload::new(
+                    "text_vec",
+                    DataValue::Text("memory safety".into()),
+                )]))
                 .filter_query(Box::new(TermQuery::new("category", "concurrency")))
                 .limit(3)
                 .build(),
@@ -164,11 +163,10 @@ async fn main() -> Result<()> {
     let results = engine
         .search(
             SearchRequestBuilder::new()
-                .vector_search_request(
-                    VectorSearchRequestBuilder::new()
-                        .add_text("text_vec", "type system")
-                        .build(),
-                )
+                .vector_query(VectorSearchQuery::Payloads(vec![QueryPayload::new(
+                    "text_vec",
+                    DataValue::Text("type system".into()),
+                )]))
                 .filter_query(Box::new(NumericRangeQuery::new(
                     "page",
                     NumericType::Integer,
@@ -188,7 +186,7 @@ async fn main() -> Result<()> {
     let results = engine
         .search(
             SearchRequestBuilder::new()
-                .lexical_search_request(LexicalSearchRequest::new(Box::new(TermQuery::new(
+                .lexical_query(LexicalSearchQuery::Obj(Box::new(TermQuery::new(
                     "text",
                     "ownership",
                 ))))
@@ -203,12 +201,11 @@ async fn main() -> Result<()> {
     let results = engine
         .search(
             SearchRequestBuilder::new()
-                .vector_search_request(
-                    VectorSearchRequestBuilder::new()
-                        .add_text("text_vec", "concurrent")
-                        .build(),
-                )
-                .lexical_search_request(LexicalSearchRequest::new(Box::new(TermQuery::new(
+                .vector_query(VectorSearchQuery::Payloads(vec![QueryPayload::new(
+                    "text_vec",
+                    DataValue::Text("concurrent".into()),
+                )]))
+                .lexical_query(LexicalSearchQuery::Obj(Box::new(TermQuery::new(
                     "text", "async",
                 ))))
                 .fusion_algorithm(FusionAlgorithm::RRF { k: 60.0 })
@@ -227,16 +224,17 @@ async fn main() -> Result<()> {
 
     let vector_parser = VectorQueryParser::new(per_field_embedder.clone());
     let unified_parser = UnifiedQueryParser::new(
-        QueryParser::new(std_analyzer).with_default_field("text"),
+        LexicalQueryParser::new(std_analyzer).with_default_field("text"),
         VectorQueryParser::new(per_field_embedder.clone()),
     );
 
     // Case F: Vector Search via DSL
     println!("\n[F] Vector DSL: text_vec:~\"memory safety\"");
+    let parsed = vector_parser.parse("text_vec:~\"memory safety\"").await?;
     let results = engine
         .search(
             SearchRequestBuilder::new()
-                .vector_search_request(vector_parser.parse("text_vec:~\"memory safety\"").await?)
+                .vector_query(parsed.query)
                 .limit(3)
                 .build(),
         )

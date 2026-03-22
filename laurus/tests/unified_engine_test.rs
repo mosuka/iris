@@ -7,9 +7,9 @@ use laurus::lexical::TextOption;
 use laurus::storage::file::FileStorageConfig;
 use laurus::storage::{StorageConfig, StorageFactory};
 use laurus::vector::FlatOption;
-use laurus::vector::VectorSearchRequestBuilder;
+use laurus::vector::Vector;
 use laurus::{DataValue, Document};
-use laurus::{FieldOption, LexicalSearchRequest, Schema};
+use laurus::{FieldOption, LexicalSearchQuery, QueryVector, Schema, VectorSearchQuery};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_unified_engine_indexing() -> laurus::Result<()> {
@@ -138,7 +138,7 @@ async fn test_unified_engine_concurrent_reads() -> laurus::Result<()> {
         handles.push(tokio::spawn(async move {
             // Lexical search
             let req = SearchRequestBuilder::new()
-                .lexical_search_request(LexicalSearchRequest::new(Box::new(TermQuery::new(
+                .lexical_query(LexicalSearchQuery::Obj(Box::new(TermQuery::new(
                     "title", "document",
                 ))))
                 .build();
@@ -150,12 +150,12 @@ async fn test_unified_engine_concurrent_reads() -> laurus::Result<()> {
 
             // Vector search
             let req = SearchRequestBuilder::new()
-                .vector_search_request(
-                    VectorSearchRequestBuilder::new()
-                        .add_vector("embedding", vec![i as f32, 0.0, 0.0])
-                        .limit(3)
-                        .build(),
-                )
+                .vector_query(VectorSearchQuery::Vectors(vec![QueryVector {
+                    vector: Vector::new(vec![i as f32, 0.0, 0.0]),
+                    weight: 1.0,
+                    fields: Some(vec!["embedding".into()]),
+                }]))
+                .limit(3)
                 .build();
             let results = engine.search(req).await.unwrap();
             assert!(

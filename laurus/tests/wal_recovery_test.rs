@@ -7,7 +7,7 @@ use laurus::storage::file::FileStorageConfig;
 use laurus::storage::{StorageConfig, StorageFactory};
 use laurus::vector::FlatOption;
 use laurus::{DataValue, Document};
-use laurus::{FieldOption, LexicalSearchRequest, Schema};
+use laurus::{FieldOption, LexicalSearchQuery, Schema};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_wal_recovery_uncommitted() -> laurus::Result<()> {
@@ -32,7 +32,7 @@ async fn test_wal_recovery_uncommitted() -> laurus::Result<()> {
         // Initial state
         let query = Box::new(TermQuery::new("title", "rust"));
         let search_request = laurus::SearchRequestBuilder::new()
-            .lexical_search_request(LexicalSearchRequest::new(query))
+            .lexical_query(LexicalSearchQuery::Obj(query))
             .build();
         let search_results = engine.search(search_request).await?;
         assert_eq!(search_results.len(), 0);
@@ -58,7 +58,7 @@ async fn test_wal_recovery_uncommitted() -> laurus::Result<()> {
         // Should have recovered doc1 from WAL and now committed
         let query = Box::new(TermQuery::new("title", "rust"));
         let search_request = laurus::SearchRequestBuilder::new()
-            .lexical_search_request(LexicalSearchRequest::new(query))
+            .lexical_query(LexicalSearchQuery::Obj(query))
             .build();
         let search_results = engine.search(search_request).await?;
         assert_eq!(

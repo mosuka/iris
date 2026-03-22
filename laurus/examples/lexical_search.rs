@@ -21,11 +21,11 @@ mod common;
 use laurus::lexical::core::field::{BooleanOption, FloatOption, GeoOption, IntegerOption};
 use laurus::lexical::span::{SpanQueryBuilder, SpanQueryWrapper};
 use laurus::lexical::{
-    BooleanQuery, FuzzyQuery, GeoQuery, NumericRangeQuery, PhraseQuery, QueryParser, TermQuery,
-    TextOption, WildcardQuery,
+    BooleanQuery, FuzzyQuery, GeoQuery, LexicalQueryParser, NumericRangeQuery, PhraseQuery,
+    TermQuery, TextOption, WildcardQuery,
 };
 use laurus::{
-    DataValue, Document, Engine, LexicalSearchRequest, Result, Schema, SearchRequestBuilder,
+    DataValue, Document, Engine, LexicalSearchQuery, Result, Schema, SearchRequestBuilder,
 };
 
 #[tokio::main]
@@ -125,7 +125,7 @@ async fn main() -> Result<()> {
     println!("  Done.\n");
 
     // ─── Query parser for DSL examples ──────────────────────────────────
-    let parser = QueryParser::new(analyzer).with_default_field("body");
+    let parser = LexicalQueryParser::new(analyzer).with_default_field("body");
 
     // =====================================================================
     // PART 1: TermQuery — exact single-term matching
@@ -138,7 +138,7 @@ async fn main() -> Result<()> {
     let results = engine
         .search(
             SearchRequestBuilder::new()
-                .lexical_search_request(LexicalSearchRequest::new(Box::new(TermQuery::new(
+                .lexical_query(LexicalSearchQuery::Obj(Box::new(TermQuery::new(
                     "body", "rust",
                 ))))
                 .limit(5)
@@ -151,7 +151,7 @@ async fn main() -> Result<()> {
     let results = engine
         .search(
             SearchRequestBuilder::new()
-                .lexical_search_request(LexicalSearchRequest::new(Box::new(TermQuery::new(
+                .lexical_query(LexicalSearchQuery::Obj(Box::new(TermQuery::new(
                     "category",
                     "programming",
                 ))))
@@ -165,7 +165,7 @@ async fn main() -> Result<()> {
     let results = engine
         .search(
             SearchRequestBuilder::new()
-                .lexical_search_request(LexicalSearchRequest::new(Box::new(TermQuery::new(
+                .lexical_query(LexicalSearchQuery::Obj(Box::new(TermQuery::new(
                     "in_print", "true",
                 ))))
                 .limit(5)
@@ -179,7 +179,7 @@ async fn main() -> Result<()> {
     let results = engine
         .search(
             SearchRequestBuilder::new()
-                .lexical_search_request(LexicalSearchRequest::new(query))
+                .lexical_query(LexicalSearchQuery::Obj(query))
                 .limit(5)
                 .build(),
         )
@@ -197,7 +197,7 @@ async fn main() -> Result<()> {
     let results = engine
         .search(
             SearchRequestBuilder::new()
-                .lexical_search_request(LexicalSearchRequest::new(Box::new(PhraseQuery::new(
+                .lexical_query(LexicalSearchQuery::Obj(Box::new(PhraseQuery::new(
                     "body",
                     vec!["machine".into(), "learning".into()],
                 ))))
@@ -211,7 +211,7 @@ async fn main() -> Result<()> {
     let results = engine
         .search(
             SearchRequestBuilder::new()
-                .lexical_search_request(LexicalSearchRequest::new(Box::new(PhraseQuery::new(
+                .lexical_query(LexicalSearchQuery::Obj(Box::new(PhraseQuery::new(
                     "body",
                     vec!["systems".into(), "programming".into(), "language".into()],
                 ))))
@@ -226,7 +226,7 @@ async fn main() -> Result<()> {
     let results = engine
         .search(
             SearchRequestBuilder::new()
-                .lexical_search_request(LexicalSearchRequest::new(query))
+                .lexical_query(LexicalSearchQuery::Obj(query))
                 .limit(5)
                 .build(),
         )
@@ -244,7 +244,7 @@ async fn main() -> Result<()> {
     let results = engine
         .search(
             SearchRequestBuilder::new()
-                .lexical_search_request(LexicalSearchRequest::new(Box::new(
+                .lexical_query(LexicalSearchQuery::Obj(Box::new(
                     FuzzyQuery::new("body", "programing").max_edits(2),
                 )))
                 .limit(5)
@@ -257,7 +257,7 @@ async fn main() -> Result<()> {
     let results = engine
         .search(
             SearchRequestBuilder::new()
-                .lexical_search_request(LexicalSearchRequest::new(Box::new(
+                .lexical_query(LexicalSearchQuery::Obj(Box::new(
                     FuzzyQuery::new("body", "javascritp").max_edits(1),
                 )))
                 .limit(5)
@@ -271,7 +271,7 @@ async fn main() -> Result<()> {
     let results = engine
         .search(
             SearchRequestBuilder::new()
-                .lexical_search_request(LexicalSearchRequest::new(query))
+                .lexical_query(LexicalSearchQuery::Obj(query))
                 .limit(5)
                 .build(),
         )
@@ -289,7 +289,7 @@ async fn main() -> Result<()> {
     let results = engine
         .search(
             SearchRequestBuilder::new()
-                .lexical_search_request(LexicalSearchRequest::new(Box::new(WildcardQuery::new(
+                .lexical_query(LexicalSearchQuery::Obj(Box::new(WildcardQuery::new(
                     "filename", "*.pdf",
                 )?)))
                 .limit(5)
@@ -302,7 +302,7 @@ async fn main() -> Result<()> {
     let results = engine
         .search(
             SearchRequestBuilder::new()
-                .lexical_search_request(LexicalSearchRequest::new(Box::new(WildcardQuery::new(
+                .lexical_query(LexicalSearchQuery::Obj(Box::new(WildcardQuery::new(
                     "body", "pro*",
                 )?)))
                 .limit(5)
@@ -316,7 +316,7 @@ async fn main() -> Result<()> {
     let results = engine
         .search(
             SearchRequestBuilder::new()
-                .lexical_search_request(LexicalSearchRequest::new(query))
+                .lexical_query(LexicalSearchQuery::Obj(query))
                 .limit(5)
                 .build(),
         )
@@ -334,7 +334,7 @@ async fn main() -> Result<()> {
     let results = engine
         .search(
             SearchRequestBuilder::new()
-                .lexical_search_request(LexicalSearchRequest::new(Box::new(
+                .lexical_query(LexicalSearchQuery::Obj(Box::new(
                     NumericRangeQuery::f64_range("price", Some(40.0), Some(60.0)),
                 )))
                 .limit(5)
@@ -347,7 +347,7 @@ async fn main() -> Result<()> {
     let results = engine
         .search(
             SearchRequestBuilder::new()
-                .lexical_search_request(LexicalSearchRequest::new(Box::new(
+                .lexical_query(LexicalSearchQuery::Obj(Box::new(
                     NumericRangeQuery::i64_range("year", Some(2021), None),
                 )))
                 .limit(5)
@@ -361,7 +361,7 @@ async fn main() -> Result<()> {
     let results = engine
         .search(
             SearchRequestBuilder::new()
-                .lexical_search_request(LexicalSearchRequest::new(query))
+                .lexical_query(LexicalSearchQuery::Obj(query))
                 .limit(5)
                 .build(),
         )
@@ -379,9 +379,9 @@ async fn main() -> Result<()> {
     let results = engine
         .search(
             SearchRequestBuilder::new()
-                .lexical_search_request(LexicalSearchRequest::new(Box::new(
-                    GeoQuery::within_radius("location", 37.7749, -122.4194, 100.0)?,
-                )))
+                .lexical_query(LexicalSearchQuery::Obj(Box::new(GeoQuery::within_radius(
+                    "location", 37.7749, -122.4194, 100.0,
+                )?)))
                 .limit(5)
                 .build(),
         )
@@ -392,7 +392,7 @@ async fn main() -> Result<()> {
     let results = engine
         .search(
             SearchRequestBuilder::new()
-                .lexical_search_request(LexicalSearchRequest::new(Box::new(
+                .lexical_query(LexicalSearchQuery::Obj(Box::new(
                     GeoQuery::within_bounding_box("location", 33.0, -123.0, 48.0, -117.0)?,
                 )))
                 .limit(5)
@@ -415,7 +415,7 @@ async fn main() -> Result<()> {
     let results = engine
         .search(
             SearchRequestBuilder::new()
-                .lexical_search_request(LexicalSearchRequest::new(Box::new(bq)))
+                .lexical_query(LexicalSearchQuery::Obj(Box::new(bq)))
                 .limit(5)
                 .build(),
         )
@@ -429,7 +429,7 @@ async fn main() -> Result<()> {
     let results = engine
         .search(
             SearchRequestBuilder::new()
-                .lexical_search_request(LexicalSearchRequest::new(Box::new(bq)))
+                .lexical_query(LexicalSearchQuery::Obj(Box::new(bq)))
                 .limit(5)
                 .build(),
         )
@@ -443,7 +443,7 @@ async fn main() -> Result<()> {
     let results = engine
         .search(
             SearchRequestBuilder::new()
-                .lexical_search_request(LexicalSearchRequest::new(Box::new(bq)))
+                .lexical_query(LexicalSearchQuery::Obj(Box::new(bq)))
                 .limit(5)
                 .build(),
         )
@@ -455,7 +455,7 @@ async fn main() -> Result<()> {
     let results = engine
         .search(
             SearchRequestBuilder::new()
-                .lexical_search_request(LexicalSearchRequest::new(query))
+                .lexical_query(LexicalSearchQuery::Obj(query))
                 .limit(5)
                 .build(),
         )
@@ -480,7 +480,7 @@ async fn main() -> Result<()> {
     let results = engine
         .search(
             SearchRequestBuilder::new()
-                .lexical_search_request(LexicalSearchRequest::new(Box::new(SpanQueryWrapper::new(
+                .lexical_query(LexicalSearchQuery::Obj(Box::new(SpanQueryWrapper::new(
                     Box::new(span_near),
                 ))))
                 .limit(5)
@@ -500,7 +500,7 @@ async fn main() -> Result<()> {
     let results = engine
         .search(
             SearchRequestBuilder::new()
-                .lexical_search_request(LexicalSearchRequest::new(Box::new(SpanQueryWrapper::new(
+                .lexical_query(LexicalSearchQuery::Obj(Box::new(SpanQueryWrapper::new(
                     Box::new(containing),
                 ))))
                 .limit(5)

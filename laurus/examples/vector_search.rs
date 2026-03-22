@@ -16,8 +16,11 @@ use std::sync::Arc;
 
 use laurus::lexical::core::field::{IntegerOption, NumericType};
 use laurus::lexical::{NumericRangeQuery, TermQuery, TextOption};
-use laurus::vector::{FlatOption, VectorQueryParser, VectorSearchRequestBuilder};
-use laurus::{Document, Engine, PerFieldEmbedder, Result, Schema, SearchRequestBuilder};
+use laurus::vector::{FlatOption, VectorQueryParser};
+use laurus::{
+    DataValue, Document, Engine, PerFieldEmbedder, QueryPayload, Result, Schema,
+    SearchRequestBuilder, VectorSearchQuery,
+};
 use serde_json::json;
 
 #[tokio::main]
@@ -111,11 +114,10 @@ async fn main() -> Result<()> {
     let results = engine
         .search(
             SearchRequestBuilder::new()
-                .vector_search_request(
-                    VectorSearchRequestBuilder::new()
-                        .add_text("text_vec", "memory safety")
-                        .build(),
-                )
+                .vector_query(VectorSearchQuery::Payloads(vec![QueryPayload::new(
+                    "text_vec",
+                    DataValue::Text("memory safety".into()),
+                )]))
                 .limit(3)
                 .build(),
         )
@@ -131,11 +133,10 @@ async fn main() -> Result<()> {
     let results = engine
         .search(
             SearchRequestBuilder::new()
-                .vector_search_request(
-                    VectorSearchRequestBuilder::new()
-                        .add_text("text_vec", "memory safety")
-                        .build(),
-                )
+                .vector_query(VectorSearchQuery::Payloads(vec![QueryPayload::new(
+                    "text_vec",
+                    DataValue::Text("memory safety".into()),
+                )]))
                 .filter_query(Box::new(TermQuery::new("category", "concurrency")))
                 .limit(3)
                 .build(),
@@ -152,11 +153,10 @@ async fn main() -> Result<()> {
     let results = engine
         .search(
             SearchRequestBuilder::new()
-                .vector_search_request(
-                    VectorSearchRequestBuilder::new()
-                        .add_text("text_vec", "type system")
-                        .build(),
-                )
+                .vector_query(VectorSearchQuery::Payloads(vec![QueryPayload::new(
+                    "text_vec",
+                    DataValue::Text("type system".into()),
+                )]))
                 .filter_query(Box::new(NumericRangeQuery::new(
                     "page",
                     NumericType::Integer,
@@ -180,10 +180,11 @@ async fn main() -> Result<()> {
 
     let vector_parser = VectorQueryParser::new(per_field_embedder.clone());
 
+    let parsed = vector_parser.parse("text_vec:~\"memory safety\"").await?;
     let results = engine
         .search(
             SearchRequestBuilder::new()
-                .vector_search_request(vector_parser.parse("text_vec:~\"memory safety\"").await?)
+                .vector_query(parsed.query)
                 .limit(3)
                 .build(),
         )

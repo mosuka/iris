@@ -17,11 +17,11 @@ use std::sync::Arc;
 
 use laurus::analysis::analyzer::standard::StandardAnalyzer;
 use laurus::lexical::core::field::IntegerOption;
-use laurus::lexical::{QueryParser, TermQuery, TextOption};
-use laurus::vector::{FlatOption, VectorQueryParser, VectorSearchRequestBuilder};
+use laurus::lexical::{LexicalQueryParser, TermQuery, TextOption};
+use laurus::vector::{FlatOption, VectorQueryParser};
 use laurus::{
-    Document, Engine, FusionAlgorithm, LexicalSearchRequest, PerFieldEmbedder, Result, Schema,
-    SearchRequestBuilder, UnifiedQueryParser,
+    DataValue, Document, Engine, FusionAlgorithm, LexicalSearchQuery, PerFieldEmbedder,
+    QueryPayload, Result, Schema, SearchRequestBuilder, UnifiedQueryParser, VectorSearchQuery,
 };
 use serde_json::json;
 
@@ -118,7 +118,7 @@ async fn main() -> Result<()> {
     let results = engine
         .search(
             SearchRequestBuilder::new()
-                .lexical_search_request(LexicalSearchRequest::new(Box::new(TermQuery::new(
+                .lexical_query(LexicalSearchQuery::Obj(Box::new(TermQuery::new(
                     "text",
                     "ownership",
                 ))))
@@ -137,11 +137,10 @@ async fn main() -> Result<()> {
     let results = engine
         .search(
             SearchRequestBuilder::new()
-                .vector_search_request(
-                    VectorSearchRequestBuilder::new()
-                        .add_text("text_vec", "memory safety")
-                        .build(),
-                )
+                .vector_query(VectorSearchQuery::Payloads(vec![QueryPayload::new(
+                    "text_vec",
+                    DataValue::Text("memory safety".into()),
+                )]))
                 .limit(3)
                 .build(),
         )
@@ -157,12 +156,11 @@ async fn main() -> Result<()> {
     let results = engine
         .search(
             SearchRequestBuilder::new()
-                .vector_search_request(
-                    VectorSearchRequestBuilder::new()
-                        .add_text("text_vec", "concurrent")
-                        .build(),
-                )
-                .lexical_search_request(LexicalSearchRequest::new(Box::new(TermQuery::new(
+                .vector_query(VectorSearchQuery::Payloads(vec![QueryPayload::new(
+                    "text_vec",
+                    DataValue::Text("concurrent".into()),
+                )]))
+                .lexical_query(LexicalSearchQuery::Obj(Box::new(TermQuery::new(
                     "text", "async",
                 ))))
                 .fusion_algorithm(FusionAlgorithm::RRF { k: 60.0 })
@@ -180,7 +178,7 @@ async fn main() -> Result<()> {
     println!("{}", "=".repeat(60));
 
     let unified_parser = UnifiedQueryParser::new(
-        QueryParser::new(std_analyzer).with_default_field("text"),
+        LexicalQueryParser::new(std_analyzer).with_default_field("text"),
         VectorQueryParser::new(per_field_embedder.clone()),
     );
 
@@ -202,12 +200,11 @@ async fn main() -> Result<()> {
     let results = engine
         .search(
             SearchRequestBuilder::new()
-                .vector_search_request(
-                    VectorSearchRequestBuilder::new()
-                        .add_text("text_vec", "type system")
-                        .build(),
-                )
-                .lexical_search_request(LexicalSearchRequest::new(Box::new(TermQuery::new(
+                .vector_query(VectorSearchQuery::Payloads(vec![QueryPayload::new(
+                    "text_vec",
+                    DataValue::Text("type system".into()),
+                )]))
+                .lexical_query(LexicalSearchQuery::Obj(Box::new(TermQuery::new(
                     "text", "trait",
                 ))))
                 .filter_query(Box::new(TermQuery::new("category", "type-system")))

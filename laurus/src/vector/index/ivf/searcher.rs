@@ -6,7 +6,7 @@ use crate::error::{LaurusError, Result};
 use crate::vector::core::vector::Vector;
 use crate::vector::reader::VectorIndexReader;
 use crate::vector::search::searcher::VectorIndexSearcher;
-use crate::vector::search::searcher::{VectorIndexSearchRequest, VectorIndexSearchResults};
+use crate::vector::search::searcher::{VectorIndexQuery, VectorIndexQueryResults};
 
 /// IVF (Inverted File) vector searcher that performs memory-efficient approximate search.
 #[derive(Debug)]
@@ -76,11 +76,11 @@ impl IvfSearcher {
 }
 
 impl VectorIndexSearcher for IvfSearcher {
-    fn search(&self, request: &VectorIndexSearchRequest) -> Result<VectorIndexSearchResults> {
+    fn search(&self, request: &VectorIndexQuery) -> Result<VectorIndexQueryResults> {
         use std::time::Instant;
 
         let start = Instant::now();
-        let mut results = VectorIndexSearchResults::new();
+        let mut results = VectorIndexQueryResults::new();
 
         // Find nearest centroids to probe
         let n_probe = self.n_probe.min(10); // Default max clusters
@@ -142,7 +142,7 @@ impl VectorIndexSearcher for IvfSearcher {
 
             results
                 .results
-                .push(crate::vector::search::searcher::VectorSearchResult {
+                .push(crate::vector::search::searcher::VectorIndexQueryResult {
                     doc_id,
                     field_name,
                     similarity,
@@ -156,7 +156,7 @@ impl VectorIndexSearcher for IvfSearcher {
         Ok(results)
     }
 
-    fn count(&self, request: VectorIndexSearchRequest) -> Result<u64> {
+    fn count(&self, request: VectorIndexQuery) -> Result<u64> {
         // Get all vector IDs with field names
         let vector_ids = self.index_reader.vector_ids()?;
 

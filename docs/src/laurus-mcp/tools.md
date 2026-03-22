@@ -251,17 +251,21 @@ Result: `Changes committed successfully.`
 
 ## search
 
-Search documents using the laurus query DSL.
+Search documents using the laurus unified query DSL. Supports lexical search, vector search, and hybrid search in a single query string.
 
 ### Parameters
 
 | Name | Type | Required | Description |
 | :--- | :--- | :--- | :--- |
-| `query` | string | Yes | Search query in laurus query DSL |
+| `query` | string | Yes | Search query in laurus unified query DSL |
 | `limit` | integer | No | Maximum results (default: 10) |
 | `offset` | integer | No | Results to skip for pagination (default: 0) |
+| `fusion` | string | No | Fusion algorithm as JSON (for hybrid search) |
+| `field_boosts` | string | No | Per-field boost factors as JSON |
 
 ### Query DSL examples
+
+#### Lexical search
 
 | Query | Description |
 | :--- | :--- |
@@ -272,6 +276,38 @@ Search documents using the laurus query DSL.
 | `roam~2` | Fuzzy search (edit distance 2) |
 | `count:[1 TO 10]` | Range search |
 | `title:helo~1` | Fuzzy field search |
+
+#### Vector search
+
+| Query | Description |
+| :--- | :--- |
+| `content:~"cute kitten"` | Vector search on a specific field |
+| `~"cute kitten"` | Vector search on default field |
+| `content:~"cute kitten"^0.8` | Vector search with weight/boost |
+| `a:~"cats" b:~"dogs"^0.5` | Multiple vector queries |
+
+#### Hybrid search
+
+| Query | Description |
+| :--- | :--- |
+| `title:hello content:~"cute kitten"` | Lexical + vector in one query |
+| `title:hello AND body:world content:~"cats"^0.8` | Boolean lexical + weighted vector |
+
+### Fusion algorithm examples
+
+```json
+{"rrf": {"k": 60.0}}
+```
+
+```json
+{"weighted_sum": {"lexical_weight": 0.7, "vector_weight": 0.3}}
+```
+
+### Field boosts example
+
+```json
+{"title": 2.0, "body": 1.0}
+```
 
 ### Result
 

@@ -1,77 +1,22 @@
-//! Vector store search request types.
+//! Vector store request value types.
 //!
-//! This module provides types for constructing vector search requests,
-//! including query vectors, field selectors, and score combination modes.
+//! This module provides low-level value types used in vector search requests:
+//! query vectors, query payloads, field selectors, and score combination modes.
+//!
+//! The high-level request and query types ([`VectorSearchRequest`],
+//! [`VectorSearchQuery`]) live in [`crate::vector::search::searcher`], mirroring
+//! the lexical module's organization where [`LexicalSearchRequest`] and
+//! [`LexicalSearchQuery`] live in [`crate::lexical::search::searcher`].
 
 use serde::{Deserialize, Serialize};
 
 use crate::data::DataValue;
+use crate::vector::core::vector::Vector;
 
-fn default_query_limit() -> usize {
-    10
-}
-
-fn default_overfetch() -> f32 {
-    1.0
-}
-
-/// Request model for collection-level search.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct VectorSearchRequest {
-    /// Query vectors to search with (already embedded).
-    #[serde(default)]
-    pub query_vectors: Vec<QueryVector>,
-    /// Query payloads to embed and search with.
-    /// These will be embedded internally using the configured embedder.
-    /// Note: This field is skipped during serialization because `Payload`
-    /// contains non-serializable data (e.g., `Arc<[u8]>`).
-    #[serde(skip)]
-    pub query_payloads: Vec<QueryPayload>,
-    /// Fields to search in.
-    ///
-    /// **Note:** The current [`VectorStore::search()`](crate::vector::store::VectorStore::search)
-    /// implementation does not use this field. All indexed vectors are searched
-    /// regardless of this value. This field is reserved for future
-    /// field-level filtering support.
-    #[serde(default)]
-    pub fields: Option<Vec<FieldSelector>>,
-    /// Maximum number of results to return.
-    #[serde(default = "default_query_limit")]
-    pub limit: usize,
-    /// How to combine scores from multiple query vectors.
-    #[serde(default)]
-    pub score_mode: VectorScoreMode,
-    /// Overfetch factor for better result quality.
-    ///
-    /// **Note:** The current [`VectorStore::search()`](crate::vector::store::VectorStore::search)
-    /// implementation does not use this field. Instead, it hardcodes a 2x overfetch
-    /// (`limit.saturating_mul(2)`). This field is reserved for future use.
-    #[serde(default = "default_overfetch")]
-    pub overfetch: f32,
-    /// Minimum score threshold. Results with scores below this value are filtered out.
-    /// Default is 0.0 (no filtering).
-    #[serde(default)]
-    pub min_score: f32,
-
-    /// List of allowed document IDs (for internal use by Engine filtering).
-    #[serde(skip)]
-    pub allowed_ids: Option<Vec<u64>>,
-}
-
-impl Default for VectorSearchRequest {
-    fn default() -> Self {
-        Self {
-            query_vectors: Vec::new(),
-            query_payloads: Vec::new(),
-            fields: None,
-            limit: default_query_limit(),
-            score_mode: VectorScoreMode::default(),
-            overfetch: default_overfetch(),
-            min_score: 0.0,
-            allowed_ids: None,
-        }
-    }
-}
+// Re-export high-level types from their canonical location for backward compatibility.
+pub use crate::vector::search::searcher::{
+    VectorSearchParams, VectorSearchQuery, VectorSearchRequest,
+};
 
 /// Selector for choosing which vector fields to include in a search.
 ///
@@ -117,8 +62,8 @@ pub enum VectorScoreMode {
 /// computation against the stored document vectors.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct QueryVector {
-    /// Dense floating-point embedding representing the query.
-    pub vector: Vec<f32>,
+    /// Dense vector embedding representing the query.
+    pub vector: Vector,
     /// Multiplicative weight applied to the similarity score produced by this
     /// vector. Defaults to `1.0`.
     #[serde(default = "QueryVector::default_weight")]

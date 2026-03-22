@@ -38,7 +38,7 @@ struct QueryStringParser;
 ///
 /// Similar to Lucene's QueryParser, this requires an Analyzer to properly
 /// normalize query terms before matching against the index.
-pub struct QueryParser {
+pub struct LexicalQueryParser {
     /// Analyzer for tokenizing and normalizing query terms.
     /// Required - following Lucene's design where Analyzer is mandatory.
     analyzer: Arc<dyn Analyzer>,
@@ -47,7 +47,7 @@ pub struct QueryParser {
     default_occur: Occur,
 }
 
-impl std::fmt::Debug for QueryParser {
+impl std::fmt::Debug for LexicalQueryParser {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("QueryParser")
             .field("analyzer", &self.analyzer.name())
@@ -57,7 +57,7 @@ impl std::fmt::Debug for QueryParser {
     }
 }
 
-impl QueryParser {
+impl LexicalQueryParser {
     /// Creates a new query parser with the given analyzer.
     ///
     /// Following Lucene's design, an Analyzer is required.
@@ -68,11 +68,11 @@ impl QueryParser {
     /// # Example
     /// ```
     /// use laurus::analysis::analyzer::standard::StandardAnalyzer;
-    /// use laurus::lexical::query::parser::QueryParser;
+    /// use laurus::lexical::query::parser::LexicalQueryParser;
     /// use std::sync::Arc;
     ///
     /// let analyzer = Arc::new(StandardAnalyzer::new().unwrap());
-    /// let parser = QueryParser::new(analyzer);
+    /// let parser = LexicalQueryParser::new(analyzer);
     /// ```
     pub fn new(analyzer: Arc<dyn Analyzer>) -> Self {
         Self {
@@ -86,7 +86,7 @@ impl QueryParser {
     ///
     /// This is a convenience method for the common case.
     pub fn with_standard_analyzer() -> Result<Self> {
-        Ok(QueryParser::new(Arc::new(StandardAnalyzer::new()?)))
+        Ok(LexicalQueryParser::new(Arc::new(StandardAnalyzer::new()?)))
     }
 
     /// Sets the default field.
@@ -664,8 +664,8 @@ impl QueryParserBuilder {
     }
 
     /// Builds the parser.
-    pub fn build(self) -> Result<QueryParser> {
-        Ok(QueryParser {
+    pub fn build(self) -> Result<LexicalQueryParser> {
+        Ok(LexicalQueryParser {
             analyzer: self.analyzer,
             default_fields: self.default_fields,
             default_occur: self.default_occur,
@@ -679,9 +679,9 @@ mod tests {
     use crate::analysis::analyzer::standard::StandardAnalyzer;
 
     /// Helper function to create a test parser with StandardAnalyzer
-    fn create_test_parser() -> QueryParser {
+    fn create_test_parser() -> LexicalQueryParser {
         let analyzer = Arc::new(StandardAnalyzer::new().unwrap());
-        QueryParser::new(analyzer)
+        LexicalQueryParser::new(analyzer)
     }
 
     #[test]

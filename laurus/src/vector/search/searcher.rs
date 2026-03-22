@@ -1,28 +1,36 @@
-//! Vector searcher trait and search request/response types.
+//! Vector searcher trait and query/response types.
 
 use serde::{Deserialize, Serialize};
 
 use crate::error::Result;
 use crate::vector::core::vector::Vector;
 
-/// Vector search request combining query vector and configuration.
+/// Low-level query for a single-vector search against a vector index.
+///
+/// This type represents a single nearest-neighbor query at the index level,
+/// in contrast to the high-level [`VectorSearchRequest`] which can contain
+/// multiple query vectors and aggregation settings.
+///
+/// Naming convention: low-level index operations use "Query" (e.g.,
+/// `VectorIndexQuery`, `VectorIndexQueryParams`), while high-level
+/// store/engine operations use "Request" (e.g., `VectorSearchRequest`).
 #[derive(Debug, Clone)]
-pub struct VectorIndexSearchRequest {
+pub struct VectorIndexQuery {
     /// The query vector.
     pub query: Vector,
     /// Search configuration.
-    pub params: VectorIndexSearchParams,
+    pub params: VectorIndexQueryParams,
     /// Optional field name to filter search results.
     /// If None, searches across all fields.
     pub field_name: Option<String>,
 }
 
-impl VectorIndexSearchRequest {
+impl VectorIndexQuery {
     /// Create a new vector search request.
     pub fn new(query: Vector) -> Self {
-        VectorIndexSearchRequest {
+        VectorIndexQuery {
             query,
-            params: VectorIndexSearchParams::default(),
+            params: VectorIndexQueryParams::default(),
             field_name: None,
         }
     }
@@ -64,9 +72,12 @@ impl VectorIndexSearchRequest {
     }
 }
 
-/// Configuration for vector search operations.
+/// Configuration for low-level vector index query operations.
+///
+/// Used with [`VectorIndexQuery`] to configure nearest-neighbor search
+/// parameters at the index level.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct VectorIndexSearchParams {
+pub struct VectorIndexQueryParams {
     /// Number of results to return.
     pub top_k: usize,
     /// Minimum similarity threshold.
@@ -81,7 +92,7 @@ pub struct VectorIndexSearchParams {
     pub reranking: Option<crate::vector::search::scoring::ranking::RankingConfig>,
 }
 
-impl Default for VectorIndexSearchParams {
+impl Default for VectorIndexQueryParams {
     fn default() -> Self {
         Self {
             top_k: 10,
@@ -94,9 +105,9 @@ impl Default for VectorIndexSearchParams {
     }
 }
 
-/// A single vector search result.
+/// A single result from a low-level vector index query.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct VectorSearchResult {
+pub struct VectorIndexQueryResult {
     /// Document ID.
     pub doc_id: u64,
     /// Field name of the matched vector.
@@ -109,11 +120,11 @@ pub struct VectorSearchResult {
     pub vector: Option<Vector>,
 }
 
-/// Collection of vector search results.
+/// Collection of results from a low-level vector index query.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct VectorIndexSearchResults {
+pub struct VectorIndexQueryResults {
     /// Individual search results.
-    pub results: Vec<VectorSearchResult>,
+    pub results: Vec<VectorIndexQueryResult>,
     /// Total number of candidates examined.
     pub candidates_examined: usize,
     /// Search execution time in milliseconds.
@@ -122,7 +133,7 @@ pub struct VectorIndexSearchResults {
     pub query_metadata: std::collections::HashMap<String, String>,
 }
 
-impl VectorIndexSearchResults {
+impl VectorIndexQueryResults {
     /// Create new empty search results.
     pub fn new() -> Self {
         Self {
@@ -175,7 +186,7 @@ impl VectorIndexSearchResults {
     }
 
     /// Get the best (highest similarity) result.
-    pub fn best_result(&self) -> Option<&VectorSearchResult> {
+    pub fn best_result(&self) -> Option<&VectorIndexQueryResult> {
         self.results.iter().max_by(|a, b| {
             a.similarity
                 .partial_cmp(&b.similarity)
@@ -184,7 +195,7 @@ impl VectorIndexSearchResults {
     }
 }
 
-impl Default for VectorIndexSearchResults {
+impl Default for VectorIndexQueryResults {
     fn default() -> Self {
         Self::new()
     }
@@ -193,17 +204,112 @@ impl Default for VectorIndexSearchResults {
 /// Trait for vector searchers.
 pub trait VectorIndexSearcher: Send + Sync + std::fmt::Debug {
     /// Execute a vector similarity search.
-    fn search(&self, request: &VectorIndexSearchRequest) -> Result<VectorIndexSearchResults>;
+    fn search(&self, request: &VectorIndexQuery) -> Result<VectorIndexQueryResults>;
 
     /// Count the number of vectors matching the query.
-    fn count(&self, request: VectorIndexSearchRequest) -> Result<u64>;
+    fn count(&self, request: VectorIndexQuery) -> Result<u64>;
 
     /// Warm up the searcher (pre-load data, etc.).
     fn warmup(&mut self) -> Result<()> {
-        // デフォルト実装: 何もしない
+        // No-op by default. Implementations can override this method to perform
+        // any necessary warm-up steps, such as loading index data into memory.
         Ok(())
     }
 }
+
+// ── High-level search request types ──────────────────────────────────────────
+
+/// How a vector search query is specified.
+///
+/// Mirrors [`LexicalSearchQuery`](crate::lexical::search::searcher::LexicalSearchQuery)
+/// for symmetry:
+///
+/// | | Lexical | Vector |
+/// |---|---|---|
+/// | Deferred resolution | [`Dsl(String)`](crate::lexical::search::searcher::LexicalSearchQuery::Dsl) | [`Payloads`](Self::Payloads) |
+/// | Pre-built | [`Obj(Box<dyn Query>)`](crate::lexical::search::searcher::LexicalSearchQuery::Obj) | [`Vectors`](Self::Vectors) |
+#[derive(Debug, Clone)]
+pub enum VectorSearchQuery {
+    /// Raw payloads (text, bytes, etc.) to be embedded into vectors at
+    /// search time by the engine's configured embedder.
+    Payloads(Vec<crate::vector::store::request::QueryPayload>),
+
+    /// Pre-embedded query vectors, ready for nearest-neighbor search.
+    Vectors(Vec<crate::vector::store::request::QueryVector>),
+}
+
+fn default_query_limit() -> usize {
+    10
+}
+
+fn default_overfetch() -> f32 {
+    1.0
+}
+
+/// Parameters for vector search operations.
+///
+/// Analogous to
+/// [`LexicalSearchParams`](crate::lexical::search::searcher::LexicalSearchParams),
+/// this struct groups all configuration knobs for a vector search independently
+/// of the query specification.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VectorSearchParams {
+    /// Fields to search in.
+    #[serde(default)]
+    pub fields: Option<Vec<crate::vector::store::request::FieldSelector>>,
+    /// Maximum number of results to return.
+    #[serde(default = "default_query_limit")]
+    pub limit: usize,
+    /// How to combine scores from multiple query vectors.
+    #[serde(default)]
+    pub score_mode: crate::vector::store::request::VectorScoreMode,
+    /// Overfetch factor for better result quality.
+    #[serde(default = "default_overfetch")]
+    pub overfetch: f32,
+    /// Minimum score threshold. Results below this score are filtered out.
+    #[serde(default)]
+    pub min_score: f32,
+    /// List of allowed document IDs (for internal use by Engine filtering).
+    #[serde(skip)]
+    pub allowed_ids: Option<Vec<u64>>,
+}
+
+impl Default for VectorSearchParams {
+    fn default() -> Self {
+        Self {
+            fields: None,
+            limit: default_query_limit(),
+            score_mode: crate::vector::store::request::VectorScoreMode::default(),
+            overfetch: default_overfetch(),
+            min_score: 0.0,
+            allowed_ids: None,
+        }
+    }
+}
+
+/// Request model for collection-level vector search.
+///
+/// Mirrors
+/// [`LexicalSearchRequest`](crate::lexical::search::searcher::LexicalSearchRequest)
+/// structure: a query enum paired with a params struct.
+#[derive(Debug, Clone)]
+pub struct VectorSearchRequest {
+    /// The query to execute.
+    pub query: VectorSearchQuery,
+    /// Search configuration.
+    pub params: VectorSearchParams,
+}
+
+impl Default for VectorSearchRequest {
+    fn default() -> Self {
+        Self {
+            query: VectorSearchQuery::Vectors(Vec::new()),
+            params: VectorSearchParams::default(),
+        }
+    }
+}
+
+// ── High-level searcher trait ────────────────────────────────────────────────
 
 /// Trait for high-level vector search implementations.
 ///
@@ -221,15 +327,12 @@ pub trait VectorSearcher: Send + Sync + std::fmt::Debug {
     /// and aggregates scores according to the specified score mode.
     fn search(
         &self,
-        request: &crate::vector::store::request::VectorSearchRequest,
+        request: &VectorSearchRequest,
     ) -> crate::error::Result<crate::vector::store::response::VectorSearchResults>;
 
     /// Count the number of matching documents for a request.
     ///
     /// Returns the number of documents that match the given search request,
     /// applying the min_score threshold if specified in the request.
-    fn count(
-        &self,
-        request: &crate::vector::store::request::VectorSearchRequest,
-    ) -> crate::error::Result<u64>;
+    fn count(&self, request: &VectorSearchRequest) -> crate::error::Result<u64>;
 }
