@@ -4,14 +4,15 @@
 [![Documentation](https://docs.rs/laurus/badge.svg)](https://docs.rs/laurus)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Laurus is a composable search core library written in Rust — built for Lexical Augmented Unified Retrieval Using Semantics.
-Rather than a monolithic engine, Laurus provides modular building blocks for embedding powerful search into any application:
+Laurus is a search platform written in Rust — built for Lexical Augmented Unified Retrieval Using Semantics.
+Built on a core library covering lexical search, vector search, and hybrid search, it provides multiple ready-to-use interfaces:
 
-- **Lexical search primitives** for precise, exact-match retrieval
-- **Vector-based similarity search** for deep semantic understanding
-- **Hybrid scoring and ranking** to synthesize multiple signals into coherent results
+- **Core Library** — Modular search engine embeddable into any application
+- **CLI & REPL** — Command-line tool for interactive search experiences
+- **gRPC Server & HTTP Gateway** — Seamless integration with microservices and existing systems
+- **MCP Server** — Direct integration with AI assistants such as Claude
 
-Rather than functioning as a monolithic search engine, Laurus is architected as a **composable search core** — a suite of modular building blocks designed to be embedded into applications, extended with custom logic, or orchestrated within distributed systems.
+Whether embedded as a library, deployed as a standalone server, or woven into AI workflows, Laurus is a composable search foundation.
 
 ## Documentation
 
