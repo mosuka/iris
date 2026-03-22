@@ -230,7 +230,7 @@ jobs:
 
       - name: Publish crates
         run: |
-          for crate in laurus laurus-mcp laurus-server laurus-cli; do
+          for crate in laurus laurus-server laurus-mcp laurus-cli; do
             VERSION=$(cargo metadata --no-deps --format-version=1 | jq -r ".packages[] | select(.name==\"$crate\") | .version")
             PUBLISHED_VERSIONS=$(curl -s -A "laurus-release-workflow (https://github.com/mosuka/laurus)" "https://crates.io/api/v1/crates/$crate" | jq -r 'select(.versions != null) | .versions[].num')
             if echo "${PUBLISHED_VERSIONS}" | grep -Fx "${VERSION}" >/dev/null; then
