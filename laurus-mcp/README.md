@@ -32,6 +32,25 @@ laurus serve --port 50051
 claude mcp add laurus -- laurus mcp --endpoint http://localhost:50051
 ```
 
+### Claude Desktop
+
+Add the following to your Claude Desktop configuration file (`claude_desktop_config.json`):
+
+- **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- **Linux**: `~/.config/Claude/claude_desktop_config.json`
+- **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
+
+```json
+{
+  "mcpServers": {
+    "laurus": {
+      "command": "laurus",
+      "args": ["mcp", "--endpoint", "http://localhost:50051"]
+    }
+  }
+}
+```
+
 ## MCP Tools
 
 | Tool | Description |
