@@ -7,7 +7,7 @@ documentation.workspace = true
 homepage.workspace = true
 repository.workspace = true
 readme = "README.md"
-keywords = ["search", "mcp", "model-context-protocol", "indexing"]
+keywords = ["search", "mcp", "indexing"]
 categories = ["text-processing"]
 license.workspace = true
 
