@@ -778,14 +778,31 @@ impl Engine {
         }
     }
 
-    /// Resolve external ID from internal doc_id.
-    fn resolve_external_id(&self, internal_id: u64) -> Result<String> {
-        if let Some(doc) = self.log.get_document(internal_id)?
-            && let Some(id) = doc.fields.get("_id").and_then(|v| v.as_text())
-        {
-            return Ok(id.to_string());
+    /// Resolve external ID and load document in a single retrieval.
+    ///
+    /// This avoids the double-fetch that occurs when calling
+    /// `resolve_external_id()` and `get_document_by_internal_id()` separately.
+    ///
+    /// # Arguments
+    ///
+    /// * `internal_id` - The internal document ID.
+    ///
+    /// # Returns
+    ///
+    /// A tuple of (external_id, Option<Document>).
+    fn resolve_id_and_document(&self, internal_id: u64) -> Result<(String, Option<Document>)> {
+        if let Some(doc) = self.log.get_document(internal_id)? {
+            let external_id = doc
+                .fields
+                .get("_id")
+                .and_then(|v| v.as_text())
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| format!("unknown_{}", internal_id));
+            let filtered = self.filter_stored_fields(&doc);
+            Ok((external_id, Some(filtered)))
+        } else {
+            Ok((format!("unknown_{}", internal_id), None))
         }
-        Ok(format!("unknown_{}", internal_id))
     }
 
     /// Split the unified schema into specialized configs.
@@ -1071,7 +1088,8 @@ impl Engine {
                 fetch_count
             };
             let req = crate::lexical::search::searcher::LexicalSearchRequest::new(q)
-                .limit(overfetch_limit);
+                .limit(overfetch_limit)
+                .load_documents(false);
 
             self.lexical.search(req)?.hits
         } else {
@@ -1158,8 +1176,7 @@ impl Engine {
                 .skip(request_offset)
                 .take(request_limit)
             {
-                let external_id = self.resolve_external_id(hit.doc_id)?;
-                let document = self.get_document_by_internal_id(hit.doc_id)?;
+                let (external_id, document) = self.resolve_id_and_document(hit.doc_id)?;
                 results.push(SearchResult {
                     id: external_id,
                     score: hit.score,
@@ -1168,18 +1185,20 @@ impl Engine {
             }
             Ok(results)
         } else {
-            // Only lexical results (or both empty)
+            // Only lexical results (or both empty).
+            // Documents are not loaded during scoring (load_documents=false),
+            // so we load them here only for the final paginated result set.
             let mut results = Vec::with_capacity(request_limit);
             for hit in lexical_hits
                 .into_iter()
                 .skip(request_offset)
                 .take(request_limit)
             {
-                let external_id = self.resolve_external_id(hit.doc_id)?;
+                let (external_id, document) = self.resolve_id_and_document(hit.doc_id)?;
                 results.push(SearchResult {
                     id: external_id,
                     score: hit.score,
-                    document: hit.document,
+                    document,
                 });
             }
             Ok(results)
@@ -1187,6 +1206,10 @@ impl Engine {
     }
 
     /// Combine results from lexical and vector engines.
+    ///
+    /// Fusion operates on `(doc_id, score)` pairs only — documents are loaded
+    /// after scoring and truncation so that only the final result set incurs
+    /// the document-fetch cost.
     fn fuse_results(
         &self,
         lexical_hits: Vec<crate::lexical::query::SearchHit>,
@@ -1195,22 +1218,17 @@ impl Engine {
         limit: usize,
     ) -> Result<Vec<SearchResult>> {
         let estimated_capacity = lexical_hits.len().max(vector_hits.len());
-        let mut fused_scores: HashMap<u64, (f32, Option<crate::data::Document>)> =
-            HashMap::with_capacity(estimated_capacity);
+        let mut fused_scores: HashMap<u64, f32> = HashMap::with_capacity(estimated_capacity);
 
         match fusion {
             FusionAlgorithm::RRF { k } => {
                 for (rank, hit) in lexical_hits.into_iter().enumerate() {
                     let rrf_score = 1.0 / (k + (rank + 1) as f64);
-                    let entry = fused_scores
-                        .entry(hit.doc_id)
-                        .or_insert((0.0, hit.document));
-                    entry.0 += rrf_score as f32;
+                    *fused_scores.entry(hit.doc_id).or_insert(0.0) += rrf_score as f32;
                 }
                 for (rank, hit) in vector_hits.into_iter().enumerate() {
                     let rrf_score = 1.0 / (k + (rank + 1) as f64);
-                    let entry = fused_scores.entry(hit.doc_id).or_insert((0.0, None));
-                    entry.0 += rrf_score as f32;
+                    *fused_scores.entry(hit.doc_id).or_insert(0.0) += rrf_score as f32;
                 }
             }
             FusionAlgorithm::WeightedSum {
@@ -1229,10 +1247,7 @@ impl Engine {
                     } else {
                         1.0
                     };
-                    let entry = fused_scores
-                        .entry(hit.doc_id)
-                        .or_insert((0.0, hit.document));
-                    entry.0 += norm_score * lexical_weight;
+                    *fused_scores.entry(hit.doc_id).or_insert(0.0) += norm_score * lexical_weight;
                 }
 
                 let (vector_min, vector_max) = vector_hits
@@ -1247,16 +1262,12 @@ impl Engine {
                     } else {
                         1.0
                     };
-                    let entry = fused_scores.entry(hit.doc_id).or_insert((0.0, None));
-                    entry.0 += norm_score * vector_weight;
+                    *fused_scores.entry(hit.doc_id).or_insert(0.0) += norm_score * vector_weight;
                 }
             }
         }
 
-        let mut intermediate: Vec<(u64, f32, Option<crate::data::Document>)> = fused_scores
-            .into_iter()
-            .map(|(doc_id, (score, document))| (doc_id, score, document))
-            .collect();
+        let mut intermediate: Vec<(u64, f32)> = fused_scores.into_iter().collect();
 
         // Sort by fused score descending
         intermediate
@@ -1267,15 +1278,10 @@ impl Engine {
             intermediate.truncate(limit);
         }
 
-        // Resolve external IDs and fill missing documents
+        // Load documents only for the final truncated result set.
         let mut results = Vec::with_capacity(intermediate.len());
-        for (doc_id, score, document) in intermediate {
-            let external_id = self.resolve_external_id(doc_id)?;
-            let document = if document.is_some() {
-                document
-            } else {
-                self.get_document_by_internal_id(doc_id)?
-            };
+        for (doc_id, score) in intermediate {
+            let (external_id, document) = self.resolve_id_and_document(doc_id)?;
             results.push(SearchResult {
                 id: external_id,
                 score,

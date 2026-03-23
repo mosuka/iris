@@ -6,7 +6,7 @@
 use std::hint::black_box;
 use std::sync::Arc;
 
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use tokio::runtime::Runtime;
 
 use laurus::analysis::analyzer::analyzer::Analyzer;
@@ -15,9 +15,7 @@ use laurus::lexical::core::field::IntegerOption;
 use laurus::lexical::{BooleanQuery, FuzzyQuery, PhraseQuery, TermQuery, TextOption};
 use laurus::storage::memory::MemoryStorageConfig;
 use laurus::storage::{Storage, StorageConfig, StorageFactory};
-use laurus::{
-    Document, Engine, LexicalSearchQuery, Result, Schema, SearchRequestBuilder,
-};
+use laurus::{Document, Engine, LexicalSearchQuery, Result, Schema, SearchRequestBuilder};
 
 /// Create an in-memory storage backend.
 fn memory_storage() -> Result<Arc<dyn Storage>> {
@@ -216,11 +214,7 @@ fn bench_phrase_query(c: &mut Criterion) {
                 async move {
                     let query = Box::new(PhraseQuery::new(
                         "body",
-                        vec![
-                            "practical".into(),
-                            "applications".into(),
-                            "in".into(),
-                        ],
+                        vec!["practical".into(), "applications".into(), "in".into()],
                     ));
                     let request = SearchRequestBuilder::new()
                         .lexical_query(LexicalSearchQuery::Obj(query))
@@ -245,8 +239,7 @@ fn bench_fuzzy_query(c: &mut Criterion) {
             b.to_async(&rt).iter(|| {
                 let engine = &engine;
                 async move {
-                    let query =
-                        Box::new(FuzzyQuery::new("body", "programing").max_edits(1));
+                    let query = Box::new(FuzzyQuery::new("body", "programing").max_edits(1));
                     let request = SearchRequestBuilder::new()
                         .lexical_query(LexicalSearchQuery::Obj(query))
                         .limit(10)
@@ -260,8 +253,7 @@ fn bench_fuzzy_query(c: &mut Criterion) {
             b.to_async(&rt).iter(|| {
                 let engine = &engine;
                 async move {
-                    let query =
-                        Box::new(FuzzyQuery::new("body", "progrming").max_edits(2));
+                    let query = Box::new(FuzzyQuery::new("body", "progrming").max_edits(2));
                     let request = SearchRequestBuilder::new()
                         .lexical_query(LexicalSearchQuery::Obj(query))
                         .limit(10)
@@ -297,7 +289,9 @@ fn bench_dsl_query(c: &mut Criterion) {
             let engine = &engine;
             async move {
                 let request = SearchRequestBuilder::new()
-                    .lexical_query(LexicalSearchQuery::Dsl("body:programming AND body:language".to_string()))
+                    .lexical_query(LexicalSearchQuery::Dsl(
+                        "body:programming AND body:language".to_string(),
+                    ))
                     .limit(10)
                     .build();
                 black_box(engine.search(request).await.unwrap())
@@ -310,7 +304,9 @@ fn bench_dsl_query(c: &mut Criterion) {
             let engine = &engine;
             async move {
                 let request = SearchRequestBuilder::new()
-                    .lexical_query(LexicalSearchQuery::Dsl("body:rust OR body:python OR body:javascript".to_string()))
+                    .lexical_query(LexicalSearchQuery::Dsl(
+                        "body:rust OR body:python OR body:javascript".to_string(),
+                    ))
                     .limit(10)
                     .build();
                 black_box(engine.search(request).await.unwrap())

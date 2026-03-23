@@ -84,7 +84,8 @@ impl VectorIndexSearcher for HnswSearcher {
             }
         }
 
-        candidates.sort_unstable_by(|a, b| b.2.partial_cmp(&a.2).unwrap_or(std::cmp::Ordering::Equal));
+        candidates
+            .sort_unstable_by(|a, b| b.2.partial_cmp(&a.2).unwrap_or(std::cmp::Ordering::Equal));
 
         let top_k = request.params.top_k.min(candidates.len());
         for (doc_id, field_name, similarity, distance, vector) in candidates.into_iter().take(top_k)
@@ -353,7 +354,11 @@ impl HnswSearcher {
         // Optimization: HnswIndexReader *could* support getting raw bytes or avoiding clone,
         // but get_vector returns Option<Vector>.
         if let Some(target) = reader.get_vector(doc_id, field_name)? {
-            reader.distance_metric().distance(&query.data, &target.data)
+            // Use unchecked distance for performance in hot loop.
+            // Dimension consistency is validated at search entry point.
+            Ok(reader
+                .distance_metric()
+                .distance_unchecked(&query.data, &target.data))
         } else {
             // Vector not found in this field?
             // Should return max distance or error?
