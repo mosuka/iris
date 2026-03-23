@@ -1,5 +1,6 @@
 //! Collector implementations for gathering search results.
 
+use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 use std::fmt::Debug;
@@ -553,6 +554,8 @@ pub struct AllDocsCollector {
     hits: Vec<SearchHit>,
     /// Minimum score threshold.
     min_score: f32,
+    /// Cached sorted results to avoid repeated clone+sort.
+    sorted_cache: RefCell<Option<Vec<SearchHit>>>,
 }
 
 impl AllDocsCollector {
@@ -561,6 +564,7 @@ impl AllDocsCollector {
         AllDocsCollector {
             hits: Vec::new(),
             min_score: 0.0,
+            sorted_cache: RefCell::new(None),
         }
     }
 
@@ -569,6 +573,7 @@ impl AllDocsCollector {
         AllDocsCollector {
             hits: Vec::new(),
             min_score,
+            sorted_cache: RefCell::new(None),
         }
     }
 }
@@ -587,14 +592,20 @@ impl Collector for AllDocsCollector {
                 score,
                 document: None,
             });
+            // Invalidate cached sorted results.
+            *self.sorted_cache.borrow_mut() = None;
         }
         Ok(())
     }
 
     fn results(&self) -> Vec<SearchHit> {
+        let mut cache = self.sorted_cache.borrow_mut();
+        if let Some(ref cached) = *cache {
+            return cached.clone();
+        }
         let mut results = self.hits.clone();
-        // Sort by score descending
         results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(Ordering::Equal));
+        *cache = Some(results.clone());
         results
     }
 
@@ -613,6 +624,7 @@ impl Collector for AllDocsCollector {
 
     fn reset(&mut self) {
         self.hits.clear();
+        *self.sorted_cache.borrow_mut() = None;
     }
 }
 

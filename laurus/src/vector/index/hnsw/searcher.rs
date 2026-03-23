@@ -11,8 +11,9 @@ use crate::vector::search::searcher::VectorIndexSearcher;
 use crate::vector::search::searcher::{
     VectorIndexQuery, VectorIndexQueryResult, VectorIndexQueryResults,
 };
+use ahash::AHashSet;
 use std::cmp::Ordering;
-use std::collections::{BinaryHeap, HashSet};
+use std::collections::BinaryHeap;
 
 /// HNSW vector searcher that performs approximate nearest neighbor search.
 #[derive(Debug)]
@@ -187,13 +188,25 @@ impl HnswSearcher {
         request: &VectorIndexQuery,
         field_name: &str,
     ) -> Result<VectorIndexQueryResults> {
+        let query = &request.query;
+        let ef_search = self.ef_search;
+
+        // Validate query vector dimensions once at search entry.
+        if let Some(ep) = graph.entry_point
+            && let Some(ep_vec) = reader.get_vector(ep, field_name)?
+            && query.data.len() != ep_vec.data.len()
+        {
+            return Err(crate::error::LaurusError::InvalidOperation(format!(
+                "Query vector dimension {} does not match index dimension {}",
+                query.data.len(),
+                ep_vec.data.len()
+            )));
+        }
+
         let entry_point = match graph.entry_point {
             Some(ep) => ep,
             None => return Ok(VectorIndexQueryResults::new()),
         };
-
-        let query = &request.query;
-        let ef_search = self.ef_search;
 
         // 1. Start from entry point at max_level
         let mut curr_obj = entry_point;
@@ -235,7 +248,7 @@ impl HnswSearcher {
             distance: dist,
         });
 
-        let mut visited = HashSet::new();
+        let mut visited = AHashSet::with_capacity(ef_search * 2);
         visited.insert(curr_obj);
 
         while let Some(curr) = candidates.pop() {
@@ -277,31 +290,30 @@ impl HnswSearcher {
         // Convert found heaps to results
         let mut final_results = Vec::new();
         for c in found {
-            if let Ok(Some(vector)) = reader.get_vector(c.id, field_name) {
-                // Recalculate similarity? Or deduce from distance?
-                // DistanceMetric::similarity is not strictly inverse of distance for all metrics,
-                // but Reader knows metric.
-                let similarity = reader
-                    .distance_metric()
-                    .similarity(&query.data, &vector.data)?;
+            // Convert cached distance to similarity without re-reading vectors or re-computing distance.
+            let similarity = reader.distance_metric().distance_to_similarity(c.distance);
 
-                // Apply min_score
-                if similarity < request.params.min_similarity {
-                    continue;
-                }
-
-                final_results.push(VectorIndexQueryResult {
-                    doc_id: c.id,
-                    field_name: field_name.to_string(),
-                    similarity,
-                    distance: c.distance,
-                    vector: if request.params.include_vectors {
-                        Some(vector)
-                    } else {
-                        None
-                    },
-                });
+            if similarity < request.params.min_similarity {
+                continue;
             }
+
+            // Only read the vector if the caller requested it.
+            let vector = if request.params.include_vectors {
+                reader
+                    .get_vector(c.id, field_name)?
+                    .map(Some)
+                    .unwrap_or(None)
+            } else {
+                None
+            };
+
+            final_results.push(VectorIndexQueryResult {
+                doc_id: c.id,
+                field_name: field_name.to_string(),
+                similarity,
+                distance: c.distance,
+                vector,
+            });
         }
 
         // Sort results (similarity descending)
@@ -330,15 +342,13 @@ impl HnswSearcher {
         doc_id: u64,
         field_name: &str,
     ) -> Result<f32> {
-        // Optimization: HnswIndexReader *could* support getting raw bytes or avoiding clone,
-        // but get_vector returns Option<Vector>.
         if let Some(target) = reader.get_vector(doc_id, field_name)? {
-            reader.distance_metric().distance(&query.data, &target.data)
+            // Use unchecked distance for performance in hot loop.
+            // Dimension consistency is validated at search entry point.
+            Ok(reader
+                .distance_metric()
+                .distance_unchecked(&query.data, &target.data))
         } else {
-            // Vector not found in this field?
-            // Should return max distance or error?
-            // Since graph contains doc_id, it should exist.
-            // But if mixed fields, it might not exist in *this* field.
             Ok(f32::MAX)
         }
     }

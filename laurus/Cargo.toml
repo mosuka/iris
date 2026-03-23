@@ -13,7 +13,7 @@ license = { workspace = true }
 autoexamples = false
 
 [dependencies]
-ahash = "0.8.12"
+ahash = { version = "0.8.12", features = ["serde"] }
 aho-corasick = "1.1.4"
 anyhow = { workspace = true }
 async-trait = "0.1.89"
@@ -123,6 +123,10 @@ harness = false
 
 [[bench]]
 name = "distance_bench"
+harness = false
+
+[[bench]]
+name = "search_perf"
 harness = false
 
 [dev-dependencies]

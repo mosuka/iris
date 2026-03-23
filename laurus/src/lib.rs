@@ -66,7 +66,7 @@ mod maintenance;
 pub mod spelling;
 pub mod storage;
 pub mod store;
-mod util;
+pub mod util;
 pub mod vector;
 
 // Re-exports for the public API

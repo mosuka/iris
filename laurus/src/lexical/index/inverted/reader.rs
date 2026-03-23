@@ -191,22 +191,16 @@ impl InvertedIndexPostingIterator {
     /// Find the block containing the target document ID.
     fn find_block(&self, target: u64) -> Option<usize> {
         if let Some(blocks) = &self.block_cache {
-            for (i, block) in blocks.iter().enumerate() {
-                if target >= block.min_doc_id && target <= block.max_doc_id {
-                    return Some(i);
-                }
-                if target < block.min_doc_id {
-                    // Target falls before this block. Start scanning from this
-                    // block since all prior blocks contain only smaller doc_ids.
-                    return Some(i);
-                }
+            if blocks.is_empty() {
+                return None;
             }
-
-            // Target is beyond all blocks — return last block as starting point.
-            if !blocks.is_empty() {
-                Some(blocks.len() - 1)
+            // Binary search: find the block that contains or follows the target doc_id.
+            let idx = blocks.partition_point(|block| block.max_doc_id < target);
+            if idx < blocks.len() {
+                Some(idx)
             } else {
-                None
+                // Target is beyond all blocks — return last block as starting point.
+                Some(blocks.len() - 1)
             }
         } else {
             None
@@ -262,7 +256,6 @@ impl crate::lexical::reader::PostingIterator for InvertedIndexPostingIterator {
     }
 
     fn skip_to(&mut self, target_doc_id: u64) -> Result<bool> {
-        // Mark as started
         self.started = true;
 
         // Use block optimization if available
@@ -270,17 +263,31 @@ impl crate::lexical::reader::PostingIterator for InvertedIndexPostingIterator {
             && let Some(blocks) = &self.block_cache
         {
             let block = &blocks[block_idx];
-            self.position = block.start_position;
+            // Don't go backwards - take the max of current position and block start
+            self.position = self.position.max(block.start_position);
             self.current_block = block_idx;
         }
 
-        // Linear search within the current range
-        while self.position < self.postings.len() {
-            if self.postings[self.position].doc_id >= target_doc_id {
-                return Ok(true);
+        // Binary search within the remaining postings
+        let search_from = self.position;
+        if search_from < self.postings.len() {
+            match self.postings[search_from..].binary_search_by_key(&target_doc_id, |p| p.doc_id) {
+                Ok(idx) => {
+                    self.position = search_from + idx;
+                    return Ok(true);
+                }
+                Err(idx) => {
+                    let abs_pos = search_from + idx;
+                    if abs_pos < self.postings.len() {
+                        self.position = abs_pos;
+                        return Ok(true);
+                    }
+                }
             }
-            self.position += 1;
         }
+
+        // Exhausted
+        self.position = self.postings.len();
         Ok(false)
     }
 

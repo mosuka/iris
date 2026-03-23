@@ -92,6 +92,10 @@ impl InvertedIndexSearcher {
         // Create a scorer for the query
         let scorer = query.scorer(self.reader.as_ref())?;
 
+        // Hoist field name and downcast outside the loop to avoid repeated work.
+        let target_field = query.field();
+        let inverted_reader = self.reader.as_any().downcast_ref::<InvertedIndexReader>();
+
         // Iterate through matching documents
         while !matcher.is_exhausted() {
             let doc_id = matcher.doc_id();
@@ -104,11 +108,9 @@ impl InvertedIndexSearcher {
             let term_freq = matcher.term_freq() as f32;
 
             // Retrieve actual field length if query targets a specific field
-            let field_length = if let Some(field_name) = query.field() {
-                if let Some(inverted_index_reader) =
-                    self.reader.as_any().downcast_ref::<InvertedIndexReader>()
-                {
-                    inverted_index_reader
+            let field_length = if let Some(field_name) = target_field {
+                if let Some(reader) = inverted_reader {
+                    reader
                         .field_length(doc_id, field_name)
                         .ok()
                         .flatten()
