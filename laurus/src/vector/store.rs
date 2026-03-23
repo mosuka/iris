@@ -500,15 +500,28 @@ impl VectorStore {
             })
             .collect();
 
-        hits.sort_by(|a, b| {
-            b.score
-                .partial_cmp(&a.score)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
-
-        // Apply limit
-        if hits.len() > request.params.limit {
-            hits.truncate(request.params.limit);
+        // Use partial sort (select_nth_unstable_by) for top-K selection instead of full sort
+        // when the result set is larger than the requested limit.
+        let limit = request.params.limit.min(hits.len());
+        if limit > 0 && limit < hits.len() {
+            hits.select_nth_unstable_by(limit - 1, |a, b| {
+                b.score
+                    .partial_cmp(&a.score)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
+            hits.truncate(limit);
+            // Sort only the top-K for proper ordering.
+            hits.sort_unstable_by(|a, b| {
+                b.score
+                    .partial_cmp(&a.score)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
+        } else if !hits.is_empty() {
+            hits.sort_unstable_by(|a, b| {
+                b.score
+                    .partial_cmp(&a.score)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
         }
 
         Ok(VectorSearchResults { hits })

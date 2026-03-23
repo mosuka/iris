@@ -194,7 +194,7 @@ impl<'a> Collector for TopFieldCollector<'a> {
         use crate::lexical::core::field::FieldValue;
         if self.ascending {
             // Ascending: compare field values directly
-            sorted_docs.sort_by(|a, b| match (&a.field_value, &b.field_value) {
+            sorted_docs.sort_unstable_by(|a, b| match (&a.field_value, &b.field_value) {
                 (FieldValue::Text(av), FieldValue::Text(bv)) => av.cmp(bv),
                 (FieldValue::Int64(av), FieldValue::Int64(bv)) => av.cmp(bv),
                 (FieldValue::Float64(av), FieldValue::Float64(bv)) => {
@@ -218,7 +218,7 @@ impl<'a> Collector for TopFieldCollector<'a> {
             });
         } else {
             // Descending: reverse comparison
-            sorted_docs.sort_by(|a, b| match (&a.field_value, &b.field_value) {
+            sorted_docs.sort_unstable_by(|a, b| match (&a.field_value, &b.field_value) {
                 (FieldValue::Text(av), FieldValue::Text(bv)) => bv.cmp(av),
                 (FieldValue::Int64(av), FieldValue::Int64(bv)) => bv.cmp(av),
                 (FieldValue::Float64(av), FieldValue::Float64(bv)) => {
@@ -455,7 +455,7 @@ impl Collector for TopDocsCollector {
             .collect();
 
         // Sort by score descending
-        results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(Ordering::Equal));
+        results.sort_unstable_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(Ordering::Equal));
 
         results
     }
@@ -604,7 +604,7 @@ impl Collector for AllDocsCollector {
             return cached.clone();
         }
         let mut results = self.hits.clone();
-        results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(Ordering::Equal));
+        results.sort_unstable_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(Ordering::Equal));
         *cache = Some(results.clone());
         results
     }

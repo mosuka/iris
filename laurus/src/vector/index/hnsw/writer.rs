@@ -827,10 +827,10 @@ impl HnswIndexWriter {
 
             if let Some(neighbors) = graph.get_neighbors_view(curr.id, level) {
                 for neighbor_id in neighbors {
-                    if visited.contains(&neighbor_id) {
+                    // Use insert() return value to avoid double hash lookup.
+                    if !visited.insert(neighbor_id) {
                         continue;
                     }
-                    visited.insert(neighbor_id);
 
                     let neighbor_dist = self.calc_dist(query, neighbor_id)?;
                     let furthest_dist = found.peek().map(|c| c.distance).unwrap_or(f32::MAX);
@@ -868,20 +868,14 @@ impl HnswIndexWriter {
         _m_max: usize,
         _m_max_0: usize,
     ) -> Vec<u64> {
-        // Simple heuristic: take M nearest
-        // Candidates are in a max-heap (furthest at top).
-        // We want smallest distances.
-        let mut sorted: Vec<_> = candidates.clone().into_sorted_vec();
-        // into_sorted_vec returns ascending order [min ... max] for max-heap?
-        // No, pop() returns max. sorted vec will be [small, ..., large].
-        // Wait, doc says: "The elements are sorted in ascending order." for BinaryHeap::into_sorted_vec().
-
-        // But BinaryHeap<T> is a MaxHeap.
-        // pop() gives largest.
-        // into_sorted_vec gives ascending order.
-        // So if Candidate implies larger distance > smaller, then ascending is [small, ..., large].
-        // We want the smallest distance ones (start of vec).
-
+        // Simple heuristic: take M nearest.
+        // Collect without cloning the heap, then sort by ascending distance.
+        let mut sorted: Vec<_> = candidates.iter().cloned().collect();
+        sorted.sort_unstable_by(|a, b| {
+            a.distance
+                .partial_cmp(&b.distance)
+                .unwrap_or(Ordering::Equal)
+        });
         sorted.truncate(m);
         sorted.into_iter().map(|c| c.id).collect()
     }

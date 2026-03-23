@@ -158,20 +158,17 @@ impl PhraseMatcher {
                 // Subsequent terms - must be within slop distance
                 expected_pos += 1; // Next expected position
 
-                let found = positions
-                    .iter()
-                    .any(|&pos| pos >= expected_pos && pos <= expected_pos + slop as u64);
+                // Use binary search since positions are sorted.
+                let idx = positions.partition_point(|&pos| pos < expected_pos);
+                let found_pos = positions
+                    .get(idx)
+                    .copied()
+                    .filter(|&pos| pos <= expected_pos + slop as u64);
 
-                if !found {
-                    return false;
-                }
-
-                // Update expected position to the actual position found
-                if let Some(&actual_pos) = positions
-                    .iter()
-                    .find(|&&pos| pos >= expected_pos && pos <= expected_pos + slop as u64)
-                {
+                if let Some(actual_pos) = found_pos {
                     expected_pos = actual_pos;
+                } else {
+                    return false;
                 }
             }
         }

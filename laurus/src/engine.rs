@@ -1142,7 +1142,11 @@ impl Engine {
             let mut results =
                 self.fuse_results(lexical_hits, vector_hits, algorithm, fetch_count)?;
             if request_offset > 0 {
-                results = results.into_iter().skip(request_offset).collect();
+                if request_offset >= results.len() {
+                    results.clear();
+                } else {
+                    results.drain(..request_offset);
+                }
             }
             results.truncate(request_limit);
             Ok(results)
@@ -1190,7 +1194,9 @@ impl Engine {
         fusion: FusionAlgorithm,
         limit: usize,
     ) -> Result<Vec<SearchResult>> {
-        let mut fused_scores: HashMap<u64, (f32, Option<crate::data::Document>)> = HashMap::new();
+        let estimated_capacity = lexical_hits.len().max(vector_hits.len());
+        let mut fused_scores: HashMap<u64, (f32, Option<crate::data::Document>)> =
+            HashMap::with_capacity(estimated_capacity);
 
         match fusion {
             FusionAlgorithm::RRF { k } => {
@@ -1211,14 +1217,11 @@ impl Engine {
                 lexical_weight,
                 vector_weight,
             } => {
-                let lexical_min = lexical_hits
+                let (lexical_min, lexical_max) = lexical_hits
                     .iter()
-                    .map(|h| h.score)
-                    .fold(f32::INFINITY, f32::min);
-                let lexical_max = lexical_hits
-                    .iter()
-                    .map(|h| h.score)
-                    .fold(f32::NEG_INFINITY, f32::max);
+                    .fold((f32::INFINITY, f32::NEG_INFINITY), |(min, max), h| {
+                        (min.min(h.score), max.max(h.score))
+                    });
 
                 for hit in lexical_hits {
                     let norm_score = if lexical_max > lexical_min {
@@ -1232,14 +1235,11 @@ impl Engine {
                     entry.0 += norm_score * lexical_weight;
                 }
 
-                let vector_min = vector_hits
+                let (vector_min, vector_max) = vector_hits
                     .iter()
-                    .map(|h| h.score)
-                    .fold(f32::INFINITY, f32::min);
-                let vector_max = vector_hits
-                    .iter()
-                    .map(|h| h.score)
-                    .fold(f32::NEG_INFINITY, f32::max);
+                    .fold((f32::INFINITY, f32::NEG_INFINITY), |(min, max), h| {
+                        (min.min(h.score), max.max(h.score))
+                    });
 
                 for hit in vector_hits {
                     let norm_score = if vector_max > vector_min {
@@ -1259,7 +1259,8 @@ impl Engine {
             .collect();
 
         // Sort by fused score descending
-        intermediate.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        intermediate
+            .sort_unstable_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
         // Limit results
         if intermediate.len() > limit {

@@ -221,13 +221,12 @@ fn clean_lexical_string(s: &str) -> String {
     let mut result: Vec<&str> = Vec::new();
 
     for token in &tokens {
-        let upper = token.to_uppercase();
-        if upper == "AND" || upper == "OR" {
+        if token.eq_ignore_ascii_case("AND") || token.eq_ignore_ascii_case("OR") {
             // Only add boolean operator if there's a preceding non-boolean token
             // and the previous token is not already a boolean operator.
             if !result.is_empty() {
-                let last_upper = result.last().unwrap().to_uppercase();
-                if last_upper != "AND" && last_upper != "OR" {
+                let last = result.last().unwrap();
+                if !last.eq_ignore_ascii_case("AND") && !last.eq_ignore_ascii_case("OR") {
                     result.push(token);
                 }
                 // else: skip consecutive boolean operator
@@ -239,11 +238,10 @@ fn clean_lexical_string(s: &str) -> String {
     }
 
     // Remove trailing boolean operator
-    if let Some(last) = result.last() {
-        let upper = last.to_uppercase();
-        if upper == "AND" || upper == "OR" {
-            result.pop();
-        }
+    if let Some(last) = result.last()
+        && (last.eq_ignore_ascii_case("AND") || last.eq_ignore_ascii_case("OR"))
+    {
+        result.pop();
     }
 
     result.join(" ")
