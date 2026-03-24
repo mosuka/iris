@@ -12,7 +12,7 @@ use crate::vector::search::searcher::{
     VectorIndexQuery, VectorIndexQueryResult, VectorIndexQueryResults,
 };
 use std::cmp::Ordering;
-use std::collections::{BinaryHeap, HashSet};
+use std::collections::{BinaryHeap, HashMap, HashSet};
 
 /// HNSW vector searcher that performs approximate nearest neighbor search.
 #[derive(Debug)]
@@ -195,6 +195,11 @@ impl HnswSearcher {
         let query = &request.query;
         let ef_search = self.ef_search;
 
+        // Retrieve the per-field prefetch index once per search call (O(1), no allocation).
+        // `None` for on-demand (disk-backed) storage; the prefetch loop is skipped entirely.
+        let field_prefetch = reader.field_prefetch_index(field_name);
+        let prefetch_n_bytes = reader.dimension() * std::mem::size_of::<f32>();
+
         // 1. Start from entry point at max_level
         let mut curr_obj = entry_point;
         // Note: Assuming entry_point is in field_name. If not, we might fail to get vector.
@@ -210,6 +215,15 @@ impl HnswSearcher {
             while changed {
                 changed = false;
                 if let Some(neighbors) = graph.get_neighbors(curr_obj, lc) {
+                    // Pass 1: issue prefetch hints for all neighbors before computing
+                    // distances.  For datasets larger than L3 cache this hides the
+                    // memory latency of loading Vec<f32> data.
+                    if let Some(idx) = field_prefetch {
+                        for &neighbor_id in neighbors {
+                            Self::prefetch_neighbor(idx, neighbor_id, prefetch_n_bytes);
+                        }
+                    }
+                    // Pass 2: compute distances (data is being fetched in the background).
                     for &neighbor_id in neighbors {
                         let d = self.calc_dist(reader, query, neighbor_id, field_name)?;
                         if d < dist {
@@ -247,6 +261,18 @@ impl HnswSearcher {
             }
 
             if let Some(neighbors) = graph.get_neighbors(curr.id, 0) {
+                // Pass 1: issue prefetch hints for unvisited neighbors.
+                // O(1) per neighbor (u64 HashMap lookup, no allocation).
+                if let Some(idx) = field_prefetch {
+                    for &neighbor_id in neighbors {
+                        if !visited.contains(&neighbor_id) {
+                            Self::prefetch_neighbor(idx, neighbor_id, prefetch_n_bytes);
+                        }
+                    }
+                }
+
+                // Pass 2: compute distances for unvisited neighbors (data loading
+                // overlaps with the prefetch hints issued above).
                 for &neighbor_id in neighbors {
                     if visited.contains(&neighbor_id) {
                         continue;
@@ -338,6 +364,47 @@ impl HnswSearcher {
             // Since graph contains doc_id, it should exist.
             // But if mixed fields, it might not exist in *this* field.
             Ok(f32::MAX)
+        }
+    }
+
+    /// Issue software prefetch hints for the vector identified by `doc_id`.
+    ///
+    /// Performs an O(1) `u64` lookup in `idx` (no `String` allocation) to
+    /// retrieve the base address of the vector's `f32` data, then emits one
+    /// prefetch instruction per 64-byte cache line.  This lets the CPU start
+    /// fetching the data from RAM before the distance computation begins,
+    /// reducing memory-latency stalls on datasets larger than L3 cache.
+    ///
+    /// # Safety
+    ///
+    /// The addresses in `idx` were recorded from `Vec<f32>::as_ptr()` at reader
+    /// construction time.  The backing `Arc<Vec<f32>>` is kept alive by
+    /// `VectorStorage::Owned` inside the same `HnswIndexReader`, so every
+    /// pointer is valid for the entire lifetime of the search.
+    /// `_mm_prefetch` / `prfm` are pure hints that never dereference the pointer.
+    #[inline]
+    fn prefetch_neighbor(idx: &HashMap<u64, usize>, doc_id: u64, n_bytes: usize) {
+        if let Some(&addr) = idx.get(&doc_id) {
+            let base_ptr = addr as *const i8;
+            let mut offset = 0;
+            while offset < n_bytes {
+                #[cfg(target_arch = "x86_64")]
+                // SAFETY: see method doc comment.
+                unsafe {
+                    use std::arch::x86_64::{_MM_HINT_T0, _mm_prefetch};
+                    _mm_prefetch::<_MM_HINT_T0>(base_ptr.add(offset));
+                }
+                #[cfg(target_arch = "aarch64")]
+                // SAFETY: see method doc comment.
+                unsafe {
+                    std::arch::asm!(
+                        "prfm pldl1keep, [{p}]",
+                        p = in(reg) base_ptr.add(offset),
+                        options(nostack, readonly),
+                    );
+                }
+                offset += 64;
+            }
         }
     }
 }

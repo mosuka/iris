@@ -26,6 +26,18 @@ pub struct HnswIndexReader {
     ef_construction: usize,
     pub graph: Option<Arc<HnswGraph>>,
     deletion_bitmap: Option<Arc<DeletionBitmap>>,
+    /// Pre-built lookup table: `field_name → (doc_id → Vec<f32> base address as usize)`.
+    ///
+    /// Populated at load time for in-memory (`Owned`) storage; empty for
+    /// on-demand (disk-backed) storage.  Enables zero-allocation, O(1) software
+    /// prefetch hints on the HNSW search hot-path without the per-call
+    /// `String` allocation that a direct `HashMap<(u64, String), _>` lookup
+    /// would require.
+    ///
+    /// The address is stored as `usize` so that the struct remains `Send + Sync`.
+    /// The pointer is valid for the lifetime of `self` because the backing
+    /// `Arc<Vec<f32>>` is kept alive by `VectorStorage::Owned`.
+    prefetch_index: HashMap<String, HashMap<u64, usize>>,
 }
 
 impl HnswIndexReader {
@@ -236,6 +248,22 @@ impl HnswIndexReader {
             }
         };
 
+        // Build zero-allocation prefetch lookup for the Owned (in-memory) variant.
+        // For each field, maps doc_id to the base address of the Vec<f32> data so that
+        // HnswSearcher can issue prefetch hints without any per-call String allocation.
+        // Empty for OnDemand storage where CPU cache hints are not applicable.
+        let prefetch_index = if let VectorStorage::Owned(ref map) = vectors {
+            let mut idx: HashMap<String, HashMap<u64, usize>> = HashMap::new();
+            for ((doc_id, field_name), vector) in map.iter() {
+                idx.entry(field_name.clone())
+                    .or_default()
+                    .insert(*doc_id, vector.data.as_ptr() as usize);
+            }
+            idx
+        } else {
+            HashMap::new()
+        };
+
         Ok(Self {
             vectors,
             vector_ids,
@@ -245,6 +273,7 @@ impl HnswIndexReader {
             ef_construction,
             graph,
             deletion_bitmap: None,
+            prefetch_index,
         })
     }
 
@@ -263,6 +292,24 @@ impl HnswIndexReader {
     /// Get HNSW parameters.
     pub fn hnsw_params(&self) -> (usize, usize) {
         (self.m, self.ef_construction)
+    }
+
+    /// Returns a reference to the per-field prefetch lookup table for `field_name`.
+    ///
+    /// The returned map provides O(1), zero-allocation access from `doc_id` to
+    /// the base address of the corresponding `Vec<f32>` data, allowing
+    /// [`HnswSearcher`] to issue software prefetch hints on the search hot-path
+    /// without the `String` allocation that a direct `HashMap<(u64, String), _>`
+    /// lookup would require.
+    ///
+    /// Returns `None` for on-demand (disk-backed) storage where prefetching is
+    /// not applicable.
+    ///
+    /// # Arguments
+    ///
+    /// * `field_name` - The name of the vector field.
+    pub(crate) fn field_prefetch_index(&self, field_name: &str) -> Option<&HashMap<u64, usize>> {
+        self.prefetch_index.get(field_name)
     }
 }
 
