@@ -27,6 +27,7 @@ jobs:
       cli: ${{ steps.resolve.outputs.cli }}
       server: ${{ steps.resolve.outputs.server }}
       mcp: ${{ steps.resolve.outputs.mcp }}
+      python: ${{ steps.resolve.outputs.python }}
     steps:
       - name: Run checkout
         uses: actions/checkout@v6
@@ -75,6 +76,13 @@ jobs:
               - 'Cargo.toml'
               - 'Cargo.lock'
               - '.github/workflows/regression.yml'
+            # python: laurus-python depends on laurus
+            python:
+              - 'laurus-python/**'
+              - 'laurus/**'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+              - '.github/workflows/regression.yml'
 
       # For non-PR events (push / workflow_dispatch), filter outputs are empty.
       # Default to true so all jobs run.
@@ -86,12 +94,14 @@ jobs:
           CLI: ${{ steps.filter.outputs.cli }}
           SERVER: ${{ steps.filter.outputs.server }}
           MCP: ${{ steps.filter.outputs.mcp }}
+          PYTHON: ${{ steps.filter.outputs.python }}
         run: |
           echo "code=${CODE:-true}" >> "$GITHUB_OUTPUT"
           echo "laurus=${LAURUS:-true}" >> "$GITHUB_OUTPUT"
           echo "cli=${CLI:-true}" >> "$GITHUB_OUTPUT"
           echo "server=${SERVER:-true}" >> "$GITHUB_OUTPUT"
           echo "mcp=${MCP:-true}" >> "$GITHUB_OUTPUT"
+          echo "python=${PYTHON:-true}" >> "$GITHUB_OUTPUT"
 
   # ============================================================
   # Format
@@ -131,6 +141,11 @@ jobs:
         with:
           version: "24.x"
           repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
 
       - name: Install toolchain
         uses: dtolnay/rust-toolchain@v1
@@ -370,3 +385,41 @@ jobs:
           else
             cargo test --package laurus-mcp --target "${{ matrix.platform.target }}" $FEATURES
           fi
+
+  # ============================================================
+  # Test laurus-python
+  # ============================================================
+  test-python:
+    name: Test laurus-python
+    needs: [changes, clippy]
+    if: ${{ !failure() && !cancelled() && needs.changes.outputs.python == 'true' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - runner: ubuntu-latest
+          - runner: macos-latest
+          - runner: macos-15-intel
+          - runner: windows-latest
+        python: ["3.13"]
+    runs-on: ${{ matrix.platform.runner }}
+    steps:
+      - name: Run checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Install toolchain
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Install maturin and pytest
+        run: pip install maturin pytest
+
+      - name: Run tests
+        working-directory: laurus-python
+        run: maturin develop && pytest tests/ -v

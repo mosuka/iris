@@ -4,16 +4,23 @@ This page explains how Laurus is structured internally. Understanding the archit
 
 ## Project Structure
 
-Laurus is organized as a Cargo workspace with three crates:
+Laurus is organized as a Cargo workspace with five crates:
 
 ```mermaid
 graph TB
     CLI["laurus-cli\n(Binary Crate)\nCLI + REPL"]
     SRV["laurus-server\n(Library + Binary)\ngRPC Server + HTTP Gateway"]
+    MCP["laurus-mcp\n(Library + Binary)\nMCP Server"]
+    PY["laurus-python\n(cdylib)\nPython Bindings"]
     LIB["laurus\n(Library Crate)\nCore Search Engine"]
 
     CLI --> LIB
+    CLI --> SRV
+    CLI --> MCP
     SRV --> LIB
+    MCP --> SRV
+    MCP --> LIB
+    PY --> LIB
 ```
 
 | Crate | Type | Description |
@@ -21,12 +28,16 @@ graph TB
 | **laurus** | Library | Core search engine -- lexical, vector, and hybrid search |
 | **laurus-cli** | Binary | Command-line interface for index management and search |
 | **laurus-server** | Library + Binary | gRPC server with optional HTTP/JSON gateway |
+| **laurus-mcp** | Library + Binary | MCP (Model Context Protocol) server |
+| **laurus-python** | cdylib | Python bindings via PyO3 |
 
 For details on each crate, see:
 
 - [Library Overview](laurus.md)
 - [CLI Overview](laurus-cli.md)
 - [Server Overview](laurus-server.md)
+- [MCP Server Overview](laurus-mcp.md)
+- [Python Bindings Overview](laurus-python.md)
 
 ## High-Level Overview
 

@@ -64,6 +64,13 @@
   - [Getting Started](laurus-mcp/getting_started.md)
   - [Tools Reference](laurus-mcp/tools.md)
 
+# laurus-python
+
+- [Python Binding Overview](laurus-python.md)
+  - [Installation](laurus-python/installation.md)
+  - [Quick Start](laurus-python/quickstart.md)
+  - [API Reference](laurus-python/api_reference.md)
+
 # Development Guide
 
 - [Build & Test](development/build_and_test.md)

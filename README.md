@@ -11,8 +11,9 @@ Built on a core library covering lexical search, vector search, and hybrid searc
 - **CLI & REPL** — Command-line tool for interactive search experiences
 - **gRPC Server & HTTP Gateway** — Seamless integration with microservices and existing systems
 - **MCP Server** — Direct integration with AI assistants such as Claude
+- **Python Bindings** — Native Python package for use in data science and AI workflows
 
-Whether embedded as a library, deployed as a standalone server, or woven into AI workflows, Laurus is a composable search foundation.
+Whether embedded as a library, deployed as a standalone server, called from Python, or woven into AI workflows, Laurus is a composable search foundation.
 
 ## Documentation
 
@@ -40,6 +41,7 @@ Comprehensive documentation is available online:
   - [laurus-cli](https://mosuka.github.io/laurus/laurus-cli.html) — Command-line interface, REPL, Schema Format
   - [laurus-server](https://mosuka.github.io/laurus/laurus-server.html) — gRPC server, HTTP Gateway, Configuration
   - [laurus-mcp](https://mosuka.github.io/laurus/laurus-mcp.html) — MCP server for AI assistants (Claude, etc.)
+  - [laurus-python](https://mosuka.github.io/laurus/laurus-python.html) — Python bindings (PyPI package)
 - **Development**
   - [Build & Test](https://mosuka.github.io/laurus/development/build_and_test.html)
   - [Feature Flags](https://mosuka.github.io/laurus/development/feature_flags.html)
@@ -60,7 +62,7 @@ Comprehensive documentation is available online:
 
 ## Workspace Structure
 
-Laurus is organized as a Cargo workspace with 4 crates:
+Laurus is organized as a Cargo workspace with 5 crates:
 
 | Crate | Description |
 | --- | --- |
@@ -68,6 +70,7 @@ Laurus is organized as a Cargo workspace with 4 crates:
 | [`laurus-cli`](laurus-cli/) | Command-line interface with REPL for interactive search |
 | [`laurus-server`](laurus-server/) | gRPC server with HTTP gateway for deploying Laurus as a service |
 | [`laurus-mcp`](laurus-mcp/) | MCP server for AI assistants (Claude, etc.) via stdio transport |
+| [`laurus-python`](laurus-python/) | Python bindings (PyPI package) built with PyO3 and Maturin |
 
 ## Feature Flags
 

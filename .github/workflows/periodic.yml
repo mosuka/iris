@@ -46,6 +46,11 @@ jobs:
           version: "24.x"
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
       - name: Install toolchain
         uses: dtolnay/rust-toolchain@v1
         with:
@@ -87,6 +92,11 @@ jobs:
         with:
           version: "24.x"
           repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
 
       - name: Install toolchain
         uses: dtolnay/rust-toolchain@v1

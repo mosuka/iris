@@ -64,6 +64,13 @@
   - [はじめに](laurus-mcp/getting_started.md)
   - [ツールリファレンス](laurus-mcp/tools.md)
 
+# laurus-python
+
+- [Python バインディング概要](laurus-python.md)
+  - [インストール](laurus-python/installation.md)
+  - [クイックスタート](laurus-python/quickstart.md)
+  - [API リファレンス](laurus-python/api_reference.md)
+
 # 開発ガイド
 
 - [ビルドとテスト](development/build_and_test.md)

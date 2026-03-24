@@ -4,16 +4,23 @@
 
 ## プロジェクト構成
 
-Laurus は Cargo workspace として 3 つのクレートで構成されています。
+Laurus は Cargo workspace として 5 つのクレートで構成されています。
 
 ```mermaid
 graph TB
     CLI["laurus-cli\n(Binary Crate)\nCLI + REPL"]
     SRV["laurus-server\n(Library + Binary)\ngRPC Server + HTTP Gateway"]
+    MCP["laurus-mcp\n(Library + Binary)\nMCP Server"]
+    PY["laurus-python\n(cdylib)\nPython Bindings"]
     LIB["laurus\n(Library Crate)\nCore Search Engine"]
 
     CLI --> LIB
+    CLI --> SRV
+    CLI --> MCP
     SRV --> LIB
+    MCP --> SRV
+    MCP --> LIB
+    PY --> LIB
 ```
 
 | クレート | 種類 | 説明 |
@@ -21,12 +28,16 @@ graph TB
 | **laurus** | Library | コア検索エンジン -- Lexical 検索、Vector 検索、ハイブリッド検索 |
 | **laurus-cli** | Binary | インデックス管理と検索のためのコマンドラインインターフェース |
 | **laurus-server** | Library + Binary | オプションの HTTP/JSON ゲートウェイ付き gRPC サーバー |
+| **laurus-mcp** | Library + Binary | MCP（Model Context Protocol）サーバー |
+| **laurus-python** | cdylib | PyO3 による Python バインディング |
 
 各クレートの詳細については以下を参照してください。
 
 - [ライブラリ概要](laurus.md)
 - [CLI 概要](laurus-cli.md)
 - [サーバー概要](laurus-server.md)
+- [MCP サーバー概要](laurus-mcp.md)
+- [Python バインディング概要](laurus-python.md)
 
 ## 全体概要
 

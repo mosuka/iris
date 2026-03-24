@@ -30,4 +30,23 @@ tokio = { workspace = true }
 toml = { workspace = true }
 
 [features]
-embeddings-multimodal = ["laurus/embeddings-multimodal"]
+embeddings-candle = [
+    "laurus/embeddings-candle",
+    "laurus-server/embeddings-candle",
+    "laurus-mcp/embeddings-candle",
+]
+embeddings-multimodal = [
+    "laurus/embeddings-multimodal",
+    "laurus-server/embeddings-multimodal",
+    "laurus-mcp/embeddings-multimodal",
+]
+embeddings-openai = [
+    "laurus/embeddings-openai",
+    "laurus-server/embeddings-openai",
+    "laurus-mcp/embeddings-openai",
+]
+embeddings-all = [
+    "embeddings-candle",
+    "embeddings-multimodal",
+    "embeddings-openai",
+]

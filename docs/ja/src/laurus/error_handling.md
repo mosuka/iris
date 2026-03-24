@@ -17,7 +17,10 @@ Laurusのすべての操作は `Result<T>` を返します。これは `std::res
 | `Query` | クエリの解析/実行エラー | 不正なQuery DSL、クエリ内の不明なフィールド |
 | `Storage` | ストレージバックエンドエラー | ストレージのオープン失敗、書き込み失敗 |
 | `Field` | フィールド定義エラー | 無効なフィールドオプション、重複するフィールド名 |
+| `BenchmarkFailed` | ベンチマークエラー | ベンチマーク実行失敗 |
+| `ThreadJoinError` | スレッド join エラー | ワーカースレッドでのパニック |
 | `Json` | JSONシリアライズエラー | 不正なドキュメントJSON |
+| `Anyhow` | anyhow ラップエラー | `anyhow` 経由のサードパーティクレートエラー |
 | `InvalidOperation` | 無効な操作 | コミット前の検索、二重クローズ |
 | `ResourceExhausted` | リソース制限超過 | メモリ不足、オープンファイル数超過 |
 | `SerializationError` | バイナリシリアライズエラー | ディスク上のデータ破損 |
