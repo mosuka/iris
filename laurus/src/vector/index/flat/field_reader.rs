@@ -60,20 +60,15 @@ impl FlatFieldReader {
 
         for (doc_id, field_name) in filtered_ids {
             if let Ok(Some(vector)) = self.index_reader.get_vector(doc_id, &field_name) {
-                let similarity = self
-                    .index_reader
-                    .distance_metric()
-                    .similarity(&query.data, &vector.data)?;
-                let distance = self
-                    .index_reader
-                    .distance_metric()
-                    .distance(&query.data, &vector.data)?;
+                let metric = self.index_reader.distance_metric();
+                let distance = metric.distance(&query.data, &vector.data)?;
+                let similarity = metric.distance_to_similarity(distance);
                 candidates.push((doc_id, similarity, distance));
             }
         }
 
         // Sort by similarity (descending)
-        candidates.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(Ordering::Equal));
+        candidates.sort_unstable_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(Ordering::Equal));
 
         // Take top results and convert to FieldHit
         let top_k = limit.min(candidates.len());
@@ -135,7 +130,7 @@ impl VectorFieldReader for FlatFieldReader {
 
         // Sort by score and truncate to limit
         let mut hits: Vec<FieldHit> = merged.into_values().collect();
-        hits.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(Ordering::Equal));
+        hits.sort_unstable_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(Ordering::Equal));
         if hits.len() > request.limit {
             hits.truncate(request.limit);
         }

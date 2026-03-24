@@ -51,20 +51,16 @@ impl VectorIndexSearcher for FlatVectorSearcher {
             Vec::with_capacity(filtered_vector_ids.len());
         for (doc_id, field_name) in filtered_vector_ids {
             if let Ok(Some(vector)) = self.index_reader.get_vector(doc_id, &field_name) {
-                let similarity = self
-                    .index_reader
-                    .distance_metric()
-                    .similarity(&request.query.data, &vector.data)?;
-                let distance = self
-                    .index_reader
-                    .distance_metric()
-                    .distance(&request.query.data, &vector.data)?;
+                let metric = self.index_reader.distance_metric();
+                let distance = metric.distance(&request.query.data, &vector.data)?;
+                let similarity = metric.distance_to_similarity(distance);
                 candidates.push((doc_id, field_name, similarity, distance, vector));
             }
         }
 
         // Sort by similarity (descending)
-        candidates.sort_by(|a, b| b.2.partial_cmp(&a.2).unwrap_or(std::cmp::Ordering::Equal));
+        candidates
+            .sort_unstable_by(|a, b| b.2.partial_cmp(&a.2).unwrap_or(std::cmp::Ordering::Equal));
 
         // Take top_k results
         let top_k = request.params.top_k.min(candidates.len());
