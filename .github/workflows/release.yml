@@ -30,7 +30,7 @@ jobs:
 
   clippy:
     name: Clippy
-    needs: [format]
+    needs: []
     strategy:
       matrix:
         platform:
