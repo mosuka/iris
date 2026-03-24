@@ -266,14 +266,18 @@ impl PySchema {
             "candle_bert" => {
                 let model: String = dict
                     .get_item("model")?
-                    .ok_or_else(|| PyValueError::new_err("candle_bert embedder requires a 'model' key"))?
+                    .ok_or_else(|| {
+                        PyValueError::new_err("candle_bert embedder requires a 'model' key")
+                    })?
                     .extract()?;
                 EmbedderDefinition::CandleBert { model }
             }
             "candle_clip" => {
                 let model: String = dict
                     .get_item("model")?
-                    .ok_or_else(|| PyValueError::new_err("candle_clip embedder requires a 'model' key"))?
+                    .ok_or_else(|| {
+                        PyValueError::new_err("candle_clip embedder requires a 'model' key")
+                    })?
                     .extract()?;
                 EmbedderDefinition::CandleClip { model }
             }

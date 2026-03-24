@@ -8,8 +8,8 @@ use laurus::lexical::span::{SpanQueryBuilder, SpanQueryWrapper};
 use laurus::lexical::{
     BooleanQuery, FuzzyQuery, GeoQuery, NumericRangeQuery, PhraseQuery, TermQuery, WildcardQuery,
 };
-use laurus::vector::store::request::QueryVector;
 use laurus::vector::Vector;
+use laurus::vector::store::request::QueryVector;
 use laurus::{DataValue, LexicalSearchQuery, QueryPayload, VectorSearchQuery};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
