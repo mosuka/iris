@@ -12,10 +12,11 @@
 //!
 //! ## Thread Safety
 //!
-//! All internal data is protected by [`Mutex`] locks, so [`MemoryStorage`]
-//! can be shared across threads via `Arc<MemoryStorage>`. Individual I/O
-//! handles ([`MemoryInput`] / [`MemoryOutput`]) are **not** `Sync` but are
-//! safe to send between threads.
+//! The file map is protected by a [`parking_lot::RwLock`] so that concurrent
+//! readers do not block each other -- important because reads vastly outnumber
+//! writes during search. [`MemoryStorage`] can be shared across threads via
+//! `Arc<MemoryStorage>`. Individual I/O handles ([`MemoryInput`] /
+//! [`MemoryOutput`]) are **not** `Sync` but are safe to send between threads.
 //!
 //! ## When to Use `MemoryStorage` vs `FileStorage`
 //!
@@ -29,6 +30,8 @@
 use std::collections::HashMap;
 use std::io::{Cursor, Read, Seek, SeekFrom, Write};
 use std::sync::{Arc, Mutex};
+
+use parking_lot::RwLock;
 
 use crate::error::{LaurusError, Result};
 use crate::storage::{
@@ -57,14 +60,16 @@ impl Default for MemoryStorageConfig {
 /// An in-memory storage implementation.
 ///
 /// All files are held in a shared `HashMap<String, Box<[u8]>>` guarded by a
-/// [`Mutex`]. `Box<[u8]>` is used instead of `Vec<u8>` for finalized files
-/// to avoid wasting memory on unused capacity.
+/// [`parking_lot::RwLock`]. `Box<[u8]>` is used instead of `Vec<u8>` for
+/// finalized files to avoid wasting memory on unused capacity. The `RwLock`
+/// allows multiple concurrent readers without blocking, which is important
+/// because reads vastly outnumber writes during search operations.
 ///
 /// This is useful for testing and for creating temporary indexes in memory.
 #[derive(Debug)]
 pub struct MemoryStorage {
     /// The files stored in memory with optimized memory layout.
-    files: Arc<Mutex<HashMap<String, Box<[u8]>>>>,
+    files: Arc<RwLock<HashMap<String, Box<[u8]>>>>,
     /// Lock manager for coordinating access.
     lock_manager: Arc<MemoryLockManager>,
     /// Storage configuration.
@@ -94,7 +99,7 @@ impl MemoryStorage {
     pub fn new(config: MemoryStorageConfig) -> Self {
         let initial_capacity = config.initial_capacity;
         MemoryStorage {
-            files: Arc::new(Mutex::new(HashMap::with_capacity(initial_capacity))),
+            files: Arc::new(RwLock::new(HashMap::with_capacity(initial_capacity))),
             lock_manager: Arc::new(MemoryLockManager::new()),
             config,
             closed: false,
@@ -120,8 +125,9 @@ impl MemoryStorage {
     /// # Returns
     ///
     /// The file count.
+    #[inline]
     pub fn file_count(&self) -> usize {
-        self.files.lock().unwrap().len()
+        self.files.read().len()
     }
 
     /// Get the total size of all files in bytes.
@@ -130,7 +136,7 @@ impl MemoryStorage {
     ///
     /// The sum of all file sizes.
     pub fn total_size(&self) -> u64 {
-        let files = self.files.lock().unwrap();
+        let files = self.files.read();
         files.values().map(|data| data.len() as u64).sum()
     }
 
@@ -141,17 +147,19 @@ impl MemoryStorage {
     /// Returns an error if the storage is closed.
     pub fn clear(&self) -> Result<()> {
         self.check_closed()?;
-        let mut files = self.files.lock().unwrap();
+        let mut files = self.files.write();
         files.clear();
         Ok(())
     }
 }
 
 impl Storage for MemoryStorage {
+    #[inline]
     fn open_input(&self, name: &str) -> Result<Box<dyn StorageInput>> {
         self.check_closed()?;
 
-        let files = self.files.lock().unwrap();
+        // Use read lock: concurrent readers do not block each other.
+        let files = self.files.read();
         let data = files
             .get(name)
             .ok_or_else(|| StorageError::FileNotFound(name.to_string()))?;
@@ -183,14 +191,14 @@ impl Storage for MemoryStorage {
             return false;
         }
 
-        let files = self.files.lock().unwrap();
+        let files = self.files.read();
         files.contains_key(name)
     }
 
     fn delete_file(&self, name: &str) -> Result<()> {
         self.check_closed()?;
 
-        let mut files = self.files.lock().unwrap();
+        let mut files = self.files.write();
         files.remove(name);
         Ok(())
     }
@@ -198,7 +206,7 @@ impl Storage for MemoryStorage {
     fn list_files(&self) -> Result<Vec<String>> {
         self.check_closed()?;
 
-        let files = self.files.lock().unwrap();
+        let files = self.files.read();
         let mut file_names: Vec<String> = files.keys().cloned().collect();
         file_names.sort();
         Ok(file_names)
@@ -207,7 +215,7 @@ impl Storage for MemoryStorage {
     fn file_size(&self, name: &str) -> Result<u64> {
         self.check_closed()?;
 
-        let files = self.files.lock().unwrap();
+        let files = self.files.read();
         let data = files
             .get(name)
             .ok_or_else(|| StorageError::FileNotFound(name.to_string()))?;
@@ -224,7 +232,7 @@ impl Storage for MemoryStorage {
     fn metadata(&self, name: &str) -> Result<crate::storage::FileMetadata> {
         self.check_closed()?;
 
-        let files = self.files.lock().unwrap();
+        let files = self.files.read();
         if let Some(data) = files.get(name) {
             let now = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
@@ -245,7 +253,7 @@ impl Storage for MemoryStorage {
     fn rename_file(&self, old_name: &str, new_name: &str) -> Result<()> {
         self.check_closed()?;
 
-        let mut files = self.files.lock().unwrap();
+        let mut files = self.files.write();
         let data = files
             .remove(old_name)
             .ok_or_else(|| StorageError::FileNotFound(old_name.to_string()))?;
@@ -354,7 +362,7 @@ pub struct MemoryOutput {
     /// Write buffer accumulating output bytes.
     buffer: Vec<u8>,
     /// Shared reference to the storage file map for committing on close.
-    files: Arc<Mutex<HashMap<String, Box<[u8]>>>>,
+    files: Arc<RwLock<HashMap<String, Box<[u8]>>>>,
     /// Current write position within the buffer.
     position: u64,
     /// Whether this output handle has been closed.
@@ -362,7 +370,7 @@ pub struct MemoryOutput {
 }
 
 impl MemoryOutput {
-    fn new(name: String, files: Arc<Mutex<HashMap<String, Box<[u8]>>>>) -> Self {
+    fn new(name: String, files: Arc<RwLock<HashMap<String, Box<[u8]>>>>) -> Self {
         MemoryOutput {
             name,
             buffer: Vec::new(),
@@ -372,10 +380,10 @@ impl MemoryOutput {
         }
     }
 
-    fn new_append(name: String, files: Arc<Mutex<HashMap<String, Box<[u8]>>>>) -> Self {
+    fn new_append(name: String, files: Arc<RwLock<HashMap<String, Box<[u8]>>>>) -> Self {
         // For append mode, load existing data into buffer
         let existing_data = {
-            let files_guard = files.lock().unwrap();
+            let files_guard = files.read();
             files_guard
                 .get(&name)
                 .map(|data| data.to_vec())
@@ -467,10 +475,10 @@ impl Seek for MemoryOutput {
 
 impl StorageOutput for MemoryOutput {
     fn flush_and_sync(&mut self) -> Result<()> {
-        // Update the shared storage with current buffer content
+        // Update the shared storage with current buffer content.
         // This mimics filesystem behavior where flushed data is visible to readers
         // even if the writer is still open.
-        let mut files = self.files.lock().unwrap();
+        let mut files = self.files.write();
         files.insert(self.name.clone(), self.buffer.clone().into_boxed_slice());
         Ok(())
     }
@@ -481,8 +489,8 @@ impl StorageOutput for MemoryOutput {
 
     fn close(&mut self) -> Result<()> {
         if !self.closed {
-            // Store the buffer in the files map, converting Vec<u8> to Box<[u8]>
-            let mut files = self.files.lock().unwrap();
+            // Store the buffer in the files map, converting Vec<u8> to Box<[u8]>.
+            let mut files = self.files.write();
             files.insert(self.name.clone(), self.buffer.clone().into_boxed_slice());
             self.closed = true;
         }

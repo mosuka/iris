@@ -12,7 +12,7 @@ use crate::vector::search::searcher::{
     VectorIndexQuery, VectorIndexQueryResult, VectorIndexQueryResults,
 };
 use std::cmp::Ordering;
-use std::collections::BinaryHeap;
+use std::collections::{BinaryHeap, HashSet};
 
 /// HNSW vector searcher that performs approximate nearest neighbor search.
 #[derive(Debug)]
@@ -84,8 +84,7 @@ impl VectorIndexSearcher for HnswSearcher {
             }
         }
 
-        candidates
-            .sort_unstable_by(|a, b| b.2.partial_cmp(&a.2).unwrap_or(std::cmp::Ordering::Equal));
+        candidates.sort_by(|a, b| b.2.partial_cmp(&a.2).unwrap_or(std::cmp::Ordering::Equal));
 
         let top_k = request.params.top_k.min(candidates.len());
         for (doc_id, field_name, similarity, distance, vector) in candidates.into_iter().take(top_k)
@@ -203,13 +202,7 @@ impl HnswSearcher {
         // Since HNSW here is single-graph for mixed IDs (potentially), we must hope entry point is valid for calc_dist with this field?
         // Ref discussion: assuming HnswIndex is single-field.
 
-        // Cache computed distances to avoid redundant calculations for nodes visited from multiple paths.
-        let mut dist_cache: ahash::AHashMap<u64, f32> =
-            ahash::AHashMap::with_capacity(ef_search * 2);
-
-        let dist = self.calc_dist(reader, query, curr_obj, field_name)?;
-        dist_cache.insert(curr_obj, dist);
-        let mut dist = dist;
+        let mut dist = self.calc_dist(reader, query, curr_obj, field_name)?;
 
         // 2. Greedy descent
         for lc in (1..=graph.max_level).rev() {
@@ -218,13 +211,7 @@ impl HnswSearcher {
                 changed = false;
                 if let Some(neighbors) = graph.get_neighbors(curr_obj, lc) {
                     for &neighbor_id in neighbors {
-                        let d = if let Some(&cached) = dist_cache.get(&neighbor_id) {
-                            cached
-                        } else {
-                            let d = self.calc_dist(reader, query, neighbor_id, field_name)?;
-                            dist_cache.insert(neighbor_id, d);
-                            d
-                        };
+                        let d = self.calc_dist(reader, query, neighbor_id, field_name)?;
                         if d < dist {
                             dist = d;
                             curr_obj = neighbor_id;
@@ -248,7 +235,7 @@ impl HnswSearcher {
             distance: dist,
         });
 
-        let mut visited = ahash::AHashSet::with_capacity(ef_search * 2);
+        let mut visited = HashSet::new();
         visited.insert(curr_obj);
 
         while let Some(curr) = candidates.pop() {
@@ -261,18 +248,12 @@ impl HnswSearcher {
 
             if let Some(neighbors) = graph.get_neighbors(curr.id, 0) {
                 for &neighbor_id in neighbors {
-                    // Task M9: Use insert() return value to avoid double hash lookup.
-                    if !visited.insert(neighbor_id) {
+                    if visited.contains(&neighbor_id) {
                         continue;
                     }
+                    visited.insert(neighbor_id);
 
-                    let d = if let Some(&cached) = dist_cache.get(&neighbor_id) {
-                        cached
-                    } else {
-                        let d = self.calc_dist(reader, query, neighbor_id, field_name)?;
-                        dist_cache.insert(neighbor_id, d);
-                        d
-                    };
+                    let d = self.calc_dist(reader, query, neighbor_id, field_name)?;
                     let furthest_dist = found.peek().map(|c| c.distance).unwrap_or(f32::MAX);
 
                     if d < furthest_dist || found.len() < ef_search {
@@ -294,39 +275,35 @@ impl HnswSearcher {
         }
 
         // Convert found heaps to results.
-        // Pre-allocate field_name once and clone for each result to avoid repeated &str -> String conversion.
         let field_name_owned = field_name.to_string();
         let mut final_results = Vec::new();
         for c in found {
-            if let Ok(Some(vector)) = reader.get_vector(c.id, field_name) {
-                // Recalculate similarity? Or deduce from distance?
-                // DistanceMetric::similarity is not strictly inverse of distance for all metrics,
-                // but Reader knows metric.
-                let similarity = reader
-                    .distance_metric()
-                    .similarity(&query.data, &vector.data)?;
+            // Convert cached distance to similarity without re-reading vectors.
+            let similarity = reader.distance_metric().distance_to_similarity(c.distance);
 
-                // Apply min_score
-                if similarity < request.params.min_similarity {
-                    continue;
-                }
-
-                final_results.push(VectorIndexQueryResult {
-                    doc_id: c.id,
-                    field_name: field_name_owned.clone(),
-                    similarity,
-                    distance: c.distance,
-                    vector: if request.params.include_vectors {
-                        Some(vector)
-                    } else {
-                        None
-                    },
-                });
+            // Apply min_score filter.
+            if similarity < request.params.min_similarity {
+                continue;
             }
+
+            // Only load vector data if explicitly requested.
+            let vector = if request.params.include_vectors {
+                reader.get_vector(c.id, field_name)?
+            } else {
+                None
+            };
+
+            final_results.push(VectorIndexQueryResult {
+                doc_id: c.id,
+                field_name: field_name_owned.clone(),
+                similarity,
+                distance: c.distance,
+                vector,
+            });
         }
 
         // Sort results (similarity descending)
-        final_results.sort_unstable_by(|a, b| {
+        final_results.sort_by(|a, b| {
             b.similarity
                 .partial_cmp(&a.similarity)
                 .unwrap_or(Ordering::Equal)
@@ -354,11 +331,7 @@ impl HnswSearcher {
         // Optimization: HnswIndexReader *could* support getting raw bytes or avoiding clone,
         // but get_vector returns Option<Vector>.
         if let Some(target) = reader.get_vector(doc_id, field_name)? {
-            // Use unchecked distance for performance in hot loop.
-            // Dimension consistency is validated at search entry point.
-            Ok(reader
-                .distance_metric()
-                .distance_unchecked(&query.data, &target.data))
+            reader.distance_metric().distance(&query.data, &target.data)
         } else {
             // Vector not found in this field?
             // Should return max distance or error?

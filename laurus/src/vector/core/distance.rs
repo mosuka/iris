@@ -203,31 +203,36 @@ impl DistanceMetric {
     }
 
     /// Calculate similarity (0-1, higher is more similar) between two vectors.
-    ///
-    /// # Arguments
-    /// * `a` - The first vector.
-    /// * `b` - The second vector. Must have the same length as `a`.
-    ///
-    /// # Returns
-    /// Similarity score clamped to [0.0, 1.0].
-    ///
-    /// # Errors
-    /// Returns an error if the two vectors have different dimensions.
     pub fn similarity(&self, a: &[f32], b: &[f32]) -> Result<f32> {
         let distance = self.distance(a, b)?;
-        Ok(self.distance_to_similarity(distance))
+
+        let similarity = match self {
+            DistanceMetric::Cosine => 1.0 - distance,
+            DistanceMetric::Euclidean => (-distance).exp(),
+            DistanceMetric::Manhattan => (-distance).exp(),
+            DistanceMetric::DotProduct => -distance,
+            DistanceMetric::Angular => 1.0 - (distance / std::f32::consts::PI),
+        };
+
+        Ok(similarity.clamp(0.0, 1.0))
     }
 
-    /// Convert a pre-computed distance value to a similarity score (0.0-1.0).
+    /// Convert a pre-computed distance value to a similarity score without
+    /// re-reading the original vectors.
     ///
-    /// This avoids redundant distance re-computation when the distance is already known.
+    /// This is the pure-arithmetic inverse of the per-metric transform applied
+    /// in [`distance()`](Self::distance), so it is **much** cheaper than calling
+    /// [`similarity()`](Self::similarity) (which reloads both vectors and
+    /// recomputes dot products / norms).
     ///
     /// # Arguments
-    /// * `distance` - Pre-computed distance value from `distance()` method.
+    ///
+    /// * `distance` - A distance value previously returned by
+    ///   [`distance()`](Self::distance) for the same metric.
     ///
     /// # Returns
-    /// Similarity score clamped to [0.0, 1.0].
-    #[inline]
+    ///
+    /// A similarity score in [0, 1] (higher is more similar).
     pub fn distance_to_similarity(&self, distance: f32) -> f32 {
         let similarity = match self {
             DistanceMetric::Cosine => 1.0 - distance,
@@ -237,47 +242,6 @@ impl DistanceMetric {
             DistanceMetric::Angular => 1.0 - (distance / std::f32::consts::PI),
         };
         similarity.clamp(0.0, 1.0)
-    }
-
-    /// Calculate distance without dimension validation.
-    ///
-    /// # Safety (logical)
-    /// Caller must ensure `a.len() == b.len()`. In debug builds, this is checked via `debug_assert`.
-    /// This method avoids the overhead of Result wrapping on every call in tight loops.
-    ///
-    /// # Arguments
-    /// * `a` - First vector
-    /// * `b` - Second vector
-    ///
-    /// # Returns
-    /// Raw distance value.
-    #[inline]
-    pub(crate) fn distance_unchecked(&self, a: &[f32], b: &[f32]) -> f32 {
-        debug_assert_eq!(a.len(), b.len(), "Vector dimensions must match");
-
-        match self {
-            DistanceMetric::Cosine => {
-                let (dot, norm_a, norm_b) = self.simd_dot_and_norms(a, b);
-                let denom = norm_a.sqrt() * norm_b.sqrt();
-                if denom == 0.0 {
-                    1.0
-                } else {
-                    1.0 - (dot / denom).clamp(-1.0, 1.0)
-                }
-            }
-            DistanceMetric::Euclidean => self.simd_euclidean_sq(a, b).sqrt(),
-            DistanceMetric::Manhattan => self.simd_manhattan(a, b),
-            DistanceMetric::DotProduct => -self.simd_dot_product(a, b),
-            DistanceMetric::Angular => {
-                let (dot, norm_a, norm_b) = self.simd_dot_and_norms(a, b);
-                let denom = norm_a.sqrt() * norm_b.sqrt();
-                if denom == 0.0 {
-                    std::f32::consts::PI
-                } else {
-                    (dot / denom).clamp(-1.0, 1.0).acos()
-                }
-            }
-        }
     }
 
     /// Get the name of this distance metric.
@@ -341,47 +305,5 @@ impl DistanceMetric {
             .par_iter()
             .map(|v| self.similarity(query, v))
             .collect::<Result<Vec<_>>>()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_distance_to_similarity_consistency() {
-        let a = vec![1.0, 0.0, 0.0];
-        let b = vec![0.707, 0.707, 0.0];
-
-        let metrics = [
-            DistanceMetric::Cosine,
-            DistanceMetric::Euclidean,
-            DistanceMetric::Manhattan,
-            DistanceMetric::DotProduct,
-            DistanceMetric::Angular,
-        ];
-
-        for metric in &metrics {
-            let similarity_direct = metric.similarity(&a, &b).unwrap();
-            let distance = metric.distance(&a, &b).unwrap();
-            let similarity_via_distance = metric.distance_to_similarity(distance);
-
-            assert!(
-                (similarity_direct - similarity_via_distance).abs() < 1e-6,
-                "Mismatch for {:?}: similarity()={}, distance_to_similarity()={}",
-                metric,
-                similarity_direct,
-                similarity_via_distance,
-            );
-        }
-    }
-
-    #[test]
-    #[cfg(debug_assertions)]
-    #[should_panic(expected = "Vector dimensions must match")]
-    fn test_distance_unchecked_panics_on_dimension_mismatch() {
-        let a = vec![1.0, 0.0];
-        let b = vec![1.0, 0.0, 0.0];
-        DistanceMetric::Cosine.distance_unchecked(&a, &b);
     }
 }

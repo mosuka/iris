@@ -328,6 +328,29 @@ impl DocumentLog {
         self.doc_store.read().get_document(doc_id)
     }
 
+    /// Retrieve multiple documents by their internal IDs in a single batch.
+    ///
+    /// More efficient than individual [`get_document()`](Self::get_document) calls
+    /// because each segment file is opened and scanned only once.
+    ///
+    /// # Arguments
+    ///
+    /// * `doc_ids` - Slice of internal document IDs to retrieve.
+    ///
+    /// # Returns
+    ///
+    /// A map of doc_id to [`Document`] for all found documents.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`LaurusError`] on storage I/O or deserialization failure.
+    pub fn get_documents_batch(
+        &self,
+        doc_ids: &[u64],
+    ) -> Result<std::collections::HashMap<u64, Document>> {
+        self.doc_store.read().get_documents_batch(doc_ids)
+    }
+
     /// Find internal doc_id by external ID.
     pub fn find_by_external_id(&self, external_id: &str) -> Result<Option<u64>> {
         self.doc_store.read().find_by_external_id(external_id)

@@ -442,6 +442,58 @@ impl VectorStore {
 
         let searcher_guard = self.acquire_searcher_guard()?;
         let searcher = searcher_guard.as_ref().unwrap();
+
+        // Fast path: single query vector, skip HashMap aggregation.
+        if query_vectors.len() == 1 {
+            let qv = &query_vectors[0];
+            let index_request = VectorIndexQuery::new(qv.vector.clone())
+                .top_k(request.params.limit.saturating_mul(2));
+            let results = searcher.search(&index_request)?;
+
+            let mut hits: Vec<VectorHit> = results
+                .results
+                .into_iter()
+                .filter(|r| {
+                    if let Some(ref allowed) = request.params.allowed_ids
+                        && !allowed.contains(&r.doc_id)
+                    {
+                        return false;
+                    }
+                    r.similarity >= request.params.min_score
+                })
+                .map(|r| VectorHit {
+                    doc_id: r.doc_id,
+                    score: r.similarity * qv.weight,
+                    field_hits: vec![],
+                })
+                .collect();
+
+            // Use partial sort for top-K selection when the result set is larger
+            // than the requested limit.
+            let limit = request.params.limit.min(hits.len());
+            if limit > 0 && limit < hits.len() {
+                hits.select_nth_unstable_by(limit - 1, |a, b| {
+                    b.score
+                        .partial_cmp(&a.score)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                });
+                hits.truncate(limit);
+                hits.sort_unstable_by(|a, b| {
+                    b.score
+                        .partial_cmp(&a.score)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                });
+            } else if !hits.is_empty() {
+                hits.sort_unstable_by(|a, b| {
+                    b.score
+                        .partial_cmp(&a.score)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                });
+            }
+
+            return Ok(VectorSearchResults { hits });
+        }
+
         let mut all_hits: std::collections::HashMap<u64, f32> = std::collections::HashMap::new();
 
         // Process each query vector
@@ -500,28 +552,15 @@ impl VectorStore {
             })
             .collect();
 
-        // Use partial sort (select_nth_unstable_by) for top-K selection instead of full sort
-        // when the result set is larger than the requested limit.
-        let limit = request.params.limit.min(hits.len());
-        if limit > 0 && limit < hits.len() {
-            hits.select_nth_unstable_by(limit - 1, |a, b| {
-                b.score
-                    .partial_cmp(&a.score)
-                    .unwrap_or(std::cmp::Ordering::Equal)
-            });
-            hits.truncate(limit);
-            // Sort only the top-K for proper ordering.
-            hits.sort_unstable_by(|a, b| {
-                b.score
-                    .partial_cmp(&a.score)
-                    .unwrap_or(std::cmp::Ordering::Equal)
-            });
-        } else if !hits.is_empty() {
-            hits.sort_unstable_by(|a, b| {
-                b.score
-                    .partial_cmp(&a.score)
-                    .unwrap_or(std::cmp::Ordering::Equal)
-            });
+        hits.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+
+        // Apply limit
+        if hits.len() > request.params.limit {
+            hits.truncate(request.params.limit);
         }
 
         Ok(VectorSearchResults { hits })

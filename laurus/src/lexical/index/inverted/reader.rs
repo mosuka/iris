@@ -191,16 +191,22 @@ impl InvertedIndexPostingIterator {
     /// Find the block containing the target document ID.
     fn find_block(&self, target: u64) -> Option<usize> {
         if let Some(blocks) = &self.block_cache {
-            if blocks.is_empty() {
-                return None;
+            for (i, block) in blocks.iter().enumerate() {
+                if target >= block.min_doc_id && target <= block.max_doc_id {
+                    return Some(i);
+                }
+                if target < block.min_doc_id {
+                    // Target falls before this block. Start scanning from this
+                    // block since all prior blocks contain only smaller doc_ids.
+                    return Some(i);
+                }
             }
-            // Binary search: find the block that contains or follows the target doc_id.
-            let idx = blocks.partition_point(|block| block.max_doc_id < target);
-            if idx < blocks.len() {
-                Some(idx)
-            } else {
-                // Target is beyond all blocks — return last block as starting point.
+
+            // Target is beyond all blocks — return last block as starting point.
+            if !blocks.is_empty() {
                 Some(blocks.len() - 1)
+            } else {
+                None
             }
         } else {
             None
@@ -256,6 +262,7 @@ impl crate::lexical::reader::PostingIterator for InvertedIndexPostingIterator {
     }
 
     fn skip_to(&mut self, target_doc_id: u64) -> Result<bool> {
+        // Mark as started
         self.started = true;
 
         // Use block optimization if available
@@ -263,31 +270,17 @@ impl crate::lexical::reader::PostingIterator for InvertedIndexPostingIterator {
             && let Some(blocks) = &self.block_cache
         {
             let block = &blocks[block_idx];
-            // Don't go backwards - take the max of current position and block start
-            self.position = self.position.max(block.start_position);
+            self.position = block.start_position;
             self.current_block = block_idx;
         }
 
-        // Binary search within the remaining postings
-        let search_from = self.position;
-        if search_from < self.postings.len() {
-            match self.postings[search_from..].binary_search_by_key(&target_doc_id, |p| p.doc_id) {
-                Ok(idx) => {
-                    self.position = search_from + idx;
-                    return Ok(true);
-                }
-                Err(idx) => {
-                    let abs_pos = search_from + idx;
-                    if abs_pos < self.postings.len() {
-                        self.position = abs_pos;
-                        return Ok(true);
-                    }
-                }
+        // Linear search within the current range
+        while self.position < self.postings.len() {
+            if self.postings[self.position].doc_id >= target_doc_id {
+                return Ok(true);
             }
+            self.position += 1;
         }
-
-        // Exhausted
-        self.position = self.postings.len();
         Ok(false)
     }
 
@@ -331,6 +324,14 @@ pub struct SegmentReader {
 }
 
 impl SegmentReader {
+    /// Return a reference to the segment metadata.
+    ///
+    /// This is useful for callers that need to inspect segment boundaries
+    /// (e.g., `min_doc_id` / `max_doc_id`) without acquiring interior locks.
+    pub fn segment_info(&self) -> &SegmentInfo {
+        &self.info
+    }
+
     /// Open a segment reader (schema-less mode).
     pub fn open(info: SegmentInfo, storage: Arc<dyn Storage>) -> Result<Self> {
         let reader = SegmentReader {
@@ -706,21 +707,41 @@ impl SegmentReader {
     }
 
     /// Get field length for a specific document and field.
+    ///
+    /// Uses a fast path with a single `RwLock` acquisition when field lengths
+    /// are already loaded (hot path). Falls back to loading on the first call
+    /// (cold path), which requires a second acquisition.
+    ///
+    /// # Arguments
+    ///
+    /// * `doc_id` - The document ID to look up.
+    /// * `field` - The field name whose length is requested.
+    ///
+    /// # Returns
+    ///
+    /// `Ok(Some(length))` if the document exists and has the field,
+    /// `Ok(None)` if the document is deleted or the field is absent.
     pub fn field_length(&self, doc_id: u64, field: &str) -> Result<Option<u32>> {
-        // Ensure field lengths are loaded
-        if self.field_lengths.read().unwrap().is_none() {
-            self.load_field_lengths()?;
-        }
-
         if self.is_deleted(doc_id)? {
             return Ok(None);
         }
 
+        // Fast path: try to read with a single lock acquisition.
         let field_lengths = self.field_lengths.read().unwrap();
-        if let Some(ref lengths_map) = *field_lengths
-            && let Some(doc_lengths) = lengths_map.get(&doc_id)
-        {
-            return Ok(doc_lengths.get(field).copied());
+        if let Some(ref lengths_map) = *field_lengths {
+            return Ok(lengths_map
+                .get(&doc_id)
+                .and_then(|doc_lengths| doc_lengths.get(field).copied()));
+        }
+        drop(field_lengths);
+
+        // Cold path: load field lengths (one-time), then retry.
+        self.load_field_lengths()?;
+        let field_lengths = self.field_lengths.read().unwrap();
+        if let Some(ref lengths_map) = *field_lengths {
+            return Ok(lengths_map
+                .get(&doc_id)
+                .and_then(|doc_lengths| doc_lengths.get(field).copied()));
         }
         Ok(None)
     }
@@ -1045,6 +1066,12 @@ pub struct InvertedIndexReader {
     /// Segment readers.
     segment_readers: Vec<Arc<RwLock<SegmentReader>>>,
 
+    /// Segment metadata cached at construction time.
+    ///
+    /// Stored separately so that doc_id range checks can be performed
+    /// without acquiring the per-segment `RwLock`.
+    segment_infos: Vec<SegmentInfo>,
+
     /// Cache manager.
     cache_manager: Arc<CacheManager>,
 
@@ -1082,6 +1109,7 @@ impl InvertedIndexReader {
 
         Ok(InvertedIndexReader {
             segment_readers,
+            segment_infos: segments,
             cache_manager,
             config,
             closed: Arc::new(AtomicBool::new(false)),
@@ -1109,11 +1137,31 @@ impl InvertedIndexReader {
     }
 
     /// Get the field length for a specific document and field.
+    ///
+    /// Skips segments whose `[min_doc_id, max_doc_id]` range does not
+    /// contain the requested `doc_id`, avoiding unnecessary lock
+    /// acquisitions.
+    ///
+    /// # Arguments
+    ///
+    /// * `doc_id` - The internal document ID.
+    /// * `field` - The field name whose length is requested.
+    ///
+    /// # Returns
+    ///
+    /// `Ok(Some(length))` if found, `Ok(None)` otherwise.
     pub fn field_length(&self, doc_id: u64, field: &str) -> Result<Option<u32>> {
         self.check_closed()?;
 
-        // Search across all segments
-        for segment_reader in &self.segment_readers {
+        // Search across segments, skipping those that cannot contain doc_id.
+        for (i, segment_reader) in self.segment_readers.iter().enumerate() {
+            // Use cached segment info to skip out-of-range segments
+            // without acquiring the reader lock.
+            if let Some(info) = self.segment_infos.get(i)
+                && (doc_id < info.min_doc_id || doc_id > info.max_doc_id)
+            {
+                continue;
+            }
             let reader = segment_reader.read().unwrap();
             if let Ok(Some(length)) = reader.field_length(doc_id, field) {
                 return Ok(Some(length));

@@ -778,31 +778,50 @@ impl Engine {
         }
     }
 
-    /// Resolve external ID and load document in a single retrieval.
+    /// Resolve external ID from internal doc_id.
+    fn resolve_external_id(&self, internal_id: u64) -> Result<String> {
+        if let Some(doc) = self.log.get_document(internal_id)?
+            && let Some(id) = doc.fields.get("_id").and_then(|v| v.as_text())
+        {
+            return Ok(id.to_string());
+        }
+        Ok(format!("unknown_{}", internal_id))
+    }
+
+    /// Batch-resolve external IDs and documents for multiple internal IDs.
     ///
-    /// This avoids the double-fetch that occurs when calling
-    /// `resolve_external_id()` and `get_document_by_internal_id()` separately.
+    /// Fetches all documents in one pass through the document store,
+    /// reducing per-document lock acquisition overhead compared to
+    /// calling [`resolve_external_id`] and [`get_document_by_internal_id`]
+    /// separately for each document.
     ///
     /// # Arguments
     ///
-    /// * `internal_id` - The internal document ID.
+    /// * `internal_ids` - Slice of internal document IDs.
     ///
     /// # Returns
     ///
-    /// A tuple of (external_id, Option<Document>).
-    fn resolve_id_and_document(&self, internal_id: u64) -> Result<(String, Option<Document>)> {
-        if let Some(doc) = self.log.get_document(internal_id)? {
-            let external_id = doc
-                .fields
-                .get("_id")
-                .and_then(|v| v.as_text())
-                .map(|s| s.to_string())
-                .unwrap_or_else(|| format!("unknown_{}", internal_id));
-            let filtered = self.filter_stored_fields(&doc);
-            Ok((external_id, Some(filtered)))
-        } else {
-            Ok((format!("unknown_{}", internal_id), None))
+    /// A map from internal ID to `(external_id, Option<Document>)`.
+    fn resolve_ids_and_documents_batch(
+        &self,
+        internal_ids: &[u64],
+    ) -> Result<HashMap<u64, (String, Option<Document>)>> {
+        let mut results = HashMap::with_capacity(internal_ids.len());
+        for &id in internal_ids {
+            if let Some(doc) = self.log.get_document(id)? {
+                let external_id = doc
+                    .fields
+                    .get("_id")
+                    .and_then(|v| v.as_text())
+                    .map(|s| s.to_string())
+                    .unwrap_or_else(|| format!("unknown_{}", id));
+                let filtered = self.filter_stored_fields(&doc);
+                results.insert(id, (external_id, Some(filtered)));
+            } else {
+                results.insert(id, (format!("unknown_{}", id), None));
+            }
         }
+        Ok(results)
     }
 
     /// Split the unified schema into specialized configs.
@@ -1160,45 +1179,43 @@ impl Engine {
             let mut results =
                 self.fuse_results(lexical_hits, vector_hits, algorithm, fetch_count)?;
             if request_offset > 0 {
-                if request_offset >= results.len() {
-                    results.clear();
-                } else {
-                    results.drain(..request_offset);
-                }
+                results = results.into_iter().skip(request_offset).collect();
             }
             results.truncate(request_limit);
             Ok(results)
         } else if !vector_hits.is_empty() {
-            // Only vector results — resolve external IDs and load documents
-            let mut results = Vec::with_capacity(request_limit);
-            for hit in vector_hits
+            // Only vector results — batch-resolve external IDs and documents.
+            let paginated: Vec<_> = vector_hits
                 .into_iter()
                 .skip(request_offset)
                 .take(request_limit)
-            {
-                let (external_id, document) = self.resolve_id_and_document(hit.doc_id)?;
-                results.push(SearchResult {
-                    id: external_id,
-                    score: hit.score,
-                    document,
-                });
+                .collect();
+            let ids: Vec<u64> = paginated.iter().map(|h| h.doc_id).collect();
+            let resolved = self.resolve_ids_and_documents_batch(&ids)?;
+            let mut results = Vec::with_capacity(paginated.len());
+            for hit in paginated {
+                if let Some((external_id, document)) = resolved.get(&hit.doc_id) {
+                    results.push(SearchResult {
+                        id: external_id.clone(),
+                        score: hit.score,
+                        document: document.clone(),
+                    });
+                }
             }
             Ok(results)
         } else {
-            // Only lexical results (or both empty).
-            // Documents are not loaded during scoring (load_documents=false),
-            // so we load them here only for the final paginated result set.
+            // Only lexical results (or both empty)
             let mut results = Vec::with_capacity(request_limit);
             for hit in lexical_hits
                 .into_iter()
                 .skip(request_offset)
                 .take(request_limit)
             {
-                let (external_id, document) = self.resolve_id_and_document(hit.doc_id)?;
+                let external_id = self.resolve_external_id(hit.doc_id)?;
                 results.push(SearchResult {
                     id: external_id,
                     score: hit.score,
-                    document,
+                    document: hit.document,
                 });
             }
             Ok(results)
@@ -1206,10 +1223,6 @@ impl Engine {
     }
 
     /// Combine results from lexical and vector engines.
-    ///
-    /// Fusion operates on `(doc_id, score)` pairs only — documents are loaded
-    /// after scoring and truncation so that only the final result set incurs
-    /// the document-fetch cost.
     fn fuse_results(
         &self,
         lexical_hits: Vec<crate::lexical::query::SearchHit>,
@@ -1217,29 +1230,35 @@ impl Engine {
         fusion: FusionAlgorithm,
         limit: usize,
     ) -> Result<Vec<SearchResult>> {
-        let estimated_capacity = lexical_hits.len().max(vector_hits.len());
-        let mut fused_scores: HashMap<u64, f32> = HashMap::with_capacity(estimated_capacity);
+        let mut fused_scores: HashMap<u64, (f32, Option<crate::data::Document>)> = HashMap::new();
 
         match fusion {
             FusionAlgorithm::RRF { k } => {
                 for (rank, hit) in lexical_hits.into_iter().enumerate() {
                     let rrf_score = 1.0 / (k + (rank + 1) as f64);
-                    *fused_scores.entry(hit.doc_id).or_insert(0.0) += rrf_score as f32;
+                    let entry = fused_scores
+                        .entry(hit.doc_id)
+                        .or_insert((0.0, hit.document));
+                    entry.0 += rrf_score as f32;
                 }
                 for (rank, hit) in vector_hits.into_iter().enumerate() {
                     let rrf_score = 1.0 / (k + (rank + 1) as f64);
-                    *fused_scores.entry(hit.doc_id).or_insert(0.0) += rrf_score as f32;
+                    let entry = fused_scores.entry(hit.doc_id).or_insert((0.0, None));
+                    entry.0 += rrf_score as f32;
                 }
             }
             FusionAlgorithm::WeightedSum {
                 lexical_weight,
                 vector_weight,
             } => {
-                let (lexical_min, lexical_max) = lexical_hits
+                let lexical_min = lexical_hits
                     .iter()
-                    .fold((f32::INFINITY, f32::NEG_INFINITY), |(min, max), h| {
-                        (min.min(h.score), max.max(h.score))
-                    });
+                    .map(|h| h.score)
+                    .fold(f32::INFINITY, f32::min);
+                let lexical_max = lexical_hits
+                    .iter()
+                    .map(|h| h.score)
+                    .fold(f32::NEG_INFINITY, f32::max);
 
                 for hit in lexical_hits {
                     let norm_score = if lexical_max > lexical_min {
@@ -1247,14 +1266,20 @@ impl Engine {
                     } else {
                         1.0
                     };
-                    *fused_scores.entry(hit.doc_id).or_insert(0.0) += norm_score * lexical_weight;
+                    let entry = fused_scores
+                        .entry(hit.doc_id)
+                        .or_insert((0.0, hit.document));
+                    entry.0 += norm_score * lexical_weight;
                 }
 
-                let (vector_min, vector_max) = vector_hits
+                let vector_min = vector_hits
                     .iter()
-                    .fold((f32::INFINITY, f32::NEG_INFINITY), |(min, max), h| {
-                        (min.min(h.score), max.max(h.score))
-                    });
+                    .map(|h| h.score)
+                    .fold(f32::INFINITY, f32::min);
+                let vector_max = vector_hits
+                    .iter()
+                    .map(|h| h.score)
+                    .fold(f32::NEG_INFINITY, f32::max);
 
                 for hit in vector_hits {
                     let norm_score = if vector_max > vector_min {
@@ -1262,31 +1287,47 @@ impl Engine {
                     } else {
                         1.0
                     };
-                    *fused_scores.entry(hit.doc_id).or_insert(0.0) += norm_score * vector_weight;
+                    let entry = fused_scores.entry(hit.doc_id).or_insert((0.0, None));
+                    entry.0 += norm_score * vector_weight;
                 }
             }
         }
 
-        let mut intermediate: Vec<(u64, f32)> = fused_scores.into_iter().collect();
+        let mut intermediate: Vec<(u64, f32, Option<crate::data::Document>)> = fused_scores
+            .into_iter()
+            .map(|(doc_id, (score, document))| (doc_id, score, document))
+            .collect();
 
         // Sort by fused score descending
-        intermediate
-            .sort_unstable_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        intermediate.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
         // Limit results
         if intermediate.len() > limit {
             intermediate.truncate(limit);
         }
 
-        // Load documents only for the final truncated result set.
+        // Batch-resolve external IDs and fill missing documents.
+        // Collect IDs that need resolution (either missing external ID or
+        // missing document).
+        let ids_to_resolve: Vec<u64> = intermediate.iter().map(|(doc_id, _, _)| *doc_id).collect();
+        let resolved = self.resolve_ids_and_documents_batch(&ids_to_resolve)?;
+
         let mut results = Vec::with_capacity(intermediate.len());
-        for (doc_id, score) in intermediate {
-            let (external_id, document) = self.resolve_id_and_document(doc_id)?;
-            results.push(SearchResult {
-                id: external_id,
-                score,
-                document,
-            });
+        for (doc_id, score, document) in intermediate {
+            if let Some((external_id, resolved_doc)) = resolved.get(&doc_id) {
+                // Prefer the document already fetched by the lexical search;
+                // fall back to the batch-resolved copy.
+                let final_doc = if document.is_some() {
+                    document
+                } else {
+                    resolved_doc.clone()
+                };
+                results.push(SearchResult {
+                    id: external_id.clone(),
+                    score,
+                    document: final_doc,
+                });
+            }
         }
 
         Ok(results)
