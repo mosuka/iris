@@ -85,6 +85,36 @@ impl Posting {
     }
 }
 
+/// Compact posting for hot-path scanning where positions are not needed.
+///
+/// This reduces memory footprint per posting from ~40+ bytes to 16 bytes,
+/// improving cache efficiency during posting list traversal.
+#[derive(Debug, Clone, PartialEq)]
+pub struct CompactPosting {
+    /// Document ID.
+    pub doc_id: u64,
+    /// Term frequency in the document.
+    pub frequency: u32,
+    /// Document-level weight/boost.
+    pub weight: f32,
+}
+
+impl CompactPosting {
+    /// Create a new compact posting.
+    ///
+    /// # Arguments
+    /// * `doc_id` - Document ID
+    /// * `frequency` - Term frequency
+    /// * `weight` - Document weight
+    pub fn new(doc_id: u64, frequency: u32, weight: f32) -> Self {
+        CompactPosting {
+            doc_id,
+            frequency,
+            weight,
+        }
+    }
+}
+
 /// A posting list for a specific term.
 #[derive(Debug, Clone)]
 pub struct PostingList {
@@ -158,6 +188,23 @@ impl PostingList {
     pub fn optimize(&mut self) {
         self.postings.sort_by_key(|p| p.doc_id);
         self.postings.dedup_by_key(|p| p.doc_id);
+    }
+
+    /// Convert postings to compact format, dropping position data.
+    ///
+    /// Useful for query types that don't need position information (e.g., TermQuery, BooleanQuery).
+    ///
+    /// # Returns
+    /// Vector of compact postings without position data.
+    pub fn to_compact(&self) -> Vec<CompactPosting> {
+        self.postings
+            .iter()
+            .map(|p| CompactPosting {
+                doc_id: p.doc_id,
+                frequency: p.frequency,
+                weight: p.weight,
+            })
+            .collect()
     }
 
     /// Encode the posting list to binary format.
@@ -772,5 +819,34 @@ mod tests {
         assert!(stats.total_postings > 0);
         assert!(stats.avg_postings_per_list > 0.0);
         assert!(stats.max_posting_list_size > 0);
+    }
+
+    #[test]
+    fn test_compact_posting() {
+        let posting = CompactPosting::new(42, 3, 1.5);
+        assert_eq!(posting.doc_id, 42);
+        assert_eq!(posting.frequency, 3);
+        assert_eq!(posting.weight, 1.5);
+    }
+
+    #[test]
+    fn test_posting_list_to_compact() {
+        let mut list = PostingList::new("test".to_string());
+        list.add_posting(Posting::with_positions(1, vec![0, 5, 10]).with_weight(1.0));
+        list.add_posting(Posting::with_positions(2, vec![3, 7]).with_weight(2.0));
+
+        let compact = list.to_compact();
+        assert_eq!(compact.len(), 2);
+        assert_eq!(compact[0].doc_id, 1);
+        assert_eq!(compact[0].frequency, 3);
+        assert_eq!(compact[0].weight, 1.0);
+        assert_eq!(compact[1].doc_id, 2);
+        assert_eq!(compact[1].frequency, 2);
+        assert_eq!(compact[1].weight, 2.0);
+    }
+
+    #[test]
+    fn test_compact_posting_size() {
+        assert_eq!(std::mem::size_of::<CompactPosting>(), 16);
     }
 }

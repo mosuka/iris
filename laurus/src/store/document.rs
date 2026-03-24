@@ -207,6 +207,59 @@ impl DocumentSegmentReader {
         Ok(None)
     }
 
+    /// Retrieve multiple documents from this segment in a single pass.
+    ///
+    /// Opens the segment file once and scans through, collecting all
+    /// documents whose IDs are in the requested set. More efficient
+    /// than multiple individual [`get_document()`](Self::get_document) calls.
+    ///
+    /// # Arguments
+    ///
+    /// * `doc_ids` - Set of document IDs to retrieve.
+    ///
+    /// # Returns
+    ///
+    /// A map of doc_id to [`Document`] for all found documents in this segment.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`LaurusError`] on storage I/O or deserialization failure.
+    pub fn get_documents_batch(
+        &self,
+        doc_ids: &std::collections::HashSet<u64>,
+    ) -> Result<HashMap<u64, Document>> {
+        let mut results = HashMap::with_capacity(doc_ids.len());
+        if doc_ids.is_empty() {
+            return Ok(results);
+        }
+
+        // Quick check: are any requested IDs within this segment's range?
+        if !doc_ids.iter().any(|id| self.segment.contains(*id)) {
+            return Ok(results);
+        }
+
+        let input = self.storage.open_input(&self.segment.file_name())?;
+        let mut reader = StructReader::new(input)?;
+        let doc_count = reader.read_u32()?;
+
+        let mut remaining = doc_ids.len();
+        for _ in 0..doc_count {
+            if remaining == 0 {
+                break; // All requested docs found, stop early.
+            }
+            let current_id = reader.read_u64()?;
+            let json = reader.read_bytes()?;
+            if doc_ids.contains(&current_id) {
+                let doc: Document = serde_json::from_slice(&json).map_err(|e| {
+                    LaurusError::index(format!("failed to deserialize document: {e}"))
+                })?;
+                results.insert(current_id, doc);
+                remaining -= 1;
+            }
+        }
+        Ok(results)
+    }
+
     /// Finds the first internal document ID whose `_id` field matches the given external ID.
     ///
     /// The method performs a linear scan over all documents in this segment.
@@ -513,6 +566,67 @@ impl UnifiedDocumentStore {
             }
         }
         Ok(None)
+    }
+
+    /// Retrieve multiple documents by their internal IDs in a single batch.
+    ///
+    /// More efficient than individual [`get_document()`](Self::get_document) calls because
+    /// each segment file is opened and scanned only once.
+    ///
+    /// # Arguments
+    ///
+    /// * `doc_ids` - Slice of internal document IDs to retrieve.
+    ///
+    /// # Returns
+    ///
+    /// A map of doc_id to [`Document`] for all found documents.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`LaurusError`] on storage I/O or deserialization failure.
+    pub fn get_documents_batch(&self, doc_ids: &[u64]) -> Result<HashMap<u64, Document>> {
+        let mut results = HashMap::with_capacity(doc_ids.len());
+        if doc_ids.is_empty() {
+            return Ok(results);
+        }
+
+        let id_set: std::collections::HashSet<u64> = doc_ids.iter().copied().collect();
+
+        // Check pending docs first.
+        for &doc_id in doc_ids {
+            if let Some(doc) = self.pending_docs.get(&doc_id) {
+                results.insert(doc_id, doc.clone());
+            }
+        }
+
+        // Find remaining IDs not yet resolved.
+        let remaining: std::collections::HashSet<u64> = id_set
+            .iter()
+            .filter(|id| !results.contains_key(id))
+            .copied()
+            .collect();
+
+        if remaining.is_empty() {
+            return Ok(results);
+        }
+
+        // Batch-load from segments (one file open per segment).
+        for segment in &self.segments {
+            let segment_ids: std::collections::HashSet<u64> = remaining
+                .iter()
+                .filter(|id| segment.contains(**id))
+                .copied()
+                .collect();
+            if segment_ids.is_empty() {
+                continue;
+            }
+
+            let reader = DocumentSegmentReader::new(self.storage.clone(), segment.clone());
+            let batch = reader.get_documents_batch(&segment_ids)?;
+            results.extend(batch);
+        }
+
+        Ok(results)
     }
 
     /// Finds the first internal document ID whose `_id` field matches the given external ID.

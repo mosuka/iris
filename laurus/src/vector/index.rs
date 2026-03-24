@@ -310,40 +310,34 @@ impl ManagedVectorIndex {
             ));
         }
 
-        // If storage is available, load from storage
+        // Try loading from storage if available (index was written via write()).
         if let Some(storage) = &self.storage {
             let path_guard = self.index_path.read();
             if let Some(path) = &*path_guard {
-                return match &self.config {
-                    VectorIndexTypeConfig::Flat(c) => Ok(Arc::new(FlatVectorIndexReader::load(
-                        &**storage,
-                        path,
-                        c.distance_metric,
-                    )?)),
-                    VectorIndexTypeConfig::HNSW(c) => Ok(Arc::new(HnswIndexReader::load(
-                        &**storage,
-                        path,
-                        c.distance_metric,
-                    )?)),
-                    VectorIndexTypeConfig::IVF(c) => Ok(Arc::new(IvfIndexReader::load(
-                        &**storage,
-                        path,
-                        c.distance_metric,
-                    )?)),
-                };
+                let storage_result: Result<Arc<dyn crate::vector::reader::VectorIndexReader>> =
+                    match &self.config {
+                        VectorIndexTypeConfig::Flat(c) => {
+                            FlatVectorIndexReader::load(&**storage, path, c.distance_metric)
+                                .map(|r| Arc::new(r) as _)
+                        }
+                        VectorIndexTypeConfig::HNSW(c) => {
+                            HnswIndexReader::load(&**storage, path, c.distance_metric)
+                                .map(|r| Arc::new(r) as _)
+                        }
+                        VectorIndexTypeConfig::IVF(c) => {
+                            IvfIndexReader::load(&**storage, path, c.distance_metric)
+                                .map(|r| Arc::new(r) as _)
+                        }
+                    };
+                if let Ok(reader) = storage_result {
+                    return Ok(reader);
+                }
+                // Fall through to in-memory reader if storage load fails
+                // (e.g., finalize() was called but write() was not).
             }
-
-            // Fallback for cases where write() wasn't called but storage exists?
-            // Or maybe default to "default_index" if not set?
-            // For now, let's error if path is not known, or fallback to in-memory if possible?
-            // But writer might have flushed to disk.
-            // Let's assume if storage is present, we should have written or we should error if not written.
-            return Err(LaurusError::InvalidOperation(
-                "Index has not been written to storage, cannot create reader from storage without path.".to_string(),
-            ));
         }
 
-        // Otherwise, create from in-memory vectors
+        // Create reader from in-memory vectors held by the writer.
         let vectors = self.vectors()?;
         let reader = crate::vector::reader::SimpleVectorReader::new(
             vectors,

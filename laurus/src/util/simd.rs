@@ -94,46 +94,62 @@ pub mod ascii {
 
 /// SIMD-accelerated numerical operations for scoring.
 pub mod numeric {
+    use wide::f32x8;
 
-    /// Batch BM25 score calculation for multiple documents.
+    /// Batch BM25 TF calculation using SIMD for improved throughput.
     ///
-    /// This function processes multiple TF values simultaneously
-    /// for better performance in scoring operations.
+    /// Computes TF = tf * (k1 + 1) / (tf + k1 * norm_factor) for each element.
+    ///
+    /// # Arguments
+    /// * `term_freqs` - Slice of term frequencies
+    /// * `k1` - BM25 k1 parameter
+    /// * `norm_factors` - Slice of normalization factors (same length as term_freqs)
+    ///
+    /// # Returns
+    /// Vector of BM25 TF scores.
     pub fn batch_bm25_tf(term_freqs: &[f32], k1: f32, norm_factors: &[f32]) -> Vec<f32> {
         assert_eq!(term_freqs.len(), norm_factors.len());
+        let len = term_freqs.len();
+        let mut results = Vec::with_capacity(len);
 
-        let mut results = Vec::with_capacity(term_freqs.len());
+        let k1_plus_1 = f32x8::splat(k1 + 1.0);
+        let k1_vec = f32x8::splat(k1);
 
-        // Process 4 values at a time for better performance
-        let chunks = term_freqs.chunks_exact(4);
-        let remainder = chunks.remainder();
-        let norm_chunks = norm_factors.chunks_exact(4);
+        let tf_chunks = term_freqs.chunks_exact(8);
+        let norm_chunks = norm_factors.chunks_exact(8);
+        let tf_remainder = tf_chunks.remainder();
 
-        for (tf_chunk, norm_chunk) in chunks.zip(norm_chunks) {
-            let mut batch_results = [0.0f32; 4];
-
-            for i in 0..4 {
-                let tf = tf_chunk[i];
-                let norm = norm_chunk[i];
-
-                // BM25 TF calculation: tf * (k1 + 1) / (tf + k1 * norm)
-                batch_results[i] = (tf * (k1 + 1.0)) / (tf + k1 * norm);
-            }
-
-            results.extend_from_slice(&batch_results);
+        for (tf_chunk, norm_chunk) in tf_chunks.zip(norm_chunks) {
+            let tf = f32x8::from(tf_chunk);
+            let norm = f32x8::from(norm_chunk);
+            // BM25 TF: tf * (k1 + 1) / (tf + k1 * norm)
+            let numerator = tf * k1_plus_1;
+            let denominator = tf + k1_vec * norm;
+            let result = numerator / denominator;
+            results.extend_from_slice(&result.to_array());
         }
 
-        // Handle remaining values
-        let norm_remainder = &norm_factors[norm_factors.len() - remainder.len()..];
-        for (tf, norm) in remainder.iter().zip(norm_remainder.iter()) {
-            let tf_score = (tf * (k1 + 1.0)) / (tf + k1 * norm);
-            results.push(tf_score);
+        // Handle remainder with scalar fallback.
+        let norm_remainder_start = len - tf_remainder.len();
+        let norm_remainder = &norm_factors[norm_remainder_start..];
+        for (tf, norm) in tf_remainder.iter().zip(norm_remainder.iter()) {
+            results.push((tf * (k1 + 1.0)) / (tf + k1 * norm));
         }
 
         results
     }
 
-    /// Batch final BM25 score calculation.
+    /// Batch BM25 final score calculation using SIMD.
+    ///
+    /// Computes final_score = idf * tf * boost for each element.
+    ///
+    /// # Arguments
+    /// * `tf_scores` - Slice of TF scores
+    /// * `idf_scores` - Slice of IDF scores
+    /// * `boosts` - Slice of boost factors
+    ///
+    /// # Returns
+    /// Vector of final BM25 scores.
     pub fn batch_bm25_final_score(
         tf_scores: &[f32],
         idf_scores: &[f32],
@@ -141,31 +157,27 @@ pub mod numeric {
     ) -> Vec<f32> {
         assert_eq!(tf_scores.len(), idf_scores.len());
         assert_eq!(tf_scores.len(), boosts.len());
+        let len = tf_scores.len();
+        let mut results = Vec::with_capacity(len);
 
-        let mut results = Vec::with_capacity(tf_scores.len());
+        let tf_chunks = tf_scores.chunks_exact(8);
+        let idf_chunks = idf_scores.chunks_exact(8);
+        let boost_chunks = boosts.chunks_exact(8);
+        let tf_remainder = tf_chunks.remainder();
 
-        // Process 4 values at a time
-        let chunks = tf_scores.chunks_exact(4);
-        let remainder = chunks.remainder();
-        let idf_chunks = idf_scores.chunks_exact(4);
-        let boost_chunks = boosts.chunks_exact(4);
-
-        for ((tf_chunk, idf_chunk), boost_chunk) in chunks.zip(idf_chunks).zip(boost_chunks) {
-            let mut batch_results = [0.0f32; 4];
-
-            for i in 0..4 {
-                // Final BM25: IDF * TF * boost
-                batch_results[i] = idf_chunk[i] * tf_chunk[i] * boost_chunk[i];
-            }
-
-            results.extend_from_slice(&batch_results);
+        for ((tf_chunk, idf_chunk), boost_chunk) in tf_chunks.zip(idf_chunks).zip(boost_chunks) {
+            let tf = f32x8::from(tf_chunk);
+            let idf = f32x8::from(idf_chunk);
+            let boost = f32x8::from(boost_chunk);
+            let result = idf * tf * boost;
+            results.extend_from_slice(&result.to_array());
         }
 
-        // Handle remaining values
-        let idf_remainder = &idf_scores[idf_scores.len() - remainder.len()..];
-        let boost_remainder = &boosts[boosts.len() - remainder.len()..];
-
-        for ((tf, idf), boost) in remainder
+        // Handle remainder with scalar fallback.
+        let remainder_start = len - tf_remainder.len();
+        let idf_remainder = &idf_scores[remainder_start..];
+        let boost_remainder = &boosts[remainder_start..];
+        for ((tf, idf), boost) in tf_remainder
             .iter()
             .zip(idf_remainder.iter())
             .zip(boost_remainder.iter())
@@ -217,5 +229,60 @@ mod tests {
         let result = ascii::to_lowercase(input);
         let expected = input.to_lowercase();
         assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_simd_batch_bm25_tf() {
+        // 10 elements: 8 handled by SIMD + 2 remainder
+        let tfs = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0];
+        let norms = vec![1.0; 10];
+        let k1 = 1.2;
+        let result = numeric::batch_bm25_tf(&tfs, k1, &norms);
+        assert_eq!(result.len(), 10);
+        for (i, &r) in result.iter().enumerate() {
+            let tf = tfs[i];
+            let expected = (tf * (k1 + 1.0)) / (tf + k1 * 1.0);
+            assert!((r - expected).abs() < 1e-5, "mismatch at index {i}");
+        }
+    }
+
+    #[test]
+    fn test_simd_batch_bm25_tf_exact_multiple() {
+        // Exactly 8 elements (no remainder)
+        let tfs = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0];
+        let norms = vec![0.5; 8];
+        let k1 = 1.5;
+        let result = numeric::batch_bm25_tf(&tfs, k1, &norms);
+        assert_eq!(result.len(), 8);
+        for (i, &r) in result.iter().enumerate() {
+            let tf = tfs[i];
+            let expected = (tf * (k1 + 1.0)) / (tf + k1 * 0.5);
+            assert!((r - expected).abs() < 1e-5);
+        }
+    }
+
+    #[test]
+    fn test_simd_batch_bm25_final_score() {
+        let tfs = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0];
+        let idfs = vec![0.5, 1.0, 1.5, 2.0, 0.5, 1.0, 1.5, 2.0, 0.5];
+        let boosts = vec![1.0; 9];
+        let result = numeric::batch_bm25_final_score(&tfs, &idfs, &boosts);
+        assert_eq!(result.len(), 9);
+        for (i, &r) in result.iter().enumerate() {
+            let expected = idfs[i] * tfs[i] * boosts[i];
+            assert!((r - expected).abs() < 1e-5, "mismatch at index {i}");
+        }
+    }
+
+    #[test]
+    fn test_simd_batch_bm25_tf_empty() {
+        let result = numeric::batch_bm25_tf(&[], 1.2, &[]);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_simd_batch_bm25_final_score_empty() {
+        let result = numeric::batch_bm25_final_score(&[], &[], &[]);
+        assert!(result.is_empty());
     }
 }

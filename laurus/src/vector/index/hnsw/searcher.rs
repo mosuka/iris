@@ -274,34 +274,32 @@ impl HnswSearcher {
             }
         }
 
-        // Convert found heaps to results
+        // Convert found heaps to results.
+        let field_name_owned = field_name.to_string();
         let mut final_results = Vec::new();
         for c in found {
-            if let Ok(Some(vector)) = reader.get_vector(c.id, field_name) {
-                // Recalculate similarity? Or deduce from distance?
-                // DistanceMetric::similarity is not strictly inverse of distance for all metrics,
-                // but Reader knows metric.
-                let similarity = reader
-                    .distance_metric()
-                    .similarity(&query.data, &vector.data)?;
+            // Convert cached distance to similarity without re-reading vectors.
+            let similarity = reader.distance_metric().distance_to_similarity(c.distance);
 
-                // Apply min_score
-                if similarity < request.params.min_similarity {
-                    continue;
-                }
-
-                final_results.push(VectorIndexQueryResult {
-                    doc_id: c.id,
-                    field_name: field_name.to_string(),
-                    similarity,
-                    distance: c.distance,
-                    vector: if request.params.include_vectors {
-                        Some(vector)
-                    } else {
-                        None
-                    },
-                });
+            // Apply min_score filter.
+            if similarity < request.params.min_similarity {
+                continue;
             }
+
+            // Only load vector data if explicitly requested.
+            let vector = if request.params.include_vectors {
+                reader.get_vector(c.id, field_name)?
+            } else {
+                None
+            };
+
+            final_results.push(VectorIndexQueryResult {
+                doc_id: c.id,
+                field_name: field_name_owned.clone(),
+                similarity,
+                distance: c.distance,
+                vector,
+            });
         }
 
         // Sort results (similarity descending)

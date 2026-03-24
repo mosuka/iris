@@ -57,8 +57,9 @@ impl IvfSearcher {
                 .collect();
 
             // Sort by distance (ascending)
-            centroid_distances
-                .sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+            centroid_distances.sort_unstable_by(|a, b| {
+                a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal)
+            });
 
             // Return n_probe nearest centroid indices
             Ok(centroid_distances
@@ -109,20 +110,16 @@ impl VectorIndexSearcher for IvfSearcher {
 
         for (doc_id, field_name) in vector_ids {
             if let Ok(Some(vector)) = self.index_reader.get_vector(doc_id, &field_name) {
-                let similarity = self
-                    .index_reader
-                    .distance_metric()
-                    .similarity(&request.query.data, &vector.data)?;
-                let distance = self
-                    .index_reader
-                    .distance_metric()
-                    .distance(&request.query.data, &vector.data)?;
+                let metric = self.index_reader.distance_metric();
+                let distance = metric.distance(&request.query.data, &vector.data)?;
+                let similarity = metric.distance_to_similarity(distance);
                 candidates.push((doc_id, field_name, similarity, distance, vector));
             }
         }
 
         // Sort by similarity (descending)
-        candidates.sort_by(|a, b| b.2.partial_cmp(&a.2).unwrap_or(std::cmp::Ordering::Equal));
+        candidates
+            .sort_unstable_by(|a, b| b.2.partial_cmp(&a.2).unwrap_or(std::cmp::Ordering::Equal));
 
         // Take top_k results
         let candidates_len = candidates.len();

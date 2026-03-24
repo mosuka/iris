@@ -316,13 +316,13 @@ impl SegmentedVectorField {
         let mut candidates = Vec::with_capacity(vectors.len());
 
         for (doc_id, _field, vector) in vectors {
-            let similarity = distance_metric.similarity(query, &vector.data)?;
             let distance = distance_metric.distance(query, &vector.data)?;
+            let similarity = distance_metric.distance_to_similarity(distance);
             candidates.push((*doc_id, similarity, distance));
         }
 
         // Sort by similarity descending
-        candidates.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(Ordering::Equal));
+        candidates.sort_unstable_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(Ordering::Equal));
 
         let hits = candidates
             .into_iter()
@@ -450,7 +450,7 @@ impl VectorFieldReader for SegmentedVectorField {
         }
 
         let mut hits: Vec<FieldHit> = merged.into_values().collect();
-        hits.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(Ordering::Equal));
+        hits.sort_unstable_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(Ordering::Equal));
         if hits.len() > request.limit {
             hits.truncate(request.limit);
         }

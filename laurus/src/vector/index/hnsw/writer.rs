@@ -97,8 +97,8 @@ impl ConcurrentHnswGraph {
     }
 
     fn from_hnsw_graph(graph: HnswGraph, extended_max_level: usize) -> Self {
-        let mut nodes = HashMap::with_capacity(graph.nodes.len());
-        for (doc_id, layered_neighbors) in graph.nodes {
+        let mut nodes = HashMap::with_capacity(graph.node_count());
+        for (doc_id, layered_neighbors) in graph.into_iter_nodes() {
             let mut layers = Vec::with_capacity(layered_neighbors.len());
             for neighbors in layered_neighbors {
                 layers.push(RwLock::new(neighbors));
@@ -397,16 +397,16 @@ impl HnswIndexWriter {
                     nodes.insert(doc_id, layers);
                 }
 
-                Some(HnswGraph {
+                Some(HnswGraph::new(
                     entry_point,
                     max_level,
                     nodes,
-                    m: index_config.m,
-                    m_max: index_config.m,
-                    m_max_0: index_config.m * 2,
-                    ef_construction: index_config.ef_construction,
-                    level_mult: _ml,
-                })
+                    index_config.m,
+                    index_config.m,
+                    index_config.m * 2,
+                    index_config.ef_construction,
+                    _ml,
+                ))
             } else {
                 None
             }
@@ -562,7 +562,7 @@ impl HnswIndexWriter {
             if let Some(existing_graph) = self.graph.take() {
                 // Identify new vectors
                 for (doc_id, _, _) in &self.vectors {
-                    if !existing_graph.nodes.contains_key(doc_id) {
+                    if !existing_graph.contains_node(doc_id) {
                         new_doc_ids_in_order.push(*doc_id);
                     }
                 }
@@ -725,16 +725,16 @@ impl HnswIndexWriter {
             final_nodes.insert(doc_id, vec_layers);
         }
 
-        self.graph = Some(HnswGraph {
+        self.graph = Some(HnswGraph::new(
             entry_point,
             max_level,
-            nodes: final_nodes,
+            final_nodes,
             m,
             m_max,
             m_max_0,
             ef_construction,
-            level_mult: 1.0 / (self.index_config.m as f64).ln(),
-        });
+            1.0 / (self.index_config.m as f64).ln(),
+        ));
         self.entry_point = entry_point;
 
         // Rebuild self.levels
@@ -827,10 +827,10 @@ impl HnswIndexWriter {
 
             if let Some(neighbors) = graph.get_neighbors_view(curr.id, level) {
                 for neighbor_id in neighbors {
-                    if visited.contains(&neighbor_id) {
+                    // Use insert() return value to avoid double hash lookup.
+                    if !visited.insert(neighbor_id) {
                         continue;
                     }
-                    visited.insert(neighbor_id);
 
                     let neighbor_dist = self.calc_dist(query, neighbor_id)?;
                     let furthest_dist = found.peek().map(|c| c.distance).unwrap_or(f32::MAX);
@@ -868,20 +868,14 @@ impl HnswIndexWriter {
         _m_max: usize,
         _m_max_0: usize,
     ) -> Vec<u64> {
-        // Simple heuristic: take M nearest
-        // Candidates are in a max-heap (furthest at top).
-        // We want smallest distances.
-        let mut sorted: Vec<_> = candidates.clone().into_sorted_vec();
-        // into_sorted_vec returns ascending order [min ... max] for max-heap?
-        // No, pop() returns max. sorted vec will be [small, ..., large].
-        // Wait, doc says: "The elements are sorted in ascending order." for BinaryHeap::into_sorted_vec().
-
-        // But BinaryHeap<T> is a MaxHeap.
-        // pop() gives largest.
-        // into_sorted_vec gives ascending order.
-        // So if Candidate implies larger distance > smaller, then ascending is [small, ..., large].
-        // We want the smallest distance ones (start of vec).
-
+        // Simple heuristic: take M nearest.
+        // Collect without cloning the heap, then sort by ascending distance.
+        let mut sorted: Vec<_> = candidates.iter().cloned().collect();
+        sorted.sort_unstable_by(|a, b| {
+            a.distance
+                .partial_cmp(&b.distance)
+                .unwrap_or(Ordering::Equal)
+        });
         sorted.truncate(m);
         sorted.into_iter().map(|c| c.id).collect()
     }
@@ -1141,12 +1135,11 @@ impl VectorIndexWriter for HnswIndexWriter {
             output.write_all(&(graph.max_level as u32).to_le_bytes())?;
 
             // Nodes (u64 to avoid truncation for large graphs)
-            let node_count = graph.nodes.len() as u64;
+            let node_count = graph.node_count() as u64;
             output.write_all(&node_count.to_le_bytes())?;
 
             // Sort nodes by doc_id for deterministic serialization
-            let mut sorted_nodes: Vec<_> = graph.nodes.iter().collect();
-            sorted_nodes.sort_by_key(|(id, _)| *id);
+            let sorted_nodes = graph.sorted_nodes();
 
             for (doc_id, layers) in sorted_nodes {
                 output.write_all(&doc_id.to_le_bytes())?;

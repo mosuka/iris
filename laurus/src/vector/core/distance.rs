@@ -217,6 +217,33 @@ impl DistanceMetric {
         Ok(similarity.clamp(0.0, 1.0))
     }
 
+    /// Convert a pre-computed distance value to a similarity score without
+    /// re-reading the original vectors.
+    ///
+    /// This is the pure-arithmetic inverse of the per-metric transform applied
+    /// in [`distance()`](Self::distance), so it is **much** cheaper than calling
+    /// [`similarity()`](Self::similarity) (which reloads both vectors and
+    /// recomputes dot products / norms).
+    ///
+    /// # Arguments
+    ///
+    /// * `distance` - A distance value previously returned by
+    ///   [`distance()`](Self::distance) for the same metric.
+    ///
+    /// # Returns
+    ///
+    /// A similarity score in [0, 1] (higher is more similar).
+    pub fn distance_to_similarity(&self, distance: f32) -> f32 {
+        let similarity = match self {
+            DistanceMetric::Cosine => 1.0 - distance,
+            DistanceMetric::Euclidean => (-distance).exp(),
+            DistanceMetric::Manhattan => (-distance).exp(),
+            DistanceMetric::DotProduct => -distance,
+            DistanceMetric::Angular => 1.0 - (distance / std::f32::consts::PI),
+        };
+        similarity.clamp(0.0, 1.0)
+    }
+
     /// Get the name of this distance metric.
     pub fn name(&self) -> &'static str {
         match self {

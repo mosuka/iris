@@ -324,6 +324,14 @@ pub struct SegmentReader {
 }
 
 impl SegmentReader {
+    /// Return a reference to the segment metadata.
+    ///
+    /// This is useful for callers that need to inspect segment boundaries
+    /// (e.g., `min_doc_id` / `max_doc_id`) without acquiring interior locks.
+    pub fn segment_info(&self) -> &SegmentInfo {
+        &self.info
+    }
+
     /// Open a segment reader (schema-less mode).
     pub fn open(info: SegmentInfo, storage: Arc<dyn Storage>) -> Result<Self> {
         let reader = SegmentReader {
@@ -699,21 +707,41 @@ impl SegmentReader {
     }
 
     /// Get field length for a specific document and field.
+    ///
+    /// Uses a fast path with a single `RwLock` acquisition when field lengths
+    /// are already loaded (hot path). Falls back to loading on the first call
+    /// (cold path), which requires a second acquisition.
+    ///
+    /// # Arguments
+    ///
+    /// * `doc_id` - The document ID to look up.
+    /// * `field` - The field name whose length is requested.
+    ///
+    /// # Returns
+    ///
+    /// `Ok(Some(length))` if the document exists and has the field,
+    /// `Ok(None)` if the document is deleted or the field is absent.
     pub fn field_length(&self, doc_id: u64, field: &str) -> Result<Option<u32>> {
-        // Ensure field lengths are loaded
-        if self.field_lengths.read().unwrap().is_none() {
-            self.load_field_lengths()?;
-        }
-
         if self.is_deleted(doc_id)? {
             return Ok(None);
         }
 
+        // Fast path: try to read with a single lock acquisition.
         let field_lengths = self.field_lengths.read().unwrap();
-        if let Some(ref lengths_map) = *field_lengths
-            && let Some(doc_lengths) = lengths_map.get(&doc_id)
-        {
-            return Ok(doc_lengths.get(field).copied());
+        if let Some(ref lengths_map) = *field_lengths {
+            return Ok(lengths_map
+                .get(&doc_id)
+                .and_then(|doc_lengths| doc_lengths.get(field).copied()));
+        }
+        drop(field_lengths);
+
+        // Cold path: load field lengths (one-time), then retry.
+        self.load_field_lengths()?;
+        let field_lengths = self.field_lengths.read().unwrap();
+        if let Some(ref lengths_map) = *field_lengths {
+            return Ok(lengths_map
+                .get(&doc_id)
+                .and_then(|doc_lengths| doc_lengths.get(field).copied()));
         }
         Ok(None)
     }
@@ -1038,6 +1066,12 @@ pub struct InvertedIndexReader {
     /// Segment readers.
     segment_readers: Vec<Arc<RwLock<SegmentReader>>>,
 
+    /// Segment metadata cached at construction time.
+    ///
+    /// Stored separately so that doc_id range checks can be performed
+    /// without acquiring the per-segment `RwLock`.
+    segment_infos: Vec<SegmentInfo>,
+
     /// Cache manager.
     cache_manager: Arc<CacheManager>,
 
@@ -1075,6 +1109,7 @@ impl InvertedIndexReader {
 
         Ok(InvertedIndexReader {
             segment_readers,
+            segment_infos: segments,
             cache_manager,
             config,
             closed: Arc::new(AtomicBool::new(false)),
@@ -1102,11 +1137,31 @@ impl InvertedIndexReader {
     }
 
     /// Get the field length for a specific document and field.
+    ///
+    /// Skips segments whose `[min_doc_id, max_doc_id]` range does not
+    /// contain the requested `doc_id`, avoiding unnecessary lock
+    /// acquisitions.
+    ///
+    /// # Arguments
+    ///
+    /// * `doc_id` - The internal document ID.
+    /// * `field` - The field name whose length is requested.
+    ///
+    /// # Returns
+    ///
+    /// `Ok(Some(length))` if found, `Ok(None)` otherwise.
     pub fn field_length(&self, doc_id: u64, field: &str) -> Result<Option<u32>> {
         self.check_closed()?;
 
-        // Search across all segments
-        for segment_reader in &self.segment_readers {
+        // Search across segments, skipping those that cannot contain doc_id.
+        for (i, segment_reader) in self.segment_readers.iter().enumerate() {
+            // Use cached segment info to skip out-of-range segments
+            // without acquiring the reader lock.
+            if let Some(info) = self.segment_infos.get(i)
+                && (doc_id < info.min_doc_id || doc_id > info.max_doc_id)
+            {
+                continue;
+            }
             let reader = segment_reader.read().unwrap();
             if let Ok(Some(length)) = reader.field_length(doc_id, field) {
                 return Ok(Some(length));

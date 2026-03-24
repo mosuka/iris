@@ -251,6 +251,8 @@ pub struct DisjunctionMatcher {
     exhausted: bool,
     /// Total cost estimate.
     cost: u64,
+    /// Reusable buffer for matchers to reinsert during advance operations.
+    reinsert_buffer: Vec<MatcherEntry>,
 }
 
 impl DisjunctionMatcher {
@@ -278,6 +280,7 @@ impl DisjunctionMatcher {
             current_doc,
             exhausted,
             cost,
+            reinsert_buffer: Vec::new(),
         }
     }
 
@@ -288,6 +291,7 @@ impl DisjunctionMatcher {
             current_doc: u64::MAX,
             exhausted: true,
             cost: 0,
+            reinsert_buffer: Vec::new(),
         }
     }
 
@@ -299,13 +303,15 @@ impl DisjunctionMatcher {
 
         let current_doc = self.current_doc;
 
+        // Reuse buffer to avoid allocation on every call.
+        self.reinsert_buffer.clear();
+
         // Advance all matchers that are at the current document
-        let mut matchers_to_reinsert = Vec::new();
         while let Some(entry) = self.heap.peek() {
             if entry.matcher.doc_id() == current_doc {
                 let mut entry = self.heap.pop().unwrap();
                 if entry.matcher.next()? && !entry.matcher.is_exhausted() {
-                    matchers_to_reinsert.push(entry);
+                    self.reinsert_buffer.push(entry);
                 }
             } else {
                 break;
@@ -313,7 +319,7 @@ impl DisjunctionMatcher {
         }
 
         // Reinsert advanced matchers
-        for entry in matchers_to_reinsert {
+        while let Some(entry) = self.reinsert_buffer.pop() {
             self.heap.push(entry);
         }
 
@@ -348,16 +354,18 @@ impl Matcher for DisjunctionMatcher {
             return Ok(!self.exhausted);
         }
 
+        // Reuse buffer to avoid allocation on every call.
+        self.reinsert_buffer.clear();
+
         // Skip all matchers to target or beyond
-        let mut matchers_to_reinsert = Vec::new();
         while let Some(mut entry) = self.heap.pop() {
             if entry.matcher.skip_to(target)? && !entry.matcher.is_exhausted() {
-                matchers_to_reinsert.push(entry);
+                self.reinsert_buffer.push(entry);
             }
         }
 
         // Reinsert matchers that successfully skipped
-        for entry in matchers_to_reinsert {
+        while let Some(entry) = self.reinsert_buffer.pop() {
             self.heap.push(entry);
         }
 

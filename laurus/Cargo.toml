@@ -13,7 +13,7 @@ license = { workspace = true }
 autoexamples = false
 
 [dependencies]
-ahash = "0.8.12"
+ahash = { version = "0.8.12", features = ["serde"] }
 aho-corasick = "1.1.4"
 anyhow = { workspace = true }
 async-trait = "0.1.89"
@@ -125,6 +125,18 @@ harness = false
 name = "distance_bench"
 harness = false
 
+[[bench]]
+name = "search_perf"
+harness = false
+
+[[bench]]
+name = "lexical_search_bench"
+harness = false
+
+[[bench]]
+name = "vector_search_bench"
+harness = false
+
 [dev-dependencies]
-criterion = "0.8.2"
+criterion = { version = "0.8.2", features = ["async_tokio"] }
 tokio-test = "0.4.5"

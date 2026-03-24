@@ -120,16 +120,16 @@ impl HnswIndexReader {
                         nodes.insert(doc_id, layers);
                     }
 
-                    Ok(Some(Arc::new(HnswGraph {
+                    Ok(Some(Arc::new(HnswGraph::new(
                         entry_point,
                         max_level,
                         nodes,
                         m,
-                        m_max: m,
-                        m_max_0: m * 2,
+                        m,
+                        m * 2,
                         ef_construction,
-                        level_mult: 1.0 / (m as f64).ln(),
-                    })))
+                        1.0 / (m as f64).ln(),
+                    ))))
                 } else {
                     Ok(None)
                 }

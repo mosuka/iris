@@ -8,7 +8,7 @@ use crate::lexical::query::matcher::Matcher;
 use crate::util::simd;
 
 /// Type alias for boolean scorer clauses.
-type BooleanScorerClauses = std::sync::Mutex<Vec<(Box<dyn Scorer>, Box<dyn Matcher>)>>;
+type BooleanScorerClauses = std::cell::RefCell<Vec<(Box<dyn Scorer>, Box<dyn Matcher>)>>;
 
 /// Trait for document scorers.
 pub trait Scorer: Send + Debug {
@@ -54,9 +54,23 @@ pub struct BM25Scorer {
     k1: f32,
     /// BM25 b parameter.
     b: f32,
+    /// Cached IDF value computed at construction time.
+    cached_idf: f32,
 }
 
 impl BM25Scorer {
+    /// Compute the IDF (Inverse Document Frequency) value.
+    fn compute_idf(doc_freq: u64, total_docs: u64) -> f32 {
+        if doc_freq == 0 || total_docs == 0 {
+            return 0.0;
+        }
+        let n = total_docs as f32;
+        let df = doc_freq as f32;
+        let base_idf = ((n - df + 0.5) / (df + 0.5)).ln();
+        let epsilon = 0.01;
+        base_idf.max(epsilon)
+    }
+
     /// Create a new BM25 scorer.
     pub fn new(
         doc_freq: u64,
@@ -66,6 +80,7 @@ impl BM25Scorer {
         total_docs: u64,
         boost: f32,
     ) -> Self {
+        let cached_idf = Self::compute_idf(doc_freq, total_docs);
         BM25Scorer {
             doc_freq,
             total_term_freq,
@@ -75,6 +90,7 @@ impl BM25Scorer {
             boost,
             k1: 1.2,
             b: 0.75,
+            cached_idf,
         }
     }
 
@@ -90,6 +106,7 @@ impl BM25Scorer {
         k1: f32,
         b: f32,
     ) -> Self {
+        let cached_idf = Self::compute_idf(doc_freq, total_docs);
         BM25Scorer {
             doc_freq,
             total_term_freq,
@@ -99,25 +116,14 @@ impl BM25Scorer {
             boost,
             k1,
             b,
+            cached_idf,
         }
     }
 
-    /// Calculate the IDF (Inverse Document Frequency) component.
+    /// Return the cached IDF (Inverse Document Frequency) value.
+    #[inline(always)]
     fn idf(&self) -> f32 {
-        if self.doc_freq == 0 || self.total_docs == 0 {
-            return 0.0;
-        }
-
-        let n = self.total_docs as f32;
-        let df = self.doc_freq as f32;
-
-        // Standard BM25 IDF calculation with proper handling
-        // IDF = log((N - df + 0.5) / (df + 0.5))
-        let base_idf = ((n - df + 0.5) / (df + 0.5)).ln();
-
-        // Use smaller epsilon to allow more natural score variations
-        let epsilon = 0.01;
-        base_idf.max(epsilon)
+        self.cached_idf
     }
 
     /// Calculate the TF (Term Frequency) component.
@@ -342,6 +348,10 @@ pub struct BooleanScorer {
     boost: f32,
 }
 
+// SAFETY: BooleanScorer is only used within single-threaded search execution paths.
+// The RefCell is never shared across threads.
+unsafe impl Send for BooleanScorer {}
+
 impl BooleanScorer {
     /// Create a new boolean scorer.
     pub fn new(
@@ -355,7 +365,7 @@ impl BooleanScorer {
             clauses.push((scorer, matcher));
         }
         Ok(BooleanScorer {
-            clauses: std::sync::Mutex::new(clauses),
+            clauses: std::cell::RefCell::new(clauses),
             boost: 1.0,
         })
     }
@@ -364,7 +374,7 @@ impl BooleanScorer {
 impl Scorer for BooleanScorer {
     fn score(&self, doc_id: u64, _term_freq: f32, field_length: Option<f32>) -> f32 {
         let mut total_score = 0.0;
-        let mut clauses = self.clauses.lock().unwrap();
+        let mut clauses = self.clauses.borrow_mut();
 
         for (scorer, matcher) in clauses.iter_mut() {
             // Skip to the target document
@@ -392,7 +402,7 @@ impl Scorer for BooleanScorer {
 
     fn max_score(&self) -> f32 {
         let mut total_max = 0.0;
-        let clauses = self.clauses.lock().unwrap();
+        let clauses = self.clauses.borrow();
         for (scorer, _) in clauses.iter() {
             total_max += scorer.max_score();
         }

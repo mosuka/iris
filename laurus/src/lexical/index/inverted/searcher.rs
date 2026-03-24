@@ -232,7 +232,9 @@ impl InvertedIndexSearcher {
 
         // Build the candidate set
         let mut candidates: HashMap<u64, f32> = if has_must {
-            // Start with the first Must/Filter set, intersect with the rest
+            // Sort must_sets by size ascending for faster intersection.
+            must_sets.sort_unstable_by_key(|s| s.len());
+            // Start with the smallest Must/Filter set, intersect with the rest
             let mut result = must_sets.swap_remove(0);
             for other in &must_sets {
                 result.retain(|doc_id, score| {
@@ -275,7 +277,8 @@ impl InvertedIndexSearcher {
         // Feed results into the collector
         // Sort by score descending for deterministic results
         let mut sorted: Vec<(u64, f32)> = candidates.into_iter().collect();
-        sorted.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(Ordering::Equal));
+        // Use unstable sort since stability is not needed for (doc_id, score) pairs.
+        sorted.sort_unstable_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(Ordering::Equal));
 
         for (doc_id, score) in sorted {
             collector.collect(doc_id, score)?;
@@ -505,11 +508,13 @@ impl InvertedIndexSearcher {
             SortField::Score => {
                 // Default behavior: already sorted by score from collector
                 // Re-sort to ensure descending order
-                hits.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(Ordering::Equal));
+                hits.sort_unstable_by(|a, b| {
+                    b.score.partial_cmp(&a.score).unwrap_or(Ordering::Equal)
+                });
             }
             SortField::Field { name, order } => {
                 // Sort by field value
-                hits.sort_by(|a, b| {
+                hits.sort_unstable_by(|a, b| {
                     let cmp = self.compare_field_values(a, b, name);
                     match order {
                         SortOrder::Asc => cmp,
