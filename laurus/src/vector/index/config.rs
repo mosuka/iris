@@ -108,7 +108,7 @@ pub mod utils {
                 vectors.par_iter_mut().for_each(|vector| {
                     let l1_norm: f32 = vector.data.iter().map(|x| x.abs()).sum();
                     if l1_norm > 0.0 {
-                        for value in &mut vector.data {
+                        for value in Arc::make_mut(&mut vector.data) {
                             *value /= l1_norm;
                         }
                     }
@@ -128,7 +128,7 @@ pub mod utils {
                     {
                         let range = max_val - min_val;
                         if range > 0.0 {
-                            for value in &mut vector.data {
+                            for value in Arc::make_mut(&mut vector.data) {
                                 *value = (*value - min_val) / range;
                             }
                         }

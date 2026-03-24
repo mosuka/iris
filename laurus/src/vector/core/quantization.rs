@@ -116,7 +116,7 @@ impl VectorQuantizer {
         match self.method {
             QuantizationMethod::None => Ok(QuantizedVector {
                 method: self.method,
-                data: QuantizedData::Float32(vector.data.clone()),
+                data: QuantizedData::Float32(vector.data.to_vec()),
             }),
             QuantizationMethod::Scalar8Bit => {
                 let quantized_data = self.scalar_quantize(&vector.data)?;

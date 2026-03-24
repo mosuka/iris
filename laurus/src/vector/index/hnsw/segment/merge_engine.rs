@@ -163,7 +163,7 @@ impl MergeEngine {
         for segment in &segments {
             // Note: HnswIndexReader::load expects path without extension
             let reader = HnswIndexReader::load(
-                self.storage.as_ref(),
+                self.storage.clone(),
                 &segment.segment_id,
                 self.index_config.distance_metric,
             )?;

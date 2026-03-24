@@ -1,32 +1,43 @@
 use std::collections::HashMap;
 use std::io::{Read, Seek, SeekFrom};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use crate::error::{LaurusError, Result};
-use crate::storage::StorageInput;
+use crate::storage::Storage;
 use crate::vector::core::vector::Vector;
 
 /// Storage for vectors (in-memory or on-demand from disk).
 ///
-/// # Thread Safety Notes
+/// # Thread Safety
 ///
-/// In the `OnDemand` variant:
-/// - `offsets` is immutable after construction (`Arc<HashMap>`), so concurrent
-///   reads are safe without locking.
-/// - `input` uses `Mutex` because `StorageInput` requires `&mut self` for
-///   seek + read. This serializes concurrent reads, which is inherent to
-///   single file-handle I/O. For higher throughput, consider opening separate
-///   file handles per thread.
+/// - The `Owned` variant holds an immutable `Arc<HashMap>` that is freely
+///   shareable across threads.
+/// - The `OnDemand` variant stores a reference to the underlying
+///   [`Storage`] and the file name so that each call to [`get`](Self::get)
+///   opens an independent file handle.  This eliminates the previous
+///   `Mutex`-based serialization and allows fully concurrent reads.
 #[derive(Debug, Clone)]
 pub enum VectorStorage {
+    /// All vectors are loaded into memory.
     Owned(Arc<HashMap<(u64, String), Vector>>),
+    /// Vectors are read from disk on demand.
+    ///
+    /// Each [`get`](Self::get) call opens a fresh [`StorageInput`](crate::storage::StorageInput)
+    /// via [`Storage::open_input`], performs a single seek + read, and closes
+    /// the handle.  For mmap-backed storage this is essentially free; for
+    /// file-backed storage the OS typically caches the file descriptor.
     OnDemand {
-        input: Arc<Mutex<Box<dyn StorageInput>>>,
+        /// Reference to the storage backend (e.g. file system, mmap).
+        storage: Arc<dyn Storage>,
+        /// Name of the vector index file within the storage.
+        file_name: String,
+        /// Pre-built mapping from `(doc_id, field_name)` to byte offset.
         offsets: Arc<HashMap<(u64, String), u64>>,
     },
 }
 
 impl VectorStorage {
+    /// Returns all keys stored in this vector storage.
     pub fn keys(&self) -> Vec<(u64, String)> {
         match self {
             VectorStorage::Owned(map) => map.keys().cloned().collect(),
@@ -34,6 +45,7 @@ impl VectorStorage {
         }
     }
 
+    /// Returns the number of vectors stored.
     pub fn len(&self) -> usize {
         match self {
             VectorStorage::Owned(map) => map.len(),
@@ -41,10 +53,16 @@ impl VectorStorage {
         }
     }
 
+    /// Returns `true` if no vectors are stored.
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
+    /// Returns `true` if a vector with the given key exists.
+    ///
+    /// # Arguments
+    ///
+    /// * `key` - A `(doc_id, field_name)` tuple identifying the vector.
     pub fn contains_key(&self, key: &(u64, String)) -> bool {
         match self {
             VectorStorage::Owned(map) => map.contains_key(key),
@@ -52,14 +70,37 @@ impl VectorStorage {
         }
     }
 
+    /// Retrieves a vector by its key.
+    ///
+    /// For the `Owned` variant the vector is cloned (O(1) due to `Arc`
+    /// wrapping).  For the `OnDemand` variant a fresh file handle is opened,
+    /// the reader seeks to the recorded offset, and the vector data is read
+    /// directly.
+    ///
+    /// # Arguments
+    ///
+    /// * `key` - A `(doc_id, field_name)` tuple identifying the vector.
+    /// * `dimension` - The expected number of dimensions (used to size the read buffer).
+    ///
+    /// # Returns
+    ///
+    /// `Ok(Some(vector))` if the key exists, `Ok(None)` otherwise.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`LaurusError`] on I/O failure.
     pub fn get(&self, key: &(u64, String), dimension: usize) -> Result<Option<Vector>> {
         match self {
             VectorStorage::Owned(map) => Ok(map.get(key).cloned()),
-            VectorStorage::OnDemand { input, offsets } => {
+            VectorStorage::OnDemand {
+                storage,
+                file_name,
+                offsets,
+            } => {
                 if let Some(&offset) = offsets.get(key) {
-                    let mut input = input
-                        .lock()
-                        .map_err(|_| LaurusError::internal("Mutex poisoned".to_string()))?;
+                    let mut input = storage.open_input(file_name).map_err(|e| {
+                        LaurusError::internal(format!("Failed to open vector file: {e}"))
+                    })?;
 
                     input
                         .seek(SeekFrom::Start(offset))

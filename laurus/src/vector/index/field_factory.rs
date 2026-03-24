@@ -113,7 +113,7 @@ impl VectorFieldFactory {
         let reader: Arc<dyn VectorFieldReader> = match vector_option {
             FieldOption::Flat(opt) => {
                 let mut reader = FlatVectorIndexReader::load(
-                    storage.as_ref(),
+                    storage.clone(),
                     FIELD_INDEX_BASENAME,
                     opt.distance,
                 )?;
@@ -124,7 +124,7 @@ impl VectorFieldFactory {
             }
             FieldOption::Hnsw(opt) => {
                 let mut reader = HnswVectorIndexReader::load(
-                    storage.as_ref(),
+                    storage.clone(),
                     FIELD_INDEX_BASENAME,
                     opt.distance,
                 )?;
@@ -135,7 +135,7 @@ impl VectorFieldFactory {
             }
             FieldOption::Ivf(opt) => {
                 let mut reader = IvfVectorIndexReader::load(
-                    storage.as_ref(),
+                    storage.clone(),
                     FIELD_INDEX_BASENAME,
                     opt.distance,
                 )?;

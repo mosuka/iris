@@ -141,7 +141,7 @@ fn test_hnsw_append_search_verification() -> Result<(), Box<dyn std::error::Erro
         let storage = Arc::new(FileStorage::new(path, storage_config)?);
 
         let reader = Arc::new(HnswIndexReader::load(
-            storage.as_ref(),
+            storage.clone(),
             index_name,
             DistanceMetric::Euclidean,
         )?);

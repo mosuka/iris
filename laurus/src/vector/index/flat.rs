@@ -200,8 +200,11 @@ impl VectorIndex for FlatIndex {
         use crate::vector::index::flat::reader::FlatVectorIndexReader;
 
         // Load the index data from storage using the index name
-        let reader =
-            FlatVectorIndexReader::load(&*self.storage, &self.name, self.config.distance_metric)?;
+        let reader = FlatVectorIndexReader::load(
+            self.storage.clone(),
+            &self.name,
+            self.config.distance_metric,
+        )?;
         Ok(Arc::new(reader))
     }
 
