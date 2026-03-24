@@ -9,7 +9,6 @@ use crate::vector::core::distance::DistanceMetric;
 use crate::vector::core::vector::Vector;
 use crate::vector::reader::{ValidationReport, VectorIndexMetadata, VectorStats};
 use crate::vector::reader::{VectorIndexReader, VectorIterator};
-use std::sync::Mutex;
 
 use crate::maintenance::deletion::DeletionBitmap;
 /// Storage for vectors (in-memory or on-demand).
@@ -34,8 +33,22 @@ impl FlatVectorIndexReader {
     }
 
     /// Load a flat vector index from storage.
+    ///
+    /// # Arguments
+    ///
+    /// * `storage` - Shared storage backend (cloned into `OnDemand` for concurrent reads).
+    /// * `path` - Base path/name for the index file (`.flat` extension is appended).
+    /// * `distance_metric` - Distance metric used for similarity computations.
+    ///
+    /// # Returns
+    ///
+    /// A new `FlatIndexReader` instance.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`LaurusError`] on I/O or format errors.
     pub fn load(
-        storage: &dyn Storage,
+        storage: Arc<dyn Storage>,
         path: &str,
         distance_metric: DistanceMetric,
     ) -> Result<Self> {
@@ -139,7 +152,8 @@ impl FlatVectorIndexReader {
 
                 (
                     VectorStorage::OnDemand {
-                        input: Arc::new(Mutex::new(input)), // Transfer ownership
+                        storage: storage.clone(),
+                        file_name: file_name.clone(),
                         offsets: Arc::new(offsets),
                     },
                     vector_ids,

@@ -247,6 +247,6 @@ mod tests {
         // Actually vectors() returns &[(...)]
 
         assert_eq!(writer.vectors().len(), 1);
-        assert_eq!(writer.vectors()[0].2.data, vec![1.0, 2.0, 3.0]);
+        assert_eq!(*writer.vectors()[0].2.data, vec![1.0, 2.0, 3.0]);
     }
 }

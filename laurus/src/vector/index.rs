@@ -317,15 +317,15 @@ impl ManagedVectorIndex {
                 let storage_result: Result<Arc<dyn crate::vector::reader::VectorIndexReader>> =
                     match &self.config {
                         VectorIndexTypeConfig::Flat(c) => {
-                            FlatVectorIndexReader::load(&**storage, path, c.distance_metric)
+                            FlatVectorIndexReader::load(storage.clone(), path, c.distance_metric)
                                 .map(|r| Arc::new(r) as _)
                         }
                         VectorIndexTypeConfig::HNSW(c) => {
-                            HnswIndexReader::load(&**storage, path, c.distance_metric)
+                            HnswIndexReader::load(storage.clone(), path, c.distance_metric)
                                 .map(|r| Arc::new(r) as _)
                         }
                         VectorIndexTypeConfig::IVF(c) => {
-                            IvfIndexReader::load(&**storage, path, c.distance_metric)
+                            IvfIndexReader::load(storage.clone(), path, c.distance_metric)
                                 .map(|r| Arc::new(r) as _)
                         }
                     };

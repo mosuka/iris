@@ -356,7 +356,7 @@ impl SegmentedVectorField {
         for info in segments {
             // Load reader for segment
             let mut reader =
-                HnswIndexReader::load(self.storage.as_ref(), &info.segment_id, distance_metric)?;
+                HnswIndexReader::load(self.storage.clone(), &info.segment_id, distance_metric)?;
 
             // Inject deletion bitmap if available
             if let Some(bitmap) = &self.deletion_bitmap {

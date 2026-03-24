@@ -201,7 +201,11 @@ impl VectorIndex for IvfIndex {
 
         use crate::vector::index::ivf::reader::IvfIndexReader;
 
-        let reader = IvfIndexReader::load(&*self.storage, &self.name, self.config.distance_metric)?;
+        let reader = IvfIndexReader::load(
+            self.storage.clone(),
+            &self.name,
+            self.config.distance_metric,
+        )?;
         Ok(Arc::new(reader))
     }
 

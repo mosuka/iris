@@ -12,9 +12,12 @@ use crate::vector::index::storage::VectorStorage;
 use crate::vector::reader::{ValidationReport, VectorIndexMetadata, VectorStats};
 use crate::vector::reader::{VectorIndexReader, VectorIterator};
 use std::io::SeekFrom;
-use std::sync::Mutex;
 
 /// Reader for IVF (Inverted File) vector indexes.
+///
+/// Maintains a per-cluster inverted list (`cluster_to_vectors`) so that the
+/// [`IvfSearcher`](super::searcher::IvfSearcher) can restrict distance
+/// computations to vectors belonging to the `n_probe` nearest clusters.
 #[derive(Debug)]
 pub struct IvfIndexReader {
     vectors: VectorStorage,
@@ -24,6 +27,9 @@ pub struct IvfIndexReader {
     n_clusters: usize,
     n_probe: usize,
     centroids: Vec<Vector>,
+    /// Per-cluster inverted list: `cluster_to_vectors[i]` contains the
+    /// `(doc_id, field_name)` pairs assigned to cluster `i`.
+    cluster_to_vectors: Vec<Vec<(u64, String)>>,
     deletion_bitmap: Option<Arc<DeletionBitmap>>,
 }
 
@@ -36,8 +42,22 @@ impl IvfIndexReader {
     }
 
     /// Load an IVF vector index from storage.
+    ///
+    /// # Arguments
+    ///
+    /// * `storage` - Shared storage backend (cloned into `OnDemand` for concurrent reads).
+    /// * `path` - Base path/name for the index file (`.ivf` extension is appended).
+    /// * `distance_metric` - Distance metric used for similarity computations.
+    ///
+    /// # Returns
+    ///
+    /// A new `IvfIndexReader` instance.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`LaurusError`] on I/O or format errors.
     pub fn load(
-        storage: &dyn Storage,
+        storage: Arc<dyn Storage>,
         path: &str,
         distance_metric: DistanceMetric,
     ) -> Result<Self> {
@@ -76,7 +96,9 @@ impl IvfIndexReader {
             centroids.push(Vector::new(values));
         }
 
-        // Read inverted lists
+        // Read inverted lists, preserving per-cluster grouping.
+        let mut cluster_to_vectors: Vec<Vec<(u64, String)>> = Vec::with_capacity(n_clusters);
+
         let (vectors, vector_ids) = match storage.loading_mode() {
             crate::storage::LoadingMode::Eager => {
                 let mut vectors = HashMap::with_capacity(num_vectors);
@@ -86,6 +108,7 @@ impl IvfIndexReader {
                     let mut list_size_buf = [0u8; 4];
                     input.read_exact(&mut list_size_buf)?;
                     let list_size = u32::from_le_bytes(list_size_buf) as usize;
+                    let mut cluster_vecs = Vec::with_capacity(list_size);
 
                     for _ in 0..list_size {
                         let mut doc_id_buf = [0u8; 8];
@@ -112,9 +135,12 @@ impl IvfIndexReader {
                             *value = f32::from_le_bytes(value_buf);
                         }
 
-                        vector_ids.push((doc_id, field_name.clone()));
-                        vectors.insert((doc_id, field_name), Vector::new(values));
+                        let key = (doc_id, field_name.clone());
+                        cluster_vecs.push(key.clone());
+                        vector_ids.push(key.clone());
+                        vectors.insert(key, Vector::new(values));
                     }
+                    cluster_to_vectors.push(cluster_vecs);
                 }
                 (VectorStorage::Owned(Arc::new(vectors)), vector_ids)
             }
@@ -126,6 +152,7 @@ impl IvfIndexReader {
                     let mut list_size_buf = [0u8; 4];
                     input.read_exact(&mut list_size_buf)?;
                     let list_size = u32::from_le_bytes(list_size_buf) as usize;
+                    let mut cluster_vecs = Vec::with_capacity(list_size);
 
                     for _ in 0..list_size {
                         let start_offset = input.stream_position().map_err(LaurusError::Io)?;
@@ -147,18 +174,22 @@ impl IvfIndexReader {
                             ))
                         })?;
 
-                        offsets.insert((doc_id, field_name.clone()), start_offset);
-                        vector_ids.push((doc_id, field_name));
+                        let key = (doc_id, field_name);
+                        offsets.insert(key.clone(), start_offset);
+                        cluster_vecs.push(key.clone());
+                        vector_ids.push(key);
 
                         // Skip vector
                         input
                             .seek(SeekFrom::Current((dimension * 4) as i64))
                             .map_err(LaurusError::Io)?;
                     }
+                    cluster_to_vectors.push(cluster_vecs);
                 }
                 (
                     VectorStorage::OnDemand {
-                        input: Arc::new(Mutex::new(input)),
+                        storage: storage.clone(),
+                        file_name: file_name.clone(),
                         offsets: Arc::new(offsets),
                     },
                     vector_ids,
@@ -174,6 +205,7 @@ impl IvfIndexReader {
             n_clusters,
             n_probe,
             centroids,
+            cluster_to_vectors,
             deletion_bitmap: None,
         })
     }
@@ -198,6 +230,23 @@ impl IvfIndexReader {
     /// Get centroids.
     pub fn centroids(&self) -> &[Vector] {
         &self.centroids
+    }
+
+    /// Returns the vector IDs assigned to the given cluster index.
+    ///
+    /// # Arguments
+    ///
+    /// * `cluster_idx` - Zero-based cluster index.
+    ///
+    /// # Returns
+    ///
+    /// A slice of `(doc_id, field_name)` pairs, or an empty slice if
+    /// `cluster_idx` is out of range.
+    pub fn cluster_vectors(&self, cluster_idx: usize) -> &[(u64, String)] {
+        self.cluster_to_vectors
+            .get(cluster_idx)
+            .map(|v| v.as_slice())
+            .unwrap_or(&[])
     }
 }
 

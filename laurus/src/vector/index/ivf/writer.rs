@@ -960,7 +960,7 @@ impl VectorIndexWriter for IvfIndexWriter {
 
         // Write centroids
         for centroid in &self.centroids {
-            for value in &centroid.data {
+            for value in centroid.data.iter() {
                 output.write_all(&value.to_le_bytes())?;
             }
         }
@@ -977,7 +977,7 @@ impl VectorIndexWriter for IvfIndexWriter {
                 output.write_all(field_name_bytes)?;
 
                 // Write vector data
-                for value in &vector.data {
+                for value in vector.data.iter() {
                     output.write_all(&value.to_le_bytes())?;
                 }
             }
@@ -1079,7 +1079,7 @@ impl VectorIndexWriter for IvfIndexWriter {
         })?;
 
         let reader = IvfIndexReader::load(
-            storage.as_ref(),
+            storage.clone(),
             &self.path,
             self.index_config.distance_metric,
         )?;

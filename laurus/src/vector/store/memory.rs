@@ -209,7 +209,7 @@ impl VectorFieldWriter for InMemoryFieldWriter {
             if vectors.len() > before_count {
                 // Get the last added vector
                 let (_, _, ref vec) = vectors[vectors.len() - 1];
-                let stored = StoredVector::new(vec.data.clone());
+                let stored = StoredVector::new(vec.data.to_vec());
                 let converted = self.convert_vector(&stored)?;
                 self.store.replace(
                     doc_id,

@@ -85,6 +85,107 @@ impl Posting {
     }
 }
 
+/// Structure-of-Arrays posting list for cache-efficient iteration.
+///
+/// Unlike the AoS [`PostingList`] which stores each posting as a struct with
+/// `doc_id`, `frequency`, `positions`, and `weight`, this layout stores each
+/// field in its own contiguous array.  Sequential access to a single field
+/// (e.g. all `doc_ids`) hits a tight cache line sequence instead of striding
+/// over position data.
+///
+/// Position data is **not** included; use the original [`PostingList`] for
+/// phrase queries.
+#[derive(Debug, Clone)]
+pub struct SoAPostingList {
+    /// The term this posting list represents.
+    pub term: String,
+    /// Document IDs, sorted ascending.
+    pub doc_ids: Vec<u64>,
+    /// Term frequencies, parallel to `doc_ids`.
+    pub frequencies: Vec<u32>,
+    /// Per-document weights, parallel to `doc_ids`.
+    pub weights: Vec<f32>,
+    /// Total term frequency across all documents.
+    pub total_frequency: u64,
+    /// Document frequency (number of documents containing this term).
+    pub doc_frequency: u64,
+}
+
+impl SoAPostingList {
+    /// Returns the number of postings.
+    pub fn len(&self) -> usize {
+        self.doc_ids.len()
+    }
+
+    /// Returns `true` if the posting list is empty.
+    pub fn is_empty(&self) -> bool {
+        self.doc_ids.is_empty()
+    }
+
+    /// Returns an iterator that yields `(doc_id, frequency, weight)` tuples.
+    pub fn iter(&self) -> SoAPostingIterator<'_> {
+        SoAPostingIterator {
+            list: self,
+            position: 0,
+        }
+    }
+}
+
+/// Iterator over a [`SoAPostingList`] that yields
+/// `(doc_id, frequency, weight)` tuples.
+#[derive(Debug)]
+pub struct SoAPostingIterator<'a> {
+    list: &'a SoAPostingList,
+    position: usize,
+}
+
+impl<'a> SoAPostingIterator<'a> {
+    /// Skip forward until the current doc_id is >= `target`.
+    ///
+    /// Returns `true` if a posting with `doc_id >= target` was found,
+    /// or `false` if the iterator is exhausted.
+    ///
+    /// # Arguments
+    ///
+    /// * `target` - The minimum doc_id to seek to.
+    pub fn skip_to(&mut self, target: u64) -> bool {
+        while self.position < self.list.doc_ids.len() {
+            if self.list.doc_ids[self.position] >= target {
+                return true;
+            }
+            self.position += 1;
+        }
+        // Exhausted — position the cursor at end so next() returns None.
+        true
+    }
+}
+
+impl<'a> Iterator for SoAPostingIterator<'a> {
+    /// `(doc_id, frequency, weight)`
+    type Item = (u64, u32, f32);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.position < self.list.doc_ids.len() {
+            let i = self.position;
+            self.position += 1;
+            Some((
+                self.list.doc_ids[i],
+                self.list.frequencies[i],
+                self.list.weights[i],
+            ))
+        } else {
+            None
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let remaining = self.list.doc_ids.len() - self.position;
+        (remaining, Some(remaining))
+    }
+}
+
+impl<'a> ExactSizeIterator for SoAPostingIterator<'a> {}
+
 /// Compact posting for hot-path scanning where positions are not needed.
 ///
 /// This reduces memory footprint per posting from ~40+ bytes to 16 bytes,
@@ -205,6 +306,38 @@ impl PostingList {
                 weight: p.weight,
             })
             .collect()
+    }
+
+    /// Convert to Structure-of-Arrays layout for cache-efficient iteration.
+    ///
+    /// The returned [`SoAPostingList`] stores `doc_ids`, `frequencies`, and
+    /// `weights` in separate contiguous arrays.  This layout is faster for
+    /// sequential BM25 scoring because each field is read in a tight loop
+    /// without skipping over position data.
+    ///
+    /// # Returns
+    ///
+    /// A new `SoAPostingList` with the same data (positions are dropped).
+    pub fn to_soa(&self) -> SoAPostingList {
+        let len = self.postings.len();
+        let mut doc_ids = Vec::with_capacity(len);
+        let mut frequencies = Vec::with_capacity(len);
+        let mut weights = Vec::with_capacity(len);
+
+        for p in &self.postings {
+            doc_ids.push(p.doc_id);
+            frequencies.push(p.frequency);
+            weights.push(p.weight);
+        }
+
+        SoAPostingList {
+            term: self.term.clone(),
+            doc_ids,
+            frequencies,
+            weights,
+            total_frequency: self.total_frequency,
+            doc_frequency: self.doc_frequency,
+        }
     }
 
     /// Encode the posting list to binary format.
@@ -819,6 +952,40 @@ mod tests {
         assert!(stats.total_postings > 0);
         assert!(stats.avg_postings_per_list > 0.0);
         assert!(stats.max_posting_list_size > 0);
+    }
+
+    #[test]
+    fn test_soa_posting_list() {
+        let mut list = PostingList::new("hello".to_string());
+        list.add_posting(Posting::with_frequency(1, 3).with_weight(1.0));
+        list.add_posting(Posting::with_frequency(5, 1).with_weight(2.0));
+        list.add_posting(Posting::with_frequency(9, 2).with_weight(0.5));
+
+        let soa = list.to_soa();
+        assert_eq!(soa.len(), 3);
+        assert_eq!(soa.doc_ids, &[1, 5, 9]);
+        assert_eq!(soa.frequencies, &[3, 1, 2]);
+        assert_eq!(soa.weights, &[1.0, 2.0, 0.5]);
+        assert_eq!(soa.term, "hello");
+        assert_eq!(soa.total_frequency, list.total_frequency);
+        assert_eq!(soa.doc_frequency, list.doc_frequency);
+
+        // Test iterator
+        let mut iter = soa.iter();
+        let first = iter.next().unwrap();
+        assert_eq!(first, (1, 3, 1.0));
+        let second = iter.next().unwrap();
+        assert_eq!(second, (5, 1, 2.0));
+        let third = iter.next().unwrap();
+        assert_eq!(third, (9, 2, 0.5));
+        assert!(iter.next().is_none());
+
+        // Test skip_to
+        let mut iter = soa.iter();
+        assert!(iter.skip_to(5));
+        assert_eq!(iter.next().unwrap(), (5, 1, 2.0));
+        assert!(iter.skip_to(100));
+        assert!(iter.next().is_none());
     }
 
     #[test]

@@ -3,14 +3,20 @@
 //! This module provides a way to store and retrieve documents in segments,
 //! avoiding the need to keep all documents in memory or a single massive JSON file.
 
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::num::NonZeroUsize;
 use std::sync::Arc;
+
+use lru::LruCache;
+use serde::{Deserialize, Serialize};
 
 use crate::data::Document;
 use crate::error::{LaurusError, Result};
 use crate::storage::Storage;
 use crate::storage::structured::{StructReader, StructWriter};
+
+/// Default capacity for the document LRU cache.
+const DEFAULT_DOC_CACHE_CAPACITY: usize = 1024;
 
 /// A segment of stored documents.
 ///
@@ -147,14 +153,24 @@ impl DocumentSegmentWriter {
 }
 
 /// Reader for document segments.
+///
+/// On construction an in-memory offset index (`doc_id -> byte position`) can
+/// optionally be built so that subsequent lookups can seek directly to the
+/// target document in O(1) instead of performing a linear scan.
 #[derive(Debug)]
 pub struct DocumentSegmentReader {
     storage: Arc<dyn Storage>,
     segment: DocumentSegment,
+    /// doc_id -> byte position of the doc_id field in the segment file.
+    /// Built once via [`with_index`](Self::with_index) and reused for all lookups.
+    offsets: HashMap<u64, u64>,
 }
 
 impl DocumentSegmentReader {
     /// Creates a new `DocumentSegmentReader` for the specified segment.
+    ///
+    /// The offset index is **not** built; lookups will use linear scan.
+    /// Use [`with_index`](Self::with_index) for O(1) lookups.
     ///
     /// # Arguments
     ///
@@ -165,10 +181,62 @@ impl DocumentSegmentReader {
     ///
     /// A new `DocumentSegmentReader` instance.
     pub fn new(storage: Arc<dyn Storage>, segment: DocumentSegment) -> Self {
-        Self { storage, segment }
+        Self {
+            storage,
+            segment,
+            offsets: HashMap::new(),
+        }
+    }
+
+    /// Creates a `DocumentSegmentReader` with a pre-built offset index.
+    ///
+    /// The segment file is scanned once during construction. Each document's
+    /// byte offset is recorded so that subsequent lookups can seek directly
+    /// rather than scanning.
+    ///
+    /// # Arguments
+    ///
+    /// * `storage` - The storage backend from which segment files are read.
+    /// * `segment` - The [`DocumentSegment`] metadata describing the segment to read.
+    ///
+    /// # Returns
+    ///
+    /// A `DocumentSegmentReader` with an offset index that enables O(1) lookups.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`LaurusError`] if the segment file cannot be opened or read.
+    pub fn with_index(storage: Arc<dyn Storage>, segment: DocumentSegment) -> Result<Self> {
+        let offsets = Self::build_index(&*storage, &segment)?;
+        Ok(Self {
+            storage,
+            segment,
+            offsets,
+        })
+    }
+
+    /// Scans the segment file once and records the byte offset of each document
+    /// entry (positioned at the `doc_id` field).
+    fn build_index(storage: &dyn Storage, segment: &DocumentSegment) -> Result<HashMap<u64, u64>> {
+        let input = storage.open_input(&segment.file_name())?;
+        let mut reader = StructReader::new(input)?;
+        let doc_count = reader.read_u32()?;
+
+        let mut offsets = HashMap::with_capacity(doc_count as usize);
+        for _ in 0..doc_count {
+            let offset = reader.stream_position()?;
+            let doc_id = reader.read_u64()?;
+            // Skip the document bytes (varint-prefixed)
+            let _json = reader.read_bytes()?;
+            offsets.insert(doc_id, offset);
+        }
+        Ok(offsets)
     }
 
     /// Retrieves a single document by its internal document ID.
+    ///
+    /// When an offset index is available the method seeks directly to the
+    /// target document in O(1).  Otherwise it falls back to a linear scan.
     ///
     /// If the `doc_id` is outside this segment's range the method returns `Ok(None)`
     /// without performing any I/O.
@@ -189,6 +257,20 @@ impl DocumentSegmentReader {
             return Ok(None);
         }
 
+        // Fast path: use offset index for O(1) seek
+        if let Some(&offset) = self.offsets.get(&doc_id) {
+            let input = self.storage.open_input(&self.segment.file_name())?;
+            let mut reader = StructReader::new(input)?;
+            reader.seek(std::io::SeekFrom::Start(offset))?;
+            let current_id = reader.read_u64()?;
+            debug_assert_eq!(current_id, doc_id);
+            let json = reader.read_bytes()?;
+            let doc: Document = serde_json::from_slice(&json)
+                .map_err(|e| LaurusError::index(format!("failed to deserialize document: {e}")))?;
+            return Ok(Some(doc));
+        }
+
+        // Fallback: linear scan
         let input = self.storage.open_input(&self.segment.file_name())?;
         let mut reader = StructReader::new(input)?;
         let doc_count = reader.read_u32()?;
@@ -207,11 +289,11 @@ impl DocumentSegmentReader {
         Ok(None)
     }
 
-    /// Retrieve multiple documents from this segment in a single pass.
+    /// Retrieve multiple documents from this segment.
     ///
-    /// Opens the segment file once and scans through, collecting all
-    /// documents whose IDs are in the requested set. More efficient
-    /// than multiple individual [`get_document()`](Self::get_document) calls.
+    /// When an offset index is available each document is looked up via direct
+    /// seek (offsets are sorted for sequential I/O).  Otherwise the method
+    /// falls back to a single-pass linear scan.
     ///
     /// # Arguments
     ///
@@ -238,6 +320,32 @@ impl DocumentSegmentReader {
             return Ok(results);
         }
 
+        // Fast path: use offset index for direct seeks
+        if !self.offsets.is_empty() {
+            let input = self.storage.open_input(&self.segment.file_name())?;
+            let mut reader = StructReader::new(input)?;
+
+            // Sort offsets for sequential I/O
+            let mut indexed: Vec<(u64, u64)> = doc_ids
+                .iter()
+                .filter_map(|id| self.offsets.get(id).map(|&off| (*id, off)))
+                .collect();
+            indexed.sort_unstable_by_key(|&(_, off)| off);
+
+            for (doc_id, offset) in indexed {
+                reader.seek(std::io::SeekFrom::Start(offset))?;
+                let current_id = reader.read_u64()?;
+                debug_assert_eq!(current_id, doc_id);
+                let json = reader.read_bytes()?;
+                let doc: Document = serde_json::from_slice(&json).map_err(|e| {
+                    LaurusError::index(format!("failed to deserialize document: {e}"))
+                })?;
+                results.insert(doc_id, doc);
+            }
+            return Ok(results);
+        }
+
+        // Fallback: linear scan
         let input = self.storage.open_input(&self.segment.file_name())?;
         let mut reader = StructReader::new(input)?;
         let doc_count = reader.read_u32()?;
@@ -354,6 +462,13 @@ pub struct UnifiedDocumentStore {
     next_segment_id: u32,
     pending_docs: HashMap<u64, Document>,
     next_doc_id: u64,
+    /// Cached segment readers with pre-built offset indexes.
+    /// Keyed by segment ID to avoid rebuilding the index on every lookup.
+    reader_cache: HashMap<u32, DocumentSegmentReader>,
+    /// LRU cache for recently accessed documents, avoiding repeated I/O
+    /// for hot documents.  Wrapped in `parking_lot::Mutex` so that
+    /// [`get_document`](Self::get_document) can remain `&self`.
+    doc_cache: parking_lot::Mutex<LruCache<u64, Document>>,
 }
 
 impl UnifiedDocumentStore {
@@ -370,12 +485,16 @@ impl UnifiedDocumentStore {
     ///
     /// A fresh `UnifiedDocumentStore` instance.
     pub fn new(storage: Arc<dyn Storage>) -> Self {
+        // SAFETY: DEFAULT_DOC_CACHE_CAPACITY is a compile-time constant > 0.
+        let cap = NonZeroUsize::new(DEFAULT_DOC_CACHE_CAPACITY).unwrap();
         Self {
             storage,
             segments: Vec::new(),
             next_segment_id: 0,
             pending_docs: HashMap::new(),
             next_doc_id: 1,
+            reader_cache: HashMap::new(),
+            doc_cache: parking_lot::Mutex::new(LruCache::new(cap)),
         }
     }
 
@@ -412,12 +531,16 @@ impl UnifiedDocumentStore {
                 }
             }
 
+            // SAFETY: DEFAULT_DOC_CACHE_CAPACITY is a compile-time constant > 0.
+            let cap = NonZeroUsize::new(DEFAULT_DOC_CACHE_CAPACITY).unwrap();
             Ok(Self {
                 storage,
                 segments: manifest.segments,
                 next_segment_id: manifest.next_segment_id,
                 pending_docs: HashMap::new(),
                 next_doc_id,
+                reader_cache: HashMap::new(),
+                doc_cache: parking_lot::Mutex::new(LruCache::new(cap)),
             })
         } else {
             Ok(Self::new(storage))
@@ -438,6 +561,18 @@ impl UnifiedDocumentStore {
         if !self.pending_docs.is_empty() {
             let docs = std::mem::take(&mut self.pending_docs);
             self.add_segment(&docs)?;
+        }
+
+        // Build offset indexes for any segments not yet cached.
+        for segment in &self.segments {
+            if self.reader_cache.contains_key(&segment.id) {
+                continue;
+            }
+            if let Ok(reader) =
+                DocumentSegmentReader::with_index(self.storage.clone(), segment.clone())
+            {
+                self.reader_cache.insert(segment.id, reader);
+            }
         }
 
         let manifest = StoreManifest {
@@ -504,6 +639,8 @@ impl UnifiedDocumentStore {
     /// to avoid ID conflicts on subsequent `add_document()` calls.
     pub fn put_document_with_id(&mut self, doc_id: u64, doc: Document) {
         self.pending_docs.insert(doc_id, doc);
+        // Invalidate stale cache entry
+        self.doc_cache.get_mut().pop(&doc_id);
         if doc_id >= self.next_doc_id {
             self.next_doc_id = doc_id + 1;
         }
@@ -555,12 +692,27 @@ impl UnifiedDocumentStore {
             return Ok(Some(doc.clone()));
         }
 
-        // Search in reverse order (newer segments first might have the doc if it was updated?)
-        // Actually doc_ids are unique, so any segment is fine.
+        // Check LRU cache
+        {
+            let mut cache = self.doc_cache.lock();
+            if let Some(doc) = cache.get(&doc_id) {
+                return Ok(Some(doc.clone()));
+            }
+        }
+
+        // Search segments; prefer cached reader with offset index.
         for segment in self.segments.iter().rev() {
             if segment.contains(doc_id) {
-                let reader = DocumentSegmentReader::new(self.storage.clone(), segment.clone());
-                if let Some(doc) = reader.get_document(doc_id)? {
+                let doc_opt = if let Some(reader) = self.reader_cache.get(&segment.id) {
+                    reader.get_document(doc_id)?
+                } else {
+                    let reader = DocumentSegmentReader::new(self.storage.clone(), segment.clone());
+                    reader.get_document(doc_id)?
+                };
+
+                if let Some(doc) = doc_opt {
+                    // Insert into LRU cache
+                    self.doc_cache.lock().put(doc_id, doc.clone());
                     return Ok(Some(doc));
                 }
             }
@@ -621,9 +773,14 @@ impl UnifiedDocumentStore {
                 continue;
             }
 
-            let reader = DocumentSegmentReader::new(self.storage.clone(), segment.clone());
-            let batch = reader.get_documents_batch(&segment_ids)?;
-            results.extend(batch);
+            if let Some(reader) = self.reader_cache.get(&segment.id) {
+                let batch = reader.get_documents_batch(&segment_ids)?;
+                results.extend(batch);
+            } else {
+                let reader = DocumentSegmentReader::new(self.storage.clone(), segment.clone());
+                let batch = reader.get_documents_batch(&segment_ids)?;
+                results.extend(batch);
+            }
         }
 
         Ok(results)
