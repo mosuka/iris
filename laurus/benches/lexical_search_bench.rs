@@ -62,7 +62,7 @@ async fn build_engine(n: usize) -> Result<Engine> {
             i, topic
         );
         let doc = Document::builder()
-            .add_text("title", &format!("Title for document {}", i))
+            .add_text("title", format!("Title for document {}", i))
             .add_text("body", &body)
             .add_text("category", categories[i % categories.len()])
             .add_integer("year", 2020 + (i % 5) as i64)
