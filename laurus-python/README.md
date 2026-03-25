@@ -1,0 +1,141 @@
+# laurus-python
+
+[![PyPI](https://img.shields.io/pypi/v/laurus.svg)](https://pypi.org/project/laurus/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+Python bindings for the [Laurus](https://github.com/mosuka/laurus) search engine. Provides lexical search, vector search, and hybrid search from Python via a native Rust extension built with [PyO3](https://github.com/PyO3/pyo3) and [Maturin](https://github.com/PyO3/maturin).
+
+## Features
+
+- **Lexical Search** -- Full-text search powered by an inverted index with BM25 scoring
+- **Vector Search** -- Approximate nearest neighbor (ANN) search using Flat, HNSW, or IVF indexes
+- **Hybrid Search** -- Combine lexical and vector results with fusion algorithms (RRF, WeightedSum)
+- **Rich Query DSL** -- Term, Phrase, Fuzzy, Wildcard, NumericRange, Geo, Boolean, Span queries
+- **Text Analysis** -- Tokenizers, filters, stemmers, and synonym expansion
+- **Flexible Storage** -- In-memory (ephemeral) or file-based (persistent) indexes
+- **Pythonic API** -- Clean, intuitive Python classes with full type information
+
+## Installation
+
+```bash
+pip install laurus
+```
+
+To build from source (requires Rust toolchain):
+
+```bash
+pip install maturin
+maturin develop
+```
+
+## Quick Start
+
+```python
+import laurus
+
+# Create an in-memory index
+index = laurus.Index()
+
+# Index documents
+index.put_document("doc1", {"title": "Introduction to Rust", "body": "Systems programming language."})
+index.put_document("doc2", {"title": "Python for Data Science", "body": "Data analysis with Python."})
+index.commit()
+
+# Search with a DSL string
+results = index.search("title:rust", limit=5)
+for r in results:
+    print(f"[{r.id}] score={r.score:.4f}  {r.document['title']}")
+
+# Search with a query object
+results = index.search(laurus.TermQuery("body", "python"), limit=5)
+```
+
+## Index Types
+
+### In-memory (ephemeral)
+
+```python
+index = laurus.Index()
+```
+
+### File-based (persistent)
+
+```python
+schema = laurus.Schema()
+schema.add_text_field("title")
+schema.add_text_field("body")
+schema.add_hnsw_field("embedding", dimension=384)
+
+index = laurus.Index(path="./myindex", schema=schema)
+```
+
+## Query Types
+
+| Query class | Description |
+| :--- | :--- |
+| `TermQuery(field, term)` | Exact term match |
+| `PhraseQuery(field, [terms])` | Ordered phrase match |
+| `FuzzyQuery(field, term, max_edits)` | Approximate term match |
+| `WildcardQuery(field, pattern)` | Wildcard pattern match (`*`, `?`) |
+| `NumericRangeQuery(field, min, max)` | Numeric range (int or float) |
+| `GeoQuery(field, lat, lon, radius_km)` | Geo-distance radius search |
+| `BooleanQuery(must, should, must_not)` | Compound boolean logic |
+| `SpanNearQuery(field, [terms], slop)` | Proximity / ordered span match |
+| `VectorQuery(field, vector)` | Pre-computed vector similarity |
+| `VectorTextQuery(field, text)` | Text-to-vector similarity (requires embedder) |
+
+## Hybrid Search
+
+```python
+request = laurus.SearchRequest(
+    lexical_query=laurus.TermQuery("body", "rust"),
+    vector_query=laurus.VectorQuery("embedding", query_vec),
+    fusion=laurus.RRF(k=60.0),
+    limit=10,
+)
+results = index.search(request)
+```
+
+### Fusion algorithms
+
+| Class | Description |
+| :--- | :--- |
+| `RRF(k=60.0)` | Reciprocal Rank Fusion (rank-based, default for hybrid) |
+| `WeightedSum(lexical_weight=0.5, vector_weight=0.5)` | Score-normalised weighted sum |
+
+## Text Analysis
+
+```python
+syn_dict = laurus.SynonymDictionary()
+syn_dict.add_synonym_group(["ml", "machine learning"])
+
+tokenizer = laurus.WhitespaceTokenizer()
+filt = laurus.SynonymGraphFilter(syn_dict, keep_original=True, boost=0.8)
+
+tokens = tokenizer.tokenize("ml tutorial")
+tokens = filt.apply(tokens)
+for tok in tokens:
+    print(tok.text, tok.position, tok.boost)
+```
+
+## Examples
+
+Usage examples are in the [`examples/`](examples/) directory:
+
+| Example | Description |
+| :--- | :--- |
+| [quickstart.py](examples/quickstart.py) | Basic indexing and full-text search |
+| [lexical_search.py](examples/lexical_search.py) | All query types (Term, Phrase, Boolean, Fuzzy, Wildcard, Range, Geo, Span) |
+| [vector_search.py](examples/vector_search.py) | Semantic similarity search with embeddings |
+| [hybrid_search.py](examples/hybrid_search.py) | Combining lexical and vector search with fusion |
+| [synonym_graph_filter.py](examples/synonym_graph_filter.py) | Synonym expansion in the analysis pipeline |
+| [search_with_openai.py](examples/search_with_openai.py) | Cloud-based embeddings via OpenAI |
+| [multimodal_search.py](examples/multimodal_search.py) | Text-to-image and image-to-image search |
+
+## Documentation
+
+- [Python Binding Guide](https://mosuka.github.io/laurus/laurus-python.html)
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](../LICENSE) file for details.

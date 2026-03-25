@@ -11,8 +11,9 @@ Lexical 検索、ベクトル検索、ハイブリッド検索をカバーする
 - **CLI & REPL** — インタラクティブな検索体験を実現するコマンドラインツール
 - **gRPC サーバー & HTTP Gateway** — マイクロサービスや既存システムへのシームレスな統合
 - **MCP サーバー** — Claude などの AI アシスタントとの直接連携
+- **Python バインディング** — データサイエンスや AI ワークフローで利用できるネイティブ Python パッケージ
 
-ライブラリとして組み込むことも、スタンドアロンのサーバーとしてデプロイすることも、AI ワークフローに検索機能を組み込むことも可能な、コンポーザブルな検索基盤です。
+ライブラリとして組み込むことも、スタンドアロンのサーバーとしてデプロイすることも、Python から呼び出すことも、AI ワークフローに検索機能を組み込むことも可能な、コンポーザブルな検索基盤です。
 
 ## ドキュメント
 
@@ -40,6 +41,7 @@ Lexical 検索、ベクトル検索、ハイブリッド検索をカバーする
   - [laurus-cli](https://mosuka.github.io/laurus/ja/laurus-cli.html) — コマンドラインインターフェース、REPL、スキーマフォーマット
   - [laurus-server](https://mosuka.github.io/laurus/ja/laurus-server.html) — gRPC サーバー、HTTP Gateway、設定
   - [laurus-mcp](https://mosuka.github.io/laurus/ja/laurus-mcp.html) — AI アシスタント（Claude など）向け MCP サーバー
+  - [laurus-python](https://mosuka.github.io/laurus/ja/laurus-python.html) — Python バインディング（PyPI パッケージ）
 - **開発**
   - [ビルドとテスト](https://mosuka.github.io/laurus/ja/development/build_and_test.html)
   - [フィーチャーフラグ](https://mosuka.github.io/laurus/ja/development/feature_flags.html)
@@ -60,7 +62,7 @@ Lexical 検索、ベクトル検索、ハイブリッド検索をカバーする
 
 ## ワークスペース構成
 
-Laurus は 4 つのクレートで構成された Cargo ワークスペースです:
+Laurus は 5 つのクレートで構成された Cargo ワークスペースです:
 
 | クレート | 説明 |
 | --- | --- |
@@ -68,6 +70,7 @@ Laurus は 4 つのクレートで構成された Cargo ワークスペースで
 | [`laurus-cli`](laurus-cli/) | 対話型検索のための REPL 付きコマンドラインインターフェース |
 | [`laurus-server`](laurus-server/) | Laurus をサービスとしてデプロイするための HTTP Gateway 付き gRPC サーバー |
 | [`laurus-mcp`](laurus-mcp/) | AI アシスタント（Claude など）向け stdio トランスポートの MCP サーバー |
+| [`laurus-python`](laurus-python/) | PyO3 と Maturin で構築した Python バインディング（PyPI パッケージ） |
 
 ## フィーチャーフラグ
 

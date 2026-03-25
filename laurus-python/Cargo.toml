@@ -1,0 +1,28 @@
+[package]
+name = "laurus-python"
+version = { workspace = true }
+edition = { workspace = true }
+description = "Python bindings for the Laurus search library"
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+
+[lib]
+name = "laurus"
+crate-type = ["cdylib"]
+
+[features]
+embeddings-candle = ["laurus/embeddings-candle"]
+embeddings-multimodal = ["laurus/embeddings-multimodal"]
+embeddings-openai = ["laurus/embeddings-openai"]
+embeddings-all = [
+    "embeddings-candle",
+    "embeddings-multimodal",
+    "embeddings-openai",
+]
+
+[dependencies]
+laurus = { workspace = true }
+pyo3 = { version = "0.28.2", features = ["extension-module"] }
+tokio = { workspace = true }
+chrono = { workspace = true }

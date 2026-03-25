@@ -27,6 +27,7 @@ jobs:
       cli: ${{ steps.resolve.outputs.cli }}
       server: ${{ steps.resolve.outputs.server }}
       mcp: ${{ steps.resolve.outputs.mcp }}
+      python: ${{ steps.resolve.outputs.python }}
     steps:
       - name: Run checkout
         uses: actions/checkout@v6
@@ -75,6 +76,13 @@ jobs:
               - 'Cargo.toml'
               - 'Cargo.lock'
               - '.github/workflows/regression.yml'
+            # python: laurus-python depends on laurus
+            python:
+              - 'laurus-python/**'
+              - 'laurus/**'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+              - '.github/workflows/regression.yml'
 
       # For non-PR events (push / workflow_dispatch), filter outputs are empty.
       # Default to true so all jobs run.
@@ -86,12 +94,14 @@ jobs:
           CLI: ${{ steps.filter.outputs.cli }}
           SERVER: ${{ steps.filter.outputs.server }}
           MCP: ${{ steps.filter.outputs.mcp }}
+          PYTHON: ${{ steps.filter.outputs.python }}
         run: |
           echo "code=${CODE:-true}" >> "$GITHUB_OUTPUT"
           echo "laurus=${LAURUS:-true}" >> "$GITHUB_OUTPUT"
           echo "cli=${CLI:-true}" >> "$GITHUB_OUTPUT"
           echo "server=${SERVER:-true}" >> "$GITHUB_OUTPUT"
           echo "mcp=${MCP:-true}" >> "$GITHUB_OUTPUT"
+          echo "python=${PYTHON:-true}" >> "$GITHUB_OUTPUT"
 
   # ============================================================
   # Format
@@ -119,7 +129,7 @@ jobs:
   # ============================================================
   clippy:
     name: Clippy
-    needs: [changes, format]
+    needs: [changes]
     if: ${{ !failure() && !cancelled() && needs.changes.outputs.code == 'true' }}
     runs-on: ubuntu-latest
     steps:
@@ -132,11 +142,21 @@ jobs:
           version: "24.x"
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
       - name: Install toolchain
         uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
           components: clippy
+
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "stable-x86_64-unknown-linux-gnu"
 
       - name: Run clippy
         run: cargo clippy --all-targets --all-features -- -D warnings
@@ -146,7 +166,7 @@ jobs:
   # ============================================================
   test-laurus:
     name: Test laurus
-    needs: [changes, clippy]
+    needs: [changes, format, clippy]
     if: ${{ !failure() && !cancelled() && needs.changes.outputs.laurus == 'true' }}
     strategy:
       fail-fast: false
@@ -163,9 +183,8 @@ jobs:
             target: x86_64-apple-darwin
           - runner: windows-latest
             target: x86_64-pc-windows-msvc
-          - runner: windows-latest
+          - runner: windows-11-arm
             target: aarch64-pc-windows-msvc
-            skip_test_run: true
             skip_embedding_features: true
         toolchain: [stable]
     runs-on: ${{ matrix.platform.runner }}
@@ -179,6 +198,11 @@ jobs:
           toolchain: ${{ matrix.toolchain }}
           target: ${{ matrix.platform.target }}
 
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "${{ matrix.toolchain }}-${{ matrix.platform.target }}"
+
       - name: Run test
         shell: bash
         run: |
@@ -188,18 +212,14 @@ jobs:
             FEATURES="--all-features"
           fi
 
-          if [ "${{ matrix.platform.skip_test_run }}" == "true" ]; then
-            cargo check --package laurus --target "${{ matrix.platform.target }}" $FEATURES
-          else
-            cargo test --package laurus --target "${{ matrix.platform.target }}" $FEATURES
-          fi
+          cargo test --package laurus --target "${{ matrix.platform.target }}" $FEATURES
 
   # ============================================================
   # Test laurus-cli
   # ============================================================
   test-cli:
     name: Test laurus-cli
-    needs: [changes, clippy]
+    needs: [changes, format, clippy, test-mcp]
     if: ${{ !failure() && !cancelled() && needs.changes.outputs.cli == 'true' }}
     strategy:
       fail-fast: false
@@ -216,9 +236,8 @@ jobs:
             target: x86_64-apple-darwin
           - runner: windows-latest
             target: x86_64-pc-windows-msvc
-          - runner: windows-latest
+          - runner: windows-11-arm
             target: aarch64-pc-windows-msvc
-            skip_test_run: true
             skip_embedding_features: true
         toolchain: [stable]
     runs-on: ${{ matrix.platform.runner }}
@@ -238,6 +257,11 @@ jobs:
           toolchain: ${{ matrix.toolchain }}
           target: ${{ matrix.platform.target }}
 
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "${{ matrix.toolchain }}-${{ matrix.platform.target }}"
+
       - name: Run test
         shell: bash
         run: |
@@ -247,18 +271,14 @@ jobs:
             FEATURES="--all-features"
           fi
 
-          if [ "${{ matrix.platform.skip_test_run }}" == "true" ]; then
-            cargo check --package laurus-cli --target "${{ matrix.platform.target }}" $FEATURES
-          else
-            cargo test --package laurus-cli --target "${{ matrix.platform.target }}" $FEATURES
-          fi
+          cargo test --package laurus-cli --target "${{ matrix.platform.target }}" $FEATURES
 
   # ============================================================
   # Test laurus-server
   # ============================================================
   test-server:
     name: Test laurus-server
-    needs: [changes, clippy]
+    needs: [changes, format, clippy, test-laurus]
     if: ${{ !failure() && !cancelled() && needs.changes.outputs.server == 'true' }}
     strategy:
       fail-fast: false
@@ -275,9 +295,8 @@ jobs:
             target: x86_64-apple-darwin
           - runner: windows-latest
             target: x86_64-pc-windows-msvc
-          - runner: windows-latest
+          - runner: windows-11-arm
             target: aarch64-pc-windows-msvc
-            skip_test_run: true
             skip_embedding_features: true
         toolchain: [stable]
     runs-on: ${{ matrix.platform.runner }}
@@ -297,6 +316,11 @@ jobs:
           toolchain: ${{ matrix.toolchain }}
           target: ${{ matrix.platform.target }}
 
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "${{ matrix.toolchain }}-${{ matrix.platform.target }}"
+
       - name: Run test
         shell: bash
         run: |
@@ -306,18 +330,14 @@ jobs:
             FEATURES="--all-features"
           fi
 
-          if [ "${{ matrix.platform.skip_test_run }}" == "true" ]; then
-            cargo check --package laurus-server --target "${{ matrix.platform.target }}" $FEATURES
-          else
-            cargo test --package laurus-server --target "${{ matrix.platform.target }}" $FEATURES
-          fi
+          cargo test --package laurus-server --target "${{ matrix.platform.target }}" $FEATURES
 
   # ============================================================
   # Test laurus-mcp
   # ============================================================
   test-mcp:
     name: Test laurus-mcp
-    needs: [changes, clippy]
+    needs: [changes, format, clippy, test-server]
     if: ${{ !failure() && !cancelled() && needs.changes.outputs.mcp == 'true' }}
     strategy:
       fail-fast: false
@@ -334,9 +354,8 @@ jobs:
             target: x86_64-apple-darwin
           - runner: windows-latest
             target: x86_64-pc-windows-msvc
-          - runner: windows-latest
+          - runner: windows-11-arm
             target: aarch64-pc-windows-msvc
-            skip_test_run: true
             skip_embedding_features: true
         toolchain: [stable]
     runs-on: ${{ matrix.platform.runner }}
@@ -356,6 +375,11 @@ jobs:
           toolchain: ${{ matrix.toolchain }}
           target: ${{ matrix.platform.target }}
 
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "${{ matrix.toolchain }}-${{ matrix.platform.target }}"
+
       - name: Run test
         shell: bash
         run: |
@@ -365,8 +389,68 @@ jobs:
             FEATURES="--all-features"
           fi
 
-          if [ "${{ matrix.platform.skip_test_run }}" == "true" ]; then
-            cargo check --package laurus-mcp --target "${{ matrix.platform.target }}" $FEATURES
+          cargo test --package laurus-mcp --target "${{ matrix.platform.target }}" $FEATURES
+
+  # ============================================================
+  # Test laurus-python
+  # ============================================================
+  test-python:
+    name: Test laurus-python
+    needs: [changes, format, clippy, test-laurus]
+    if: ${{ !failure() && !cancelled() && needs.changes.outputs.python == 'true' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - runner: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            skip_embedding_features: true
+          - runner: macos-latest
+            target: aarch64-apple-darwin
+          - runner: macos-15-intel
+            target: x86_64-apple-darwin
+          - runner: windows-latest
+            target: x86_64-pc-windows-msvc
+          - runner: windows-11-arm
+            target: aarch64-pc-windows-msvc
+            skip_embedding_features: true
+        python: ["3.13"]
+    runs-on: ${{ matrix.platform.runner }}
+    steps:
+      - name: Run checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Install toolchain
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "stable-${{ matrix.platform.target }}"
+
+      - name: Run tests
+        working-directory: laurus-python
+        shell: bash
+        run: |
+          python -m venv .venv
+          if [ "$RUNNER_OS" == "Windows" ]; then
+            source .venv/Scripts/activate
           else
-            cargo test --package laurus-mcp --target "${{ matrix.platform.target }}" $FEATURES
+            source .venv/bin/activate
           fi
+          pip install maturin pytest
+          if [ "${{ matrix.platform.skip_embedding_features }}" == "true" ]; then
+            maturin develop
+          else
+            maturin develop --features embeddings-all
+          fi
+          pytest tests/ -v

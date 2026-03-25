@@ -28,5 +28,24 @@ tokio = { workspace = true }
 tonic = { workspace = true }
 tracing = { workspace = true }
 
+[features]
+embeddings-candle = [
+    "laurus/embeddings-candle",
+    "laurus-server/embeddings-candle",
+]
+embeddings-multimodal = [
+    "laurus/embeddings-multimodal",
+    "laurus-server/embeddings-multimodal",
+]
+embeddings-openai = [
+    "laurus/embeddings-openai",
+    "laurus-server/embeddings-openai",
+]
+embeddings-all = [
+    "embeddings-candle",
+    "embeddings-multimodal",
+    "embeddings-openai",
+]
+
 [dev-dependencies]
 tempfile = { workspace = true }

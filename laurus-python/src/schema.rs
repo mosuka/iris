@@ -1,0 +1,319 @@
+//! Python wrapper for the Laurus [`Schema`] type.
+
+use laurus::{
+    BooleanOption, BytesOption, DateTimeOption, DistanceMetric, EmbedderDefinition, FieldOption,
+    FlatOption, FloatOption, GeoOption, HnswOption, IntegerOption, IvfOption, Schema, TextOption,
+};
+use pyo3::exceptions::PyValueError;
+use pyo3::prelude::*;
+use pyo3::types::PyDict;
+
+/// Parse a distance metric string into [`DistanceMetric`].
+fn parse_distance(s: &str) -> PyResult<DistanceMetric> {
+    match s.to_lowercase().as_str() {
+        "cosine" => Ok(DistanceMetric::Cosine),
+        "euclidean" => Ok(DistanceMetric::Euclidean),
+        "dot_product" | "dot" => Ok(DistanceMetric::DotProduct),
+        "manhattan" => Ok(DistanceMetric::Manhattan),
+        "angular" => Ok(DistanceMetric::Angular),
+        other => Err(PyValueError::new_err(format!(
+            "Unknown distance metric: '{}'. Valid: cosine, euclidean, dot_product, manhattan, angular",
+            other
+        ))),
+    }
+}
+
+/// Python-facing schema builder.
+///
+/// ## Example
+///
+/// ```python
+/// schema = laurus.Schema()
+/// schema.add_text_field("title")
+/// schema.add_hnsw_field("embedding", dimension=384, distance="cosine")
+/// schema.add_integer_field("year")
+/// schema.set_default_fields(["title"])
+/// ```
+#[pyclass(name = "Schema")]
+pub struct PySchema {
+    pub inner: Schema,
+}
+
+#[pymethods]
+impl PySchema {
+    /// Create a new empty schema.
+    #[new]
+    pub fn new() -> Self {
+        Self {
+            inner: Schema::new(),
+        }
+    }
+
+    /// Add a full-text searchable text field.
+    ///
+    /// Args:
+    ///     name: Field name.
+    ///     stored: Whether the original value is retrievable (default True).
+    ///     indexed: Whether the field is searchable (default True).
+    ///     term_vectors: Whether term position information is stored (default False).
+    ///     analyzer: Optional named analyzer to use.
+    #[pyo3(signature = (name, *, stored=true, indexed=true, term_vectors=false, analyzer=None))]
+    pub fn add_text_field(
+        &mut self,
+        name: &str,
+        stored: bool,
+        indexed: bool,
+        term_vectors: bool,
+        analyzer: Option<String>,
+    ) {
+        self.inner.fields.insert(
+            name.to_string(),
+            FieldOption::Text(TextOption {
+                indexed,
+                stored,
+                term_vectors,
+                analyzer,
+            }),
+        );
+    }
+
+    /// Add an integer (i64) field.
+    #[pyo3(signature = (name, *, stored=true, indexed=true))]
+    pub fn add_integer_field(&mut self, name: &str, stored: bool, indexed: bool) {
+        self.inner.fields.insert(
+            name.to_string(),
+            FieldOption::Integer(IntegerOption { indexed, stored }),
+        );
+    }
+
+    /// Add a float (f64) field.
+    #[pyo3(signature = (name, *, stored=true, indexed=true))]
+    pub fn add_float_field(&mut self, name: &str, stored: bool, indexed: bool) {
+        self.inner.fields.insert(
+            name.to_string(),
+            FieldOption::Float(FloatOption { indexed, stored }),
+        );
+    }
+
+    /// Add a boolean field.
+    #[pyo3(signature = (name, *, stored=true, indexed=true))]
+    pub fn add_boolean_field(&mut self, name: &str, stored: bool, indexed: bool) {
+        self.inner.fields.insert(
+            name.to_string(),
+            FieldOption::Boolean(BooleanOption { indexed, stored }),
+        );
+    }
+
+    /// Add a date/time field.
+    #[pyo3(signature = (name, *, stored=true, indexed=true))]
+    pub fn add_datetime_field(&mut self, name: &str, stored: bool, indexed: bool) {
+        self.inner.fields.insert(
+            name.to_string(),
+            FieldOption::DateTime(DateTimeOption { indexed, stored }),
+        );
+    }
+
+    /// Add a geographic coordinate field (latitude, longitude).
+    #[pyo3(signature = (name, *, stored=true, indexed=true))]
+    pub fn add_geo_field(&mut self, name: &str, stored: bool, indexed: bool) {
+        self.inner.fields.insert(
+            name.to_string(),
+            FieldOption::Geo(GeoOption { indexed, stored }),
+        );
+    }
+
+    /// Add a binary data field.
+    #[pyo3(signature = (name, *, stored=true))]
+    pub fn add_bytes_field(&mut self, name: &str, stored: bool) {
+        self.inner
+            .fields
+            .insert(name.to_string(), FieldOption::Bytes(BytesOption { stored }));
+    }
+
+    /// Add an HNSW approximate nearest-neighbor vector index field.
+    ///
+    /// Args:
+    ///     name: Field name.
+    ///     dimension: Vector dimensionality.
+    ///     distance: Distance metric — "cosine" (default), "euclidean", "dot_product".
+    ///     m: HNSW branching factor (default 16).
+    ///     ef_construction: Build-time expansion factor (default 200).
+    ///     embedder: Optional embedder name registered via `add_embedder`.
+    ///         When set, text payloads are automatically embedded by the Rust engine.
+    #[pyo3(signature = (name, dimension, *, distance="cosine", m=16, ef_construction=200, embedder=None))]
+    pub fn add_hnsw_field(
+        &mut self,
+        name: &str,
+        dimension: usize,
+        distance: &str,
+        m: usize,
+        ef_construction: usize,
+        embedder: Option<String>,
+    ) -> PyResult<()> {
+        let opt = HnswOption {
+            dimension,
+            distance: parse_distance(distance)?,
+            m,
+            ef_construction,
+            embedder,
+            ..Default::default()
+        };
+        self.inner
+            .fields
+            .insert(name.to_string(), FieldOption::Hnsw(opt));
+        Ok(())
+    }
+
+    /// Add a flat (brute-force) vector index field.
+    ///
+    /// Args:
+    ///     name: Field name.
+    ///     dimension: Vector dimensionality.
+    ///     distance: Distance metric — "cosine" (default), "euclidean", "dot_product".
+    ///     embedder: Optional embedder name registered via `add_embedder`.
+    ///         When set, text payloads are automatically embedded by the Rust engine.
+    #[pyo3(signature = (name, dimension, *, distance="cosine", embedder=None))]
+    pub fn add_flat_field(
+        &mut self,
+        name: &str,
+        dimension: usize,
+        distance: &str,
+        embedder: Option<String>,
+    ) -> PyResult<()> {
+        let opt = FlatOption {
+            dimension,
+            distance: parse_distance(distance)?,
+            embedder,
+            ..Default::default()
+        };
+        self.inner
+            .fields
+            .insert(name.to_string(), FieldOption::Flat(opt));
+        Ok(())
+    }
+
+    /// Add an IVF (Inverted File Index) approximate nearest-neighbor vector field.
+    ///
+    /// Args:
+    ///     name: Field name.
+    ///     dimension: Vector dimensionality.
+    ///     distance: Distance metric — "cosine" (default), "euclidean", "dot_product".
+    ///     n_clusters: Number of Voronoi clusters (default 100).
+    ///     n_probe: Number of clusters to probe at search time (default 1).
+    ///     embedder: Optional embedder name registered via `add_embedder`.
+    ///         When set, text payloads are automatically embedded by the Rust engine.
+    #[pyo3(signature = (name, dimension, *, distance="cosine", n_clusters=100, n_probe=1, embedder=None))]
+    pub fn add_ivf_field(
+        &mut self,
+        name: &str,
+        dimension: usize,
+        distance: &str,
+        n_clusters: usize,
+        n_probe: usize,
+        embedder: Option<String>,
+    ) -> PyResult<()> {
+        let opt = IvfOption {
+            dimension,
+            distance: parse_distance(distance)?,
+            n_clusters,
+            n_probe,
+            embedder,
+            ..Default::default()
+        };
+        self.inner
+            .fields
+            .insert(name.to_string(), FieldOption::Ivf(opt));
+        Ok(())
+    }
+
+    /// Register a named embedder definition in the schema.
+    ///
+    /// The embedder can then be referenced by name from vector field options
+    /// (e.g. `add_hnsw_field(..., embedder="my-bert")`).
+    ///
+    /// The `config` dict must have a `"type"` key selecting the backend:
+    ///
+    /// | type            | required keys | feature flag          |
+    /// |-----------------|---------------|-----------------------|
+    /// | `"precomputed"` | —             | (always available)    |
+    /// | `"candle_bert"` | `"model"`     | `embeddings-candle`   |
+    /// | `"candle_clip"` | `"model"`     | `embeddings-multimodal` |
+    /// | `"openai"`      | `"model"`     | `embeddings-openai`   |
+    ///
+    /// Args:
+    ///     name: Unique embedder name referenced from vector fields.
+    ///     config: Dict describing the embedder, e.g.
+    ///         `{"type": "candle_bert", "model": "sentence-transformers/all-MiniLM-L6-v2"}`.
+    ///
+    /// Example:
+    ///     ```python
+    ///     schema.add_embedder("bert", {"type": "candle_bert", "model": "sentence-transformers/all-MiniLM-L6-v2"})
+    ///     schema.add_hnsw_field("embedding", dimension=384, embedder="bert")
+    ///     ```
+    pub fn add_embedder(&mut self, name: &str, config: &Bound<PyAny>) -> PyResult<()> {
+        let dict = config.extract::<Bound<PyDict>>().map_err(|_| {
+            PyValueError::new_err("embedder config must be a dict, e.g. {\"type\": \"candle_bert\", \"model\": \"...\"}")
+        })?;
+        let dict = &dict;
+
+        let embedder_type: String = dict
+            .get_item("type")?
+            .ok_or_else(|| PyValueError::new_err("embedder config must have a 'type' key"))?
+            .extract()?;
+
+        let definition = match embedder_type.as_str() {
+            "precomputed" => EmbedderDefinition::Precomputed,
+            "candle_bert" => {
+                let model: String = dict
+                    .get_item("model")?
+                    .ok_or_else(|| {
+                        PyValueError::new_err("candle_bert embedder requires a 'model' key")
+                    })?
+                    .extract()?;
+                EmbedderDefinition::CandleBert { model }
+            }
+            "candle_clip" => {
+                let model: String = dict
+                    .get_item("model")?
+                    .ok_or_else(|| {
+                        PyValueError::new_err("candle_clip embedder requires a 'model' key")
+                    })?
+                    .extract()?;
+                EmbedderDefinition::CandleClip { model }
+            }
+            "openai" => {
+                let model: String = dict
+                    .get_item("model")?
+                    .ok_or_else(|| PyValueError::new_err("openai embedder requires a 'model' key"))?
+                    .extract()?;
+                EmbedderDefinition::Openai { model }
+            }
+            other => {
+                return Err(PyValueError::new_err(format!(
+                    "Unknown embedder type: '{}'. Valid types: precomputed, candle_bert, candle_clip, openai",
+                    other
+                )));
+            }
+        };
+
+        self.inner.embedders.insert(name.to_string(), definition);
+        Ok(())
+    }
+
+    /// Set the default fields used when no field is specified in a query.
+    pub fn set_default_fields(&mut self, fields: Vec<String>) {
+        self.inner.default_fields = fields;
+    }
+
+    /// Return the list of field names defined in this schema.
+    pub fn field_names(&self) -> Vec<String> {
+        self.inner.fields.keys().cloned().collect()
+    }
+
+    fn __repr__(&self) -> String {
+        format!(
+            "Schema(fields={:?})",
+            self.inner.fields.keys().collect::<Vec<_>>()
+        )
+    }
+}

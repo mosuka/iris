@@ -17,7 +17,10 @@ All Laurus operations return `Result<T>`, which is an alias for `std::result::Re
 | `Query` | Query parsing/execution errors | Malformed Query DSL, unknown field in query |
 | `Storage` | Storage backend errors | Failed to open storage, write failure |
 | `Field` | Field definition errors | Invalid field options, duplicate field name |
+| `BenchmarkFailed` | Benchmark errors | Benchmark execution failure |
+| `ThreadJoinError` | Thread join errors | Panic in a worker thread |
 | `Json` | JSON serialization errors | Malformed document JSON |
+| `Anyhow` | Wrapped anyhow errors | Errors from third-party crates via `anyhow` |
 | `InvalidOperation` | Invalid operation | Searching before commit, double close |
 | `ResourceExhausted` | Resource limits exceeded | Out of memory, too many open files |
 | `SerializationError` | Binary serialization errors | Corrupt data on disk |

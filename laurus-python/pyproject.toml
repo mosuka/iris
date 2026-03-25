@@ -1,0 +1,22 @@
+[build-system]
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "laurus"
+requires-python = ">=3.8"
+description = "Python bindings for the Laurus search library"
+readme = "README.md"
+license = "MIT"
+dynamic = ["version"]
+classifiers = [
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Python :: Implementation :: PyPy",
+    "Topic :: Database",
+    "Topic :: Text Processing :: Indexing",
+]
+
+[tool.maturin]
+module-name = "laurus"
+features = ["pyo3/extension-module"]

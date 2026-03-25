@@ -30,7 +30,7 @@ jobs:
 
   clippy:
     name: Clippy
-    needs: [format]
+    needs: []
     strategy:
       matrix:
         platform:
@@ -47,19 +47,33 @@ jobs:
           version: "24.x"
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
       - name: Install toolchain
         uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: ${{ matrix.toolchain }}
           components: clippy
 
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "stable-x86_64-unknown-linux-gnu"
+
       - name: Run clippy
         run: cargo clippy --all-targets --all-features -- -D warnings
 
-  test:
-    name: Test
-    needs: [clippy]
+  # ============================================================
+  # Test laurus (core library)
+  # ============================================================
+  test-laurus:
+    name: Test laurus
+    needs: [format, clippy]
     strategy:
+      fail-fast: false
       matrix:
         platform:
           - runner: ubuntu-latest
@@ -73,9 +87,60 @@ jobs:
             target: x86_64-apple-darwin
           - runner: windows-latest
             target: x86_64-pc-windows-msvc
-          - runner: windows-latest
+          - runner: windows-11-arm
             target: aarch64-pc-windows-msvc
-            skip_test_run: true
+            skip_embedding_features: true
+        toolchain: [stable]
+    runs-on: ${{ matrix.platform.runner }}
+    steps:
+      - name: Run checkout
+        uses: actions/checkout@v6
+
+      - name: Install toolchain
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: ${{ matrix.toolchain }}
+          target: ${{ matrix.platform.target }}
+
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "${{ matrix.toolchain }}-${{ matrix.platform.target }}"
+
+      - name: Run test
+        shell: bash
+        run: |
+          if [ "${{ matrix.platform.skip_embedding_features }}" == "true" ]; then
+            FEATURES=""
+          else
+            FEATURES="--all-features"
+          fi
+
+          cargo test --package laurus --target "${{ matrix.platform.target }}" $FEATURES
+
+  # ============================================================
+  # Test laurus-cli
+  # ============================================================
+  test-cli:
+    name: Test laurus-cli
+    needs: [format, clippy, test-mcp]
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - runner: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            skip_embedding_features: true
+          - runner: macos-latest
+            target: aarch64-apple-darwin
+          - runner: macos-15-intel
+            target: x86_64-apple-darwin
+          - runner: windows-latest
+            target: x86_64-pc-windows-msvc
+          - runner: windows-11-arm
+            target: aarch64-pc-windows-msvc
             skip_embedding_features: true
         toolchain: [stable]
     runs-on: ${{ matrix.platform.runner }}
@@ -95,6 +160,11 @@ jobs:
           toolchain: ${{ matrix.toolchain }}
           target: ${{ matrix.platform.target }}
 
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "${{ matrix.toolchain }}-${{ matrix.platform.target }}"
+
       - name: Run test
         shell: bash
         run: |
@@ -104,16 +174,260 @@ jobs:
             FEATURES="--all-features"
           fi
 
-          if [ "${{ matrix.platform.skip_test_run }}" == "true" ]; then
-            cargo check --target "${{ matrix.platform.target }}" $FEATURES
+          cargo test --package laurus-cli --target "${{ matrix.platform.target }}" $FEATURES
+
+  # ============================================================
+  # Test laurus-server
+  # ============================================================
+  test-server:
+    name: Test laurus-server
+    needs: [format, clippy, test-laurus]
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - runner: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            skip_embedding_features: true
+          - runner: macos-latest
+            target: aarch64-apple-darwin
+          - runner: macos-15-intel
+            target: x86_64-apple-darwin
+          - runner: windows-latest
+            target: x86_64-pc-windows-msvc
+          - runner: windows-11-arm
+            target: aarch64-pc-windows-msvc
+            skip_embedding_features: true
+        toolchain: [stable]
+    runs-on: ${{ matrix.platform.runner }}
+    steps:
+      - name: Run checkout
+        uses: actions/checkout@v6
+
+      - name: Install protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          version: "24.x"
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install toolchain
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: ${{ matrix.toolchain }}
+          target: ${{ matrix.platform.target }}
+
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "${{ matrix.toolchain }}-${{ matrix.platform.target }}"
+
+      - name: Run test
+        shell: bash
+        run: |
+          if [ "${{ matrix.platform.skip_embedding_features }}" == "true" ]; then
+            FEATURES=""
           else
-            cargo test --target "${{ matrix.platform.target }}" $FEATURES
+            FEATURES="--all-features"
           fi
+
+          cargo test --package laurus-server --target "${{ matrix.platform.target }}" $FEATURES
+
+  # ============================================================
+  # Test laurus-mcp
+  # ============================================================
+  test-mcp:
+    name: Test laurus-mcp
+    needs: [format, clippy, test-server]
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - runner: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            skip_embedding_features: true
+          - runner: macos-latest
+            target: aarch64-apple-darwin
+          - runner: macos-15-intel
+            target: x86_64-apple-darwin
+          - runner: windows-latest
+            target: x86_64-pc-windows-msvc
+          - runner: windows-11-arm
+            target: aarch64-pc-windows-msvc
+            skip_embedding_features: true
+        toolchain: [stable]
+    runs-on: ${{ matrix.platform.runner }}
+    steps:
+      - name: Run checkout
+        uses: actions/checkout@v6
+
+      - name: Install protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          version: "24.x"
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install toolchain
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: ${{ matrix.toolchain }}
+          target: ${{ matrix.platform.target }}
+
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "${{ matrix.toolchain }}-${{ matrix.platform.target }}"
+
+      - name: Run test
+        shell: bash
+        run: |
+          if [ "${{ matrix.platform.skip_embedding_features }}" == "true" ]; then
+            FEATURES=""
+          else
+            FEATURES="--all-features"
+          fi
+
+          cargo test --package laurus-mcp --target "${{ matrix.platform.target }}" $FEATURES
+
+  # ============================================================
+  # Test laurus-python
+  # ============================================================
+  test-python:
+    name: Test laurus-python
+    needs: [format, clippy, test-laurus]
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - runner: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            skip_embedding_features: true
+          - runner: macos-latest
+            target: aarch64-apple-darwin
+          - runner: macos-15-intel
+            target: x86_64-apple-darwin
+          - runner: windows-latest
+            target: x86_64-pc-windows-msvc
+          - runner: windows-11-arm
+            target: aarch64-pc-windows-msvc
+            skip_embedding_features: true
+        python: ["3.13"]
+    runs-on: ${{ matrix.platform.runner }}
+    steps:
+      - name: Run checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Install toolchain
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "stable-${{ matrix.platform.target }}"
+
+      - name: Run tests
+        working-directory: laurus-python
+        shell: bash
+        run: |
+          python -m venv .venv
+          if [ "$RUNNER_OS" == "Windows" ]; then
+            source .venv/Scripts/activate
+          else
+            source .venv/bin/activate
+          fi
+          pip install maturin pytest
+          if [ "${{ matrix.platform.skip_embedding_features }}" == "true" ]; then
+            maturin develop
+          else
+            maturin develop --features embeddings-all
+          fi
+          pytest tests/ -v
+
+  # ============================================================
+  # Gate: 全テスト通過を確認してからビルドへ
+  # ============================================================
+  test-all:
+    name: Test All
+    if: ${{ !failure() && !cancelled() }}
+    needs: [test-laurus, test-cli, test-server, test-mcp, test-python]
+    runs-on: ubuntu-latest
+    steps:
+      - name: All tests passed
+        run: echo "All tests passed"
+
+  build-python-sdist:
+    name: Build Python sdist
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [test-all]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run checkout
+        uses: actions/checkout@v6
+
+      - name: Build sdist
+        uses: PyO3/maturin-action@v1
+        with:
+          command: sdist
+          args: --manifest-path laurus-python/Cargo.toml --out dist
+
+      - name: Upload sdist
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-sdist
+          path: dist/*.tar.gz
+
+  build-wheel:
+    name: Build Python Wheel
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [test-all]
+    strategy:
+      matrix:
+        platform:
+          - runner: ubuntu-latest
+            target: x86_64
+          - runner: ubuntu-24.04-arm
+            target: aarch64
+          - runner: macos-latest
+            target: aarch64
+          - runner: macos-15-intel
+            target: x86_64
+          - runner: windows-latest
+            target: x86_64
+          - runner: windows-latest
+            target: aarch64
+    runs-on: ${{ matrix.platform.runner }}
+    steps:
+      - name: Run checkout
+        uses: actions/checkout@v6
+
+      - name: Build wheel
+        uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.platform.target }}
+          args: --release --out dist --manifest-path laurus-python/Cargo.toml --features embeddings-all
+
+      - name: Upload wheel
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-${{ matrix.platform.runner }}-${{ matrix.platform.target }}
+          path: dist/*.whl
 
   build-binary:
     name: Build Binary
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [test]
+    needs: [test-all]
     strategy:
       matrix:
         platform:
@@ -194,7 +508,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: artifacts
-          pattern: laurus-*
+          pattern: "laurus-*"
           merge-multiple: true
 
       - name: Create GitHub Release
@@ -207,6 +521,27 @@ jobs:
           generate_release_notes: true
           make_latest: true
           files: artifacts/*
+
+  publish-pypi:
+    name: Publish to PyPI
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [build-wheel, build-python-sdist]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download wheels and sdist
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: "wheels-*"
+          merge-multiple: true
+
+      - name: Publish to PyPI
+        uses: PyO3/maturin-action@v1
+        env:
+          MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
+        with:
+          command: upload
+          args: --non-interactive --skip-existing dist/*
 
   publish-crates:
     name: Publish crates

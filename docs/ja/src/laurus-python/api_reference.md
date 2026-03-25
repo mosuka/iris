@@ -1,0 +1,286 @@
+# API リファレンス
+
+## Index
+
+Laurus 検索エンジンをラップするメインクラスです。
+
+```python
+class Index:
+    def __init__(self, path: str | None = None, schema: Schema | None = None) -> None: ...
+```
+
+### コンストラクタ
+
+| パラメータ | 型 | デフォルト | 説明 |
+| :--- | :--- | :--- | :--- |
+| `path` | `str \| None` | `None` | 永続ストレージのディレクトリパス。`None` の場合はインメモリインデックスを作成します。 |
+| `schema` | `Schema \| None` | `None` | スキーマ定義。省略時は空のスキーマが使用されます。 |
+
+### メソッド
+
+| メソッド | 説明 |
+| :--- | :--- |
+| `put_document(id, doc)` | ドキュメントをアップサート（upsert）します。同じ ID の既存バージョンをすべて置換します。 |
+| `add_document(id, doc)` | 既存バージョンを削除せずにドキュメントチャンクを追記します。 |
+| `get_documents(id) -> list[dict]` | 指定 ID の全保存バージョンを返します。 |
+| `delete_documents(id)` | 指定 ID の全バージョンを削除します。 |
+| `commit()` | バッファリングされた書き込みをフラッシュし、すべての保留中の変更を検索可能にします。 |
+| `search(query, *, limit=10, offset=0) -> list[SearchResult]` | 検索クエリを実行します。 |
+| `stats() -> dict` | インデックス統計（`document_count`、`vector_fields`）を返します。 |
+
+### `search` の query 引数
+
+`query` パラメータは以下のいずれかを受け付けます：
+
+- **DSL 文字列**（例: `"title:hello"`、`"~\"memory safety\""`)
+- **Lexical クエリオブジェクト**（`TermQuery`、`PhraseQuery`、`BooleanQuery` など）
+- **Vector クエリオブジェクト**（`VectorQuery`、`VectorTextQuery`）
+- **`SearchRequest`**（完全な制御が必要な場合）
+
+---
+
+## Schema
+
+`Index` のフィールドとインデックスタイプを定義します。
+
+```python
+class Schema:
+    def __init__(self) -> None: ...
+```
+
+### フィールドメソッド
+
+| メソッド | 説明 |
+| :--- | :--- |
+| `add_text_field(name)` | 全文フィールド（転置インデックス、BM25）。 |
+| `add_int_field(name)` | 64 ビット整数フィールド。 |
+| `add_float_field(name)` | 64 ビット浮動小数点フィールド。 |
+| `add_bool_field(name)` | ブールフィールド。 |
+| `add_bytes_field(name)` | 生バイトフィールド。 |
+| `add_geo_field(name)` | 地理座標フィールド（緯度/経度）。 |
+| `add_datetime_field(name)` | UTC 日時フィールド。 |
+| `add_hnsw_field(name, dimension, *, distance="cosine", m=16, ef_construction=100)` | HNSW 近似最近傍ベクトルフィールド。 |
+| `add_flat_field(name, dimension, *, distance="cosine")` | Flat（総当たり）ベクトルフィールド。 |
+| `add_ivf_field(name, dimension, *, distance="cosine", n_clusters=100, n_probe=1)` | IVF 近似最近傍ベクトルフィールド。 |
+
+### 距離メトリクス
+
+| 値 | 説明 |
+| :--- | :--- |
+| `"cosine"` | コサイン類似度（デフォルト） |
+| `"euclidean"` | ユークリッド距離 |
+| `"dot_product"` | 内積 |
+
+---
+
+## クエリクラス
+
+### TermQuery
+
+```python
+TermQuery(field: str, term: str)
+```
+
+指定フィールドに完全一致する語句を含むドキュメントを検索します。
+
+### PhraseQuery
+
+```python
+PhraseQuery(field: str, terms: list[str])
+```
+
+指定した語句が順序どおりに含まれるドキュメントを検索します。
+
+### FuzzyQuery
+
+```python
+FuzzyQuery(field: str, term: str, max_edits: int = 1)
+```
+
+編集距離が `max_edits` 以内の近似一致を検索します。
+
+### WildcardQuery
+
+```python
+WildcardQuery(field: str, pattern: str)
+```
+
+ワイルドカードパターン検索。`*` は任意の文字列、`?` は任意の1文字に一致します。
+
+### NumericRangeQuery
+
+```python
+NumericRangeQuery(field: str, min: int | float | None, max: int | float | None)
+```
+
+`[min, max]` の範囲内の数値を検索します。開いた境界には `None` を指定します。
+
+### GeoQuery
+
+```python
+GeoQuery(field: str, lat: float, lon: float, radius_km: float)
+```
+
+地理的距離検索。指定した地点から `radius_km` 以内の `(lat, lon)` 座標を持つドキュメントを返します。
+
+### BooleanQuery
+
+```python
+BooleanQuery(
+    must: list[Query] | None = None,
+    should: list[Query] | None = None,
+    must_not: list[Query] | None = None,
+)
+```
+
+複合ブールクエリ。`must` 節はすべて一致する必要があります。`should` 節は少なくとも1つ一致する必要があります。`must_not` 節は一致してはなりません。
+
+### SpanNearQuery
+
+```python
+SpanNearQuery(field: str, terms: list[str], slop: int = 0, in_order: bool = True)
+```
+
+語句が `slop` 位置以内に隣接して現れるドキュメントを検索します。
+
+### VectorQuery
+
+```python
+VectorQuery(field: str, vector: list[float])
+```
+
+事前計算済みエンベディングベクトルを使った近似最近傍検索を行います。
+
+### VectorTextQuery
+
+```python
+VectorTextQuery(field: str, text: str)
+```
+
+クエリ時に `text` をエンベディングに変換してベクトル検索を行います。インデックスにエンベダーの設定が必要です。
+
+---
+
+## SearchRequest
+
+高度な制御が必要な場合の完全なリクエストクラスです。
+
+```python
+class SearchRequest:
+    def __init__(
+        self,
+        *,
+        query=None,
+        lexical_query=None,
+        vector_query=None,
+        filter_query=None,
+        fusion=None,
+        limit: int = 10,
+        offset: int = 0,
+    ) -> None: ...
+```
+
+| パラメータ | 説明 |
+| :--- | :--- |
+| `query` | DSL 文字列または単一クエリオブジェクト。`lexical_query` / `vector_query` と排他的。 |
+| `lexical_query` | 明示的なハイブリッド検索の Lexical コンポーネント。 |
+| `vector_query` | 明示的なハイブリッド検索の Vector コンポーネント。 |
+| `filter_query` | スコアリング後に適用する Lexical フィルター。 |
+| `fusion` | フュージョンアルゴリズム（`RRF` または `WeightedSum`）。両コンポーネント指定時のデフォルトは `RRF(k=60)`。 |
+| `limit` | 最大結果件数（デフォルト 10）。 |
+| `offset` | ページネーションオフセット（デフォルト 0）。 |
+
+---
+
+## SearchResult
+
+`Index.search()` が返すクラスです。
+
+```python
+class SearchResult:
+    id: str          # 外部ドキュメント識別子
+    score: float     # 関連性スコア
+    document: dict | None  # 取得されたフィールド値。削除済みの場合は None
+```
+
+---
+
+## フュージョンアルゴリズム
+
+### RRF
+
+```python
+RRF(k: float = 60.0)
+```
+
+逆順位フュージョン（Reciprocal Rank Fusion）。Lexical と Vector の結果リストを順位位置によってマージします。`k` は平滑化定数で、値が大きいほど上位ランクの影響が小さくなります。
+
+### WeightedSum
+
+```python
+WeightedSum(lexical_weight: float = 0.5, vector_weight: float = 0.5)
+```
+
+両スコアリストをそれぞれ正規化した後、`lexical_weight * lexical_score + vector_weight * vector_score` として結合します。
+
+---
+
+## テキスト解析
+
+### SynonymDictionary
+
+```python
+class SynonymDictionary:
+    def __init__(self) -> None: ...
+    def add_synonym_group(self, synonyms: list[str]) -> None: ...
+```
+
+### WhitespaceTokenizer
+
+```python
+class WhitespaceTokenizer:
+    def __init__(self) -> None: ...
+    def tokenize(self, text: str) -> list[Token]: ...
+```
+
+### SynonymGraphFilter
+
+```python
+class SynonymGraphFilter:
+    def __init__(
+        self,
+        dictionary: SynonymDictionary,
+        keep_original: bool = True,
+        boost: float = 1.0,
+    ) -> None: ...
+    def apply(self, tokens: list[Token]) -> list[Token]: ...
+```
+
+### Token
+
+```python
+class Token:
+    text: str
+    position: int
+    position_increment: int
+    position_length: int
+    boost: float
+```
+
+---
+
+## フィールド値の型マッピング
+
+Python の値は自動的に Laurus の `DataValue` 型に変換されます：
+
+| Python 型 | Laurus 型 | 備考 |
+| :--- | :--- | :--- |
+| `None` | `Null` | |
+| `bool` | `Bool` | `int` より先にチェック |
+| `int` | `Int64` | |
+| `float` | `Float64` | |
+| `str` | `Text` | |
+| `bytes` | `Bytes` | |
+| `list[float]` | `Vector` | 要素は `f32` に変換 |
+| `(lat, lon)` タプル | `Geo` | 2 つの `float` 値 |
+| `datetime.datetime` | `DateTime` | `isoformat()` 経由で変換 |
