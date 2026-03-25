@@ -9,7 +9,7 @@ members = [
 resolver = "2"
 
 [workspace.package]
-version = "0.4.0"
+version = "0.4.1"
 edition = "2024"
 description = "Unified search library for lexical, vector, and semantic retrieval"
 documentation = "https://docs.rs/laurus"
@@ -26,9 +26,9 @@ axum = "0.8.8"
 chrono = { version = "0.4.44", features = ["serde"] }
 clap = { version = "4.6.0", features = ["derive", "env"] }
 dialoguer = "0.12.0"
-laurus = { version = "0.4.0", path = "laurus" }
-laurus-mcp = { version = "0.4.0", path = "laurus-mcp" }
-laurus-server = { version = "0.4.0", path = "laurus-server" }
+laurus = { version = "0.4.1", path = "laurus" }
+laurus-mcp = { version = "0.4.1", path = "laurus-mcp" }
+laurus-server = { version = "0.4.1", path = "laurus-server" }
 prost = "0.14.3"
 rmcp = { version = "1.2.0", features = ["server", "transport-io"] }
 rustyline = "17.0.2"
