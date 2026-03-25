@@ -219,8 +219,10 @@ impl SpanQuery for SpanNearQuery {
             return Ok(Vec::new());
         }
         // SpanNear requires all clauses to match — intersect candidates
-        let mut candidates: std::collections::HashSet<u64> =
-            self.clauses[0].candidate_doc_ids(reader)?.into_iter().collect();
+        let mut candidates: std::collections::HashSet<u64> = self.clauses[0]
+            .candidate_doc_ids(reader)?
+            .into_iter()
+            .collect();
         for clause in &self.clauses[1..] {
             let clause_ids: std::collections::HashSet<u64> =
                 clause.candidate_doc_ids(reader)?.into_iter().collect();
@@ -476,8 +478,11 @@ impl SpanQuery for SpanWithinQuery {
 
     fn candidate_doc_ids(&self, reader: &dyn LexicalIndexReader) -> Result<Vec<u64>> {
         // Union: include candidates union exclude candidates
-        let mut candidates: std::collections::HashSet<u64> =
-            self.include.candidate_doc_ids(reader)?.into_iter().collect();
+        let mut candidates: std::collections::HashSet<u64> = self
+            .include
+            .candidate_doc_ids(reader)?
+            .into_iter()
+            .collect();
         for id in self.exclude.candidate_doc_ids(reader)? {
             candidates.insert(id);
         }
