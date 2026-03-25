@@ -29,9 +29,9 @@ fst = "0.4.7"
 futures = "0.3.32"
 lazy_static = "1.5.0"
 lindera = { version = "2.3.3", features = [
-    "embed-unidic",
+    "embed-ipadic",
     "embed-ko-dic",
-    "embed-jieba",
+    "embed-cc-cedict",
 ] }
 log = "0.4.29"
 lru = "0.16.3"

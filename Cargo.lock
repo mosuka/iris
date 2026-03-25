@@ -2331,7 +2331,7 @@ dependencies = [
 
 [[package]]
 name = "laurus"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "ahash",
  "aho-corasick",
@@ -2382,7 +2382,7 @@ dependencies = [
 
 [[package]]
 name = "laurus-cli"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "anyhow",
  "clap",
@@ -2400,7 +2400,7 @@ dependencies = [
 
 [[package]]
 name = "laurus-mcp"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "anyhow",
  "chrono",
@@ -2418,7 +2418,7 @@ dependencies = [
 
 [[package]]
 name = "laurus-python"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "chrono",
  "laurus",
@@ -2428,7 +2428,7 @@ dependencies = [
 
 [[package]]
 name = "laurus-server"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "anyhow",
  "axum",
