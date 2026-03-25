@@ -9,12 +9,7 @@ on:
 jobs:
   format:
     name: Format
-    strategy:
-      matrix:
-        platform:
-          - runner: ubuntu-latest
-        toolchain: [stable]
-    runs-on: ${{ matrix.platform.runner }}
+    runs-on: ubuntu-latest
     steps:
       - name: Run checkout
         uses: actions/checkout@v6
@@ -22,7 +17,7 @@ jobs:
       - name: Install toolchain
         uses: dtolnay/rust-toolchain@v1
         with:
-          toolchain: ${{ matrix.toolchain }}
+          toolchain: stable
           components: rustfmt
 
       - name: Run format
@@ -30,13 +25,7 @@ jobs:
 
   clippy:
     name: Clippy
-    needs: []
-    strategy:
-      matrix:
-        platform:
-          - runner: ubuntu-latest
-        toolchain: [stable]
-    runs-on: ${{ matrix.platform.runner }}
+    runs-on: ubuntu-latest
     steps:
       - name: Run checkout
         uses: actions/checkout@v6
@@ -55,7 +44,7 @@ jobs:
       - name: Install toolchain
         uses: dtolnay/rust-toolchain@v1
         with:
-          toolchain: ${{ matrix.toolchain }}
+          toolchain: stable
           components: clippy
 
       - name: Cache Rust build artifacts
