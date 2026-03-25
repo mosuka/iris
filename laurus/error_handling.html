@@ -35,10 +35,10 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-5d5c033a.js";
+            window.path_to_searchindex_js = "../searchindex-4ae5f909.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-710721a4.js"></script>
+        <script src="../toc-d1dadce2.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -195,7 +195,10 @@
 <tr><td style="text-align: left"><code>Query</code></td><td style="text-align: left">Query parsing/execution errors</td><td style="text-align: left">Malformed Query DSL, unknown field in query</td></tr>
 <tr><td style="text-align: left"><code>Storage</code></td><td style="text-align: left">Storage backend errors</td><td style="text-align: left">Failed to open storage, write failure</td></tr>
 <tr><td style="text-align: left"><code>Field</code></td><td style="text-align: left">Field definition errors</td><td style="text-align: left">Invalid field options, duplicate field name</td></tr>
+<tr><td style="text-align: left"><code>BenchmarkFailed</code></td><td style="text-align: left">Benchmark errors</td><td style="text-align: left">Benchmark execution failure</td></tr>
+<tr><td style="text-align: left"><code>ThreadJoinError</code></td><td style="text-align: left">Thread join errors</td><td style="text-align: left">Panic in a worker thread</td></tr>
 <tr><td style="text-align: left"><code>Json</code></td><td style="text-align: left">JSON serialization errors</td><td style="text-align: left">Malformed document JSON</td></tr>
+<tr><td style="text-align: left"><code>Anyhow</code></td><td style="text-align: left">Wrapped anyhow errors</td><td style="text-align: left">Errors from third-party crates via <code>anyhow</code></td></tr>
 <tr><td style="text-align: left"><code>InvalidOperation</code></td><td style="text-align: left">Invalid operation</td><td style="text-align: left">Searching before commit, double close</td></tr>
 <tr><td style="text-align: left"><code>ResourceExhausted</code></td><td style="text-align: left">Resource limits exceeded</td><td style="text-align: left">Out of memory, too many open files</td></tr>
 <tr><td style="text-align: left"><code>SerializationError</code></td><td style="text-align: left">Binary serialization errors</td><td style="text-align: left">Corrupt data on disk</td></tr>

@@ -35,10 +35,10 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-cfe8b56a.js";
+            window.path_to_searchindex_js = "../searchindex-10c422bb.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-d18ed058.js"></script>
+        <script src="../toc-7af89407.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -198,7 +198,10 @@
 <tr><td style="text-align: left"><code>Query</code></td><td style="text-align: left">クエリの解析/実行エラー</td><td style="text-align: left">不正なQuery DSL、クエリ内の不明なフィールド</td></tr>
 <tr><td style="text-align: left"><code>Storage</code></td><td style="text-align: left">ストレージバックエンドエラー</td><td style="text-align: left">ストレージのオープン失敗、書き込み失敗</td></tr>
 <tr><td style="text-align: left"><code>Field</code></td><td style="text-align: left">フィールド定義エラー</td><td style="text-align: left">無効なフィールドオプション、重複するフィールド名</td></tr>
+<tr><td style="text-align: left"><code>BenchmarkFailed</code></td><td style="text-align: left">ベンチマークエラー</td><td style="text-align: left">ベンチマーク実行失敗</td></tr>
+<tr><td style="text-align: left"><code>ThreadJoinError</code></td><td style="text-align: left">スレッド join エラー</td><td style="text-align: left">ワーカースレッドでのパニック</td></tr>
 <tr><td style="text-align: left"><code>Json</code></td><td style="text-align: left">JSONシリアライズエラー</td><td style="text-align: left">不正なドキュメントJSON</td></tr>
+<tr><td style="text-align: left"><code>Anyhow</code></td><td style="text-align: left">anyhow ラップエラー</td><td style="text-align: left"><code>anyhow</code> 経由のサードパーティクレートエラー</td></tr>
 <tr><td style="text-align: left"><code>InvalidOperation</code></td><td style="text-align: left">無効な操作</td><td style="text-align: left">コミット前の検索、二重クローズ</td></tr>
 <tr><td style="text-align: left"><code>ResourceExhausted</code></td><td style="text-align: left">リソース制限超過</td><td style="text-align: left">メモリ不足、オープンファイル数超過</td></tr>
 <tr><td style="text-align: left"><code>SerializationError</code></td><td style="text-align: left">バイナリシリアライズエラー</td><td style="text-align: left">ディスク上のデータ破損</td></tr>

@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-cfe8b56a.js";
+            window.path_to_searchindex_js = "searchindex-10c422bb.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-d18ed058.js"></script>
+        <script src="toc-7af89407.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -183,14 +183,21 @@
                         <h1 id="アーキテクチャ"><a class="header" href="#アーキテクチャ">アーキテクチャ</a></h1>
 <p>このページでは、Laurus の内部構造について説明します。アーキテクチャを理解することで、スキーマ設計、Analyzer の選択、検索戦略についてより適切な判断ができるようになります。</p>
 <h2 id="プロジェクト構成"><a class="header" href="#プロジェクト構成">プロジェクト構成</a></h2>
-<p>Laurus は Cargo workspace として 3 つのクレートで構成されています。</p>
+<p>Laurus は Cargo workspace として 5 つのクレートで構成されています。</p>
 <pre><code class="language-mermaid">graph TB
     CLI["laurus-cli\n(Binary Crate)\nCLI + REPL"]
     SRV["laurus-server\n(Library + Binary)\ngRPC Server + HTTP Gateway"]
+    MCP["laurus-mcp\n(Library + Binary)\nMCP Server"]
+    PY["laurus-python\n(cdylib)\nPython Bindings"]
     LIB["laurus\n(Library Crate)\nCore Search Engine"]
 
     CLI --&gt; LIB
+    CLI --&gt; SRV
+    CLI --&gt; MCP
     SRV --&gt; LIB
+    MCP --&gt; SRV
+    MCP --&gt; LIB
+    PY --&gt; LIB
 </code></pre>
 <div class="table-wrapper">
 <table>
@@ -201,6 +208,8 @@
 <tr><td style="text-align: left"><strong>laurus</strong></td><td style="text-align: left">Library</td><td style="text-align: left">コア検索エンジン – Lexical 検索、Vector 検索、ハイブリッド検索</td></tr>
 <tr><td style="text-align: left"><strong>laurus-cli</strong></td><td style="text-align: left">Binary</td><td style="text-align: left">インデックス管理と検索のためのコマンドラインインターフェース</td></tr>
 <tr><td style="text-align: left"><strong>laurus-server</strong></td><td style="text-align: left">Library + Binary</td><td style="text-align: left">オプションの HTTP/JSON ゲートウェイ付き gRPC サーバー</td></tr>
+<tr><td style="text-align: left"><strong>laurus-mcp</strong></td><td style="text-align: left">Library + Binary</td><td style="text-align: left">MCP（Model Context Protocol）サーバー</td></tr>
+<tr><td style="text-align: left"><strong>laurus-python</strong></td><td style="text-align: left">cdylib</td><td style="text-align: left">PyO3 による Python バインディング</td></tr>
 </tbody>
 </table>
 </div>
@@ -209,6 +218,8 @@
 <li><a href="laurus.html">ライブラリ概要</a></li>
 <li><a href="laurus-cli.html">CLI 概要</a></li>
 <li><a href="laurus-server.html">サーバー概要</a></li>
+<li><a href="laurus-mcp.html">MCP サーバー概要</a></li>
+<li><a href="laurus-python.html">Python バインディング概要</a></li>
 </ul>
 <h2 id="全体概要"><a class="header" href="#全体概要">全体概要</a></h2>
 <p>Laurus は単一の <code>Engine</code> を中心に構成されており、4 つの内部コンポーネントを統括します。</p>
