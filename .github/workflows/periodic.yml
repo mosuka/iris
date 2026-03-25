@@ -60,10 +60,66 @@ jobs:
       - name: Run clippy
         run: cargo clippy --all-targets --all-features -- -D warnings
 
-  test:
-    name: Test
+  # ============================================================
+  # Test laurus (core library)
+  # ============================================================
+  test-laurus:
+    name: Test laurus
     needs: [clippy]
     strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - runner: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            skip_embedding_features: true
+          - runner: macos-latest
+            target: aarch64-apple-darwin
+          - runner: macos-15-intel
+            target: x86_64-apple-darwin
+          - runner: windows-latest
+            target: x86_64-pc-windows-msvc
+          - runner: windows-latest
+            target: aarch64-pc-windows-msvc
+            skip_test_run: true
+            skip_embedding_features: true
+        toolchain: [stable, beta, nightly]
+    runs-on: ${{ matrix.platform.runner }}
+    steps:
+      - name: Run checkout
+        uses: actions/checkout@v6
+
+      - name: Install toolchain
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: ${{ matrix.toolchain }}
+          target: ${{ matrix.platform.target }}
+
+      - name: Run test
+        shell: bash
+        run: |
+          if [ "${{ matrix.platform.skip_embedding_features }}" == "true" ]; then
+            FEATURES=""
+          else
+            FEATURES="--all-features"
+          fi
+
+          if [ "${{ matrix.platform.skip_test_run }}" == "true" ]; then
+            cargo check --package laurus --target "${{ matrix.platform.target }}" $FEATURES
+          else
+            cargo test --package laurus --target "${{ matrix.platform.target }}" $FEATURES
+          fi
+
+  # ============================================================
+  # Test laurus-cli
+  # ============================================================
+  test-cli:
+    name: Test laurus-cli
+    needs: [clippy]
+    strategy:
+      fail-fast: false
       matrix:
         platform:
           - runner: ubuntu-latest
@@ -93,10 +149,63 @@ jobs:
           version: "24.x"
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Install toolchain
+        uses: dtolnay/rust-toolchain@v1
         with:
-          python-version: "3.13"
+          toolchain: ${{ matrix.toolchain }}
+          target: ${{ matrix.platform.target }}
+
+      - name: Run test
+        shell: bash
+        run: |
+          if [ "${{ matrix.platform.skip_embedding_features }}" == "true" ]; then
+            FEATURES=""
+          else
+            FEATURES="--all-features"
+          fi
+
+          if [ "${{ matrix.platform.skip_test_run }}" == "true" ]; then
+            cargo check --package laurus-cli --target "${{ matrix.platform.target }}" $FEATURES
+          else
+            cargo test --package laurus-cli --target "${{ matrix.platform.target }}" $FEATURES
+          fi
+
+  # ============================================================
+  # Test laurus-server
+  # ============================================================
+  test-server:
+    name: Test laurus-server
+    needs: [clippy]
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - runner: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            skip_embedding_features: true
+          - runner: macos-latest
+            target: aarch64-apple-darwin
+          - runner: macos-15-intel
+            target: x86_64-apple-darwin
+          - runner: windows-latest
+            target: x86_64-pc-windows-msvc
+          - runner: windows-latest
+            target: aarch64-pc-windows-msvc
+            skip_test_run: true
+            skip_embedding_features: true
+        toolchain: [stable, beta, nightly]
+    runs-on: ${{ matrix.platform.runner }}
+    steps:
+      - name: Run checkout
+        uses: actions/checkout@v6
+
+      - name: Install protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          version: "24.x"
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install toolchain
         uses: dtolnay/rust-toolchain@v1
@@ -114,7 +223,109 @@ jobs:
           fi
 
           if [ "${{ matrix.platform.skip_test_run }}" == "true" ]; then
-            cargo check --target "${{ matrix.platform.target }}" $FEATURES
+            cargo check --package laurus-server --target "${{ matrix.platform.target }}" $FEATURES
           else
-            cargo test --target "${{ matrix.platform.target }}" $FEATURES
+            cargo test --package laurus-server --target "${{ matrix.platform.target }}" $FEATURES
           fi
+
+  # ============================================================
+  # Test laurus-mcp
+  # ============================================================
+  test-mcp:
+    name: Test laurus-mcp
+    needs: [clippy]
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - runner: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            skip_embedding_features: true
+          - runner: macos-latest
+            target: aarch64-apple-darwin
+          - runner: macos-15-intel
+            target: x86_64-apple-darwin
+          - runner: windows-latest
+            target: x86_64-pc-windows-msvc
+          - runner: windows-latest
+            target: aarch64-pc-windows-msvc
+            skip_test_run: true
+            skip_embedding_features: true
+        toolchain: [stable, beta, nightly]
+    runs-on: ${{ matrix.platform.runner }}
+    steps:
+      - name: Run checkout
+        uses: actions/checkout@v6
+
+      - name: Install protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          version: "24.x"
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install toolchain
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: ${{ matrix.toolchain }}
+          target: ${{ matrix.platform.target }}
+
+      - name: Run test
+        shell: bash
+        run: |
+          if [ "${{ matrix.platform.skip_embedding_features }}" == "true" ]; then
+            FEATURES=""
+          else
+            FEATURES="--all-features"
+          fi
+
+          if [ "${{ matrix.platform.skip_test_run }}" == "true" ]; then
+            cargo check --package laurus-mcp --target "${{ matrix.platform.target }}" $FEATURES
+          else
+            cargo test --package laurus-mcp --target "${{ matrix.platform.target }}" $FEATURES
+          fi
+
+  # ============================================================
+  # Test laurus-python
+  # ============================================================
+  test-python:
+    name: Test laurus-python
+    needs: [clippy]
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - runner: ubuntu-latest
+          - runner: macos-latest
+          - runner: macos-15-intel
+          - runner: windows-latest
+        python: ["3.13"]
+    runs-on: ${{ matrix.platform.runner }}
+    steps:
+      - name: Run checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Install toolchain
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Run tests
+        working-directory: laurus-python
+        shell: bash
+        run: |
+          python -m venv .venv
+          if [ "$RUNNER_OS" == "Windows" ]; then
+            source .venv/Scripts/activate
+          else
+            source .venv/bin/activate
+          fi
+          pip install maturin pytest
+          maturin develop
+          pytest tests/ -v

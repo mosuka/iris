@@ -417,9 +417,16 @@ jobs:
         with:
           toolchain: stable
 
-      - name: Install maturin and pytest
-        run: pip install maturin pytest
-
       - name: Run tests
         working-directory: laurus-python
-        run: maturin develop && pytest tests/ -v
+        shell: bash
+        run: |
+          python -m venv .venv
+          if [ "$RUNNER_OS" == "Windows" ]; then
+            source .venv/Scripts/activate
+          else
+            source .venv/bin/activate
+          fi
+          pip install maturin pytest
+          maturin develop
+          pytest tests/ -v
