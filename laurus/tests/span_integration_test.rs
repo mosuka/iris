@@ -147,7 +147,9 @@ fn test_span_near_query_integration() -> Result<(), Box<dyn std::error::Error>> 
     let mut docs = Vec::new();
     while !matcher2.is_exhausted() {
         docs.push(matcher2.doc_id());
-        if !matcher2.next()? { break; }
+        if !matcher2.next()? {
+            break;
+        }
     }
     docs.sort();
     assert_eq!(docs, vec![0, 1]);
@@ -168,7 +170,9 @@ fn test_span_near_query_integration() -> Result<(), Box<dyn std::error::Error>> 
     let mut docs3 = Vec::new();
     while !matcher3.is_exhausted() {
         docs3.push(matcher3.doc_id());
-        if !matcher3.next()? { break; }
+        if !matcher3.next()? {
+            break;
+        }
     }
     docs3.sort();
     assert_eq!(docs3, vec![0, 2]);
