@@ -515,7 +515,7 @@ jobs:
   publish-pypi:
     name: Publish to PyPI
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [build-wheel, build-python-sdist]
+    needs: [create-release, build-wheel, build-python-sdist]
     runs-on: ubuntu-latest
     steps:
       - name: Download wheels and sdist
