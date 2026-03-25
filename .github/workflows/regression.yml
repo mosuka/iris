@@ -183,9 +183,8 @@ jobs:
             target: x86_64-apple-darwin
           - runner: windows-latest
             target: x86_64-pc-windows-msvc
-          - runner: windows-latest
+          - runner: windows-11-arm
             target: aarch64-pc-windows-msvc
-            skip_test_run: true
             skip_embedding_features: true
         toolchain: [stable]
     runs-on: ${{ matrix.platform.runner }}
@@ -213,11 +212,7 @@ jobs:
             FEATURES="--all-features"
           fi
 
-          if [ "${{ matrix.platform.skip_test_run }}" == "true" ]; then
-            cargo check --package laurus --target "${{ matrix.platform.target }}" $FEATURES
-          else
-            cargo test --package laurus --target "${{ matrix.platform.target }}" $FEATURES
-          fi
+          cargo test --package laurus --target "${{ matrix.platform.target }}" $FEATURES
 
   # ============================================================
   # Test laurus-cli
@@ -241,9 +236,8 @@ jobs:
             target: x86_64-apple-darwin
           - runner: windows-latest
             target: x86_64-pc-windows-msvc
-          - runner: windows-latest
+          - runner: windows-11-arm
             target: aarch64-pc-windows-msvc
-            skip_test_run: true
             skip_embedding_features: true
         toolchain: [stable]
     runs-on: ${{ matrix.platform.runner }}
@@ -277,11 +271,7 @@ jobs:
             FEATURES="--all-features"
           fi
 
-          if [ "${{ matrix.platform.skip_test_run }}" == "true" ]; then
-            cargo check --package laurus-cli --target "${{ matrix.platform.target }}" $FEATURES
-          else
-            cargo test --package laurus-cli --target "${{ matrix.platform.target }}" $FEATURES
-          fi
+          cargo test --package laurus-cli --target "${{ matrix.platform.target }}" $FEATURES
 
   # ============================================================
   # Test laurus-server
@@ -305,9 +295,8 @@ jobs:
             target: x86_64-apple-darwin
           - runner: windows-latest
             target: x86_64-pc-windows-msvc
-          - runner: windows-latest
+          - runner: windows-11-arm
             target: aarch64-pc-windows-msvc
-            skip_test_run: true
             skip_embedding_features: true
         toolchain: [stable]
     runs-on: ${{ matrix.platform.runner }}
@@ -341,11 +330,7 @@ jobs:
             FEATURES="--all-features"
           fi
 
-          if [ "${{ matrix.platform.skip_test_run }}" == "true" ]; then
-            cargo check --package laurus-server --target "${{ matrix.platform.target }}" $FEATURES
-          else
-            cargo test --package laurus-server --target "${{ matrix.platform.target }}" $FEATURES
-          fi
+          cargo test --package laurus-server --target "${{ matrix.platform.target }}" $FEATURES
 
   # ============================================================
   # Test laurus-mcp
@@ -369,9 +354,8 @@ jobs:
             target: x86_64-apple-darwin
           - runner: windows-latest
             target: x86_64-pc-windows-msvc
-          - runner: windows-latest
+          - runner: windows-11-arm
             target: aarch64-pc-windows-msvc
-            skip_test_run: true
             skip_embedding_features: true
         toolchain: [stable]
     runs-on: ${{ matrix.platform.runner }}
@@ -405,11 +389,7 @@ jobs:
             FEATURES="--all-features"
           fi
 
-          if [ "${{ matrix.platform.skip_test_run }}" == "true" ]; then
-            cargo check --package laurus-mcp --target "${{ matrix.platform.target }}" $FEATURES
-          else
-            cargo test --package laurus-mcp --target "${{ matrix.platform.target }}" $FEATURES
-          fi
+          cargo test --package laurus-mcp --target "${{ matrix.platform.target }}" $FEATURES
 
   # ============================================================
   # Test laurus-python
@@ -426,6 +406,7 @@ jobs:
             target: x86_64-unknown-linux-gnu
           - runner: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
+            skip_embedding_features: true
           - runner: macos-latest
             target: aarch64-apple-darwin
           - runner: macos-15-intel
@@ -434,6 +415,7 @@ jobs:
             target: x86_64-pc-windows-msvc
           - runner: windows-11-arm
             target: aarch64-pc-windows-msvc
+            skip_embedding_features: true
         python: ["3.13"]
     runs-on: ${{ matrix.platform.runner }}
     steps:
@@ -466,5 +448,9 @@ jobs:
             source .venv/bin/activate
           fi
           pip install maturin pytest
-          maturin develop
+          if [ "${{ matrix.platform.skip_embedding_features }}" == "true" ]; then
+            maturin develop
+          else
+            maturin develop --features embeddings-all
+          fi
           pytest tests/ -v
