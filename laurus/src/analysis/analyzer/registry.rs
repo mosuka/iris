@@ -11,7 +11,7 @@
 //! | `standard` | Regex tokenizer + lowercase + English stop words |
 //! | `keyword` | Treats the entire input as a single token |
 //! | `english` | English-optimized (equivalent to `standard`) |
-//! | `japanese` | Lindera/UniDic tokenizer + Japanese stop words |
+//! | `japanese` | Lindera/IPADIC tokenizer + Japanese stop words |
 //! | `simple` | Regex tokenizer only, no filters |
 //! | `noop` | Produces no tokens (for stored-only fields) |
 

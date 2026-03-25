@@ -7,7 +7,7 @@
 //!
 //! 1. UnicodeNormalizationCharFilter (NFKC normalization)
 //! 2. JapaneseIterationMarkCharFilter (iteration mark normalization)
-//! 3. LinderaTokenizer (UniDic dictionary)
+//! 3. LinderaTokenizer (IPADIC dictionary)
 //! 4. LowercaseFilter
 //! 5. StopFilter (Japanese stop words — 127 common particles/auxiliaries)
 //!
@@ -47,7 +47,7 @@ use crate::error::Result;
 /// # Components
 ///
 /// - **Char filters**: UnicodeNormalizationCharFilter (NFKC) + JapaneseIterationMarkCharFilter
-/// - **Tokenizer**: LinderaTokenizer with UniDic dictionary
+/// - **Tokenizer**: LinderaTokenizer with IPADIC dictionary
 /// - **Token filters**: LowercaseFilter + StopFilter (Japanese stop words — 127 common particles/auxiliaries)
 ///
 /// # Examples
@@ -73,7 +73,7 @@ impl JapaneseAnalyzer {
     /// A new `JapaneseAnalyzer` instance configured with:
     /// - UnicodeNormalizationCharFilter (NFKC)
     /// - JapaneseIterationMarkCharFilter
-    /// - LinderaTokenizer (UniDic dictionary)
+    /// - LinderaTokenizer (IPADIC dictionary)
     /// - LowercaseFilter
     /// - StopFilter with Japanese stop words
     ///
@@ -92,7 +92,7 @@ impl JapaneseAnalyzer {
     /// assert_eq!(analyzer.name(), "japanese");
     /// ```
     pub fn new() -> Result<Self> {
-        let tokenizer = Arc::new(LinderaTokenizer::new("normal", "embedded://unidic", None)?);
+        let tokenizer = Arc::new(LinderaTokenizer::new("normal", "embedded://ipadic", None)?);
         let analyzer = PipelineAnalyzer::new(tokenizer)
             .add_char_filter(Arc::new(UnicodeNormalizationCharFilter::new(
                 NormalizationForm::NFKC,
@@ -149,14 +149,12 @@ mod tests {
 
         let tokens: Vec<Token> = analyzer.analyze(text).unwrap().collect();
 
-        assert_eq!(tokens.len(), 7);
-        assert_eq!(tokens[0].text, "日本");
-        assert_eq!(tokens[1].text, "語");
-        assert_eq!(tokens[2].text, "形態");
-        assert_eq!(tokens[3].text, "素");
-        assert_eq!(tokens[4].text, "解析");
-        assert_eq!(tokens[5].text, "行う");
-        assert_eq!(tokens[6].text, "。");
+        assert_eq!(tokens.len(), 5);
+        assert_eq!(tokens[0].text, "日本語");
+        assert_eq!(tokens[1].text, "形態素");
+        assert_eq!(tokens[2].text, "解析");
+        assert_eq!(tokens[3].text, "行う");
+        assert_eq!(tokens[4].text, "。");
     }
 
     #[test]

@@ -7,7 +7,7 @@
 //!
 //! # Supported Languages
 //!
-//! - **Japanese**: Using UniDic dictionary (`embedded://unidic`)
+//! - **Japanese**: Using IPADIC dictionary (`embedded://ipadic`)
 //! - **Korean**: Using KO-DIC dictionary (`embedded://ko-dic`)
 //! - **Chinese**: Using CC-CEDICT dictionary (`embedded://cc-cedict`)
 //!
@@ -18,7 +18,7 @@
 //! use laurus::analysis::tokenizer::Tokenizer;
 //!
 //! // Japanese tokenization
-//! let tokenizer = LinderaTokenizer::new("normal", "embedded://unidic", None).unwrap();
+//! let tokenizer = LinderaTokenizer::new("normal", "embedded://ipadic", None).unwrap();
 //! let tokens: Vec<_> = tokenizer.tokenize("日本語の解析").unwrap().collect();
 //!
 //! // Tokens: ["日本", "語", "の", "解析"]
@@ -54,8 +54,8 @@ use crate::error::{LaurusError, Result};
 /// use laurus::analysis::tokenizer::lindera::LinderaTokenizer;
 /// use laurus::analysis::tokenizer::Tokenizer;
 ///
-/// // Japanese with UniDic
-/// let tokenizer = LinderaTokenizer::new("normal", "embedded://unidic", None).unwrap();
+/// // Japanese with IPADIC
+/// let tokenizer = LinderaTokenizer::new("normal", "embedded://ipadic", None).unwrap();
 /// let tokens: Vec<_> = tokenizer.tokenize("形態素解析").unwrap().collect();
 ///
 /// // Korean with KO-DIC
@@ -73,7 +73,7 @@ impl LinderaTokenizer {
     /// # Arguments
     ///
     /// * `mode_str` - Segmentation mode: "normal", "search", or "decompose"
-    /// * `dict_uri` - Dictionary URI (e.g., "embedded://unidic", "embedded://ko-dic")
+    /// * `dict_uri` - Dictionary URI (e.g., "embedded://ipadic", "embedded://ko-dic")
     /// * `user_dict_uri` - Optional user dictionary URI for custom words
     ///
     /// # Returns
@@ -95,14 +95,14 @@ impl LinderaTokenizer {
     /// // Japanese tokenizer
     /// let tokenizer = LinderaTokenizer::new(
     ///     "normal",
-    ///     "embedded://unidic",
+    ///     "embedded://ipadic",
     ///     None
     /// ).unwrap();
     ///
     /// // With user dictionary
     /// // let tokenizer = LinderaTokenizer::new(
     /// //     "normal",
-    /// //     "embedded://unidic",
+    /// //     "embedded://ipadic",
     /// //     Some("/path/to/user_dict.csv")
     /// // ).unwrap();
     /// ```
@@ -228,26 +228,24 @@ mod tests {
 
     #[test]
     fn test_tokenize_japanese() {
-        let tokenizer = LinderaTokenizer::new("normal", "embedded://unidic", None).unwrap();
+        let tokenizer = LinderaTokenizer::new("normal", "embedded://ipadic", None).unwrap();
 
         let text = "日本語の形態素解析を行うことができます。";
 
         let tokens: Vec<Token> = tokenizer.tokenize(text).unwrap().collect();
 
-        assert_eq!(tokens.len(), 13);
-        assert_eq!(tokens[0].text, "日本");
-        assert_eq!(tokens[1].text, "語");
-        assert_eq!(tokens[2].text, "の");
-        assert_eq!(tokens[3].text, "形態");
-        assert_eq!(tokens[4].text, "素");
-        assert_eq!(tokens[5].text, "解析");
-        assert_eq!(tokens[6].text, "を");
-        assert_eq!(tokens[7].text, "行う");
-        assert_eq!(tokens[8].text, "こと");
-        assert_eq!(tokens[9].text, "が");
-        assert_eq!(tokens[10].text, "でき");
-        assert_eq!(tokens[11].text, "ます");
-        assert_eq!(tokens[12].text, "。");
+        assert_eq!(tokens.len(), 11);
+        assert_eq!(tokens[0].text, "日本語");
+        assert_eq!(tokens[1].text, "の");
+        assert_eq!(tokens[2].text, "形態素");
+        assert_eq!(tokens[3].text, "解析");
+        assert_eq!(tokens[4].text, "を");
+        assert_eq!(tokens[5].text, "行う");
+        assert_eq!(tokens[6].text, "こと");
+        assert_eq!(tokens[7].text, "が");
+        assert_eq!(tokens[8].text, "でき");
+        assert_eq!(tokens[9].text, "ます");
+        assert_eq!(tokens[10].text, "。");
     }
 
     #[test]
@@ -274,7 +272,7 @@ mod tests {
 
     #[test]
     fn test_tokenize_chinese() {
-        let tokenizer = LinderaTokenizer::new("normal", "embedded://jieba", None).unwrap();
+        let tokenizer = LinderaTokenizer::new("normal", "embedded://cc-cedict", None).unwrap();
 
         let text = "能够进行汉语的形态素解析。";
 
@@ -292,7 +290,7 @@ mod tests {
 
     #[test]
     fn test_tokenizer_name() {
-        let tokenizer = LinderaTokenizer::new("normal", "embedded://unidic", None).unwrap();
+        let tokenizer = LinderaTokenizer::new("normal", "embedded://ipadic", None).unwrap();
 
         assert_eq!(tokenizer.name(), "lindera");
     }

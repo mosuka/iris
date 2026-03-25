@@ -78,7 +78,7 @@ pub enum TokenizerConfig {
     Lindera {
         /// Tokenization mode: `"normal"`, `"search"`, or `"decompose"`.
         mode: String,
-        /// Dictionary URI (e.g. `"embedded://unidic"`).
+        /// Dictionary URI (e.g. `"embedded://ipadic"`).
         dict: String,
         /// Optional user dictionary URI.
         #[serde(default)]
@@ -262,7 +262,7 @@ mod tests {
     fn test_full_schema_with_analyzers_json() {
         let json = r#"{
             "char_filters": [{"type": "unicode_normalization", "form": "nfkc"}],
-            "tokenizer": {"type": "lindera", "mode": "normal", "dict": "embedded://unidic"},
+            "tokenizer": {"type": "lindera", "mode": "normal", "dict": "embedded://ipadic"},
             "token_filters": [{"type": "lowercase"}]
         }"#;
         let def: AnalyzerDefinition = serde_json::from_str(json).unwrap();

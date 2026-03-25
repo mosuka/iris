@@ -828,7 +828,7 @@ mod tests {
         dict.add_synonym_group(vec!["ml".to_string(), "機械学習".to_string()]);
         dict.add_synonym_group(vec!["ai".to_string(), "人工知能".to_string()]);
 
-        let lindera_tokenizer = LinderaTokenizer::new("normal", "embedded://unidic", None).unwrap();
+        let lindera_tokenizer = LinderaTokenizer::new("normal", "embedded://ipadic", None).unwrap();
         let tokenizer = Box::new(lindera_tokenizer);
         let filter = SynonymGraphFilter::with_tokenizer(dict, tokenizer, true);
 
