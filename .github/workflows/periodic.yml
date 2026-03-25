@@ -24,6 +24,7 @@ jobs:
 
   clippy:
     name: Clippy
+    needs: [format]
     runs-on: ubuntu-latest
     steps:
       - name: Run checkout

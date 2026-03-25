@@ -129,7 +129,7 @@ jobs:
   # ============================================================
   clippy:
     name: Clippy
-    needs: [changes]
+    needs: [changes, format]
     if: ${{ !failure() && !cancelled() && needs.changes.outputs.code == 'true' }}
     runs-on: ubuntu-latest
     steps:
