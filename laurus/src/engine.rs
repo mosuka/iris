@@ -778,22 +778,10 @@ impl Engine {
         }
     }
 
-    /// Resolve external ID from internal doc_id.
-    fn resolve_external_id(&self, internal_id: u64) -> Result<String> {
-        if let Some(doc) = self.log.get_document(internal_id)?
-            && let Some(id) = doc.fields.get("_id").and_then(|v| v.as_text())
-        {
-            return Ok(id.to_string());
-        }
-        Ok(format!("unknown_{}", internal_id))
-    }
-
     /// Batch-resolve external IDs and documents for multiple internal IDs.
     ///
     /// Fetches all documents in one pass through the document store,
-    /// reducing per-document lock acquisition overhead compared to
-    /// calling [`resolve_external_id`] and [`get_document_by_internal_id`]
-    /// separately for each document.
+    /// reducing per-document lock acquisition overhead.
     ///
     /// # Arguments
     ///
