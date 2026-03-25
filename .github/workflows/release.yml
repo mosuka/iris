@@ -25,6 +25,7 @@ jobs:
 
   clippy:
     name: Clippy
+    needs: [format]
     runs-on: ubuntu-latest
     steps:
       - name: Run checkout
@@ -60,7 +61,7 @@ jobs:
   # ============================================================
   test-laurus:
     name: Test laurus
-    needs: [format, clippy]
+    needs: [clippy]
     strategy:
       fail-fast: false
       matrix:
@@ -112,7 +113,7 @@ jobs:
   # ============================================================
   test-cli:
     name: Test laurus-cli
-    needs: [format, clippy, test-mcp]
+    needs: [clippy, test-mcp]
     strategy:
       fail-fast: false
       matrix:
@@ -170,7 +171,7 @@ jobs:
   # ============================================================
   test-server:
     name: Test laurus-server
-    needs: [format, clippy, test-laurus]
+    needs: [clippy, test-laurus]
     strategy:
       fail-fast: false
       matrix:
@@ -228,7 +229,7 @@ jobs:
   # ============================================================
   test-mcp:
     name: Test laurus-mcp
-    needs: [format, clippy, test-server]
+    needs: [clippy, test-server]
     strategy:
       fail-fast: false
       matrix:
@@ -286,7 +287,7 @@ jobs:
   # ============================================================
   test-python:
     name: Test laurus-python
-    needs: [format, clippy, test-laurus]
+    needs: [clippy, test-laurus]
     strategy:
       fail-fast: false
       matrix:
@@ -345,7 +346,7 @@ jobs:
           pytest tests/ -v
 
   # ============================================================
-  # Gate: 全テスト通過を確認してからビルドへ
+  # Gate: ensure all tests pass before proceeding to build
   # ============================================================
   test-all:
     name: Test All
@@ -394,7 +395,7 @@ jobs:
             target: x86_64
           - runner: windows-latest
             target: x86_64
-          - runner: windows-latest
+          - runner: windows-11-arm
             target: aarch64
     runs-on: ${{ matrix.platform.runner }}
     steps:

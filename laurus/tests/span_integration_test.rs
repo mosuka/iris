@@ -87,7 +87,7 @@ fn test_span_query_wrapper_integration() -> Result<(), Box<dyn std::error::Error
     let mut matcher = wrapper.matcher(reader.as_ref())?;
 
     // Should match Doc 0 ("world" at 1)
-    assert!(matcher.next()?);
+    assert!(!matcher.is_exhausted());
     assert_eq!(matcher.doc_id(), 0);
 
     // Should match Doc 1 ("world" at 0)
@@ -122,7 +122,7 @@ fn test_span_near_query_integration() -> Result<(), Box<dyn std::error::Error>> 
     );
     let wrapper1 = SpanQueryWrapper::new(Box::new(q1));
     let mut matcher1 = wrapper1.matcher(reader.as_ref())?;
-    assert!(matcher1.next()?);
+    assert!(!matcher1.is_exhausted());
     assert_eq!(matcher1.doc_id(), 0);
     assert!(!matcher1.next()?);
 
@@ -145,8 +145,11 @@ fn test_span_near_query_integration() -> Result<(), Box<dyn std::error::Error>> 
     let mut matcher2 = wrapper2.matcher(reader.as_ref())?;
     // Should match 0 and 1
     let mut docs = Vec::new();
-    while matcher2.next()? {
+    while !matcher2.is_exhausted() {
         docs.push(matcher2.doc_id());
+        if !matcher2.next()? {
+            break;
+        }
     }
     docs.sort();
     assert_eq!(docs, vec![0, 1]);
@@ -165,8 +168,11 @@ fn test_span_near_query_integration() -> Result<(), Box<dyn std::error::Error>> 
     let wrapper3 = SpanQueryWrapper::new(Box::new(q3));
     let mut matcher3 = wrapper3.matcher(reader.as_ref())?;
     let mut docs3 = Vec::new();
-    while matcher3.next()? {
+    while !matcher3.is_exhausted() {
         docs3.push(matcher3.doc_id());
+        if !matcher3.next()? {
+            break;
+        }
     }
     docs3.sort();
     assert_eq!(docs3, vec![0, 2]);
@@ -203,7 +209,7 @@ fn test_span_containing_query_integration() -> Result<(), Box<dyn std::error::Er
     let wrapper = SpanQueryWrapper::new(Box::new(q));
     let mut matcher = wrapper.matcher(reader.as_ref())?;
 
-    assert!(matcher.next()?);
+    assert!(!matcher.is_exhausted());
     assert_eq!(matcher.doc_id(), 2);
     assert!(!matcher.next()?);
 
@@ -237,7 +243,7 @@ fn test_span_within_query_integration() -> Result<(), Box<dyn std::error::Error>
     let wrapper = SpanQueryWrapper::new(Box::new(q));
     let mut matcher = wrapper.matcher(reader.as_ref())?;
 
-    assert!(matcher.next()?);
+    assert!(!matcher.is_exhausted());
     assert_eq!(matcher.doc_id(), 2);
     assert!(!matcher.next()?);
 
@@ -251,8 +257,8 @@ fn test_span_within_query_integration() -> Result<(), Box<dyn std::error::Error>
     let exclude2 = builder.term("world");
     let q2 = builder.within(Box::new(include2), Box::new(exclude2), 0);
     let wrapper2 = SpanQueryWrapper::new(Box::new(q2));
-    let mut matcher2 = wrapper2.matcher(reader.as_ref())?;
-    assert!(matcher2.next()?);
+    let matcher2 = wrapper2.matcher(reader.as_ref())?;
+    assert!(!matcher2.is_exhausted());
     assert_eq!(matcher2.doc_id(), 2);
 
     Ok(())

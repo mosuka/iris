@@ -59,7 +59,11 @@ impl Span {
 /// Base trait for span queries.
 pub trait SpanQuery: Send + Sync + std::fmt::Debug {
     /// Get spans for a document.
-    fn get_spans(&self, doc_id: u32, reader: &dyn LexicalIndexReader) -> Result<Vec<Span>>;
+    fn get_spans(&self, doc_id: u64, reader: &dyn LexicalIndexReader) -> Result<Vec<Span>>;
+
+    /// Return the set of candidate doc IDs that *might* match this span query.
+    /// The result is an upper bound; actual matches are confirmed by [`get_spans`].
+    fn candidate_doc_ids(&self, reader: &dyn LexicalIndexReader) -> Result<Vec<u64>>;
 
     /// Get the field name this span query operates on.
     fn field_name(&self) -> &str;
@@ -102,12 +106,12 @@ impl SpanTermQuery {
 }
 
 impl SpanQuery for SpanTermQuery {
-    fn get_spans(&self, doc_id: u32, reader: &dyn LexicalIndexReader) -> Result<Vec<Span>> {
+    fn get_spans(&self, doc_id: u64, reader: &dyn LexicalIndexReader) -> Result<Vec<Span>> {
         let mut spans = Vec::new();
 
         if let Some(mut iter) = reader.postings(&self.field, &self.term)? {
             // Skip to the target document
-            if iter.skip_to(doc_id as u64)? && iter.doc_id() == doc_id as u64 {
+            if iter.skip_to(doc_id)? && iter.doc_id() == doc_id {
                 // Determine positions if available
                 let positions = iter.positions()?;
                 for pos in positions {
@@ -118,6 +122,16 @@ impl SpanQuery for SpanTermQuery {
         }
 
         Ok(spans)
+    }
+
+    fn candidate_doc_ids(&self, reader: &dyn LexicalIndexReader) -> Result<Vec<u64>> {
+        let mut ids = Vec::new();
+        if let Some(mut iter) = reader.postings(&self.field, &self.term)? {
+            while iter.next()? {
+                ids.push(iter.doc_id());
+            }
+        }
+        Ok(ids)
     }
 
     fn field_name(&self) -> &str {
@@ -184,7 +198,7 @@ impl SpanNearQuery {
 }
 
 impl SpanQuery for SpanNearQuery {
-    fn get_spans(&self, doc_id: u32, reader: &dyn LexicalIndexReader) -> Result<Vec<Span>> {
+    fn get_spans(&self, doc_id: u64, reader: &dyn LexicalIndexReader) -> Result<Vec<Span>> {
         let mut all_clause_spans = Vec::new();
 
         // Get spans for each clause
@@ -198,6 +212,25 @@ impl SpanQuery for SpanNearQuery {
         self.find_near_spans(&all_clause_spans, 0, Vec::new(), &mut result_spans);
 
         Ok(result_spans)
+    }
+
+    fn candidate_doc_ids(&self, reader: &dyn LexicalIndexReader) -> Result<Vec<u64>> {
+        if self.clauses.is_empty() {
+            return Ok(Vec::new());
+        }
+        // SpanNear requires all clauses to match — intersect candidates
+        let mut candidates: std::collections::HashSet<u64> = self.clauses[0]
+            .candidate_doc_ids(reader)?
+            .into_iter()
+            .collect();
+        for clause in &self.clauses[1..] {
+            let clause_ids: std::collections::HashSet<u64> =
+                clause.candidate_doc_ids(reader)?.into_iter().collect();
+            candidates = candidates.intersection(&clause_ids).copied().collect();
+        }
+        let mut result: Vec<u64> = candidates.into_iter().collect();
+        result.sort_unstable();
+        Ok(result)
     }
 
     fn field_name(&self) -> &str {
@@ -335,7 +368,7 @@ impl SpanContainingQuery {
 }
 
 impl SpanQuery for SpanContainingQuery {
-    fn get_spans(&self, doc_id: u32, reader: &dyn LexicalIndexReader) -> Result<Vec<Span>> {
+    fn get_spans(&self, doc_id: u64, reader: &dyn LexicalIndexReader) -> Result<Vec<Span>> {
         let big_spans = self.big.get_spans(doc_id, reader)?;
         let little_spans = self.little.get_spans(doc_id, reader)?;
 
@@ -350,6 +383,18 @@ impl SpanQuery for SpanContainingQuery {
             }
         }
 
+        Ok(result)
+    }
+
+    fn candidate_doc_ids(&self, reader: &dyn LexicalIndexReader) -> Result<Vec<u64>> {
+        // Union: a document is a candidate if big OR little matches
+        let mut candidates: std::collections::HashSet<u64> =
+            self.big.candidate_doc_ids(reader)?.into_iter().collect();
+        for id in self.little.candidate_doc_ids(reader)? {
+            candidates.insert(id);
+        }
+        let mut result: Vec<u64> = candidates.into_iter().collect();
+        result.sort_unstable();
         Ok(result)
     }
 
@@ -407,7 +452,7 @@ impl SpanWithinQuery {
 }
 
 impl SpanQuery for SpanWithinQuery {
-    fn get_spans(&self, doc_id: u32, reader: &dyn LexicalIndexReader) -> Result<Vec<Span>> {
+    fn get_spans(&self, doc_id: u64, reader: &dyn LexicalIndexReader) -> Result<Vec<Span>> {
         let include_spans = self.include.get_spans(doc_id, reader)?;
         let exclude_spans = self.exclude.get_spans(doc_id, reader)?;
 
@@ -428,6 +473,21 @@ impl SpanQuery for SpanWithinQuery {
             }
         }
 
+        Ok(result)
+    }
+
+    fn candidate_doc_ids(&self, reader: &dyn LexicalIndexReader) -> Result<Vec<u64>> {
+        // Union: include candidates union exclude candidates
+        let mut candidates: std::collections::HashSet<u64> = self
+            .include
+            .candidate_doc_ids(reader)?
+            .into_iter()
+            .collect();
+        for id in self.exclude.candidate_doc_ids(reader)? {
+            candidates.insert(id);
+        }
+        let mut result: Vec<u64> = candidates.into_iter().collect();
+        result.sort_unstable();
         Ok(result)
     }
 
@@ -478,22 +538,22 @@ impl SpanQueryWrapper {
 
 impl SpanMatcher {
     pub fn new(span_query: Box<dyn SpanQuery>, reader: &dyn LexicalIndexReader) -> Result<Self> {
+        // Enumerate actual doc_ids from posting lists and check if spans exist.
+        let candidates = span_query.candidate_doc_ids(reader)?;
         let mut matches = Vec::new();
-        let doc_count = reader.doc_count();
-
-        // Naive scan of all documents
-        for doc_id in 0..doc_count {
-            // In a real optimized system we wouldn't do this.
-            let spans = span_query.get_spans(doc_id as u32, reader)?;
+        for doc_id in candidates {
+            let spans = span_query.get_spans(doc_id, reader)?;
             if !spans.is_empty() {
                 matches.push(doc_id);
             }
         }
 
+        // Initialize current_index=0 like PhraseMatcher so that is_exhausted() works correctly from the start.
+        let current_doc_id = matches.first().copied().unwrap_or(u64::MAX);
         Ok(SpanMatcher {
             matches,
-            current_index: usize::MAX,
-            current_doc_id: u64::MAX,
+            current_index: 0,
+            current_doc_id,
         })
     }
 }
@@ -519,11 +579,7 @@ impl Matcher for SpanMatcher {
     }
 
     fn next(&mut self) -> Result<bool> {
-        if self.current_index == usize::MAX {
-            self.current_index = 0;
-        } else {
-            self.current_index += 1;
-        }
+        self.current_index += 1;
 
         if self.current_index >= self.matches.len() {
             self.current_doc_id = u64::MAX;
@@ -535,10 +591,6 @@ impl Matcher for SpanMatcher {
     }
 
     fn skip_to(&mut self, target: u64) -> Result<bool> {
-        if self.current_index == usize::MAX {
-            self.current_index = 0;
-        }
-
         while self.current_index < self.matches.len() && self.matches[self.current_index] < target {
             self.current_index += 1;
         }
@@ -583,18 +635,12 @@ impl SpanScorer {
         reader: &dyn LexicalIndexReader,
         boost: f32,
     ) -> Result<Self> {
+        // Enumerate actual doc_ids from posting lists and pre-compute scores.
+        let candidates = span_query.candidate_doc_ids(reader)?;
         let mut scores = HashMap::new();
-        let doc_count = reader.doc_count();
-
-        // Naive pre-calculation
-        // Note: For large indexes this is terrible.
-        // But for SpanTermQuery it's equivalent to fully materializing the query.
-        for doc_id in 0..doc_count {
-            let spans = span_query.get_spans(doc_id as u32, reader)?;
+        for doc_id in candidates {
+            let spans = span_query.get_spans(doc_id, reader)?;
             if !spans.is_empty() {
-                // Score = boost * count (simplified)
-                // Or basic TF/IDF? We lack global stats easily here unless we query reader.
-                // Let's use count * boost for now.
                 let score = (spans.len() as f32) * boost;
                 scores.insert(doc_id, score);
             }
