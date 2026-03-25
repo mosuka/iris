@@ -98,6 +98,11 @@ jobs:
           toolchain: ${{ matrix.toolchain }}
           target: ${{ matrix.platform.target }}
 
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "${{ matrix.toolchain }}-${{ matrix.platform.target }}"
+
       - name: Run test
         shell: bash
         run: |
@@ -118,7 +123,7 @@ jobs:
   # ============================================================
   test-cli:
     name: Test laurus-cli
-    needs: [format, clippy]
+    needs: [format, clippy, test-mcp]
     strategy:
       fail-fast: false
       matrix:
@@ -155,6 +160,11 @@ jobs:
         with:
           toolchain: ${{ matrix.toolchain }}
           target: ${{ matrix.platform.target }}
+
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "${{ matrix.toolchain }}-${{ matrix.platform.target }}"
 
       - name: Run test
         shell: bash
@@ -176,7 +186,7 @@ jobs:
   # ============================================================
   test-server:
     name: Test laurus-server
-    needs: [format, clippy]
+    needs: [format, clippy, test-laurus]
     strategy:
       fail-fast: false
       matrix:
@@ -213,6 +223,11 @@ jobs:
         with:
           toolchain: ${{ matrix.toolchain }}
           target: ${{ matrix.platform.target }}
+
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "${{ matrix.toolchain }}-${{ matrix.platform.target }}"
 
       - name: Run test
         shell: bash
@@ -234,7 +249,7 @@ jobs:
   # ============================================================
   test-mcp:
     name: Test laurus-mcp
-    needs: [format, clippy]
+    needs: [format, clippy, test-server]
     strategy:
       fail-fast: false
       matrix:
@@ -272,6 +287,11 @@ jobs:
           toolchain: ${{ matrix.toolchain }}
           target: ${{ matrix.platform.target }}
 
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "${{ matrix.toolchain }}-${{ matrix.platform.target }}"
+
       - name: Run test
         shell: bash
         run: |
@@ -292,15 +312,19 @@ jobs:
   # ============================================================
   test-python:
     name: Test laurus-python
-    needs: [format, clippy]
+    needs: [format, clippy, test-laurus]
     strategy:
       fail-fast: false
       matrix:
         platform:
           - runner: ubuntu-latest
+            native_target: x86_64-unknown-linux-gnu
           - runner: macos-latest
+            native_target: aarch64-apple-darwin
           - runner: macos-15-intel
+            native_target: x86_64-apple-darwin
           - runner: windows-latest
+            native_target: x86_64-pc-windows-msvc
         python: ["3.13"]
     runs-on: ${{ matrix.platform.runner }}
     steps:
@@ -316,6 +340,11 @@ jobs:
         uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
+
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "stable-${{ matrix.platform.native_target }}"
 
       - name: Run tests
         working-directory: laurus-python
