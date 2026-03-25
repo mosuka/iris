@@ -65,7 +65,7 @@ jobs:
   # ============================================================
   test-laurus:
     name: Test laurus
-    needs: [clippy]
+    needs: [format, clippy]
     strategy:
       fail-fast: false
       matrix:
@@ -117,7 +117,7 @@ jobs:
   # ============================================================
   test-cli:
     name: Test laurus-cli
-    needs: [clippy]
+    needs: [format, clippy]
     strategy:
       fail-fast: false
       matrix:
@@ -175,7 +175,7 @@ jobs:
   # ============================================================
   test-server:
     name: Test laurus-server
-    needs: [clippy]
+    needs: [format, clippy]
     strategy:
       fail-fast: false
       matrix:
@@ -233,7 +233,7 @@ jobs:
   # ============================================================
   test-mcp:
     name: Test laurus-mcp
-    needs: [clippy]
+    needs: [format, clippy]
     strategy:
       fail-fast: false
       matrix:
@@ -291,7 +291,7 @@ jobs:
   # ============================================================
   test-python:
     name: Test laurus-python
-    needs: [clippy]
+    needs: [format, clippy]
     strategy:
       fail-fast: false
       matrix:
