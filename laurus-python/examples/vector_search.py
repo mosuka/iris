@@ -1,57 +1,28 @@
 """Vector Search Example — semantic similarity search with embeddings.
 
-Demonstrates vector search using pre-computed embeddings:
+Demonstrates vector search using laurus's built-in CandleBert embedder:
 - Basic vector search (semantic similarity)
 - Filtered vector search (with lexical filters)
 
-In this example the embeddings are produced by `sentence-transformers`.
-If that package is not installed, the example falls back to random vectors
-so you can verify the API shape without additional dependencies.
+The embedder is registered in the schema and laurus automatically converts
+text to vectors at index and query time — no external embedding library needed.
 
 Run with:
-    pip install sentence-transformers   # optional but recommended
-    maturin develop
+    maturin develop --features embeddings-candle
     python examples/vector_search.py
 """
 
 from __future__ import annotations
 
-import math
-import os
-import random
-
 import laurus
 
 # ---------------------------------------------------------------------------
-# Embedding helper
+# Embedder configuration
 # ---------------------------------------------------------------------------
 
-try:
-    from sentence_transformers import SentenceTransformer  # type: ignore
-
-    _model = SentenceTransformer("all-MiniLM-L6-v2")
-    _DIM = 384
-
-    def embed(text: str) -> list[float]:
-        return _model.encode(text, normalize_embeddings=True).tolist()
-
-except ImportError:
-    # Fallback: deterministic pseudo-embeddings for demo purposes only.
-    # Real similarity is not meaningful with these vectors.
-    _DIM = 64
-
-    def embed(text: str) -> list[float]:  # type: ignore[misc]
-        rng = random.Random(hash(text) & 0xFFFFFFFF)
-        raw = [rng.gauss(0, 1) for _ in range(_DIM)]
-        norm = math.sqrt(sum(x * x for x in raw)) or 1.0
-        return [x / norm for x in raw]
-
-    print(
-        "[NOTE] sentence-transformers not found — using random fallback vectors.\n"
-        "       Results will NOT reflect semantic similarity.\n"
-        "       Install with: pip install sentence-transformers\n"
-    )
-
+_EMBEDDER_NAME = "bert"
+_EMBEDDER_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
+_DIM = 384  # dimension for all-MiniLM-L6-v2
 
 # ---------------------------------------------------------------------------
 # Dataset
@@ -72,20 +43,22 @@ CHUNKS = [
 
 def main() -> None:
     print("=== Laurus Vector Search Example ===\n")
-    print(f"Embedding model dimension: {_DIM}\n")
+    print(f"Embedder: {_EMBEDDER_MODEL} (dim={_DIM})\n")
 
     # ── Schema ─────────────────────────────────────────────────────────────
     schema = laurus.Schema()
+    schema.add_embedder(_EMBEDDER_NAME, {"type": "candle_bert", "model": _EMBEDDER_MODEL})
     schema.add_text_field("title")
     schema.add_text_field("text")
     schema.add_text_field("category")
     schema.add_integer_field("page")
-    schema.add_flat_field("text_vec", dimension=_DIM, distance="cosine")
+    schema.add_flat_field("text_vec", dimension=_DIM, distance="cosine", embedder=_EMBEDDER_NAME)
     schema.set_default_fields(["text"])
 
     index = laurus.Index(schema=schema)
 
     # ── Index ──────────────────────────────────────────────────────────────
+    # Passing raw text to text_vec lets laurus automatically vectorize it via the built-in embedder.
     print("--- Indexing chunked documents ---\n")
     for doc_id, title, text, page, category in CHUNKS:
         index.add_document(
@@ -95,7 +68,7 @@ def main() -> None:
                 "text": text,
                 "category": category,
                 "page": page,
-                "text_vec": embed(text),
+                "text_vec": text,
             },
         )
     index.commit()
@@ -107,9 +80,8 @@ def main() -> None:
     print("=" * 60)
     print("[A] Basic Vector Search: 'memory safety'")
     print("=" * 60)
-    query_vec = embed("memory safety")
     _print_results(
-        index.search(laurus.VectorQuery("text_vec", query_vec), limit=3)
+        index.search(laurus.VectorTextQuery("text_vec", "memory safety"), limit=3)
     )
 
     # =====================================================================
@@ -119,7 +91,7 @@ def main() -> None:
     print("[B] Filtered Vector Search: 'memory safety' + category='concurrency'")
     print("=" * 60)
     request = laurus.SearchRequest(
-        vector_query=laurus.VectorQuery("text_vec", embed("memory safety")),
+        vector_query=laurus.VectorTextQuery("text_vec", "memory safety"),
         filter_query=laurus.TermQuery("category", "concurrency"),
         limit=3,
     )
@@ -132,7 +104,7 @@ def main() -> None:
     print("[C] Filtered Vector Search: 'type system' + page <= 3")
     print("=" * 60)
     request = laurus.SearchRequest(
-        vector_query=laurus.VectorQuery("text_vec", embed("type system")),
+        vector_query=laurus.VectorTextQuery("text_vec", "type system"),
         filter_query=laurus.NumericRangeQuery("page", min=1, max=3),
         limit=3,
     )

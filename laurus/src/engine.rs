@@ -1205,18 +1205,22 @@ impl Engine {
             Ok(results)
         } else {
             // Only lexical results (or both empty)
-            let mut results = Vec::with_capacity(request_limit);
-            for hit in lexical_hits
+            let paginated: Vec<_> = lexical_hits
                 .into_iter()
                 .skip(request_offset)
                 .take(request_limit)
-            {
-                let external_id = self.resolve_external_id(hit.doc_id)?;
-                results.push(SearchResult {
-                    id: external_id,
-                    score: hit.score,
-                    document: hit.document,
-                });
+                .collect();
+            let ids: Vec<u64> = paginated.iter().map(|h| h.doc_id).collect();
+            let resolved = self.resolve_ids_and_documents_batch(&ids)?;
+            let mut results = Vec::with_capacity(paginated.len());
+            for hit in paginated {
+                if let Some((external_id, document)) = resolved.get(&hit.doc_id) {
+                    results.push(SearchResult {
+                        id: external_id.clone(),
+                        score: hit.score,
+                        document: document.clone(),
+                    });
+                }
             }
             Ok(results)
         }

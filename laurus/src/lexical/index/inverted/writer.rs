@@ -476,6 +476,20 @@ impl InvertedIndexWriter {
                         );
                         point_values.insert(field_name.clone(), vec![ts]);
                     }
+                    DataValue::Bool(b) => {
+                        // bool is indexed as "true"/"false" text for lexical queries,
+                        // and also stored as a point value (1.0/0.0) for numeric range queries
+                        let text = if *b { "true" } else { "false" };
+                        field_terms.insert(
+                            field_name.clone(),
+                            vec![AnalyzedTerm {
+                                term: text.to_string(),
+                                position: 0,
+                                frequency: 1,
+                                offset: (0, text.len()),
+                            }],
+                        );
+                    }
                     DataValue::Geo(lat, lon) => {
                         // Geo points are indexed as 2D points in BKD
                         field_terms.insert(

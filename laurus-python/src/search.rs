@@ -284,13 +284,9 @@ pub fn build_request_from_py(
     limit: usize,
     offset: usize,
 ) -> PyResult<laurus::SearchRequest> {
-    // Full SearchRequest object
+    // Full SearchRequest object — use limit/offset as-is without overriding.
     if let Ok(req) = query.extract::<PyRef<PySearchRequest>>() {
-        let mut built = req.build(py)?;
-        // Override limit/offset only if the defaults are unchanged
-        built.limit = limit;
-        built.offset = offset;
-        return Ok(built);
+        return Ok(req.build(py)?);
     }
 
     let mut builder = SearchRequestBuilder::new().limit(limit).offset(offset);

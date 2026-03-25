@@ -345,7 +345,7 @@ jobs:
           pytest tests/ -v
 
   # ============================================================
-  # Gate: 全テスト通過を確認してからビルドへ
+  # Gate: ensure all tests pass before proceeding to build
   # ============================================================
   test-all:
     name: Test All
@@ -394,7 +394,7 @@ jobs:
             target: x86_64
           - runner: windows-latest
             target: x86_64
-          - runner: windows-latest
+          - runner: windows-11-arm
             target: aarch64
     runs-on: ${{ matrix.platform.runner }}
     steps:
