@@ -36,7 +36,7 @@ jobs:
       # For push / workflow_dispatch, this step is skipped and
       # the Resolve outputs step falls back to true for all flags.
       - name: Detect file changes
-        uses: dorny/paths-filter@v3
+        uses: dorny/paths-filter@v4
         id: filter
         if: github.event_name == 'pull_request'
         with:
