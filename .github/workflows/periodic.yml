@@ -343,3 +343,54 @@ jobs:
             maturin develop --features embeddings-all
           fi
           pytest tests/ -v
+
+  # ============================================================
+  # Test laurus-nodejs
+  # ============================================================
+  test-nodejs:
+    name: Test laurus-nodejs
+    needs: [clippy, test-laurus]
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - runner: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+          - runner: macos-latest
+            target: aarch64-apple-darwin
+          - runner: macos-15-intel
+            target: x86_64-apple-darwin
+          - runner: windows-latest
+            target: x86_64-pc-windows-msvc
+          - runner: windows-11-arm
+            target: aarch64-pc-windows-msvc
+        node: ["22"]
+    runs-on: ${{ matrix.platform.runner }}
+    steps:
+      - name: Run checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: Install toolchain
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "stable-${{ matrix.platform.target }}"
+
+      - name: Run tests
+        working-directory: laurus-nodejs
+        shell: bash
+        run: |
+          npm install
+          npm run build:debug
+          npm test

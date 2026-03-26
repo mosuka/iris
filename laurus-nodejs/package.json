@@ -1,0 +1,49 @@
+{
+  "name": "@laurus/nodejs",
+  "version": "0.4.2",
+  "description": "Node.js bindings for the Laurus search library",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "napi": {
+    "binaryName": "laurus-nodejs",
+    "targets": [
+      "x86_64-apple-darwin",
+      "x86_64-unknown-linux-gnu",
+      "x86_64-unknown-linux-musl",
+      "aarch64-apple-darwin",
+      "aarch64-unknown-linux-gnu",
+      "aarch64-unknown-linux-musl",
+      "x86_64-pc-windows-msvc"
+    ]
+  },
+  "scripts": {
+    "build": "napi build --platform --release -p laurus-nodejs",
+    "build:debug": "napi build --platform -p laurus-nodejs",
+    "prepublishOnly": "napi prepublish -t npm",
+    "test": "vitest run",
+    "artifacts": "napi artifacts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mosuka/laurus"
+  },
+  "keywords": [
+    "search",
+    "vector",
+    "lexical",
+    "hybrid",
+    "full-text-search",
+    "napi-rs",
+    "rust"
+  ],
+  "author": "Minoru Osuka",
+  "license": "MIT",
+  "files": [
+    "index.js",
+    "index.d.ts"
+  ],
+  "devDependencies": {
+    "@napi-rs/cli": "^3",
+    "vitest": "^4.1.1"
+  }
+}

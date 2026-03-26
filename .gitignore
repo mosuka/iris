@@ -17,3 +17,5 @@ perf.data*
 flamegraph.svg
 
 .tmp
+
+.mypy_cache/

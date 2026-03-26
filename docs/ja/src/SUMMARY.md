@@ -71,6 +71,14 @@
   - [クイックスタート](laurus-python/quickstart.md)
   - [API リファレンス](laurus-python/api_reference.md)
 
+# laurus-nodejs
+
+- [Node.js バインディング概要](laurus-nodejs.md)
+  - [インストール](laurus-nodejs/installation.md)
+  - [クイックスタート](laurus-nodejs/quickstart.md)
+  - [API リファレンス](laurus-nodejs/api_reference.md)
+  - [開発](laurus-nodejs/development.md)
+
 # 開発ガイド
 
 - [ビルドとテスト](development/build_and_test.md)

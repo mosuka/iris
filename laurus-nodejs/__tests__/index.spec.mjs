@@ -1,0 +1,355 @@
+/**
+ * Basic integration tests for the laurus Node.js binding.
+ *
+ * Mirrors the Python test suite (laurus-python/tests/test_index.py).
+ */
+
+import { describe, it, expect, beforeEach } from "vitest";
+import {
+  Index,
+  Schema,
+  TermQuery,
+  PhraseQuery,
+  FuzzyQuery,
+  WildcardQuery,
+  NumericRangeQuery,
+  BooleanQuery,
+  VectorQuery,
+  SearchRequest,
+  RRF,
+  WeightedSum,
+  SynonymDictionary,
+  WhitespaceTokenizer,
+  SynonymGraphFilter,
+} from "../index.js";
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+async function createTextIndex() {
+  const schema = new Schema();
+  schema.addTextField("title");
+  schema.addTextField("body");
+  schema.setDefaultFields(["title", "body"]);
+  const index = await Index.create(null, schema);
+  await index.putDocument("doc1", {
+    title: "Introduction to Rust",
+    body: "Systems programming language.",
+  });
+  await index.putDocument("doc2", {
+    title: "Python for Data Science",
+    body: "Data analysis with Python.",
+  });
+  await index.commit();
+  return index;
+}
+
+async function createVectorIndex() {
+  const schema = new Schema();
+  schema.addTextField("title");
+  schema.addHnswField("embedding", 4);
+  schema.setDefaultFields(["title"]);
+  const index = await Index.create(null, schema);
+  await index.putDocument("doc1", {
+    title: "Rust",
+    embedding: [0.1, 0.2, 0.3, 0.4],
+  });
+  await index.putDocument("doc2", {
+    title: "Python",
+    embedding: [0.9, 0.8, 0.7, 0.6],
+  });
+  await index.commit();
+  return index;
+}
+
+// ---------------------------------------------------------------------------
+// Index creation
+// ---------------------------------------------------------------------------
+
+describe("Index creation", () => {
+  it("creates an in-memory index", async () => {
+    const index = await Index.create();
+    expect(index).toBeDefined();
+  });
+
+  it("creates an index with schema", async () => {
+    const schema = new Schema();
+    schema.addTextField("title");
+    const index = await Index.create(null, schema);
+    expect(index).toBeDefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Document CRUD
+// ---------------------------------------------------------------------------
+
+describe("Document CRUD", () => {
+  it("put and get document", async () => {
+    const index = await Index.create();
+    await index.putDocument("doc1", { title: "Hello" });
+    await index.commit();
+    const docs = await index.getDocuments("doc1");
+    expect(docs).toHaveLength(1);
+  });
+
+  it("put replaces existing document", async () => {
+    const index = await createTextIndex();
+    await index.putDocument("doc1", { title: "Updated" });
+    await index.commit();
+    const docs = await index.getDocuments("doc1");
+    expect(docs).toHaveLength(1);
+  });
+
+  it("add_document appends versions", async () => {
+    const index = await Index.create();
+    await index.addDocument("doc1", { title: "Chunk 1" });
+    await index.addDocument("doc1", { title: "Chunk 2" });
+    const docs = await index.getDocuments("doc1");
+    expect(docs).toHaveLength(2);
+  });
+
+  it("delete documents", async () => {
+    const index = await createTextIndex();
+    await index.deleteDocuments("doc1");
+    await index.commit();
+    const docs = await index.getDocuments("doc1");
+    expect(docs).toHaveLength(0);
+  });
+
+  it("get documents for unknown id returns empty", async () => {
+    const index = await createTextIndex();
+    const docs = await index.getDocuments("does_not_exist");
+    expect(docs).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Stats
+// ---------------------------------------------------------------------------
+
+describe("Stats", () => {
+  it("returns document count", async () => {
+    const index = await createTextIndex();
+    const stats = index.stats();
+    expect(stats.documentCount).toBe(2);
+  });
+
+  it("returns vector field stats", async () => {
+    const index = await createVectorIndex();
+    const stats = index.stats();
+    expect(stats.vectorFields.embedding).toBeDefined();
+    expect(stats.vectorFields.embedding.count).toBe(2);
+    expect(stats.vectorFields.embedding.dimension).toBe(4);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Lexical search
+// ---------------------------------------------------------------------------
+
+describe("Lexical search", () => {
+  it("searches with DSL string", async () => {
+    const index = await createTextIndex();
+    const results = await index.search("title:rust", 5);
+    expect(results.length).toBeGreaterThanOrEqual(1);
+    expect(results[0].id).toBe("doc1");
+  });
+
+  it("searches with term query", async () => {
+    const index = await createTextIndex();
+    const results = await index.searchTerm("body", "python", 5);
+    expect(results.length).toBeGreaterThanOrEqual(1);
+    expect(results[0].id).toBe("doc2");
+  });
+
+  it("result has id, score, and document", async () => {
+    const index = await createTextIndex();
+    const results = await index.search("title:rust", 1);
+    const r = results[0];
+    expect(r.id).toBe("doc1");
+    expect(r.score).toBeGreaterThan(0);
+    expect(r.document).toBeDefined();
+    expect(r.document.title).toBe("Introduction to Rust");
+  });
+
+  it("respects limit", async () => {
+    const index = await createTextIndex();
+    const results = await index.search(
+      "body:programming OR body:python",
+      1,
+    );
+    expect(results.length).toBeLessThanOrEqual(1);
+  });
+
+  it("respects offset", async () => {
+    const index = await createTextIndex();
+    const all = await index.search("body:programming OR body:data", 10);
+    const offset = await index.search(
+      "body:programming OR body:data",
+      10,
+      1,
+    );
+    if (all.length > 1) {
+      expect(offset[0].id).toBe(all[1].id);
+    }
+  });
+
+  it("returns empty for no matches", async () => {
+    const index = await createTextIndex();
+    const results = await index.search("title:nonexistent_xyz", 5);
+    expect(results).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Vector search
+// ---------------------------------------------------------------------------
+
+describe("Vector search", () => {
+  it("searches with vector query", async () => {
+    const index = await createVectorIndex();
+    const results = await index.searchVector(
+      "embedding",
+      [0.1, 0.2, 0.3, 0.4],
+      2,
+    );
+    expect(results.length).toBeGreaterThanOrEqual(1);
+    expect(results[0].id).toBe("doc1");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Hybrid search
+// ---------------------------------------------------------------------------
+
+describe("Hybrid search", () => {
+  it("searches with SearchRequest (lexical only)", async () => {
+    const index = await createTextIndex();
+    const req = new SearchRequest(5);
+    req.setLexicalTermQuery("title", "rust");
+    const results = await index.searchWithRequest(req);
+    expect(results.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("searches with SearchRequest (hybrid)", async () => {
+    const index = await createVectorIndex();
+    const req = new SearchRequest(5);
+    req.setLexicalTermQuery("title", "rust");
+    req.setVectorQuery("embedding", [0.1, 0.2, 0.3, 0.4]);
+    req.setRrfFusion(60.0);
+    const results = await index.searchWithRequest(req);
+    expect(results.length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Query types
+// ---------------------------------------------------------------------------
+
+describe("Query types", () => {
+  it("phrase query", async () => {
+    const index = await createTextIndex();
+    const req = new SearchRequest(5);
+    req.setLexicalPhraseQuery("title", ["introduction", "rust"]);
+    const results = await index.searchWithRequest(req);
+    expect(results.some((r) => r.id === "doc1")).toBe(true);
+  });
+
+  it("numeric range query", async () => {
+    const schema = new Schema();
+    schema.addIntegerField("year");
+    const index = await Index.create(null, schema);
+    await index.putDocument("doc1", { year: 2020 });
+    await index.putDocument("doc2", { year: 2023 });
+    await index.commit();
+
+    const q = new NumericRangeQuery("year", 2022, 2024);
+    const req = new SearchRequest(5);
+    // Use DSL or searchTerm - NumericRangeQuery needs to be used via SearchRequest
+    // For now, test that the class can be constructed
+    expect(q).toBeDefined();
+  });
+
+  it("boolean query (mustTerm / mustNotTerm)", async () => {
+    const index = await createTextIndex();
+    const bq = new BooleanQuery();
+    bq.mustTerm("body", "programming");
+    bq.mustNotTerm("title", "python");
+    // BooleanQuery is used internally; test construction
+    expect(bq).toBeDefined();
+  });
+
+  it("wildcard query construction", async () => {
+    const q = new WildcardQuery("title", "py*");
+    expect(q).toBeDefined();
+  });
+
+  it("fuzzy query construction", async () => {
+    const q = new FuzzyQuery("body", "pythn", 1);
+    expect(q).toBeDefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Fusion algorithms
+// ---------------------------------------------------------------------------
+
+describe("Fusion algorithms", () => {
+  it("RRF construction", () => {
+    const rrf = new RRF(60.0);
+    expect(rrf).toBeDefined();
+  });
+
+  it("WeightedSum construction", () => {
+    const ws = new WeightedSum(0.3, 0.7);
+    expect(ws).toBeDefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Text analysis
+// ---------------------------------------------------------------------------
+
+describe("Text analysis", () => {
+  it("creates synonym dictionary", () => {
+    const syn = new SynonymDictionary();
+    syn.addSynonymGroup(["ml", "machine learning"]);
+    expect(syn).toBeDefined();
+  });
+
+  it("whitespace tokenizer", () => {
+    const tokenizer = new WhitespaceTokenizer();
+    const tokens = tokenizer.tokenize("hello world");
+    expect(tokens).toHaveLength(2);
+    expect(tokens[0].text).toBe("hello");
+    expect(tokens[1].text).toBe("world");
+  });
+
+  it("synonym graph filter", () => {
+    const syn = new SynonymDictionary();
+    syn.addSynonymGroup(["ml", "machine learning"]);
+    const tokenizer = new WhitespaceTokenizer();
+    const filter = new SynonymGraphFilter(syn, true, 0.8);
+
+    const tokens = tokenizer.tokenize("ml tutorial");
+    const result = filter.apply(tokens);
+    const texts = result.map((t) => t.text);
+    expect(texts).toContain("ml");
+    expect(texts.some((t) => t === "machine" || t === "machine learning")).toBe(
+      true,
+    );
+  });
+
+  it("token has expected fields", () => {
+    const tokenizer = new WhitespaceTokenizer();
+    const tokens = tokenizer.tokenize("hello");
+    const tok = tokens[0];
+    expect(tok.text).toBe("hello");
+    expect(typeof tok.position).toBe("number");
+    expect(typeof tok.positionIncrement).toBe("number");
+    expect(typeof tok.positionLength).toBe("number");
+    expect(typeof tok.boost).toBe("number");
+  });
+});
