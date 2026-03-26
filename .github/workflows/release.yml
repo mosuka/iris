@@ -730,18 +730,45 @@ jobs:
           pattern: "nodejs-binding-*"
           merge-multiple: true
 
-      - name: Move artifacts and publish
+      - name: Install dependencies
+        working-directory: laurus-nodejs
+        run: npm install
+
+      - name: Prepare npm packages
+        working-directory: laurus-nodejs
+        run: |
+          npx napi create-npm-dirs
+          npx napi artifacts --output-dir artifacts
+
+      - name: Publish to npm
         working-directory: laurus-nodejs
         shell: bash
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          npm install
-          npx napi artifacts --output-dir artifacts
           PACKAGE_NAME=$(node -p "require('./package.json').name")
           PACKAGE_VERSION=$(node -p "require('./package.json').version")
+
           if npm view "${PACKAGE_NAME}@${PACKAGE_VERSION}" version 2>/dev/null; then
-            echo "${PACKAGE_NAME}@${PACKAGE_VERSION} has already been published"
-          else
-            npm publish --access public
+            echo "${PACKAGE_NAME}@${PACKAGE_VERSION} has already been published, skipping"
+            exit 0
           fi
+
+          # Publish platform-specific packages first
+          for dir in npm/*/; do
+            if [ -f "${dir}package.json" ]; then
+              PKG=$(node -p "require('./${dir}package.json').name")
+              PKG_VER=$(node -p "require('./${dir}package.json').version")
+              if npm view "${PKG}@${PKG_VER}" version 2>/dev/null; then
+                echo "${PKG}@${PKG_VER} already published, skipping"
+              else
+                echo "Publishing ${PKG}@${PKG_VER}..."
+                pushd "${dir}"
+                npm publish --access public
+                popd
+              fi
+            fi
+          done
+
+          # Publish the main package
+          npm publish --access public

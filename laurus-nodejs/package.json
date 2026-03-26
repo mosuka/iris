@@ -18,7 +18,6 @@
   "scripts": {
     "build": "napi build --platform --release -p laurus-nodejs",
     "build:debug": "napi build --platform -p laurus-nodejs",
-    "prepublishOnly": "napi pre-publish -p npm",
     "test": "vitest run",
     "artifacts": "napi artifacts"
   },
@@ -41,6 +40,14 @@
     "index.js",
     "index.d.ts"
   ],
+  "optionalDependencies": {
+    "@laurus/nodejs-darwin-x64": "0.4.2",
+    "@laurus/nodejs-darwin-arm64": "0.4.2",
+    "@laurus/nodejs-linux-x64-gnu": "0.4.2",
+    "@laurus/nodejs-linux-arm64-gnu": "0.4.2",
+    "@laurus/nodejs-win32-x64-msvc": "0.4.2",
+    "@laurus/nodejs-win32-arm64-msvc": "0.4.2"
+  },
   "devDependencies": {
     "@napi-rs/cli": "^3",
     "vitest": "^4.1.1"
