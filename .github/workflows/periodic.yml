@@ -6,6 +6,9 @@ on:
     - cron: 0 0 * * SUN
 
 jobs:
+  # ============================================================
+  # Format code with rustfmt
+  # ============================================================
   format:
     name: Format
     runs-on: ubuntu-latest
@@ -22,6 +25,9 @@ jobs:
       - name: Run format
         run: cargo fmt --all -- --check
 
+  # ============================================================
+  # Lint with clippy
+  # ============================================================
   clippy:
     name: Clippy
     needs: [format]
@@ -108,69 +114,11 @@ jobs:
           cargo test --package laurus --target "${{ matrix.platform.target }}" $FEATURES
 
   # ============================================================
-  # Test laurus-cli
-  # ============================================================
-  test-cli:
-    name: Test laurus-cli
-    needs: [clippy, test-mcp]
-    strategy:
-      fail-fast: false
-      matrix:
-        platform:
-          - runner: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-          - runner: ubuntu-24.04-arm
-            target: aarch64-unknown-linux-gnu
-            skip_embedding_features: true
-          - runner: macos-latest
-            target: aarch64-apple-darwin
-          - runner: macos-15-intel
-            target: x86_64-apple-darwin
-          - runner: windows-latest
-            target: x86_64-pc-windows-msvc
-          - runner: windows-11-arm
-            target: aarch64-pc-windows-msvc
-            skip_embedding_features: true
-        toolchain: [stable, beta, nightly]
-    runs-on: ${{ matrix.platform.runner }}
-    steps:
-      - name: Run checkout
-        uses: actions/checkout@v6
-
-      - name: Install protoc
-        uses: arduino/setup-protoc@v3
-        with:
-          version: "24.x"
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Install toolchain
-        uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: ${{ matrix.toolchain }}
-          target: ${{ matrix.platform.target }}
-
-      - name: Cache Rust build artifacts
-        uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: "${{ matrix.toolchain }}-${{ matrix.platform.target }}"
-
-      - name: Run test
-        shell: bash
-        run: |
-          if [ "${{ matrix.platform.skip_embedding_features }}" == "true" ]; then
-            FEATURES=""
-          else
-            FEATURES="--all-features"
-          fi
-
-          cargo test --package laurus-cli --target "${{ matrix.platform.target }}" $FEATURES
-
-  # ============================================================
   # Test laurus-server
   # ============================================================
   test-server:
     name: Test laurus-server
-    needs: [clippy, test-laurus]
+    needs: [test-laurus]
     strategy:
       fail-fast: false
       matrix:
@@ -228,7 +176,7 @@ jobs:
   # ============================================================
   test-mcp:
     name: Test laurus-mcp
-    needs: [clippy, test-server]
+    needs: [test-laurus, test-server]
     strategy:
       fail-fast: false
       matrix:
@@ -282,11 +230,69 @@ jobs:
           cargo test --package laurus-mcp --target "${{ matrix.platform.target }}" $FEATURES
 
   # ============================================================
+  # Test laurus-cli
+  # ============================================================
+  test-cli:
+    name: Test laurus-cli
+    needs: [test-laurus, test-server, test-mcp]
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - runner: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            skip_embedding_features: true
+          - runner: macos-latest
+            target: aarch64-apple-darwin
+          - runner: macos-15-intel
+            target: x86_64-apple-darwin
+          - runner: windows-latest
+            target: x86_64-pc-windows-msvc
+          - runner: windows-11-arm
+            target: aarch64-pc-windows-msvc
+            skip_embedding_features: true
+        toolchain: [stable, beta, nightly]
+    runs-on: ${{ matrix.platform.runner }}
+    steps:
+      - name: Run checkout
+        uses: actions/checkout@v6
+
+      - name: Install protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          version: "24.x"
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install toolchain
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: ${{ matrix.toolchain }}
+          target: ${{ matrix.platform.target }}
+
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "${{ matrix.toolchain }}-${{ matrix.platform.target }}"
+
+      - name: Run test
+        shell: bash
+        run: |
+          if [ "${{ matrix.platform.skip_embedding_features }}" == "true" ]; then
+            FEATURES=""
+          else
+            FEATURES="--all-features"
+          fi
+
+          cargo test --package laurus-cli --target "${{ matrix.platform.target }}" $FEATURES
+
+  # ============================================================
   # Test laurus-python
   # ============================================================
   test-python:
     name: Test laurus-python
-    needs: [clippy, test-laurus]
+    needs: [test-laurus]
     strategy:
       fail-fast: false
       matrix:
@@ -349,7 +355,7 @@ jobs:
   # ============================================================
   test-nodejs:
     name: Test laurus-nodejs
-    needs: [clippy, test-laurus]
+    needs: [test-laurus]
     strategy:
       fail-fast: false
       matrix:

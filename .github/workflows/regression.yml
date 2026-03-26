@@ -114,7 +114,7 @@ jobs:
           echo "nodejs=${NODEJS:-true}" >> "$GITHUB_OUTPUT"
 
   # ============================================================
-  # Format
+  # Format code with rustfmt
   # ============================================================
   format:
     name: Format
@@ -135,7 +135,7 @@ jobs:
         run: cargo fmt --all -- --check
 
   # ============================================================
-  # Clippy
+  # Lint with clippy
   # ============================================================
   clippy:
     name: Clippy
@@ -225,70 +225,11 @@ jobs:
           cargo test --package laurus --target "${{ matrix.platform.target }}" $FEATURES
 
   # ============================================================
-  # Test laurus-cli
-  # ============================================================
-  test-cli:
-    name: Test laurus-cli
-    needs: [changes, clippy, test-mcp]
-    if: ${{ !failure() && !cancelled() && needs.changes.outputs.cli == 'true' }}
-    strategy:
-      fail-fast: false
-      matrix:
-        platform:
-          - runner: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-          - runner: ubuntu-24.04-arm
-            target: aarch64-unknown-linux-gnu
-            skip_embedding_features: true
-          - runner: macos-latest
-            target: aarch64-apple-darwin
-          - runner: macos-15-intel
-            target: x86_64-apple-darwin
-          - runner: windows-latest
-            target: x86_64-pc-windows-msvc
-          - runner: windows-11-arm
-            target: aarch64-pc-windows-msvc
-            skip_embedding_features: true
-        toolchain: [stable]
-    runs-on: ${{ matrix.platform.runner }}
-    steps:
-      - name: Run checkout
-        uses: actions/checkout@v6
-
-      - name: Install protoc
-        uses: arduino/setup-protoc@v3
-        with:
-          version: "24.x"
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Install toolchain
-        uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: ${{ matrix.toolchain }}
-          target: ${{ matrix.platform.target }}
-
-      - name: Cache Rust build artifacts
-        uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: "${{ matrix.toolchain }}-${{ matrix.platform.target }}"
-
-      - name: Run test
-        shell: bash
-        run: |
-          if [ "${{ matrix.platform.skip_embedding_features }}" == "true" ]; then
-            FEATURES=""
-          else
-            FEATURES="--all-features"
-          fi
-
-          cargo test --package laurus-cli --target "${{ matrix.platform.target }}" $FEATURES
-
-  # ============================================================
   # Test laurus-server
   # ============================================================
   test-server:
     name: Test laurus-server
-    needs: [changes, clippy, test-laurus]
+    needs: [changes, test-laurus]
     if: ${{ !failure() && !cancelled() && needs.changes.outputs.server == 'true' }}
     strategy:
       fail-fast: false
@@ -347,7 +288,7 @@ jobs:
   # ============================================================
   test-mcp:
     name: Test laurus-mcp
-    needs: [changes, clippy, test-server]
+    needs: [changes, test-laurus, test-server]
     if: ${{ !failure() && !cancelled() && needs.changes.outputs.mcp == 'true' }}
     strategy:
       fail-fast: false
@@ -402,11 +343,70 @@ jobs:
           cargo test --package laurus-mcp --target "${{ matrix.platform.target }}" $FEATURES
 
   # ============================================================
+  # Test laurus-cli
+  # ============================================================
+  test-cli:
+    name: Test laurus-cli
+    needs: [changes, test-laurus, test-server, test-mcp]
+    if: ${{ !failure() && !cancelled() && needs.changes.outputs.cli == 'true' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - runner: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            skip_embedding_features: true
+          - runner: macos-latest
+            target: aarch64-apple-darwin
+          - runner: macos-15-intel
+            target: x86_64-apple-darwin
+          - runner: windows-latest
+            target: x86_64-pc-windows-msvc
+          - runner: windows-11-arm
+            target: aarch64-pc-windows-msvc
+            skip_embedding_features: true
+        toolchain: [stable]
+    runs-on: ${{ matrix.platform.runner }}
+    steps:
+      - name: Run checkout
+        uses: actions/checkout@v6
+
+      - name: Install protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          version: "24.x"
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install toolchain
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: ${{ matrix.toolchain }}
+          target: ${{ matrix.platform.target }}
+
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "${{ matrix.toolchain }}-${{ matrix.platform.target }}"
+
+      - name: Run test
+        shell: bash
+        run: |
+          if [ "${{ matrix.platform.skip_embedding_features }}" == "true" ]; then
+            FEATURES=""
+          else
+            FEATURES="--all-features"
+          fi
+
+          cargo test --package laurus-cli --target "${{ matrix.platform.target }}" $FEATURES
+
+  # ============================================================
   # Test laurus-python
   # ============================================================
   test-python:
     name: Test laurus-python
-    needs: [changes, clippy, test-laurus]
+    needs: [changes, test-laurus]
     if: ${{ !failure() && !cancelled() && needs.changes.outputs.python == 'true' }}
     strategy:
       fail-fast: false
@@ -470,7 +470,7 @@ jobs:
   # ============================================================
   test-nodejs:
     name: Test laurus-nodejs
-    needs: [changes, clippy, test-laurus]
+    needs: [changes, test-laurus]
     if: ${{ !failure() && !cancelled() && needs.changes.outputs.nodejs == 'true' }}
     strategy:
       fail-fast: false
