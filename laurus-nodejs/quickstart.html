@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-d2a933a4.js";
+            window.path_to_searchindex_js = "../searchindex-cb135e87.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-27beae76.js"></script>
@@ -179,7 +179,7 @@
                     <main>
                         <h1 id="quick-start"><a class="header" href="#quick-start">Quick Start</a></h1>
 <h2 id="1-create-an-index"><a class="header" href="#1-create-an-index">1. Create an index</a></h2>
-<pre><code class="language-javascript">import { Index, Schema } from "@laurus/nodejs";
+<pre><code class="language-javascript">import { Index, Schema } from "laurus-nodejs";
 
 // In-memory index (ephemeral, useful for prototyping)
 const index = await Index.create();
@@ -218,7 +218,7 @@ for (const r of results) {
 <h2 id="4-vector-search"><a class="header" href="#4-vector-search">4. Vector search</a></h2>
 <p>Vector search requires a schema with a vector field
 and pre-computed embeddings.</p>
-<pre><code class="language-javascript">import { Index, Schema } from "@laurus/nodejs";
+<pre><code class="language-javascript">import { Index, Schema } from "laurus-nodejs";
 
 const schema = new Schema();
 schema.addTextField("name");
@@ -240,7 +240,7 @@ const results = await index.searchVector(
 );
 </code></pre>
 <h2 id="5-hybrid-search"><a class="header" href="#5-hybrid-search">5. Hybrid search</a></h2>
-<pre><code class="language-javascript">import { SearchRequest } from "@laurus/nodejs";
+<pre><code class="language-javascript">import { SearchRequest } from "laurus-nodejs";
 
 const req = new SearchRequest(5);
 req.setLexicalTermQuery("name", "express");

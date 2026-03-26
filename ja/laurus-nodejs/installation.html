@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-99e5d321.js";
+            window.path_to_searchindex_js = "../searchindex-09404469.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-c4adc502.js"></script>
@@ -182,7 +182,7 @@
                     <main>
                         <h1 id="インストール"><a class="header" href="#インストール">インストール</a></h1>
 <h2 id="npm-から"><a class="header" href="#npm-から">npm から</a></h2>
-<pre><code class="language-bash">npm install @laurus/nodejs
+<pre><code class="language-bash">npm install laurus-nodejs
 </code></pre>
 <h2 id="ソースから"><a class="header" href="#ソースから">ソースから</a></h2>
 <p>ソースからビルドするには Rust ツールチェーン（1.85 以降）と
@@ -201,7 +201,7 @@ npm run build
 npm run build:debug
 </code></pre>
 <h2 id="確認"><a class="header" href="#確認">確認</a></h2>
-<pre><code class="language-javascript">import { Index } from "@laurus/nodejs";
+<pre><code class="language-javascript">import { Index } from "laurus-nodejs";
 const index = await Index.create();
 console.log(index.stats());
 // { documentCount: 0, vectorFields: {} }

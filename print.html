@@ -36,7 +36,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-d2a933a4.js";
+            window.path_to_searchindex_js = "searchindex-cb135e87.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-27beae76.js"></script>
@@ -7950,7 +7950,7 @@ cumbersome (it would require <code>asyncio.run()</code> everywhere).
 Instead, each method calls <code>tokio::Runtime::block_on()</code> under
 the hood to bridge async Rust to synchronous Python.</p>
 <blockquote>
-<p><strong>Note:</strong> The Node.js binding (<code>@laurus/nodejs</code>) exposes the
+<p><strong>Note:</strong> The Node.js binding (<code>laurus-nodejs</code>) exposes the
 same Rust engine methods as native <code>async</code> / <code>Promise</code> APIs,
 since Node.js’s event loop supports async natively.</p>
 </blockquote>
@@ -8336,7 +8336,7 @@ print(stats["vector_fields"])
 </div>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="nodejs-binding-overview"><a class="header" href="#nodejs-binding-overview">Node.js Binding Overview</a></h1>
-<p>The <code>@laurus/nodejs</code> package provides Node.js/TypeScript bindings
+<p>The <code>laurus-nodejs</code> package provides Node.js/TypeScript bindings
 for the Laurus search engine. It is built as a native addon using
 <a href="https://napi.rs">napi-rs</a>, giving Node.js programs direct access
 to Laurus’s lexical, vector, and hybrid search capabilities with
@@ -8360,7 +8360,7 @@ and synonym expansion</li>
 </ul>
 <h2 id="architecture-4"><a class="header" href="#architecture-4">Architecture</a></h2>
 <pre><code class="language-mermaid">graph LR
-    subgraph "@laurus/nodejs"
+    subgraph "laurus-nodejs"
         JsIndex["Index\n(JS class)"]
         JsQuery["Query classes"]
         JsSearch["SearchRequest\n/ SearchResult"]
@@ -8388,7 +8388,7 @@ cumbersome. Node.js has no such constraint, so the async Rust
 engine is exposed directly as Promises.</p>
 </blockquote>
 <h2 id="quick-start-5"><a class="header" href="#quick-start-5">Quick Start</a></h2>
-<pre><code class="language-javascript">import { Index, Schema } from "@laurus/nodejs";
+<pre><code class="language-javascript">import { Index, Schema } from "laurus-nodejs";
 
 // Create an in-memory index
 const schema = new Schema();
@@ -8429,7 +8429,7 @@ Building from source, testing, and project layout</li>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="installation-3"><a class="header" href="#installation-3">Installation</a></h1>
 <h2 id="from-npm"><a class="header" href="#from-npm">From npm</a></h2>
-<pre><code class="language-bash">npm install @laurus/nodejs
+<pre><code class="language-bash">npm install laurus-nodejs
 </code></pre>
 <h2 id="from-source-2"><a class="header" href="#from-source-2">From source</a></h2>
 <p>Building from source requires a Rust toolchain (1.85 or later)
@@ -8448,7 +8448,7 @@ npm run build
 npm run build:debug
 </code></pre>
 <h2 id="verify-2"><a class="header" href="#verify-2">Verify</a></h2>
-<pre><code class="language-javascript">import { Index } from "@laurus/nodejs";
+<pre><code class="language-javascript">import { Index } from "laurus-nodejs";
 const index = await Index.create();
 console.log(index.stats());
 // { documentCount: 0, vectorFields: {} }
@@ -8461,7 +8461,7 @@ console.log(index.stats());
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="quick-start-6"><a class="header" href="#quick-start-6">Quick Start</a></h1>
 <h2 id="1-create-an-index-1"><a class="header" href="#1-create-an-index-1">1. Create an index</a></h2>
-<pre><code class="language-javascript">import { Index, Schema } from "@laurus/nodejs";
+<pre><code class="language-javascript">import { Index, Schema } from "laurus-nodejs";
 
 // In-memory index (ephemeral, useful for prototyping)
 const index = await Index.create();
@@ -8500,7 +8500,7 @@ for (const r of results) {
 <h2 id="4-vector-search-1"><a class="header" href="#4-vector-search-1">4. Vector search</a></h2>
 <p>Vector search requires a schema with a vector field
 and pre-computed embeddings.</p>
-<pre><code class="language-javascript">import { Index, Schema } from "@laurus/nodejs";
+<pre><code class="language-javascript">import { Index, Schema } from "laurus-nodejs";
 
 const schema = new Schema();
 schema.addTextField("name");
@@ -8522,7 +8522,7 @@ const results = await index.searchVector(
 );
 </code></pre>
 <h2 id="5-hybrid-search-1"><a class="header" href="#5-hybrid-search-1">5. Hybrid search</a></h2>
-<pre><code class="language-javascript">import { SearchRequest } from "@laurus/nodejs";
+<pre><code class="language-javascript">import { SearchRequest } from "laurus-nodejs";
 
 const req = new SearchRequest(5);
 req.setLexicalTermQuery("name", "express");
@@ -8851,7 +8851,7 @@ by rank position.</p>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="development-setup"><a class="header" href="#development-setup">Development Setup</a></h1>
 <p>This page covers how to set up a local development environment
-for the <code>@laurus/nodejs</code> binding, build it, and run the test
+for the <code>laurus-nodejs</code> binding, build it, and run the test
 suite.</p>
 <h2 id="prerequisites-4"><a class="header" href="#prerequisites-4">Prerequisites</a></h2>
 <ul>

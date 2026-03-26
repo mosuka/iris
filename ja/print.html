@@ -36,7 +36,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-99e5d321.js";
+            window.path_to_searchindex_js = "searchindex-09404469.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-c4adc502.js"></script>
@@ -7852,7 +7852,7 @@ API が煩雑になります。代わりに、各メソッドは内部で
 <code>tokio::Runtime::block_on()</code> を呼び出し、非同期 Rust を
 同期 Python にブリッジしています。</p>
 <blockquote>
-<p><strong>注意:</strong> Node.js バインディング（<code>@laurus/nodejs</code>）では、
+<p><strong>注意:</strong> Node.js バインディング（<code>laurus-nodejs</code>）では、
 同じ Rust エンジンのメソッドをネイティブな
 <code>async</code> / <code>Promise</code> API として公開しています。
 Node.js のイベントループは非同期をネイティブにサポート
@@ -8239,7 +8239,7 @@ print(stats["vector_fields"])
 </div>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="nodejs-バインディング概要"><a class="header" href="#nodejs-バインディング概要">Node.js バインディング概要</a></h1>
-<p><code>@laurus/nodejs</code> パッケージは、Laurus 検索エンジンの
+<p><code>laurus-nodejs</code> パッケージは、Laurus 検索エンジンの
 Node.js/TypeScript バインディングです。
 <a href="https://napi.rs">napi-rs</a> を使用したネイティブアドオンとして
 ビルドされており、Node.js プログラムから Laurus の Lexical 検索、
@@ -8260,7 +8260,7 @@ NumericRange、Geo、Boolean、Span クエリ</li>
 </ul>
 <h2 id="アーキテクチャ-4"><a class="header" href="#アーキテクチャ-4">アーキテクチャ</a></h2>
 <pre><code class="language-mermaid">graph LR
-    subgraph "@laurus/nodejs"
+    subgraph "laurus-nodejs"
         JsIndex["Index\n(JS クラス)"]
         JsQuery["Query クラス群"]
         JsSearch["SearchRequest\n/ SearchResult"]
@@ -8289,7 +8289,7 @@ Rust エンジンが完全にネイティブコードで処理を実行します
 として公開しています。</p>
 </blockquote>
 <h2 id="クイックスタート-5"><a class="header" href="#クイックスタート-5">クイックスタート</a></h2>
-<pre><code class="language-javascript">import { Index, Schema } from "@laurus/nodejs";
+<pre><code class="language-javascript">import { Index, Schema } from "laurus-nodejs";
 
 // インメモリインデックスを作成
 const schema = new Schema();
@@ -8330,7 +8330,7 @@ for (const r of results) {
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="インストール-3"><a class="header" href="#インストール-3">インストール</a></h1>
 <h2 id="npm-から"><a class="header" href="#npm-から">npm から</a></h2>
-<pre><code class="language-bash">npm install @laurus/nodejs
+<pre><code class="language-bash">npm install laurus-nodejs
 </code></pre>
 <h2 id="ソースから"><a class="header" href="#ソースから">ソースから</a></h2>
 <p>ソースからビルドするには Rust ツールチェーン（1.85 以降）と
@@ -8349,7 +8349,7 @@ npm run build
 npm run build:debug
 </code></pre>
 <h2 id="確認-1"><a class="header" href="#確認-1">確認</a></h2>
-<pre><code class="language-javascript">import { Index } from "@laurus/nodejs";
+<pre><code class="language-javascript">import { Index } from "laurus-nodejs";
 const index = await Index.create();
 console.log(index.stats());
 // { documentCount: 0, vectorFields: {} }
@@ -8362,7 +8362,7 @@ console.log(index.stats());
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="クイックスタート-6"><a class="header" href="#クイックスタート-6">クイックスタート</a></h1>
 <h2 id="1-インデックスの作成"><a class="header" href="#1-インデックスの作成">1. インデックスの作成</a></h2>
-<pre><code class="language-javascript">import { Index, Schema } from "@laurus/nodejs";
+<pre><code class="language-javascript">import { Index, Schema } from "laurus-nodejs";
 
 // インメモリインデックス（揮発性、プロトタイピング向け）
 const index = await Index.create();
@@ -8401,7 +8401,7 @@ for (const r of results) {
 <h2 id="4-vector-検索-1"><a class="header" href="#4-vector-検索-1">4. Vector 検索</a></h2>
 <p>Vector 検索にはベクトルフィールドを持つスキーマと
 事前計算済みの埋め込みベクトルが必要です。</p>
-<pre><code class="language-javascript">import { Index, Schema } from "@laurus/nodejs";
+<pre><code class="language-javascript">import { Index, Schema } from "laurus-nodejs";
 
 const schema = new Schema();
 schema.addTextField("name");
@@ -8423,7 +8423,7 @@ const results = await index.searchVector(
 );
 </code></pre>
 <h2 id="5-ハイブリッド検索-1"><a class="header" href="#5-ハイブリッド検索-1">5. ハイブリッド検索</a></h2>
-<pre><code class="language-javascript">import { SearchRequest } from "@laurus/nodejs";
+<pre><code class="language-javascript">import { SearchRequest } from "laurus-nodejs";
 
 const req = new SearchRequest(5);
 req.setLexicalTermQuery("name", "express");
@@ -8747,7 +8747,7 @@ SpanQuery.within(
 </div>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="開発環境のセットアップ"><a class="header" href="#開発環境のセットアップ">開発環境のセットアップ</a></h1>
-<p><code>@laurus/nodejs</code> バインディングのローカル開発環境の構築、
+<p><code>laurus-nodejs</code> バインディングのローカル開発環境の構築、
 ビルド、テスト実行について説明します。</p>
 <h2 id="前提条件-4"><a class="header" href="#前提条件-4">前提条件</a></h2>
 <ul>

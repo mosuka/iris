@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-d2a933a4.js";
+            window.path_to_searchindex_js = "../searchindex-cb135e87.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-27beae76.js"></script>
@@ -179,7 +179,7 @@
                     <main>
                         <h1 id="installation"><a class="header" href="#installation">Installation</a></h1>
 <h2 id="from-npm"><a class="header" href="#from-npm">From npm</a></h2>
-<pre><code class="language-bash">npm install @laurus/nodejs
+<pre><code class="language-bash">npm install laurus-nodejs
 </code></pre>
 <h2 id="from-source"><a class="header" href="#from-source">From source</a></h2>
 <p>Building from source requires a Rust toolchain (1.85 or later)
@@ -198,7 +198,7 @@ npm run build
 npm run build:debug
 </code></pre>
 <h2 id="verify"><a class="header" href="#verify">Verify</a></h2>
-<pre><code class="language-javascript">import { Index } from "@laurus/nodejs";
+<pre><code class="language-javascript">import { Index } from "laurus-nodejs";
 const index = await Index.create();
 console.log(index.stats());
 // { documentCount: 0, vectorFields: {} }
