@@ -598,18 +598,16 @@ jobs:
         settings:
           - host: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-          - host: ubuntu-latest
-            target: x86_64-unknown-linux-musl
           - host: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
-          - host: ubuntu-24.04-arm
-            target: aarch64-unknown-linux-musl
           - host: macos-latest
             target: aarch64-apple-darwin
           - host: macos-15-intel
             target: x86_64-apple-darwin
           - host: windows-latest
             target: x86_64-pc-windows-msvc
+          - host: windows-11-arm
+            target: aarch64-pc-windows-msvc
     runs-on: ${{ matrix.settings.host }}
     steps:
       - name: Run checkout
@@ -630,10 +628,6 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           shared-key: "stable-${{ matrix.settings.target }}"
-
-      - name: Install musl tools
-        if: contains(matrix.settings.target, 'musl')
-        run: sudo apt-get install -y musl-tools
 
       - name: Install dependencies and build
         working-directory: laurus-nodejs
@@ -683,7 +677,13 @@ jobs:
           npm install
           npx napi artifacts --output-dir artifacts
           npx napi prepublish --skip-gh-release
-          npm publish --access public || echo "Package may already exist"
+          PACKAGE_NAME=$(node -p "require('./package.json').name")
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+          if npm view "${PACKAGE_NAME}@${PACKAGE_VERSION}" version 2>/dev/null; then
+            echo "${PACKAGE_NAME}@${PACKAGE_VERSION} has already been published"
+          else
+            npm publish --access public
+          fi
 
   publish-crates:
     name: Publish crates
