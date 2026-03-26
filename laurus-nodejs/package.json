@@ -18,7 +18,7 @@
   "scripts": {
     "build": "napi build --platform --release -p laurus-nodejs",
     "build:debug": "napi build --platform -p laurus-nodejs",
-    "prepublishOnly": "napi prepublish -t npm",
+    "prepublishOnly": "napi pre-publish -p npm",
     "test": "vitest run",
     "artifacts": "napi artifacts"
   },

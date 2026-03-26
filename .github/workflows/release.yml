@@ -737,7 +737,7 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           npm install
-          npx napi prepublish --skip-gh-release
+          npx napi pre-publish
           npx napi artifacts --output-dir artifacts
           PACKAGE_NAME=$(node -p "require('./package.json').name")
           PACKAGE_VERSION=$(node -p "require('./package.json').version")
