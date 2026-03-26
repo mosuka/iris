@@ -541,7 +541,7 @@ jobs:
   create-release:
     name: Create Release
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [build-binary]
+    needs: [build-binary, build-wheel, build-python-sdist, build-nodejs]
     runs-on: ubuntu-latest
     permissions:
       contents: write
