@@ -71,6 +71,14 @@
   - [Quick Start](laurus-python/quickstart.md)
   - [API Reference](laurus-python/api_reference.md)
 
+# laurus-nodejs
+
+- [Node.js Binding Overview](laurus-nodejs.md)
+  - [Installation](laurus-nodejs/installation.md)
+  - [Quick Start](laurus-nodejs/quickstart.md)
+  - [API Reference](laurus-nodejs/api_reference.md)
+  - [Development](laurus-nodejs/development.md)
+
 # Development Guide
 
 - [Build & Test](development/build_and_test.md)

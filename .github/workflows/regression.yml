@@ -28,6 +28,7 @@ jobs:
       server: ${{ steps.resolve.outputs.server }}
       mcp: ${{ steps.resolve.outputs.mcp }}
       python: ${{ steps.resolve.outputs.python }}
+      nodejs: ${{ steps.resolve.outputs.nodejs }}
     steps:
       - name: Run checkout
         uses: actions/checkout@v6
@@ -83,6 +84,13 @@ jobs:
               - 'Cargo.toml'
               - 'Cargo.lock'
               - '.github/workflows/regression.yml'
+            # nodejs: laurus-nodejs depends on laurus
+            nodejs:
+              - 'laurus-nodejs/**'
+              - 'laurus/**'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+              - '.github/workflows/regression.yml'
 
       # For non-PR events (push / workflow_dispatch), filter outputs are empty.
       # Default to true so all jobs run.
@@ -95,6 +103,7 @@ jobs:
           SERVER: ${{ steps.filter.outputs.server }}
           MCP: ${{ steps.filter.outputs.mcp }}
           PYTHON: ${{ steps.filter.outputs.python }}
+          NODEJS: ${{ steps.filter.outputs.nodejs }}
         run: |
           echo "code=${CODE:-true}" >> "$GITHUB_OUTPUT"
           echo "laurus=${LAURUS:-true}" >> "$GITHUB_OUTPUT"
@@ -102,6 +111,7 @@ jobs:
           echo "server=${SERVER:-true}" >> "$GITHUB_OUTPUT"
           echo "mcp=${MCP:-true}" >> "$GITHUB_OUTPUT"
           echo "python=${PYTHON:-true}" >> "$GITHUB_OUTPUT"
+          echo "nodejs=${NODEJS:-true}" >> "$GITHUB_OUTPUT"
 
   # ============================================================
   # Format
@@ -454,3 +464,51 @@ jobs:
             maturin develop --features embeddings-all
           fi
           pytest tests/ -v
+
+  # ============================================================
+  # Test laurus-nodejs
+  # ============================================================
+  test-nodejs:
+    name: Test laurus-nodejs
+    needs: [changes, clippy, test-laurus]
+    if: ${{ !failure() && !cancelled() && needs.changes.outputs.nodejs == 'true' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - runner: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - runner: macos-latest
+            target: aarch64-apple-darwin
+          - runner: macos-15-intel
+            target: x86_64-apple-darwin
+          - runner: windows-latest
+            target: x86_64-pc-windows-msvc
+        node: ["22"]
+    runs-on: ${{ matrix.platform.runner }}
+    steps:
+      - name: Run checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: Install toolchain
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "stable-${{ matrix.platform.target }}"
+
+      - name: Run tests
+        working-directory: laurus-nodejs
+        shell: bash
+        run: |
+          npm install
+          npm run build:debug
+          npm test

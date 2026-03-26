@@ -1,0 +1,138 @@
+# クイックスタート
+
+## 1. インデックスの作成
+
+```javascript
+import { Index, Schema } from "@laurus/nodejs";
+
+// インメモリインデックス（揮発性、プロトタイピング向け）
+const index = await Index.create();
+
+// ファイルベースインデックス（永続化）
+const schema = new Schema();
+schema.addTextField("name");
+schema.addTextField("description");
+const persistentIndex = await Index.create("./myindex", schema);
+```
+
+## 2. ドキュメントのインデックス
+
+```javascript
+await index.putDocument("express", {
+  name: "Express",
+  description: "Fast minimalist web framework for Node.js.",
+});
+await index.putDocument("fastify", {
+  name: "Fastify",
+  description: "Fast and low overhead web framework.",
+});
+await index.commit();
+```
+
+## 3. Lexical 検索
+
+```javascript
+// DSL 文字列
+const results = await index.search("name:express", 5);
+
+// Term クエリ
+const results2 = await index.searchTerm(
+  "description", "framework", 5,
+);
+
+// 結果の表示
+for (const r of results) {
+  console.log(`[${r.id}] score=${r.score.toFixed(4)}  ${r.document.name}`);
+}
+```
+
+## 4. Vector 検索
+
+Vector 検索にはベクトルフィールドを持つスキーマと
+事前計算済みの埋め込みベクトルが必要です。
+
+```javascript
+import { Index, Schema } from "@laurus/nodejs";
+
+const schema = new Schema();
+schema.addTextField("name");
+schema.addHnswField("embedding", 4);
+
+const index = await Index.create(null, schema);
+await index.putDocument("express", {
+  name: "Express",
+  embedding: [0.1, 0.2, 0.3, 0.4],
+});
+await index.putDocument("pg", {
+  name: "pg",
+  embedding: [0.9, 0.8, 0.7, 0.6],
+});
+await index.commit();
+
+const results = await index.searchVector(
+  "embedding", [0.1, 0.2, 0.3, 0.4], 3,
+);
+```
+
+## 5. ハイブリッド検索
+
+```javascript
+import { SearchRequest } from "@laurus/nodejs";
+
+const req = new SearchRequest(5);
+req.setLexicalTermQuery("name", "express");
+req.setVectorQuery("embedding", [0.1, 0.2, 0.3, 0.4]);
+req.setRrfFusion(60.0);
+
+const results = await index.searchWithRequest(req);
+```
+
+## 6. 更新と削除
+
+```javascript
+// 更新: putDocument は既存バージョンをすべて置換
+await index.putDocument("express", {
+  name: "Express v5",
+  description: "Updated content.",
+});
+await index.commit();
+
+// バージョン追記（RAG チャンキングパターン）
+await index.addDocument("express", {
+  name: "Express chunk 2",
+  description: "Additional chunk.",
+});
+await index.commit();
+
+// 全バージョンの取得
+const docs = await index.getDocuments("express");
+
+// 削除
+await index.deleteDocuments("express");
+await index.commit();
+```
+
+## 7. スキーマ管理
+
+```javascript
+const schema = new Schema();
+schema.addTextField("name");
+schema.addTextField("description");
+schema.addIntegerField("stars");
+schema.addFloatField("score");
+schema.addBooleanField("published");
+schema.addBytesField("thumbnail");
+schema.addGeoField("location");
+schema.addDatetimeField("createdAt");
+schema.addHnswField("embedding", 384);
+schema.addFlatField("smallVec", 64);
+schema.addIvfField("ivfVec", 128, "cosine", 100, 1);
+```
+
+## 8. インデックス統計
+
+```javascript
+const stats = index.stats();
+console.log(stats.documentCount);
+console.log(stats.vectorFields);
+```

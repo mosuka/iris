@@ -346,12 +346,60 @@ jobs:
           pytest tests/ -v
 
   # ============================================================
+  # Test laurus-nodejs
+  # ============================================================
+  test-nodejs:
+    name: Test laurus-nodejs
+    needs: [clippy, test-laurus]
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - runner: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - runner: macos-latest
+            target: aarch64-apple-darwin
+          - runner: macos-15-intel
+            target: x86_64-apple-darwin
+          - runner: windows-latest
+            target: x86_64-pc-windows-msvc
+        node: ["22"]
+    runs-on: ${{ matrix.platform.runner }}
+    steps:
+      - name: Run checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: Install toolchain
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "stable-${{ matrix.platform.target }}"
+
+      - name: Run tests
+        working-directory: laurus-nodejs
+        shell: bash
+        run: |
+          npm install
+          npm run build:debug
+          npm test
+
+  # ============================================================
   # Gate: ensure all tests pass before proceeding to build
   # ============================================================
   test-all:
     name: Test All
     if: ${{ !failure() && !cancelled() }}
-    needs: [test-laurus, test-cli, test-server, test-mcp, test-python]
+    needs:
+      [test-laurus, test-cli, test-server, test-mcp, test-python, test-nodejs]
     runs-on: ubuntu-latest
     steps:
       - name: All tests passed
@@ -532,6 +580,106 @@ jobs:
         with:
           command: upload
           args: --non-interactive --skip-existing dist/*
+
+  # ============================================================
+  # Build Node.js native binaries
+  # ============================================================
+  build-nodejs:
+    name: Build Node.js Native
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [test-all]
+    strategy:
+      fail-fast: false
+      matrix:
+        settings:
+          - host: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - host: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+          - host: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+          - host: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-musl
+          - host: macos-latest
+            target: aarch64-apple-darwin
+          - host: macos-15-intel
+            target: x86_64-apple-darwin
+          - host: windows-latest
+            target: x86_64-pc-windows-msvc
+    runs-on: ${{ matrix.settings.host }}
+    steps:
+      - name: Run checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install toolchain
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+          target: ${{ matrix.settings.target }}
+
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "stable-${{ matrix.settings.target }}"
+
+      - name: Install musl tools
+        if: contains(matrix.settings.target, 'musl')
+        run: sudo apt-get install -y musl-tools
+
+      - name: Install dependencies and build
+        working-directory: laurus-nodejs
+        shell: bash
+        run: |
+          npm install
+          npx napi build --platform --release -p laurus-nodejs --target ${{ matrix.settings.target }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nodejs-binding-${{ matrix.settings.target }}
+          path: laurus-nodejs/*.node
+          if-no-files-found: error
+
+  # ============================================================
+  # Publish to npm
+  # ============================================================
+  publish-npm:
+    name: Publish to npm
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [create-release, build-nodejs]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Download all Node.js artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: laurus-nodejs/artifacts
+          pattern: "nodejs-binding-*"
+          merge-multiple: true
+
+      - name: Move artifacts and publish
+        working-directory: laurus-nodejs
+        shell: bash
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          npm install
+          npx napi artifacts --output-dir artifacts
+          npx napi prepublish --skip-gh-release
+          npm publish --access public || echo "Package may already exist"
 
   publish-crates:
     name: Publish crates

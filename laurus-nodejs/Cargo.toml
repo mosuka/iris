@@ -1,0 +1,37 @@
+[package]
+name = "laurus-nodejs"
+version = { workspace = true }
+edition = { workspace = true }
+description = "Node.js bindings for the Laurus search library"
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+
+[features]
+embeddings-candle = ["laurus/embeddings-candle"]
+embeddings-multimodal = ["laurus/embeddings-multimodal"]
+embeddings-openai = ["laurus/embeddings-openai"]
+embeddings-all = [
+    "embeddings-candle",
+    "embeddings-multimodal",
+    "embeddings-openai",
+]
+
+[dependencies]
+laurus = { workspace = true }
+napi = { version = "3.8.3", features = [
+    "async",
+    "tokio_rt",
+    "napi9",
+    "serde-json",
+] }
+napi-derive = "3.5.2"
+chrono = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[build-dependencies]
+napi-build = "2.3.1"
