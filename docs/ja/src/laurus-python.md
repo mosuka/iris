@@ -42,7 +42,7 @@ API が煩雑になります。代わりに、各メソッドは内部で
 `tokio::Runtime::block_on()` を呼び出し、非同期 Rust を
 同期 Python にブリッジしています。
 
-> **注意:** Node.js バインディング（`@laurus/nodejs`）では、
+> **注意:** Node.js バインディング（`laurus-nodejs`）では、
 > 同じ Rust エンジンのメソッドをネイティブな
 > `async` / `Promise` API として公開しています。
 > Node.js のイベントループは非同期をネイティブにサポート

@@ -1,5 +1,5 @@
 /**
- * Lexical search example for @laurus/nodejs.
+ * Lexical search example for laurus-nodejs.
  *
  * Demonstrates various query types: Term, Phrase, Fuzzy, Wildcard,
  * NumericRange, Boolean, and SearchRequest.

@@ -3,7 +3,7 @@
 ## 1. インデックスの作成
 
 ```javascript
-import { Index, Schema } from "@laurus/nodejs";
+import { Index, Schema } from "laurus-nodejs";
 
 // インメモリインデックス（揮発性、プロトタイピング向け）
 const index = await Index.create();
@@ -52,7 +52,7 @@ Vector 検索にはベクトルフィールドを持つスキーマと
 事前計算済みの埋め込みベクトルが必要です。
 
 ```javascript
-import { Index, Schema } from "@laurus/nodejs";
+import { Index, Schema } from "laurus-nodejs";
 
 const schema = new Schema();
 schema.addTextField("name");
@@ -77,7 +77,7 @@ const results = await index.searchVector(
 ## 5. ハイブリッド検索
 
 ```javascript
-import { SearchRequest } from "@laurus/nodejs";
+import { SearchRequest } from "laurus-nodejs";
 
 const req = new SearchRequest(5);
 req.setLexicalTermQuery("name", "express");

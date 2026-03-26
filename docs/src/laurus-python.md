@@ -41,7 +41,7 @@ cumbersome (it would require `asyncio.run()` everywhere).
 Instead, each method calls `tokio::Runtime::block_on()` under
 the hood to bridge async Rust to synchronous Python.
 
-> **Note:** The Node.js binding (`@laurus/nodejs`) exposes the
+> **Note:** The Node.js binding (`laurus-nodejs`) exposes the
 > same Rust engine methods as native `async` / `Promise` APIs,
 > since Node.js's event loop supports async natively.
 

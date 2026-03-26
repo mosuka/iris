@@ -3,7 +3,7 @@
 //! ## Example
 //!
 //! ```javascript
-//! const { SynonymDictionary, WhitespaceTokenizer, SynonymGraphFilter } = require("@laurus/nodejs");
+//! const { SynonymDictionary, WhitespaceTokenizer, SynonymGraphFilter } = require("laurus-nodejs");
 //!
 //! const synDict = new SynonymDictionary();
 //! synDict.addSynonymGroup(["ml", "machine learning"]);
@@ -86,7 +86,7 @@ impl From<laurus::analysis::token::Token> for JsToken {
 /// ## Example
 ///
 /// ```javascript
-/// const { SynonymDictionary } = require("@laurus/nodejs");
+/// const { SynonymDictionary } = require("laurus-nodejs");
 ///
 /// const synDict = new SynonymDictionary();
 /// synDict.addSynonymGroup(["ml", "machine learning"]);
@@ -129,7 +129,7 @@ impl JsSynonymDictionary {
 /// ## Example
 ///
 /// ```javascript
-/// const { WhitespaceTokenizer } = require("@laurus/nodejs");
+/// const { WhitespaceTokenizer } = require("laurus-nodejs");
 ///
 /// const tokenizer = new WhitespaceTokenizer();
 /// const tokens = tokenizer.tokenize("ml tutorial");
@@ -177,7 +177,7 @@ impl JsWhitespaceTokenizer {
 /// ## Example
 ///
 /// ```javascript
-/// const { SynonymDictionary, WhitespaceTokenizer, SynonymGraphFilter } = require("@laurus/nodejs");
+/// const { SynonymDictionary, WhitespaceTokenizer, SynonymGraphFilter } = require("laurus-nodejs");
 ///
 /// const synDict = new SynonymDictionary();
 /// synDict.addSynonymGroup(["ml", "machine learning"]);

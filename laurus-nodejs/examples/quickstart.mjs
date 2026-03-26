@@ -1,5 +1,5 @@
 /**
- * Quickstart example for @laurus/nodejs.
+ * Quickstart example for laurus-nodejs.
  *
  * Demonstrates basic index creation, document indexing, and search.
  */

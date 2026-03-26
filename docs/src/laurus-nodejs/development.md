@@ -1,7 +1,7 @@
 # Development Setup
 
 This page covers how to set up a local development environment
-for the `@laurus/nodejs` binding, build it, and run the test
+for the `laurus-nodejs` binding, build it, and run the test
 suite.
 
 ## Prerequisites

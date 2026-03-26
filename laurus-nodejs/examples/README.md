@@ -1,7 +1,7 @@
 # laurus-nodejs Examples
 
 This directory contains runnable examples for the
-`@laurus/nodejs` Node.js bindings.
+`laurus-nodejs` Node.js bindings.
 
 ## Prerequisites
 

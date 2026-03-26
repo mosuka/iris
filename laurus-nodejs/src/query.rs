@@ -147,7 +147,7 @@ impl SpanKind {
 /// ## Example
 ///
 /// ```javascript
-/// const { TermQuery } = require("@laurus/nodejs");
+/// const { TermQuery } = require("laurus-nodejs");
 /// const q = new TermQuery("body", "rust");
 /// const results = await index.search(q, { limit: 5 });
 /// ```
@@ -180,7 +180,7 @@ impl JsTermQuery {
 /// ## Example
 ///
 /// ```javascript
-/// const { PhraseQuery } = require("@laurus/nodejs");
+/// const { PhraseQuery } = require("laurus-nodejs");
 /// const q = new PhraseQuery("body", ["machine", "learning"]);
 /// ```
 #[napi(js_name = "PhraseQuery")]
@@ -212,7 +212,7 @@ impl JsPhraseQuery {
 /// ## Example
 ///
 /// ```javascript
-/// const { FuzzyQuery } = require("@laurus/nodejs");
+/// const { FuzzyQuery } = require("laurus-nodejs");
 /// const q = new FuzzyQuery("body", "programing", 2);
 /// ```
 #[napi(js_name = "FuzzyQuery")]
@@ -250,7 +250,7 @@ impl JsFuzzyQuery {
 /// ## Example
 ///
 /// ```javascript
-/// const { WildcardQuery } = require("@laurus/nodejs");
+/// const { WildcardQuery } = require("laurus-nodejs");
 /// const q = new WildcardQuery("filename", "*.pdf");
 /// ```
 #[napi(js_name = "WildcardQuery")]
@@ -282,7 +282,7 @@ impl JsWildcardQuery {
 /// ## Example
 ///
 /// ```javascript
-/// const { NumericRangeQuery } = require("@laurus/nodejs");
+/// const { NumericRangeQuery } = require("laurus-nodejs");
 /// const q = new NumericRangeQuery("year", 2020, 2023);
 /// ```
 #[napi(js_name = "NumericRangeQuery")]
@@ -345,7 +345,7 @@ impl JsNumericRangeQuery {
 /// ## Example
 ///
 /// ```javascript
-/// const { GeoQuery } = require("@laurus/nodejs");
+/// const { GeoQuery } = require("laurus-nodejs");
 ///
 /// // Radius search: within 100 km of San Francisco
 /// const q = GeoQuery.withinRadius("location", 37.77, -122.42, 100.0);
@@ -463,7 +463,7 @@ impl JsGeoQuery {
 /// ## Example
 ///
 /// ```javascript
-/// const { BooleanQuery, TermQuery } = require("@laurus/nodejs");
+/// const { BooleanQuery, TermQuery } = require("laurus-nodejs");
 ///
 /// const bq = new BooleanQuery();
 /// bq.must(new TermQuery("body", "programming"));
@@ -554,7 +554,7 @@ impl JsBooleanQuery {
 /// ## Example
 ///
 /// ```javascript
-/// const { SpanQuery } = require("@laurus/nodejs");
+/// const { SpanQuery } = require("laurus-nodejs");
 ///
 /// // SpanNear: "quick" within 1 position of "fox", in order
 /// const q = SpanQuery.near("body", ["quick", "fox"], 1, true);
@@ -675,7 +675,7 @@ impl JsSpanQuery {
 /// ## Example
 ///
 /// ```javascript
-/// const { VectorQuery } = require("@laurus/nodejs");
+/// const { VectorQuery } = require("laurus-nodejs");
 /// const results = await index.search(new VectorQuery("text_vec", [0.1, 0.2, ...]));
 /// ```
 #[napi(js_name = "VectorQuery")]
@@ -710,7 +710,7 @@ impl JsVectorQueryInner {
 /// ## Example
 ///
 /// ```javascript
-/// const { VectorTextQuery } = require("@laurus/nodejs");
+/// const { VectorTextQuery } = require("laurus-nodejs");
 /// const results = await index.search(new VectorTextQuery("text_vec", "memory safety"));
 /// ```
 #[napi(js_name = "VectorTextQuery")]

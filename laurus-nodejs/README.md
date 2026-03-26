@@ -1,4 +1,4 @@
-# @laurus/nodejs
+# laurus-nodejs
 
 Node.js/TypeScript bindings for the
 [Laurus](https://github.com/mosuka/laurus) search library —
@@ -18,13 +18,13 @@ unified lexical, vector, and hybrid search.
 ## Installation
 
 ```bash
-npm install @laurus/nodejs
+npm install laurus-nodejs
 ```
 
 ## Quick Start
 
 ```javascript
-import { Index, Schema } from "@laurus/nodejs";
+import { Index, Schema } from "laurus-nodejs";
 
 // Define schema
 const schema = new Schema();
@@ -107,7 +107,7 @@ schema.setDefaultFields(["title", "body"]);
 ### Search Request (Advanced)
 
 ```javascript
-import { SearchRequest } from "@laurus/nodejs";
+import { SearchRequest } from "laurus-nodejs";
 
 const req = new SearchRequest(10, 0);  // limit, offset
 req.setQueryDsl("title:hello");
@@ -125,7 +125,7 @@ const results = await index.searchWithRequest(req);
 ### Text Analysis
 
 ```javascript
-import { WhitespaceTokenizer, SynonymDictionary, SynonymGraphFilter } from "@laurus/nodejs";
+import { WhitespaceTokenizer, SynonymDictionary, SynonymGraphFilter } from "laurus-nodejs";
 
 const tokenizer = new WhitespaceTokenizer();
 const tokens = tokenizer.tokenize("hello world");

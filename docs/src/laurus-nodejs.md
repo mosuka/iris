@@ -1,6 +1,6 @@
 # Node.js Binding Overview
 
-The `@laurus/nodejs` package provides Node.js/TypeScript bindings
+The `laurus-nodejs` package provides Node.js/TypeScript bindings
 for the Laurus search engine. It is built as a native addon using
 [napi-rs](https://napi.rs), giving Node.js programs direct access
 to Laurus's lexical, vector, and hybrid search capabilities with
@@ -27,7 +27,7 @@ near-native performance.
 
 ```mermaid
 graph LR
-    subgraph "@laurus/nodejs"
+    subgraph "laurus-nodejs"
         JsIndex["Index\n(JS class)"]
         JsQuery["Query classes"]
         JsSearch["SearchRequest\n/ SearchResult"]
@@ -59,7 +59,7 @@ without blocking it. Schema construction, query creation, and
 ## Quick Start
 
 ```javascript
-import { Index, Schema } from "@laurus/nodejs";
+import { Index, Schema } from "laurus-nodejs";
 
 // Create an in-memory index
 const schema = new Schema();

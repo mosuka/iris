@@ -34,7 +34,7 @@ fn parse_distance(s: &str) -> Result<DistanceMetric> {
 /// ## Example
 ///
 /// ```javascript
-/// const { Schema } = require("@laurus/nodejs");
+/// const { Schema } = require("laurus-nodejs");
 ///
 /// const schema = new Schema();
 /// schema.addTextField("title");

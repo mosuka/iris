@@ -1,5 +1,5 @@
 /**
- * Vector search example for @laurus/nodejs.
+ * Vector search example for laurus-nodejs.
  *
  * Demonstrates vector search with pre-computed embeddings.
  */

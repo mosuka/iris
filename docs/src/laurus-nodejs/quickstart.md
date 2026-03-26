@@ -3,7 +3,7 @@
 ## 1. Create an index
 
 ```javascript
-import { Index, Schema } from "@laurus/nodejs";
+import { Index, Schema } from "laurus-nodejs";
 
 // In-memory index (ephemeral, useful for prototyping)
 const index = await Index.create();
@@ -52,7 +52,7 @@ Vector search requires a schema with a vector field
 and pre-computed embeddings.
 
 ```javascript
-import { Index, Schema } from "@laurus/nodejs";
+import { Index, Schema } from "laurus-nodejs";
 
 const schema = new Schema();
 schema.addTextField("name");
@@ -77,7 +77,7 @@ const results = await index.searchVector(
 ## 5. Hybrid search
 
 ```javascript
-import { SearchRequest } from "@laurus/nodejs";
+import { SearchRequest } from "laurus-nodejs";
 
 const req = new SearchRequest(5);
 req.setLexicalTermQuery("name", "express");

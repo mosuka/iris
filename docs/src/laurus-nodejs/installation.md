@@ -3,7 +3,7 @@
 ## From npm
 
 ```bash
-npm install @laurus/nodejs
+npm install laurus-nodejs
 ```
 
 ## From source
@@ -29,7 +29,7 @@ npm run build:debug
 ## Verify
 
 ```javascript
-import { Index } from "@laurus/nodejs";
+import { Index } from "laurus-nodejs";
 const index = await Index.create();
 console.log(index.stats());
 // { documentCount: 0, vectorFields: {} }

@@ -730,6 +730,26 @@ jobs:
           pattern: "nodejs-binding-*"
           merge-multiple: true
 
+      - name: Sync version from Cargo.toml
+        working-directory: laurus-nodejs
+        shell: bash
+        run: |
+          VERSION=$(cargo metadata --no-deps --format-version=1 \
+            | jq -r '.packages[] | select(.name=="laurus-nodejs") | .version')
+          echo "Syncing npm version to ${VERSION}"
+          npx napi version -c "${VERSION}"
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            pkg.version = '${VERSION}';
+            if (pkg.optionalDependencies) {
+              for (const key of Object.keys(pkg.optionalDependencies)) {
+                pkg.optionalDependencies[key] = '${VERSION}';
+              }
+            }
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          "
+
       - name: Install dependencies
         working-directory: laurus-nodejs
         run: npm install

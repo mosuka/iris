@@ -18,7 +18,7 @@ use napi_derive::napi;
 /// ## Example
 ///
 /// ```javascript
-/// const { RRF } = require("@laurus/nodejs");
+/// const { RRF } = require("laurus-nodejs");
 /// const fusion = new RRF(60.0);
 /// ```
 #[napi(js_name = "RRF")]
@@ -46,7 +46,7 @@ impl JsRRF {
 /// ## Example
 ///
 /// ```javascript
-/// const { WeightedSum } = require("@laurus/nodejs");
+/// const { WeightedSum } = require("laurus-nodejs");
 /// const fusion = new WeightedSum(0.3, 0.7);
 /// ```
 #[napi(js_name = "WeightedSum")]
@@ -126,7 +126,7 @@ pub fn to_js_search_result(r: SearchResult) -> JsSearchResult {
 /// ## Example — hybrid search with filter
 ///
 /// ```javascript
-/// const { SearchRequest, VectorTextQuery, TermQuery, RRF } = require("@laurus/nodejs");
+/// const { SearchRequest, VectorTextQuery, TermQuery, RRF } = require("laurus-nodejs");
 ///
 /// const request = new SearchRequest({
 ///     vectorQuery: new VectorTextQuery("text_vec", "type system"),

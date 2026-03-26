@@ -25,7 +25,7 @@ use serde_json::Value;
 /// ## Creating an index
 ///
 /// ```javascript
-/// const { Index, Schema } = require("@laurus/nodejs");
+/// const { Index, Schema } = require("laurus-nodejs");
 ///
 /// // In-memory (ephemeral, great for prototyping)
 /// const index = await Index.create();

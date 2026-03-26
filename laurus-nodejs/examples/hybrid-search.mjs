@@ -1,5 +1,5 @@
 /**
- * Hybrid search example for @laurus/nodejs.
+ * Hybrid search example for laurus-nodejs.
  *
  * Demonstrates combining lexical and vector search
  * with RRF and WeightedSum fusion.

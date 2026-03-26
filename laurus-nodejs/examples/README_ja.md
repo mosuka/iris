@@ -1,6 +1,6 @@
 # laurus-nodejs サンプル集
 
-このディレクトリには `@laurus/nodejs` Node.js バインディングの
+このディレクトリには `laurus-nodejs` Node.js バインディングの
 実行可能なサンプルが含まれています。
 
 ## 前提条件
