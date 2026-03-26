@@ -36,10 +36,10 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-4ae5f909.js";
+            window.path_to_searchindex_js = "searchindex-29659fc1.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-d1dadce2.js"></script>
+        <script src="toc-27beae76.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -8321,8 +8321,594 @@ print(stats["vector_fields"])
 </table>
 </div>
 <div style="break-before: page; page-break-before: always;"></div>
-<h1 id="build--test"><a class="header" href="#build--test">Build &amp; Test</a></h1>
+<h1 id="nodejs-binding-overview"><a class="header" href="#nodejs-binding-overview">Node.js Binding Overview</a></h1>
+<p>The <code>@laurus/nodejs</code> package provides Node.js/TypeScript bindings
+for the Laurus search engine. It is built as a native addon using
+<a href="https://napi.rs">napi-rs</a>, giving Node.js programs direct access
+to Laurus’s lexical, vector, and hybrid search capabilities with
+near-native performance.</p>
+<h2 id="features-5"><a class="header" href="#features-5">Features</a></h2>
+<ul>
+<li><strong>Lexical Search</strong> – Full-text search powered by an inverted
+index with BM25 scoring</li>
+<li><strong>Vector Search</strong> – Approximate nearest neighbor (ANN) search
+using Flat, HNSW, or IVF indexes</li>
+<li><strong>Hybrid Search</strong> – Combine lexical and vector results with
+fusion algorithms (RRF, WeightedSum)</li>
+<li><strong>Rich Query DSL</strong> – Term, Phrase, Fuzzy, Wildcard,
+NumericRange, Geo, Boolean, Span queries</li>
+<li><strong>Text Analysis</strong> – Tokenizers, filters, stemmers,
+and synonym expansion</li>
+<li><strong>Flexible Storage</strong> – In-memory (ephemeral) or file-based
+(persistent) indexes</li>
+<li><strong>TypeScript Types</strong> – Auto-generated <code>.d.ts</code> type definitions</li>
+<li><strong>Async API</strong> – All I/O operations return Promises</li>
+</ul>
+<h2 id="architecture-4"><a class="header" href="#architecture-4">Architecture</a></h2>
+<pre><code class="language-mermaid">graph LR
+    subgraph "@laurus/nodejs"
+        JsIndex["Index\n(JS class)"]
+        JsQuery["Query classes"]
+        JsSearch["SearchRequest\n/ SearchResult"]
+    end
+
+    Node["Node.js application"] --&gt;|"method calls"| JsIndex
+    Node --&gt;|"query objects"| JsQuery
+    JsIndex --&gt;|"napi-rs FFI"| Engine["laurus::Engine\n(Rust)"]
+    JsQuery --&gt;|"napi-rs FFI"| Engine
+    Engine --&gt; Storage["Storage\n(Memory / File)"]
+</code></pre>
+<p>The JavaScript classes are thin wrappers around the Rust engine.
+Each call crosses the napi-rs FFI boundary once; the Rust engine
+then executes the operation entirely in native code. Async methods
+run on napi-rs’s built-in tokio runtime and return Promises to
+the Node.js event loop.</p>
+<h2 id="quick-start-5"><a class="header" href="#quick-start-5">Quick Start</a></h2>
+<pre><code class="language-javascript">import { Index, Schema } from "@laurus/nodejs";
+
+// Create an in-memory index
+const schema = new Schema();
+schema.addTextField("name");
+schema.addTextField("description");
+schema.setDefaultFields(["name", "description"]);
+
+const index = await Index.create(null, schema);
+
+// Index documents
+await index.putDocument("express", {
+  name: "Express",
+  description: "Fast minimalist web framework for Node.js.",
+});
+await index.putDocument("fastify", {
+  name: "Fastify",
+  description: "Fast and low overhead web framework.",
+});
+await index.commit();
+
+// Search
+const results = await index.search("framework", 5);
+for (const r of results) {
+  console.log(`[${r.id}] score=${r.score.toFixed(4)}  ${r.document.name}`);
+}
+</code></pre>
+<h2 id="sections-4"><a class="header" href="#sections-4">Sections</a></h2>
+<ul>
+<li><a href="#installation-3">Installation</a> –
+How to install the package</li>
+<li><a href="#quick-start-6">Quick Start</a> –
+Hands-on introduction with examples</li>
+<li><a href="#api-reference-2">API Reference</a> –
+Complete class and method reference</li>
+<li><a href="#development-setup">Development</a> –
+Building from source, testing, and project layout</li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="installation-3"><a class="header" href="#installation-3">Installation</a></h1>
+<h2 id="from-npm"><a class="header" href="#from-npm">From npm</a></h2>
+<pre><code class="language-bash">npm install @laurus/nodejs
+</code></pre>
+<h2 id="from-source-2"><a class="header" href="#from-source-2">From source</a></h2>
+<p>Building from source requires a Rust toolchain (1.85 or later)
+and Node.js 18+.</p>
+<pre><code class="language-bash"># Clone the repository
+git clone https://github.com/mosuka/laurus.git
+cd laurus/laurus-nodejs
+
+# Install dependencies
+npm install
+
+# Build the native module (release)
+npm run build
+
+# Or build in debug mode (faster builds)
+npm run build:debug
+</code></pre>
+<h2 id="verify-2"><a class="header" href="#verify-2">Verify</a></h2>
+<pre><code class="language-javascript">import { Index } from "@laurus/nodejs";
+const index = await Index.create();
+console.log(index.stats());
+// { documentCount: 0, vectorFields: {} }
+</code></pre>
+<h2 id="requirements-1"><a class="header" href="#requirements-1">Requirements</a></h2>
+<ul>
+<li>Node.js 18 or later</li>
+<li>No runtime dependencies beyond the compiled native addon</li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="quick-start-6"><a class="header" href="#quick-start-6">Quick Start</a></h1>
+<h2 id="1-create-an-index-1"><a class="header" href="#1-create-an-index-1">1. Create an index</a></h2>
+<pre><code class="language-javascript">import { Index, Schema } from "@laurus/nodejs";
+
+// In-memory index (ephemeral, useful for prototyping)
+const index = await Index.create();
+
+// File-based index (persistent)
+const schema = new Schema();
+schema.addTextField("name");
+schema.addTextField("description");
+const persistentIndex = await Index.create("./myindex", schema);
+</code></pre>
+<h2 id="2-index-documents-1"><a class="header" href="#2-index-documents-1">2. Index documents</a></h2>
+<pre><code class="language-javascript">await index.putDocument("express", {
+  name: "Express",
+  description: "Fast minimalist web framework for Node.js.",
+});
+await index.putDocument("fastify", {
+  name: "Fastify",
+  description: "Fast and low overhead web framework.",
+});
+await index.commit();
+</code></pre>
+<h2 id="3-lexical-search-1"><a class="header" href="#3-lexical-search-1">3. Lexical search</a></h2>
+<pre><code class="language-javascript">// DSL string
+const results = await index.search("name:express", 5);
+
+// Term query
+const results2 = await index.searchTerm(
+  "description", "framework", 5,
+);
+
+// Print results
+for (const r of results) {
+  console.log(`[${r.id}] score=${r.score.toFixed(4)}  ${r.document.name}`);
+}
+</code></pre>
+<h2 id="4-vector-search-1"><a class="header" href="#4-vector-search-1">4. Vector search</a></h2>
+<p>Vector search requires a schema with a vector field
+and pre-computed embeddings.</p>
+<pre><code class="language-javascript">import { Index, Schema } from "@laurus/nodejs";
+
+const schema = new Schema();
+schema.addTextField("name");
+schema.addHnswField("embedding", 4);
+
+const index = await Index.create(null, schema);
+await index.putDocument("express", {
+  name: "Express",
+  embedding: [0.1, 0.2, 0.3, 0.4],
+});
+await index.putDocument("pg", {
+  name: "pg",
+  embedding: [0.9, 0.8, 0.7, 0.6],
+});
+await index.commit();
+
+const results = await index.searchVector(
+  "embedding", [0.1, 0.2, 0.3, 0.4], 3,
+);
+</code></pre>
+<h2 id="5-hybrid-search-1"><a class="header" href="#5-hybrid-search-1">5. Hybrid search</a></h2>
+<pre><code class="language-javascript">import { SearchRequest } from "@laurus/nodejs";
+
+const req = new SearchRequest(5);
+req.setLexicalTermQuery("name", "express");
+req.setVectorQuery("embedding", [0.1, 0.2, 0.3, 0.4]);
+req.setRrfFusion(60.0);
+
+const results = await index.searchWithRequest(req);
+</code></pre>
+<h2 id="6-update-and-delete-1"><a class="header" href="#6-update-and-delete-1">6. Update and delete</a></h2>
+<pre><code class="language-javascript">// Update: putDocument replaces all existing versions
+await index.putDocument("express", {
+  name: "Express v5",
+  description: "Updated content.",
+});
+await index.commit();
+
+// Append a new version (RAG chunking pattern)
+await index.addDocument("express", {
+  name: "Express chunk 2",
+  description: "Additional chunk.",
+});
+await index.commit();
+
+// Retrieve all versions
+const docs = await index.getDocuments("express");
+
+// Delete
+await index.deleteDocuments("express");
+await index.commit();
+</code></pre>
+<h2 id="7-schema-management-1"><a class="header" href="#7-schema-management-1">7. Schema management</a></h2>
+<pre><code class="language-javascript">const schema = new Schema();
+schema.addTextField("name");
+schema.addTextField("description");
+schema.addIntegerField("stars");
+schema.addFloatField("score");
+schema.addBooleanField("published");
+schema.addBytesField("thumbnail");
+schema.addGeoField("location");
+schema.addDatetimeField("createdAt");
+schema.addHnswField("embedding", 384);
+schema.addFlatField("smallVec", 64);
+schema.addIvfField("ivfVec", 128, "cosine", 100, 1);
+</code></pre>
+<h2 id="8-index-statistics-1"><a class="header" href="#8-index-statistics-1">8. Index statistics</a></h2>
+<pre><code class="language-javascript">const stats = index.stats();
+console.log(stats.documentCount);
+console.log(stats.vectorFields);
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="api-reference-2"><a class="header" href="#api-reference-2">API Reference</a></h1>
+<h2 id="index-1"><a class="header" href="#index-1">Index</a></h2>
+<p>The primary entry point. Wraps the Laurus search engine.</p>
+<pre><code class="language-typescript">class Index {
+  static create(
+    path?: string | null,
+    schema?: Schema,
+  ): Promise&lt;Index&gt;;
+}
+</code></pre>
+<h3 id="factory-method"><a class="header" href="#factory-method">Factory method</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Parameter</th><th style="text-align: left">Type</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>path</code></td><td style="text-align: left"><code>string | null</code></td><td style="text-align: left"><code>null</code></td><td style="text-align: left">Directory for persistent storage. <code>null</code> creates an in-memory index.</td></tr>
+<tr><td style="text-align: left"><code>schema</code></td><td style="text-align: left"><code>Schema</code></td><td style="text-align: left">empty</td><td style="text-align: left">Schema definition.</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="methods-1"><a class="header" href="#methods-1">Methods</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Method</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>putDocument(id, doc)</code></td><td style="text-align: left">Upsert a document. Replaces all existing versions.</td></tr>
+<tr><td style="text-align: left"><code>addDocument(id, doc)</code></td><td style="text-align: left">Append a document chunk without removing existing versions.</td></tr>
+<tr><td style="text-align: left"><code>getDocuments(id)</code></td><td style="text-align: left">Return all stored versions for the given ID.</td></tr>
+<tr><td style="text-align: left"><code>deleteDocuments(id)</code></td><td style="text-align: left">Delete all versions for the given ID.</td></tr>
+<tr><td style="text-align: left"><code>commit()</code></td><td style="text-align: left">Flush writes and make pending changes searchable.</td></tr>
+<tr><td style="text-align: left"><code>search(query, limit?, offset?)</code></td><td style="text-align: left">Search with a DSL string.</td></tr>
+<tr><td style="text-align: left"><code>searchTerm(field, term, limit?, offset?)</code></td><td style="text-align: left">Search with an exact term match.</td></tr>
+<tr><td style="text-align: left"><code>searchVector(field, vector, limit?, offset?)</code></td><td style="text-align: left">Search with a pre-computed vector.</td></tr>
+<tr><td style="text-align: left"><code>searchVectorText(field, text, limit?, offset?)</code></td><td style="text-align: left">Search with text (auto-embedded).</td></tr>
+<tr><td style="text-align: left"><code>searchWithRequest(request)</code></td><td style="text-align: left">Search with a <code>SearchRequest</code>.</td></tr>
+<tr><td style="text-align: left"><code>stats()</code></td><td style="text-align: left">Return index statistics.</td></tr>
+</tbody>
+</table>
+</div>
+<p>All document methods and search methods are async
+and return Promises. <code>stats()</code> is synchronous.</p>
+<hr>
+<h2 id="schema-3"><a class="header" href="#schema-3">Schema</a></h2>
+<p>Defines the fields and index types for an <code>Index</code>.</p>
+<pre><code class="language-typescript">class Schema {
+  constructor();
+}
+</code></pre>
+<h3 id="field-methods-1"><a class="header" href="#field-methods-1">Field methods</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Method</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>addTextField(name, stored?, indexed?, termVectors?, analyzer?)</code></td><td style="text-align: left">Full-text field (inverted index, BM25).</td></tr>
+<tr><td style="text-align: left"><code>addIntegerField(name, stored?, indexed?)</code></td><td style="text-align: left">64-bit integer field.</td></tr>
+<tr><td style="text-align: left"><code>addFloatField(name, stored?, indexed?)</code></td><td style="text-align: left">64-bit float field.</td></tr>
+<tr><td style="text-align: left"><code>addBooleanField(name, stored?, indexed?)</code></td><td style="text-align: left">Boolean field.</td></tr>
+<tr><td style="text-align: left"><code>addBytesField(name, stored?)</code></td><td style="text-align: left">Raw bytes field.</td></tr>
+<tr><td style="text-align: left"><code>addGeoField(name, stored?, indexed?)</code></td><td style="text-align: left">Geographic coordinate field.</td></tr>
+<tr><td style="text-align: left"><code>addDatetimeField(name, stored?, indexed?)</code></td><td style="text-align: left">UTC datetime field.</td></tr>
+<tr><td style="text-align: left"><code>addHnswField(name, dimension, distance?, m?, efConstruction?, embedder?)</code></td><td style="text-align: left">HNSW vector field.</td></tr>
+<tr><td style="text-align: left"><code>addFlatField(name, dimension, distance?, embedder?)</code></td><td style="text-align: left">Flat (brute-force) vector field.</td></tr>
+<tr><td style="text-align: left"><code>addIvfField(name, dimension, distance?, nClusters?, nProbe?, embedder?)</code></td><td style="text-align: left">IVF vector field.</td></tr>
+<tr><td style="text-align: left"><code>addEmbedder(name, config)</code></td><td style="text-align: left">Register a named embedder.</td></tr>
+<tr><td style="text-align: left"><code>setDefaultFields(fields)</code></td><td style="text-align: left">Set default search fields.</td></tr>
+<tr><td style="text-align: left"><code>fieldNames()</code></td><td style="text-align: left">Return all field names.</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="distance-metrics-4"><a class="header" href="#distance-metrics-4">Distance metrics</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Value</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>"cosine"</code></td><td style="text-align: left">Cosine similarity (default)</td></tr>
+<tr><td style="text-align: left"><code>"euclidean"</code></td><td style="text-align: left">Euclidean distance</td></tr>
+<tr><td style="text-align: left"><code>"dot_product"</code></td><td style="text-align: left">Dot product</td></tr>
+<tr><td style="text-align: left"><code>"manhattan"</code></td><td style="text-align: left">Manhattan distance</td></tr>
+<tr><td style="text-align: left"><code>"angular"</code></td><td style="text-align: left">Angular distance</td></tr>
+</tbody>
+</table>
+</div>
+<hr>
+<h2 id="query-classes-1"><a class="header" href="#query-classes-1">Query classes</a></h2>
+<h3 id="termquery-2"><a class="header" href="#termquery-2">TermQuery</a></h3>
+<pre><code class="language-typescript">new TermQuery(field: string, term: string)
+</code></pre>
+<p>Matches documents containing the exact term in the given field.</p>
+<h3 id="phrasequery-2"><a class="header" href="#phrasequery-2">PhraseQuery</a></h3>
+<pre><code class="language-typescript">new PhraseQuery(field: string, terms: string[])
+</code></pre>
+<p>Matches documents containing the terms in order.</p>
+<h3 id="fuzzyquery-2"><a class="header" href="#fuzzyquery-2">FuzzyQuery</a></h3>
+<pre><code class="language-typescript">new FuzzyQuery(field: string, term: string, maxEdits?: number)
+</code></pre>
+<p>Approximate match allowing up to <code>maxEdits</code> edit-distance
+errors (default 2).</p>
+<h3 id="wildcardquery-2"><a class="header" href="#wildcardquery-2">WildcardQuery</a></h3>
+<pre><code class="language-typescript">new WildcardQuery(field: string, pattern: string)
+</code></pre>
+<p>Pattern match. <code>*</code> matches any sequence, <code>?</code> matches one
+character.</p>
+<h3 id="numericrangequery-2"><a class="header" href="#numericrangequery-2">NumericRangeQuery</a></h3>
+<pre><code class="language-typescript">new NumericRangeQuery(
+  field: string,
+  min?: number | null,
+  max?: number | null,
+  isFloat?: boolean,
+)
+</code></pre>
+<p>Matches numeric values in <code>[min, max]</code>. Pass <code>null</code> for an
+open bound.</p>
+<h3 id="geoquery-2"><a class="header" href="#geoquery-2">GeoQuery</a></h3>
+<pre><code class="language-typescript">GeoQuery.withinRadius(
+  field: string, lat: number, lon: number, distanceKm: number,
+): GeoQuery
+
+GeoQuery.withinBoundingBox(
+  field: string,
+  minLat: number, minLon: number,
+  maxLat: number, maxLon: number,
+): GeoQuery
+</code></pre>
+<p>Geographic search by radius or bounding box.</p>
+<h3 id="booleanquery-2"><a class="header" href="#booleanquery-2">BooleanQuery</a></h3>
+<pre><code class="language-typescript">class BooleanQuery {
+  constructor();
+  mustTerm(field: string, term: string): void;
+  shouldTerm(field: string, term: string): void;
+  mustNotTerm(field: string, term: string): void;
+}
+</code></pre>
+<p>Compound boolean query with MUST / SHOULD / MUST_NOT clauses.</p>
+<h3 id="spanquery-1"><a class="header" href="#spanquery-1">SpanQuery</a></h3>
+<pre><code class="language-typescript">SpanQuery.term(field: string, term: string): SpanQuery
+SpanQuery.near(
+  field: string, terms: string[],
+  slop?: number, ordered?: boolean,
+): SpanQuery
+SpanQuery.nearSpans(
+  field: string, clauses: SpanQuery[],
+  slop?: number, ordered?: boolean,
+): SpanQuery
+SpanQuery.containing(
+  field: string, big: SpanQuery, little: SpanQuery,
+): SpanQuery
+SpanQuery.within(
+  field: string,
+  include: SpanQuery, exclude: SpanQuery, distance: number,
+): SpanQuery
+</code></pre>
+<p>Positional/proximity span queries.</p>
+<h3 id="vectorquery-1"><a class="header" href="#vectorquery-1">VectorQuery</a></h3>
+<pre><code class="language-typescript">new VectorQuery(field: string, vector: number[])
+</code></pre>
+<p>Nearest-neighbor search using a pre-computed embedding vector.</p>
+<h3 id="vectortextquery-1"><a class="header" href="#vectortextquery-1">VectorTextQuery</a></h3>
+<pre><code class="language-typescript">new VectorTextQuery(field: string, text: string)
+</code></pre>
+<p>Converts <code>text</code> to an embedding at query time. Requires an
+embedder configured on the index.</p>
+<hr>
+<h2 id="searchrequest-2"><a class="header" href="#searchrequest-2">SearchRequest</a></h2>
+<p>Full-featured search request for advanced control.</p>
+<pre><code class="language-typescript">class SearchRequest {
+  constructor(limit?: number, offset?: number);
+}
+</code></pre>
+<h3 id="setter-methods"><a class="header" href="#setter-methods">Setter methods</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Method</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>setQueryDsl(dsl)</code></td><td style="text-align: left">Set a DSL string query.</td></tr>
+<tr><td style="text-align: left"><code>setLexicalTermQuery(field, term)</code></td><td style="text-align: left">Set a term-based lexical query.</td></tr>
+<tr><td style="text-align: left"><code>setLexicalPhraseQuery(field, terms)</code></td><td style="text-align: left">Set a phrase-based lexical query.</td></tr>
+<tr><td style="text-align: left"><code>setVectorQuery(field, vector)</code></td><td style="text-align: left">Set a pre-computed vector query.</td></tr>
+<tr><td style="text-align: left"><code>setVectorTextQuery(field, text)</code></td><td style="text-align: left">Set a text-based vector query.</td></tr>
+<tr><td style="text-align: left"><code>setFilterQuery(field, term)</code></td><td style="text-align: left">Set a post-scoring filter.</td></tr>
+<tr><td style="text-align: left"><code>setRrfFusion(k?)</code></td><td style="text-align: left">Use RRF fusion (default k=60).</td></tr>
+<tr><td style="text-align: left"><code>setWeightedSumFusion(lexicalWeight?, vectorWeight?)</code></td><td style="text-align: left">Use weighted sum fusion.</td></tr>
+</tbody>
+</table>
+</div>
+<hr>
+<h2 id="searchresult-4"><a class="header" href="#searchresult-4">SearchResult</a></h2>
+<p>Returned by search methods as an array.</p>
+<pre><code class="language-typescript">interface SearchResult {
+  id: string;        // External document identifier
+  score: number;     // Relevance score
+  document: object | null; // Retrieved fields, or null
+}
+</code></pre>
+<hr>
+<h2 id="fusion-algorithms-3"><a class="header" href="#fusion-algorithms-3">Fusion algorithms</a></h2>
+<h3 id="rrf-1"><a class="header" href="#rrf-1">RRF</a></h3>
+<pre><code class="language-typescript">new RRF(k?: number)  // default 60.0
+</code></pre>
+<p>Reciprocal Rank Fusion. Merges lexical and vector result lists
+by rank position.</p>
+<h3 id="weightedsum-3"><a class="header" href="#weightedsum-3">WeightedSum</a></h3>
+<pre><code class="language-typescript">new WeightedSum(
+  lexicalWeight?: number,  // default 0.5
+  vectorWeight?: number,   // default 0.5
+)
+</code></pre>
+<p>Normalises both score lists independently, then combines them.</p>
+<hr>
+<h2 id="text-analysis-2"><a class="header" href="#text-analysis-2">Text analysis</a></h2>
+<h3 id="synonymdictionary-1"><a class="header" href="#synonymdictionary-1">SynonymDictionary</a></h3>
+<pre><code class="language-typescript">class SynonymDictionary {
+  constructor();
+  addSynonymGroup(terms: string[]): void;
+}
+</code></pre>
+<h3 id="whitespacetokenizer-1"><a class="header" href="#whitespacetokenizer-1">WhitespaceTokenizer</a></h3>
+<pre><code class="language-typescript">class WhitespaceTokenizer {
+  constructor();
+  tokenize(text: string): Token[];
+}
+</code></pre>
+<h3 id="synonymgraphfilter-1"><a class="header" href="#synonymgraphfilter-1">SynonymGraphFilter</a></h3>
+<pre><code class="language-typescript">class SynonymGraphFilter {
+  constructor(
+    dictionary: SynonymDictionary,
+    keepOriginal?: boolean,  // default true
+    boost?: number,          // default 1.0
+  );
+  apply(tokens: Token[]): Token[];
+}
+</code></pre>
+<h3 id="token-1"><a class="header" href="#token-1">Token</a></h3>
+<pre><code class="language-typescript">interface Token {
+  text: string;
+  position: number;
+  startOffset: number;
+  endOffset: number;
+  boost: number;
+  stopped: boolean;
+  positionIncrement: number;
+  positionLength: number;
+}
+</code></pre>
+<hr>
+<h2 id="field-value-types-1"><a class="header" href="#field-value-types-1">Field value types</a></h2>
+<p>JavaScript values are automatically converted to Laurus
+<code>DataValue</code> types:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">JavaScript type</th><th style="text-align: left">Laurus type</th><th style="text-align: left">Notes</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>null</code></td><td style="text-align: left"><code>Null</code></td><td style="text-align: left"></td></tr>
+<tr><td style="text-align: left"><code>boolean</code></td><td style="text-align: left"><code>Bool</code></td><td style="text-align: left"></td></tr>
+<tr><td style="text-align: left"><code>number</code> (integer)</td><td style="text-align: left"><code>Int64</code></td><td style="text-align: left"></td></tr>
+<tr><td style="text-align: left"><code>number</code> (float)</td><td style="text-align: left"><code>Float64</code></td><td style="text-align: left"></td></tr>
+<tr><td style="text-align: left"><code>string</code></td><td style="text-align: left"><code>Text</code></td><td style="text-align: left">ISO8601 strings become <code>DateTime</code></td></tr>
+<tr><td style="text-align: left"><code>number[]</code></td><td style="text-align: left"><code>Vector</code></td><td style="text-align: left">Coerced to <code>f32</code></td></tr>
+<tr><td style="text-align: left"><code>{ lat, lon }</code></td><td style="text-align: left"><code>Geo</code></td><td style="text-align: left">Two <code>number</code> values</td></tr>
+<tr><td style="text-align: left"><code>Date</code></td><td style="text-align: left"><code>DateTime</code></td><td style="text-align: left">Via timestamp</td></tr>
+<tr><td style="text-align: left"><code>Buffer</code></td><td style="text-align: left"><code>Bytes</code></td><td style="text-align: left"></td></tr>
+</tbody>
+</table>
+</div>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="development-setup"><a class="header" href="#development-setup">Development Setup</a></h1>
+<p>This page covers how to set up a local development environment
+for the <code>@laurus/nodejs</code> binding, build it, and run the test
+suite.</p>
 <h2 id="prerequisites-4"><a class="header" href="#prerequisites-4">Prerequisites</a></h2>
+<ul>
+<li><strong>Rust</strong> 1.85 or later with Cargo</li>
+<li><strong>Node.js</strong> 18 or later with npm</li>
+<li>Repository cloned locally</li>
+</ul>
+<pre><code class="language-bash">git clone https://github.com/mosuka/laurus.git
+cd laurus
+</code></pre>
+<h2 id="build"><a class="header" href="#build">Build</a></h2>
+<h3 id="development-build"><a class="header" href="#development-build">Development build</a></h3>
+<p>Compiles the Rust native addon in debug mode. Re-run after
+any Rust source change.</p>
+<pre><code class="language-bash">cd laurus-nodejs
+npm install
+npm run build:debug
+</code></pre>
+<h3 id="release-build"><a class="header" href="#release-build">Release build</a></h3>
+<pre><code class="language-bash">npm run build
+</code></pre>
+<h3 id="verify-the-build"><a class="header" href="#verify-the-build">Verify the build</a></h3>
+<pre><code class="language-javascript">node -e "
+const { Index } = require('./index.js');
+Index.create().then(idx =&gt; console.log(idx.stats()));
+"
+// { documentCount: 0, vectorFields: {} }
+</code></pre>
+<h2 id="testing"><a class="header" href="#testing">Testing</a></h2>
+<p>Tests use <a href="https://vitest.dev/">Vitest</a> and are located in
+<code>__tests__/</code>.</p>
+<pre><code class="language-bash"># Run all tests
+npm test
+</code></pre>
+<p>To run a specific test by name:</p>
+<pre><code class="language-bash">npx vitest run -t "searches with DSL string"
+</code></pre>
+<h2 id="linting-and-formatting"><a class="header" href="#linting-and-formatting">Linting and formatting</a></h2>
+<pre><code class="language-bash"># Rust lint (Clippy)
+cargo clippy -p laurus-nodejs -- -D warnings
+
+# Rust formatting
+cargo fmt -p laurus-nodejs --check
+
+# Apply formatting
+cargo fmt -p laurus-nodejs
+</code></pre>
+<h2 id="cleaning-up"><a class="header" href="#cleaning-up">Cleaning up</a></h2>
+<pre><code class="language-bash"># Remove build artifacts
+rm -f *.node index.js index.d.ts
+
+# Remove node_modules
+rm -rf node_modules
+</code></pre>
+<h2 id="project-layout"><a class="header" href="#project-layout">Project layout</a></h2>
+<pre><code class="language-text">laurus-nodejs/
+├── Cargo.toml          # Rust crate manifest
+├── build.rs            # napi-build setup
+├── package.json        # npm package metadata
+├── README.md           # English README
+├── README_ja.md        # Japanese README
+├── src/                # Rust source (napi-rs binding)
+│   ├── lib.rs          # Module registration
+│   ├── index.rs        # Index class
+│   ├── schema.rs       # Schema class
+│   ├── query.rs        # Query classes
+│   ├── search.rs       # SearchRequest / SearchResult / Fusion
+│   ├── analysis.rs     # Tokenizer / Filter / Token
+│   ├── convert.rs      # JS ↔ DataValue conversion
+│   └── errors.rs       # Error mapping
+├── __tests__/          # Vitest integration tests
+│   └── index.spec.mjs
+└── examples/           # Runnable Node.js examples
+    ├── quickstart.mjs
+    ├── lexical-search.mjs
+    ├── vector-search.mjs
+    └── hybrid-search.mjs
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="build--test"><a class="header" href="#build--test">Build &amp; Test</a></h1>
+<h2 id="prerequisites-5"><a class="header" href="#prerequisites-5">Prerequisites</a></h2>
 <ul>
 <li><strong>Rust</strong> 1.85 or later (edition 2024)</li>
 <li><strong>Cargo</strong> (included with Rust)</li>
@@ -8338,7 +8924,7 @@ cargo build --features embeddings-candle
 # Build in release mode
 cargo build --release
 </code></pre>
-<h2 id="testing"><a class="header" href="#testing">Testing</a></h2>
+<h2 id="testing-1"><a class="header" href="#testing-1">Testing</a></h2>
 <pre><code class="language-bash"># Run all tests
 cargo test
 
