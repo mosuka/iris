@@ -40,8 +40,19 @@ graph LR
 JavaScript クラスは Rust エンジンの薄いラッパーです。
 各呼び出しは napi-rs の FFI 境界を一度だけ越え、
 Rust エンジンが完全にネイティブコードで処理を実行します。
-非同期メソッドは napi-rs 内蔵の tokio ランタイムで実行され、
-Promise として Node.js のイベントループに返されます。
+
+全 I/O メソッド（`search`、`commit`、`putDocument` 等）は
+**async** で Promise を返します。napi-rs 内蔵の tokio
+ランタイムで実行され、Node.js のイベントループをブロック
+しません。Schema 構築、Query 作成、`stats()` は I/O を
+伴わないため同期メソッドです。
+
+> **注意:** Python バインディング（`laurus-python`）では、
+> 同じ Rust エンジンのメソッドを**同期関数**として公開
+> しています。Python の GIL（Global Interpreter Lock）の
+> 制約により非同期 API が煩雑になるためです。Node.js には
+> この制約がないため、非同期 Rust エンジンを直接 Promise
+> として公開しています。
 
 ## クイックスタート
 

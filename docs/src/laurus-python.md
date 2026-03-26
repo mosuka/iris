@@ -29,7 +29,21 @@ graph LR
     Engine --> Storage["Storage\n(Memory / File)"]
 ```
 
-The Python classes are thin wrappers around the Rust engine. Each call crosses the PyO3 FFI boundary once; the Rust engine then executes the query entirely in native code.
+The Python classes are thin wrappers around the Rust engine.
+Each call crosses the PyO3 FFI boundary once; the Rust engine
+then executes the operation entirely in native code.
+
+Although the Rust engine uses async I/O internally, all Python
+methods are exposed as **synchronous** functions. This is because
+Python's GIL (Global Interpreter Lock) prevents true concurrent
+execution within a single interpreter, making an async API
+cumbersome (it would require `asyncio.run()` everywhere).
+Instead, each method calls `tokio::Runtime::block_on()` under
+the hood to bridge async Rust to synchronous Python.
+
+> **Note:** The Node.js binding (`@laurus/nodejs`) exposes the
+> same Rust engine methods as native `async` / `Promise` APIs,
+> since Node.js's event loop supports async natively.
 
 ## Quick Start
 

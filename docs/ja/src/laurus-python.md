@@ -29,7 +29,24 @@ graph LR
     Engine --> Storage["ストレージ\n(Memory / File)"]
 ```
 
-Python クラスは Rust エンジンの薄いラッパーです。各呼び出しは PyO3 の FFI 境界を一度だけ越え、その後 Rust エンジンがクエリをネイティブコードで実行します。
+Python クラスは Rust エンジンの薄いラッパーです。
+各呼び出しは PyO3 の FFI 境界を一度だけ越え、その後
+Rust エンジンが操作をネイティブコードで実行します。
+
+Rust エンジン内部は非同期 I/O を使用していますが、
+Python 側のメソッドはすべて**同期関数**として公開されています。
+これは Python の GIL（Global Interpreter Lock）の制約により、
+単一インタプリタ内での真の並行実行ができないためです。
+非同期 API にすると `asyncio.run()` が常に必要になり、
+API が煩雑になります。代わりに、各メソッドは内部で
+`tokio::Runtime::block_on()` を呼び出し、非同期 Rust を
+同期 Python にブリッジしています。
+
+> **注意:** Node.js バインディング（`@laurus/nodejs`）では、
+> 同じ Rust エンジンのメソッドをネイティブな
+> `async` / `Promise` API として公開しています。
+> Node.js のイベントループは非同期をネイティブにサポート
+> しているためです。
 
 ## クイックスタート
 

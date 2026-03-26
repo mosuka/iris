@@ -42,9 +42,19 @@ graph LR
 
 The JavaScript classes are thin wrappers around the Rust engine.
 Each call crosses the napi-rs FFI boundary once; the Rust engine
-then executes the operation entirely in native code. Async methods
-run on napi-rs's built-in tokio runtime and return Promises to
-the Node.js event loop.
+then executes the operation entirely in native code.
+
+All I/O methods (`search`, `commit`, `putDocument`, etc.) are
+**async** and return Promises. They run on napi-rs's built-in
+tokio runtime and return results to the Node.js event loop
+without blocking it. Schema construction, query creation, and
+`stats()` are synchronous since they involve no I/O.
+
+> **Note:** The Python binding (`laurus-python`) exposes the
+> same Rust engine methods as **synchronous** functions because
+> Python's GIL (Global Interpreter Lock) makes an async API
+> cumbersome. Node.js has no such constraint, so the async Rust
+> engine is exposed directly as Promises.
 
 ## Quick Start
 
