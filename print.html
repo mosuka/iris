@@ -36,7 +36,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-29659fc1.js";
+            window.path_to_searchindex_js = "searchindex-d2a933a4.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-27beae76.js"></script>
@@ -7939,7 +7939,21 @@ document: {"title": "Hello World - Part 2", "body": "This is a continuation."}
     PyQuery --&gt;|"PyO3 FFI"| Engine
     Engine --&gt; Storage["Storage\n(Memory / File)"]
 </code></pre>
-<p>The Python classes are thin wrappers around the Rust engine. Each call crosses the PyO3 FFI boundary once; the Rust engine then executes the query entirely in native code.</p>
+<p>The Python classes are thin wrappers around the Rust engine.
+Each call crosses the PyO3 FFI boundary once; the Rust engine
+then executes the operation entirely in native code.</p>
+<p>Although the Rust engine uses async I/O internally, all Python
+methods are exposed as <strong>synchronous</strong> functions. This is because
+Python’s GIL (Global Interpreter Lock) prevents true concurrent
+execution within a single interpreter, making an async API
+cumbersome (it would require <code>asyncio.run()</code> everywhere).
+Instead, each method calls <code>tokio::Runtime::block_on()</code> under
+the hood to bridge async Rust to synchronous Python.</p>
+<blockquote>
+<p><strong>Note:</strong> The Node.js binding (<code>@laurus/nodejs</code>) exposes the
+same Rust engine methods as native <code>async</code> / <code>Promise</code> APIs,
+since Node.js’s event loop supports async natively.</p>
+</blockquote>
 <h2 id="quick-start-3"><a class="header" href="#quick-start-3">Quick Start</a></h2>
 <pre><code class="language-python">import laurus
 
@@ -8360,9 +8374,19 @@ and synonym expansion</li>
 </code></pre>
 <p>The JavaScript classes are thin wrappers around the Rust engine.
 Each call crosses the napi-rs FFI boundary once; the Rust engine
-then executes the operation entirely in native code. Async methods
-run on napi-rs’s built-in tokio runtime and return Promises to
-the Node.js event loop.</p>
+then executes the operation entirely in native code.</p>
+<p>All I/O methods (<code>search</code>, <code>commit</code>, <code>putDocument</code>, etc.) are
+<strong>async</strong> and return Promises. They run on napi-rs’s built-in
+tokio runtime and return results to the Node.js event loop
+without blocking it. Schema construction, query creation, and
+<code>stats()</code> are synchronous since they involve no I/O.</p>
+<blockquote>
+<p><strong>Note:</strong> The Python binding (<code>laurus-python</code>) exposes the
+same Rust engine methods as <strong>synchronous</strong> functions because
+Python’s GIL (Global Interpreter Lock) makes an async API
+cumbersome. Node.js has no such constraint, so the async Rust
+engine is exposed directly as Promises.</p>
+</blockquote>
 <h2 id="quick-start-5"><a class="header" href="#quick-start-5">Quick Start</a></h2>
 <pre><code class="language-javascript">import { Index, Schema } from "@laurus/nodejs";
 

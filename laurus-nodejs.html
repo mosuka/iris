@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-29659fc1.js";
+            window.path_to_searchindex_js = "searchindex-d2a933a4.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-27beae76.js"></script>
@@ -216,9 +216,19 @@ and synonym expansion</li>
 </code></pre>
 <p>The JavaScript classes are thin wrappers around the Rust engine.
 Each call crosses the napi-rs FFI boundary once; the Rust engine
-then executes the operation entirely in native code. Async methods
-run on napi-rs’s built-in tokio runtime and return Promises to
-the Node.js event loop.</p>
+then executes the operation entirely in native code.</p>
+<p>All I/O methods (<code>search</code>, <code>commit</code>, <code>putDocument</code>, etc.) are
+<strong>async</strong> and return Promises. They run on napi-rs’s built-in
+tokio runtime and return results to the Node.js event loop
+without blocking it. Schema construction, query creation, and
+<code>stats()</code> are synchronous since they involve no I/O.</p>
+<blockquote>
+<p><strong>Note:</strong> The Python binding (<code>laurus-python</code>) exposes the
+same Rust engine methods as <strong>synchronous</strong> functions because
+Python’s GIL (Global Interpreter Lock) makes an async API
+cumbersome. Node.js has no such constraint, so the async Rust
+engine is exposed directly as Promises.</p>
+</blockquote>
 <h2 id="quick-start"><a class="header" href="#quick-start">Quick Start</a></h2>
 <pre><code class="language-javascript">import { Index, Schema } from "@laurus/nodejs";
 

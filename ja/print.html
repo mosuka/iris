@@ -36,7 +36,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-40bac044.js";
+            window.path_to_searchindex_js = "searchindex-99e5d321.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-c4adc502.js"></script>
@@ -7840,7 +7840,24 @@ name: "category"
     PyQuery --&gt;|"PyO3 FFI"| Engine
     Engine --&gt; Storage["ストレージ\n(Memory / File)"]
 </code></pre>
-<p>Python クラスは Rust エンジンの薄いラッパーです。各呼び出しは PyO3 の FFI 境界を一度だけ越え、その後 Rust エンジンがクエリをネイティブコードで実行します。</p>
+<p>Python クラスは Rust エンジンの薄いラッパーです。
+各呼び出しは PyO3 の FFI 境界を一度だけ越え、その後
+Rust エンジンが操作をネイティブコードで実行します。</p>
+<p>Rust エンジン内部は非同期 I/O を使用していますが、
+Python 側のメソッドはすべて<strong>同期関数</strong>として公開されています。
+これは Python の GIL（Global Interpreter Lock）の制約により、
+単一インタプリタ内での真の並行実行ができないためです。
+非同期 API にすると <code>asyncio.run()</code> が常に必要になり、
+API が煩雑になります。代わりに、各メソッドは内部で
+<code>tokio::Runtime::block_on()</code> を呼び出し、非同期 Rust を
+同期 Python にブリッジしています。</p>
+<blockquote>
+<p><strong>注意:</strong> Node.js バインディング（<code>@laurus/nodejs</code>）では、
+同じ Rust エンジンのメソッドをネイティブな
+<code>async</code> / <code>Promise</code> API として公開しています。
+Node.js のイベントループは非同期をネイティブにサポート
+しているためです。</p>
+</blockquote>
 <h2 id="クイックスタート-3"><a class="header" href="#クイックスタート-3">クイックスタート</a></h2>
 <pre><code class="language-python">import laurus
 
@@ -8257,9 +8274,20 @@ NumericRange、Geo、Boolean、Span クエリ</li>
 </code></pre>
 <p>JavaScript クラスは Rust エンジンの薄いラッパーです。
 各呼び出しは napi-rs の FFI 境界を一度だけ越え、
-Rust エンジンが完全にネイティブコードで処理を実行します。
-非同期メソッドは napi-rs 内蔵の tokio ランタイムで実行され、
-Promise として Node.js のイベントループに返されます。</p>
+Rust エンジンが完全にネイティブコードで処理を実行します。</p>
+<p>全 I/O メソッド（<code>search</code>、<code>commit</code>、<code>putDocument</code> 等）は
+<strong>async</strong> で Promise を返します。napi-rs 内蔵の tokio
+ランタイムで実行され、Node.js のイベントループをブロック
+しません。Schema 構築、Query 作成、<code>stats()</code> は I/O を
+伴わないため同期メソッドです。</p>
+<blockquote>
+<p><strong>注意:</strong> Python バインディング（<code>laurus-python</code>）では、
+同じ Rust エンジンのメソッドを<strong>同期関数</strong>として公開
+しています。Python の GIL（Global Interpreter Lock）の
+制約により非同期 API が煩雑になるためです。Node.js には
+この制約がないため、非同期 Rust エンジンを直接 Promise
+として公開しています。</p>
+</blockquote>
 <h2 id="クイックスタート-5"><a class="header" href="#クイックスタート-5">クイックスタート</a></h2>
 <pre><code class="language-javascript">import { Index, Schema } from "@laurus/nodejs";
 
