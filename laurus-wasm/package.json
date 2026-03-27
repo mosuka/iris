@@ -1,0 +1,33 @@
+{
+  "name": "laurus-wasm",
+  "version": "0.5.0",
+  "description": "Full-text and vector search engine for browsers and edge runtimes",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mosuka/laurus"
+  },
+  "homepage": "https://github.com/mosuka/laurus/tree/main/laurus-wasm",
+  "keywords": [
+    "search",
+    "wasm",
+    "vector",
+    "lexical",
+    "hybrid",
+    "full-text-search",
+    "browser"
+  ],
+  "files": [
+    "laurus_wasm.js",
+    "laurus_wasm.d.ts",
+    "laurus_wasm_bg.wasm",
+    "laurus_wasm_bg.wasm.d.ts",
+    "package.json",
+    "README.md"
+  ],
+  "main": "laurus_wasm.js",
+  "types": "laurus_wasm.d.ts",
+  "sideEffects": [
+    "./laurus_wasm.js"
+  ]
+}
