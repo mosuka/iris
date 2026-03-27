@@ -1,0 +1,908 @@
+//! Ruby wrappers for all Laurus query types.
+//!
+//! Each Ruby query class stores the data needed to construct the Rust query.
+//! Vector query classes produce [`VectorSearchQuery`] instead.
+
+use std::cell::RefCell;
+
+use laurus::lexical::span::{SpanQueryBuilder, SpanQueryWrapper};
+use laurus::lexical::{
+    BooleanQuery, FuzzyQuery, GeoQuery, NumericRangeQuery, PhraseQuery, TermQuery, WildcardQuery,
+};
+use laurus::vector::Vector;
+use laurus::vector::store::request::QueryVector;
+use laurus::{DataValue, LexicalSearchQuery, QueryPayload, VectorSearchQuery};
+use magnus::prelude::*;
+use magnus::scan_args::{get_kwargs, scan_args};
+use magnus::{Error, RArray, RHash, RModule, Ruby, Value};
+
+// ---------------------------------------------------------------------------
+// Helper: extract a lexical query from any Ruby query object
+// ---------------------------------------------------------------------------
+
+/// Extract a Laurus lexical query from an arbitrary Ruby value.
+///
+/// Supports: `TermQuery`, `PhraseQuery`, `FuzzyQuery`, `WildcardQuery`,
+/// `NumericRangeQuery`, `GeoQuery`, `BooleanQuery`, `SpanQuery`.
+///
+/// # Arguments
+///
+/// * `value` - Ruby value that should be one of the query types.
+///
+/// # Returns
+///
+/// A boxed `dyn Query` implementing the lexical query.
+pub fn extract_lexical_query(value: Value) -> Result<Box<dyn laurus::lexical::Query>, Error> {
+    let ruby = Ruby::get().expect("called from Ruby thread");
+    if let Ok(q) = <&RbTermQuery>::try_convert(value) {
+        return Ok(Box::new(TermQuery::new(&q.field, &q.term)));
+    }
+    if let Ok(q) = <&RbPhraseQuery>::try_convert(value) {
+        return Ok(Box::new(PhraseQuery::new(&q.field, q.terms.clone())));
+    }
+    if let Ok(q) = <&RbFuzzyQuery>::try_convert(value) {
+        return Ok(Box::new(
+            FuzzyQuery::new(&q.field, &q.term).max_edits(q.max_edits),
+        ));
+    }
+    if let Ok(q) = <&RbWildcardQuery>::try_convert(value) {
+        return Ok(Box::new(WildcardQuery::new(&q.field, &q.pattern).map_err(
+            |e| Error::new(ruby.exception_arg_error(), e.to_string()),
+        )?));
+    }
+    if let Ok(q) = <&RbNumericRangeQuery>::try_convert(value) {
+        return Ok(q.build());
+    }
+    if let Ok(q) = <&RbGeoQuery>::try_convert(value) {
+        return q
+            .build()
+            .map_err(|e| Error::new(ruby.exception_arg_error(), e.to_string()));
+    }
+    if let Ok(q) = <&RbBooleanQuery>::try_convert(value) {
+        return q.build_query();
+    }
+    if let Ok(q) = <&RbSpanQuery>::try_convert(value) {
+        return Ok(Box::new(SpanQueryWrapper::new(q.kind.build(&q.field))));
+    }
+    Err(Error::new(
+        ruby.exception_arg_error(),
+        format!(
+            "Expected a lexical query type (TermQuery, BooleanQuery, …), got {}",
+            value.class()
+        ),
+    ))
+}
+
+/// Wrap an arbitrary Ruby query value as a `LexicalSearchQuery::Obj`.
+///
+/// # Arguments
+///
+/// * `value` - Ruby query object.
+///
+/// # Returns
+///
+/// A `LexicalSearchQuery` wrapping the extracted query.
+pub fn rb_to_lexical_search_query(value: Value) -> Result<LexicalSearchQuery, Error> {
+    Ok(LexicalSearchQuery::Obj(extract_lexical_query(value)?))
+}
+
+/// Check whether the Ruby value is a vector query type.
+///
+/// # Arguments
+///
+/// * `value` - Ruby value to check.
+///
+/// # Returns
+///
+/// `true` if the value is a `VectorQuery` or `VectorTextQuery`.
+pub fn is_vector_query(value: Value) -> bool {
+    <&RbVectorQuery>::try_convert(value).is_ok() || <&RbVectorTextQuery>::try_convert(value).is_ok()
+}
+
+/// Convert a vector query Ruby value into a [`VectorSearchQuery`].
+///
+/// # Arguments
+///
+/// * `value` - Ruby value that should be `VectorQuery` or `VectorTextQuery`.
+///
+/// # Returns
+///
+/// The corresponding `VectorSearchQuery`.
+pub fn rb_to_vector_search_query(value: Value) -> Result<VectorSearchQuery, Error> {
+    let ruby = Ruby::get().expect("called from Ruby thread");
+    if let Ok(q) = <&RbVectorQuery>::try_convert(value) {
+        return Ok(VectorSearchQuery::Vectors(vec![QueryVector {
+            vector: Vector::new(q.vector.clone()),
+            weight: 1.0,
+            fields: Some(vec![q.field.clone()]),
+        }]));
+    }
+    if let Ok(q) = <&RbVectorTextQuery>::try_convert(value) {
+        return Ok(VectorSearchQuery::Payloads(vec![QueryPayload::new(
+            &q.field,
+            DataValue::Text(q.text.clone()),
+        )]));
+    }
+    Err(Error::new(
+        ruby.exception_arg_error(),
+        "Expected VectorQuery or VectorTextQuery",
+    ))
+}
+
+// ---------------------------------------------------------------------------
+// Internal span-query recipe enum (Clone so it can be nested)
+// ---------------------------------------------------------------------------
+
+/// Internal representation of span query structure for deferred building.
+#[derive(Clone)]
+pub enum SpanKind {
+    /// Single term span.
+    Term(String),
+    /// Near proximity span with slop and ordering.
+    Near(Vec<SpanKind>, u32, bool),
+    /// Containing span: big span that contains little span.
+    Containing(Box<SpanKind>, Box<SpanKind>),
+    /// Within span: include span within exclude span at a maximum distance.
+    Within(Box<SpanKind>, Box<SpanKind>, u32),
+}
+
+impl SpanKind {
+    /// Build a concrete `SpanQuery` from this recipe.
+    ///
+    /// # Arguments
+    ///
+    /// * `field` - Field name to search within.
+    pub fn build(&self, field: &str) -> Box<dyn laurus::lexical::span::SpanQuery> {
+        let sb = SpanQueryBuilder::new(field);
+        match self {
+            SpanKind::Term(t) => Box::new(sb.term(t)),
+            SpanKind::Near(clauses, slop, ordered) => {
+                let built: Vec<Box<dyn laurus::lexical::span::SpanQuery>> =
+                    clauses.iter().map(|c| c.build(field)).collect();
+                Box::new(sb.near(built, *slop, *ordered))
+            }
+            SpanKind::Containing(big, little) => {
+                Box::new(sb.containing(big.build(field), little.build(field)))
+            }
+            SpanKind::Within(include, exclude, dist) => {
+                Box::new(sb.within(include.build(field), exclude.build(field), *dist))
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TermQuery
+// ---------------------------------------------------------------------------
+
+/// Exact single-term lexical query (`Laurus::TermQuery`).
+#[magnus::wrap(class = "Laurus::TermQuery")]
+pub struct RbTermQuery {
+    pub field: String,
+    pub term: String,
+}
+
+impl RbTermQuery {
+    /// Create a new term query.
+    ///
+    /// # Arguments
+    ///
+    /// * `field` - Field name to search.
+    /// * `term` - Exact term to match.
+    fn new(field: String, term: String) -> Self {
+        Self { field, term }
+    }
+
+    fn inspect(&self) -> String {
+        format!("TermQuery(field='{}', term='{}')", self.field, self.term)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// PhraseQuery
+// ---------------------------------------------------------------------------
+
+/// Exact phrase (word-sequence) lexical query (`Laurus::PhraseQuery`).
+#[magnus::wrap(class = "Laurus::PhraseQuery")]
+pub struct RbPhraseQuery {
+    pub field: String,
+    pub terms: Vec<String>,
+}
+
+impl RbPhraseQuery {
+    /// Create a new phrase query.
+    ///
+    /// # Arguments
+    ///
+    /// * `field` - Field name to search.
+    /// * `terms` - Array of terms forming the phrase.
+    fn new(field: String, terms: RArray) -> Result<Self, Error> {
+        let terms: Vec<String> = terms.to_vec()?;
+        Ok(Self { field, terms })
+    }
+
+    fn inspect(&self) -> String {
+        format!(
+            "PhraseQuery(field='{}', terms={:?})",
+            self.field, self.terms
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// FuzzyQuery
+// ---------------------------------------------------------------------------
+
+/// Approximate (typo-tolerant) lexical query (`Laurus::FuzzyQuery`).
+#[magnus::wrap(class = "Laurus::FuzzyQuery")]
+pub struct RbFuzzyQuery {
+    pub field: String,
+    pub term: String,
+    pub max_edits: u32,
+}
+
+impl RbFuzzyQuery {
+    /// Create a new fuzzy query.
+    ///
+    /// # Arguments
+    ///
+    /// * `args` - Positional and keyword arguments:
+    ///   - `field` (String): Field name.
+    ///   - `term` (String): Term to match approximately.
+    ///   - `max_edits:` (u32, default 2): Maximum edit distance.
+    fn new(args: &[Value]) -> Result<Self, Error> {
+        let args = scan_args::<(String, String), (), (), (), RHash, ()>(args)?;
+        let (field, term) = args.required;
+        let kwargs = get_kwargs::<_, (), (Option<u32>,), ()>(args.keywords, &[], &["max_edits"])?;
+        let (max_edits,) = kwargs.optional;
+        Ok(Self {
+            field,
+            term,
+            max_edits: max_edits.unwrap_or(2),
+        })
+    }
+
+    fn inspect(&self) -> String {
+        format!(
+            "FuzzyQuery(field='{}', term='{}', max_edits={})",
+            self.field, self.term, self.max_edits
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// WildcardQuery
+// ---------------------------------------------------------------------------
+
+/// Wildcard pattern lexical query (`Laurus::WildcardQuery`).
+///
+/// `*` matches any sequence, `?` matches any single character.
+#[magnus::wrap(class = "Laurus::WildcardQuery")]
+pub struct RbWildcardQuery {
+    pub field: String,
+    pub pattern: String,
+}
+
+impl RbWildcardQuery {
+    /// Create a new wildcard query.
+    ///
+    /// # Arguments
+    ///
+    /// * `field` - Field name to search.
+    /// * `pattern` - Wildcard pattern.
+    fn new(field: String, pattern: String) -> Self {
+        Self { field, pattern }
+    }
+
+    fn inspect(&self) -> String {
+        format!(
+            "WildcardQuery(field='{}', pattern='{}')",
+            self.field, self.pattern
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// NumericRangeQuery
+// ---------------------------------------------------------------------------
+
+/// Internal representation of numeric range kind.
+#[derive(Clone)]
+pub enum NumericKind {
+    /// Integer range with optional min and max.
+    Integer(Option<i64>, Option<i64>),
+    /// Float range with optional min and max.
+    Float(Option<f64>, Option<f64>),
+}
+
+/// Numeric range filter query (`Laurus::NumericRangeQuery`).
+///
+/// The type (integer or float) is inferred from the Ruby type of `min`/`max`.
+#[magnus::wrap(class = "Laurus::NumericRangeQuery")]
+pub struct RbNumericRangeQuery {
+    pub field: String,
+    pub kind: NumericKind,
+}
+
+impl RbNumericRangeQuery {
+    /// Create a new numeric range query.
+    ///
+    /// # Arguments
+    ///
+    /// * `args` - Positional and keyword arguments:
+    ///   - `field` (String): Field name.
+    ///   - `min:` (Integer or Float, optional): Lower bound.
+    ///   - `max:` (Integer or Float, optional): Upper bound.
+    fn new(args: &[Value]) -> Result<Self, Error> {
+        let ruby = Ruby::get().expect("called from Ruby thread");
+        let args = scan_args::<(String,), (), (), (), RHash, ()>(args)?;
+        let (field,) = args.required;
+        let kwargs = get_kwargs::<_, (), (Option<Value>, Option<Value>), ()>(
+            args.keywords,
+            &[],
+            &["min", "max"],
+        )?;
+        let (min_val, max_val) = kwargs.optional;
+
+        let is_float = min_val
+            .as_ref()
+            .map(|v| v.is_kind_of(ruby.class_float()))
+            .unwrap_or(false)
+            || max_val
+                .as_ref()
+                .map(|v| v.is_kind_of(ruby.class_float()))
+                .unwrap_or(false);
+
+        let kind = if is_float {
+            NumericKind::Float(
+                min_val
+                    .as_ref()
+                    .map(|v| <f64>::try_convert(*v))
+                    .transpose()?,
+                max_val
+                    .as_ref()
+                    .map(|v| <f64>::try_convert(*v))
+                    .transpose()?,
+            )
+        } else {
+            NumericKind::Integer(
+                min_val
+                    .as_ref()
+                    .map(|v| <i64>::try_convert(*v))
+                    .transpose()?,
+                max_val
+                    .as_ref()
+                    .map(|v| <i64>::try_convert(*v))
+                    .transpose()?,
+            )
+        };
+        Ok(Self { field, kind })
+    }
+
+    fn inspect(&self) -> String {
+        match &self.kind {
+            NumericKind::Integer(min, max) => {
+                format!(
+                    "NumericRangeQuery(field='{}', min={:?}, max={:?}, type='integer')",
+                    self.field, min, max
+                )
+            }
+            NumericKind::Float(min, max) => {
+                format!(
+                    "NumericRangeQuery(field='{}', min={:?}, max={:?}, type='float')",
+                    self.field, min, max
+                )
+            }
+        }
+    }
+}
+
+impl RbNumericRangeQuery {
+    /// Build the underlying Rust `NumericRangeQuery`.
+    pub fn build(&self) -> Box<dyn laurus::lexical::Query> {
+        match &self.kind {
+            NumericKind::Float(min, max) => {
+                Box::new(NumericRangeQuery::f64_range(&self.field, *min, *max))
+            }
+            NumericKind::Integer(min, max) => {
+                Box::new(NumericRangeQuery::i64_range(&self.field, *min, *max))
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// GeoQuery
+// ---------------------------------------------------------------------------
+
+/// Internal representation of geographic query kind.
+#[derive(Clone)]
+pub enum GeoKind {
+    /// Radius-based search.
+    Radius {
+        /// Center latitude.
+        lat: f64,
+        /// Center longitude.
+        lon: f64,
+        /// Search radius in kilometers.
+        distance_km: f64,
+    },
+    /// Bounding box search.
+    BoundingBox {
+        /// Southern boundary.
+        min_lat: f64,
+        /// Western boundary.
+        min_lon: f64,
+        /// Northern boundary.
+        max_lat: f64,
+        /// Eastern boundary.
+        max_lon: f64,
+    },
+}
+
+/// Geographic search query (`Laurus::GeoQuery`).
+#[magnus::wrap(class = "Laurus::GeoQuery")]
+pub struct RbGeoQuery {
+    pub field: String,
+    pub kind: GeoKind,
+}
+
+impl RbGeoQuery {
+    /// Create a radius-based geo query.
+    ///
+    /// # Arguments
+    ///
+    /// * `field` - Geo field name.
+    /// * `lat` - Center latitude.
+    /// * `lon` - Center longitude.
+    /// * `distance_km` - Search radius in kilometers.
+    fn within_radius(field: String, lat: f64, lon: f64, distance_km: f64) -> Self {
+        Self {
+            field,
+            kind: GeoKind::Radius {
+                lat,
+                lon,
+                distance_km,
+            },
+        }
+    }
+
+    /// Create a bounding-box geo query.
+    ///
+    /// # Arguments
+    ///
+    /// * `field` - Geo field name.
+    /// * `min_lat` - Southern boundary.
+    /// * `min_lon` - Western boundary.
+    /// * `max_lat` - Northern boundary.
+    /// * `max_lon` - Eastern boundary.
+    fn within_bounding_box(
+        field: String,
+        min_lat: f64,
+        min_lon: f64,
+        max_lat: f64,
+        max_lon: f64,
+    ) -> Self {
+        Self {
+            field,
+            kind: GeoKind::BoundingBox {
+                min_lat,
+                min_lon,
+                max_lat,
+                max_lon,
+            },
+        }
+    }
+
+    fn inspect(&self) -> String {
+        match &self.kind {
+            GeoKind::Radius {
+                lat,
+                lon,
+                distance_km,
+            } => format!(
+                "GeoQuery.within_radius(field='{}', lat={}, lon={}, distance_km={})",
+                self.field, lat, lon, distance_km
+            ),
+            GeoKind::BoundingBox {
+                min_lat,
+                min_lon,
+                max_lat,
+                max_lon,
+            } => format!(
+                "GeoQuery.within_bounding_box(field='{}', min_lat={}, min_lon={}, max_lat={}, max_lon={})",
+                self.field, min_lat, min_lon, max_lat, max_lon
+            ),
+        }
+    }
+}
+
+impl RbGeoQuery {
+    /// Build the underlying Rust `GeoQuery`.
+    pub fn build(&self) -> laurus::Result<Box<dyn laurus::lexical::Query>> {
+        match &self.kind {
+            GeoKind::Radius {
+                lat,
+                lon,
+                distance_km,
+            } => Ok(Box::new(GeoQuery::within_radius(
+                &self.field,
+                *lat,
+                *lon,
+                *distance_km,
+            )?)),
+            GeoKind::BoundingBox {
+                min_lat,
+                min_lon,
+                max_lat,
+                max_lon,
+            } => Ok(Box::new(GeoQuery::within_bounding_box(
+                &self.field,
+                *min_lat,
+                *min_lon,
+                *max_lat,
+                *max_lon,
+            )?)),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// BooleanQuery - stores extracted Rust queries, not Ruby Values
+// ---------------------------------------------------------------------------
+
+/// Boolean combination query (`Laurus::BooleanQuery`).
+///
+/// Supports AND (must), OR (should), and NOT (must_not) clauses.
+/// Stores extracted Rust query objects to avoid Send/Sync issues with Ruby Values.
+#[magnus::wrap(class = "Laurus::BooleanQuery")]
+pub struct RbBooleanQuery {
+    pub musts: RefCell<Vec<Box<dyn laurus::lexical::Query>>>,
+    pub shoulds: RefCell<Vec<Box<dyn laurus::lexical::Query>>>,
+    pub must_nots: RefCell<Vec<Box<dyn laurus::lexical::Query>>>,
+}
+
+impl RbBooleanQuery {
+    /// Create a new empty boolean query.
+    fn new() -> Self {
+        Self {
+            musts: RefCell::new(Vec::new()),
+            shoulds: RefCell::new(Vec::new()),
+            must_nots: RefCell::new(Vec::new()),
+        }
+    }
+
+    /// Add a MUST (required) clause.
+    ///
+    /// # Arguments
+    ///
+    /// * `query` - A lexical query object.
+    fn must(&self, query: Value) -> Result<(), Error> {
+        let q = extract_lexical_query(query)?;
+        self.musts.borrow_mut().push(q);
+        Ok(())
+    }
+
+    /// Add a SHOULD (optional, boosts score) clause.
+    ///
+    /// # Arguments
+    ///
+    /// * `query` - A lexical query object.
+    fn should(&self, query: Value) -> Result<(), Error> {
+        let q = extract_lexical_query(query)?;
+        self.shoulds.borrow_mut().push(q);
+        Ok(())
+    }
+
+    /// Add a MUST_NOT (exclusion) clause.
+    ///
+    /// # Arguments
+    ///
+    /// * `query` - A lexical query object.
+    fn must_not(&self, query: Value) -> Result<(), Error> {
+        let q = extract_lexical_query(query)?;
+        self.must_nots.borrow_mut().push(q);
+        Ok(())
+    }
+
+    fn inspect(&self) -> String {
+        format!(
+            "BooleanQuery(musts={}, shoulds={}, must_nots={})",
+            self.musts.borrow().len(),
+            self.shoulds.borrow().len(),
+            self.must_nots.borrow().len()
+        )
+    }
+}
+
+impl RbBooleanQuery {
+    /// Build the underlying Rust [`BooleanQuery`].
+    pub fn build_query(&self) -> Result<Box<dyn laurus::lexical::Query>, Error> {
+        let mut bq = BooleanQuery::new();
+        for q in self.musts.borrow_mut().drain(..) {
+            bq.add_must(q);
+        }
+        for q in self.shoulds.borrow_mut().drain(..) {
+            bq.add_should(q);
+        }
+        for q in self.must_nots.borrow_mut().drain(..) {
+            bq.add_must_not(q);
+        }
+        Ok(Box::new(bq))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SpanQuery
+// ---------------------------------------------------------------------------
+
+/// Positional / proximity span query (`Laurus::SpanQuery`).
+///
+/// Use the class methods to construct span queries, which can be nested to
+/// build complex positional expressions.
+#[magnus::wrap(class = "Laurus::SpanQuery")]
+pub struct RbSpanQuery {
+    pub field: String,
+    pub kind: SpanKind,
+}
+
+impl RbSpanQuery {
+    /// Single-term span query.
+    ///
+    /// # Arguments
+    ///
+    /// * `field` - Field to search.
+    /// * `term` - Term to match.
+    fn term(field: String, term: String) -> Self {
+        Self {
+            field,
+            kind: SpanKind::Term(term),
+        }
+    }
+
+    /// SpanNear: terms appearing within `slop` positions of each other.
+    ///
+    /// # Arguments
+    ///
+    /// * `args` - Positional and keyword arguments:
+    ///   - `field` (String): Field to search.
+    ///   - `terms` (Array): List of term strings.
+    ///   - `slop:` (u32, default 0): Maximum token distance between terms.
+    ///   - `ordered:` (bool, default true): Whether terms must appear in order.
+    fn near(args: &[Value]) -> Result<Self, Error> {
+        let args = scan_args::<(String, RArray), (), (), (), RHash, ()>(args)?;
+        let (field, terms_arr) = args.required;
+        let kwargs = get_kwargs::<_, (), (Option<u32>, Option<bool>), ()>(
+            args.keywords,
+            &[],
+            &["slop", "ordered"],
+        )?;
+        let (slop, ordered) = kwargs.optional;
+        let terms: Vec<String> = terms_arr.to_vec()?;
+        let kinds = terms.into_iter().map(SpanKind::Term).collect();
+        Ok(Self {
+            field,
+            kind: SpanKind::Near(kinds, slop.unwrap_or(0), ordered.unwrap_or(true)),
+        })
+    }
+
+    /// SpanNear with nested SpanQuery clauses instead of plain terms.
+    ///
+    /// # Arguments
+    ///
+    /// * `args` - Positional and keyword arguments:
+    ///   - `field` (String): Field to search.
+    ///   - `clauses` (Array): List of SpanQuery objects.
+    ///   - `slop:` (u32, default 0): Maximum token distance.
+    ///   - `ordered:` (bool, default true): Whether clauses must appear in order.
+    fn near_spans(args: &[Value]) -> Result<Self, Error> {
+        let args = scan_args::<(String, RArray), (), (), (), RHash, ()>(args)?;
+        let (field, clauses_arr) = args.required;
+        let kwargs = get_kwargs::<_, (), (Option<u32>, Option<bool>), ()>(
+            args.keywords,
+            &[],
+            &["slop", "ordered"],
+        )?;
+        let (slop, ordered) = kwargs.optional;
+        // Manually iterate to extract SpanQuery references
+        let len = clauses_arr.len();
+        let mut kinds = Vec::with_capacity(len);
+        for i in 0..len {
+            let val: Value = clauses_arr.entry(i as isize)?;
+            let span: &RbSpanQuery = <&RbSpanQuery>::try_convert(val)?;
+            kinds.push(span.kind.clone());
+        }
+        Ok(Self {
+            field,
+            kind: SpanKind::Near(kinds, slop.unwrap_or(0), ordered.unwrap_or(true)),
+        })
+    }
+
+    /// SpanContaining: a span that contains another span.
+    ///
+    /// # Arguments
+    ///
+    /// * `field` - Field to search.
+    /// * `big` - Outer span query.
+    /// * `little` - Inner span query.
+    fn containing(field: String, big: &RbSpanQuery, little: &RbSpanQuery) -> Self {
+        Self {
+            field,
+            kind: SpanKind::Containing(Box::new(big.kind.clone()), Box::new(little.kind.clone())),
+        }
+    }
+
+    /// SpanWithin: a span included within another span at a maximum distance.
+    ///
+    /// # Arguments
+    ///
+    /// * `field` - Field to search.
+    /// * `include` - Span to include.
+    /// * `exclude` - Span to exclude.
+    /// * `distance` - Maximum distance.
+    fn within(field: String, include: &RbSpanQuery, exclude: &RbSpanQuery, distance: u32) -> Self {
+        Self {
+            field,
+            kind: SpanKind::Within(
+                Box::new(include.kind.clone()),
+                Box::new(exclude.kind.clone()),
+                distance,
+            ),
+        }
+    }
+
+    fn inspect(&self) -> String {
+        format!("SpanQuery(field='{}')", self.field)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// VectorQuery (pre-computed vector)
+// ---------------------------------------------------------------------------
+
+/// Vector search query using a pre-computed embedding vector (`Laurus::VectorQuery`).
+#[magnus::wrap(class = "Laurus::VectorQuery")]
+pub struct RbVectorQuery {
+    pub field: String,
+    pub vector: Vec<f32>,
+}
+
+impl RbVectorQuery {
+    /// Create a new vector query.
+    ///
+    /// # Arguments
+    ///
+    /// * `field` - Vector field name.
+    /// * `vector` - Pre-computed embedding vector as Array of floats.
+    fn new(field: String, vector: RArray) -> Result<Self, Error> {
+        let vector: Vec<f32> = vector.to_vec()?;
+        Ok(Self { field, vector })
+    }
+
+    fn inspect(&self) -> String {
+        format!(
+            "VectorQuery(field='{}', dims={})",
+            self.field,
+            self.vector.len()
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// VectorTextQuery (text → Rust Embedder → vector)
+// ---------------------------------------------------------------------------
+
+/// Vector search query where text is embedded by the Rust-side Embedder
+/// (`Laurus::VectorTextQuery`).
+#[magnus::wrap(class = "Laurus::VectorTextQuery")]
+pub struct RbVectorTextQuery {
+    pub field: String,
+    pub text: String,
+}
+
+impl RbVectorTextQuery {
+    /// Create a new vector text query.
+    ///
+    /// # Arguments
+    ///
+    /// * `field` - Vector field name.
+    /// * `text` - Text to be embedded by the Rust-side embedder.
+    fn new(field: String, text: String) -> Self {
+        Self { field, text }
+    }
+
+    fn inspect(&self) -> String {
+        format!(
+            "VectorTextQuery(field='{}', text='{}')",
+            self.field, self.text
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Class registration
+// ---------------------------------------------------------------------------
+
+/// Register all query classes under the `Laurus` module.
+///
+/// # Arguments
+///
+/// * `ruby` - Ruby interpreter handle.
+/// * `module` - The `Laurus` module.
+pub fn define(ruby: &Ruby, module: &RModule) -> Result<(), Error> {
+    // TermQuery
+    let term_q = module.define_class("TermQuery", ruby.class_object())?;
+    term_q.define_singleton_method("new", magnus::function!(RbTermQuery::new, 2))?;
+    term_q.define_method("inspect", magnus::method!(RbTermQuery::inspect, 0))?;
+    term_q.define_method("to_s", magnus::method!(RbTermQuery::inspect, 0))?;
+
+    // PhraseQuery
+    let phrase_q = module.define_class("PhraseQuery", ruby.class_object())?;
+    phrase_q.define_singleton_method("new", magnus::function!(RbPhraseQuery::new, 2))?;
+    phrase_q.define_method("inspect", magnus::method!(RbPhraseQuery::inspect, 0))?;
+    phrase_q.define_method("to_s", magnus::method!(RbPhraseQuery::inspect, 0))?;
+
+    // FuzzyQuery
+    let fuzzy_q = module.define_class("FuzzyQuery", ruby.class_object())?;
+    fuzzy_q.define_singleton_method("new", magnus::function!(RbFuzzyQuery::new, -1))?;
+    fuzzy_q.define_method("inspect", magnus::method!(RbFuzzyQuery::inspect, 0))?;
+    fuzzy_q.define_method("to_s", magnus::method!(RbFuzzyQuery::inspect, 0))?;
+
+    // WildcardQuery
+    let wc_q = module.define_class("WildcardQuery", ruby.class_object())?;
+    wc_q.define_singleton_method("new", magnus::function!(RbWildcardQuery::new, 2))?;
+    wc_q.define_method("inspect", magnus::method!(RbWildcardQuery::inspect, 0))?;
+    wc_q.define_method("to_s", magnus::method!(RbWildcardQuery::inspect, 0))?;
+
+    // NumericRangeQuery
+    let nr_q = module.define_class("NumericRangeQuery", ruby.class_object())?;
+    nr_q.define_singleton_method("new", magnus::function!(RbNumericRangeQuery::new, -1))?;
+    nr_q.define_method("inspect", magnus::method!(RbNumericRangeQuery::inspect, 0))?;
+    nr_q.define_method("to_s", magnus::method!(RbNumericRangeQuery::inspect, 0))?;
+
+    // GeoQuery
+    let geo_q = module.define_class("GeoQuery", ruby.class_object())?;
+    geo_q.define_singleton_method(
+        "within_radius",
+        magnus::function!(RbGeoQuery::within_radius, 4),
+    )?;
+    geo_q.define_singleton_method(
+        "within_bounding_box",
+        magnus::function!(RbGeoQuery::within_bounding_box, 5),
+    )?;
+    geo_q.define_method("inspect", magnus::method!(RbGeoQuery::inspect, 0))?;
+    geo_q.define_method("to_s", magnus::method!(RbGeoQuery::inspect, 0))?;
+
+    // BooleanQuery
+    let bool_q = module.define_class("BooleanQuery", ruby.class_object())?;
+    bool_q.define_singleton_method("new", magnus::function!(RbBooleanQuery::new, 0))?;
+    bool_q.define_method("must", magnus::method!(RbBooleanQuery::must, 1))?;
+    bool_q.define_method("should", magnus::method!(RbBooleanQuery::should, 1))?;
+    bool_q.define_method("must_not", magnus::method!(RbBooleanQuery::must_not, 1))?;
+    bool_q.define_method("inspect", magnus::method!(RbBooleanQuery::inspect, 0))?;
+    bool_q.define_method("to_s", magnus::method!(RbBooleanQuery::inspect, 0))?;
+
+    // SpanQuery
+    let span_q = module.define_class("SpanQuery", ruby.class_object())?;
+    span_q.define_singleton_method("term", magnus::function!(RbSpanQuery::term, 2))?;
+    span_q.define_singleton_method("near", magnus::function!(RbSpanQuery::near, -1))?;
+    span_q.define_singleton_method("near_spans", magnus::function!(RbSpanQuery::near_spans, -1))?;
+    span_q.define_singleton_method("containing", magnus::function!(RbSpanQuery::containing, 3))?;
+    span_q.define_singleton_method("within", magnus::function!(RbSpanQuery::within, 4))?;
+    span_q.define_method("inspect", magnus::method!(RbSpanQuery::inspect, 0))?;
+    span_q.define_method("to_s", magnus::method!(RbSpanQuery::inspect, 0))?;
+
+    // VectorQuery
+    let vec_q = module.define_class("VectorQuery", ruby.class_object())?;
+    vec_q.define_singleton_method("new", magnus::function!(RbVectorQuery::new, 2))?;
+    vec_q.define_method("inspect", magnus::method!(RbVectorQuery::inspect, 0))?;
+    vec_q.define_method("to_s", magnus::method!(RbVectorQuery::inspect, 0))?;
+
+    // VectorTextQuery
+    let vt_q = module.define_class("VectorTextQuery", ruby.class_object())?;
+    vt_q.define_singleton_method("new", magnus::function!(RbVectorTextQuery::new, 2))?;
+    vt_q.define_method("inspect", magnus::method!(RbVectorTextQuery::inspect, 0))?;
+    vt_q.define_method("to_s", magnus::method!(RbVectorTextQuery::inspect, 0))?;
+
+    Ok(())
+}

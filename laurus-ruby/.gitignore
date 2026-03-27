@@ -1,0 +1,19 @@
+# Build artifacts
+tmp/
+lib/laurus/laurus_ruby.so
+lib/laurus/laurus_ruby.bundle
+lib/laurus/laurus_ruby.dll
+*.so
+*.bundle
+*.dll
+
+# Bundler
+vendor/
+.bundle/
+
+# Gem build output
+*.gem
+pkg/
+
+# Ruby
+Gemfile.lock

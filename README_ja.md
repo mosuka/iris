@@ -12,8 +12,11 @@ Lexical 検索、ベクトル検索、ハイブリッド検索をカバーする
 - **gRPC サーバー & HTTP Gateway** — マイクロサービスや既存システムへのシームレスな統合
 - **MCP サーバー** — Claude などの AI アシスタントとの直接連携
 - **Python バインディング** — データサイエンスや AI ワークフローで利用できるネイティブ Python パッケージ
+- **Node.js バインディング** — サーバーサイド JavaScript アプリケーション向けネイティブ Node.js アドオン
+- **WebAssembly** — wasm-bindgen によるブラウザおよびエッジランタイムサポート
+- **Ruby バインディング** — Rails や Ruby アプリケーション向けネイティブ Ruby gem
 
-ライブラリとして組み込むことも、スタンドアロンのサーバーとしてデプロイすることも、Python から呼び出すことも、AI ワークフローに検索機能を組み込むことも可能な、コンポーザブルな検索基盤です。
+ライブラリとして組み込むことも、スタンドアロンのサーバーとしてデプロイすることも、Python / Node.js / Ruby から呼び出すことも、ブラウザで WASM として実行することも、AI ワークフローに検索機能を組み込むことも可能な、コンポーザブルな検索基盤です。
 
 ## ドキュメント
 
@@ -42,6 +45,9 @@ Lexical 検索、ベクトル検索、ハイブリッド検索をカバーする
   - [laurus-server](https://mosuka.github.io/laurus/ja/laurus-server.html) — gRPC サーバー、HTTP Gateway、設定
   - [laurus-mcp](https://mosuka.github.io/laurus/ja/laurus-mcp.html) — AI アシスタント（Claude など）向け MCP サーバー
   - [laurus-python](https://mosuka.github.io/laurus/ja/laurus-python.html) — Python バインディング（PyPI パッケージ）
+  - [laurus-nodejs](https://mosuka.github.io/laurus/ja/laurus-nodejs.html) — Node.js バインディング（npm パッケージ）
+  - [laurus-wasm](https://mosuka.github.io/laurus/ja/laurus-wasm.html) — WebAssembly バインディング（npm パッケージ）
+  - [laurus-ruby](https://mosuka.github.io/laurus/ja/laurus-ruby.html) — Ruby バインディング（RubyGems パッケージ）
 - **開発**
   - [ビルドとテスト](https://mosuka.github.io/laurus/ja/development/build_and_test.html)
   - [フィーチャーフラグ](https://mosuka.github.io/laurus/ja/development/feature_flags.html)
@@ -62,7 +68,7 @@ Lexical 検索、ベクトル検索、ハイブリッド検索をカバーする
 
 ## ワークスペース構成
 
-Laurus は 5 つのクレートで構成された Cargo ワークスペースです:
+Laurus は 8 つのクレートで構成された Cargo ワークスペースです:
 
 | クレート | 説明 |
 | --- | --- |
@@ -71,6 +77,9 @@ Laurus は 5 つのクレートで構成された Cargo ワークスペースで
 | [`laurus-server`](laurus-server/) | Laurus をサービスとしてデプロイするための HTTP Gateway 付き gRPC サーバー |
 | [`laurus-mcp`](laurus-mcp/) | AI アシスタント（Claude など）向け stdio トランスポートの MCP サーバー |
 | [`laurus-python`](laurus-python/) | PyO3 と Maturin で構築した Python バインディング（PyPI パッケージ） |
+| [`laurus-nodejs`](laurus-nodejs/) | NAPI-RS で構築した Node.js バインディング（npm パッケージ） |
+| [`laurus-wasm`](laurus-wasm/) | wasm-bindgen で構築した WebAssembly バインディング（npm パッケージ） |
+| [`laurus-ruby`](laurus-ruby/) | magnus と rb-sys で構築した Ruby バインディング（RubyGems パッケージ） |
 
 ## フィーチャーフラグ
 

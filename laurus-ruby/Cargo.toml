@@ -1,0 +1,28 @@
+[package]
+name = "laurus-ruby"
+version = { workspace = true }
+edition = { workspace = true }
+description = "Ruby bindings for the Laurus search library"
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+
+[lib]
+name = "laurus_ruby"
+crate-type = ["cdylib"]
+
+[features]
+embeddings-candle = ["laurus/embeddings-candle"]
+embeddings-multimodal = ["laurus/embeddings-multimodal"]
+embeddings-openai = ["laurus/embeddings-openai"]
+embeddings-all = [
+    "embeddings-candle",
+    "embeddings-multimodal",
+    "embeddings-openai",
+]
+
+[dependencies]
+laurus = { workspace = true, features = ["native"] }
+magnus = { version = "0.8.2", features = ["rb-sys"] }
+tokio = { workspace = true }
+chrono = { workspace = true }

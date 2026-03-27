@@ -12,8 +12,11 @@ Built on a core library covering lexical search, vector search, and hybrid searc
 - **gRPC Server & HTTP Gateway** — Seamless integration with microservices and existing systems
 - **MCP Server** — Direct integration with AI assistants such as Claude
 - **Python Bindings** — Native Python package for use in data science and AI workflows
+- **Node.js Bindings** — Native Node.js addon for server-side JavaScript applications
+- **WebAssembly** — Browser and edge runtime support via wasm-bindgen
+- **Ruby Bindings** — Native Ruby gem for Rails and Ruby applications
 
-Whether embedded as a library, deployed as a standalone server, called from Python, or woven into AI workflows, Laurus is a composable search foundation.
+Whether embedded as a library, deployed as a standalone server, called from Python / Node.js / Ruby, run in the browser via WASM, or woven into AI workflows, Laurus is a composable search foundation.
 
 ## Documentation
 
@@ -42,6 +45,9 @@ Comprehensive documentation is available online:
   - [laurus-server](https://mosuka.github.io/laurus/laurus-server.html) — gRPC server, HTTP Gateway, Configuration
   - [laurus-mcp](https://mosuka.github.io/laurus/laurus-mcp.html) — MCP server for AI assistants (Claude, etc.)
   - [laurus-python](https://mosuka.github.io/laurus/laurus-python.html) — Python bindings (PyPI package)
+  - [laurus-nodejs](https://mosuka.github.io/laurus/laurus-nodejs.html) — Node.js bindings (npm package)
+  - [laurus-wasm](https://mosuka.github.io/laurus/laurus-wasm.html) — WebAssembly bindings (npm package)
+  - [laurus-ruby](https://mosuka.github.io/laurus/laurus-ruby.html) — Ruby bindings (RubyGems package)
 - **Development**
   - [Build & Test](https://mosuka.github.io/laurus/development/build_and_test.html)
   - [Feature Flags](https://mosuka.github.io/laurus/development/feature_flags.html)
@@ -62,7 +68,7 @@ Comprehensive documentation is available online:
 
 ## Workspace Structure
 
-Laurus is organized as a Cargo workspace with 5 crates:
+Laurus is organized as a Cargo workspace with 8 crates:
 
 | Crate | Description |
 | --- | --- |
@@ -71,6 +77,9 @@ Laurus is organized as a Cargo workspace with 5 crates:
 | [`laurus-server`](laurus-server/) | gRPC server with HTTP gateway for deploying Laurus as a service |
 | [`laurus-mcp`](laurus-mcp/) | MCP server for AI assistants (Claude, etc.) via stdio transport |
 | [`laurus-python`](laurus-python/) | Python bindings (PyPI package) built with PyO3 and Maturin |
+| [`laurus-nodejs`](laurus-nodejs/) | Node.js bindings (npm package) built with NAPI-RS |
+| [`laurus-wasm`](laurus-wasm/) | WebAssembly bindings (npm package) built with wasm-bindgen |
+| [`laurus-ruby`](laurus-ruby/) | Ruby bindings (RubyGems package) built with magnus and rb-sys |
 
 ## Feature Flags
 

@@ -87,6 +87,14 @@
   - [API Reference](laurus-wasm/api_reference.md)
   - [Development](laurus-wasm/development.md)
 
+# laurus-ruby
+
+- [Ruby Binding Overview](laurus-ruby.md)
+  - [Installation](laurus-ruby/installation.md)
+  - [Quick Start](laurus-ruby/quickstart.md)
+  - [API Reference](laurus-ruby/api_reference.md)
+  - [Development](laurus-ruby/development.md)
+
 # Development Guide
 
 - [Build & Test](development/build_and_test.md)

@@ -1,0 +1,17 @@
+require "rake/extensiontask"
+require "rb_sys/extensiontask"
+
+GEMSPEC = Gem::Specification.load("laurus.gemspec")
+
+RbSys::ExtensionTask.new("laurus-ruby", GEMSPEC) do |ext|
+  ext.lib_dir = "lib/laurus"
+end
+
+require "rake/testtask"
+
+Rake::TestTask.new(:test) do |t|
+  t.libs << "test" << "lib"
+  t.pattern = "test/test_*.rb"
+end
+
+task default: %i[compile test]
