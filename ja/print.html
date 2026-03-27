@@ -36,7 +36,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-aca5f779.js";
+            window.path_to_searchindex_js = "searchindex-d73688fb.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-c8b18c0d.js"></script>
@@ -3338,6 +3338,26 @@ float_value    = @{ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)? }
 <blockquote>
 <p><strong>注意</strong>: フュージョンアルゴリズムは DSL 構文では指定できません。<code>UnifiedQueryParser</code> の構築時に <code>.with_fusion()</code> で設定します。デフォルトは RRF（k=60）です。コード例は<a href="#カスタムフュージョン">カスタムフュージョン</a>を参照してください。</p>
 </blockquote>
+<h3 id="ハイブリッド-andor-セマンティクス-プレフィックス"><a class="header" href="#ハイブリッド-andor-セマンティクス-プレフィックス">ハイブリッド AND/OR セマンティクス（<code>+</code> プレフィックス）</a></h3>
+<p>デフォルトでは、ハイブリッドクエリは <strong>union（OR）</strong> を使用します。Lexical 結果または Vector 結果の<strong>いずれか</strong>に含まれるドキュメントが返されます。Vector 句に <code>+</code> プレフィックスを付けると <strong>intersection（AND）</strong> に切り替わり、<strong>両方</strong>の結果セットに存在するドキュメントのみが返されます。</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">構文</th><th style="text-align: center">モード</th><th style="text-align: left">動作</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>title:Rust content:"system process"</code></td><td style="text-align: center">OR（union）</td><td style="text-align: left">Lexical クエリ<strong>または</strong> Vector クエリにマッチするドキュメントが返される</td></tr>
+<tr><td style="text-align: left"><code>title:Rust +content:"system process"</code></td><td style="text-align: center">AND（intersection）</td><td style="text-align: left">Lexical と Vector の<strong>両方</strong>にマッチするドキュメントのみが返される</td></tr>
+<tr><td style="text-align: left"><code>+title:Rust +content:"system process"</code></td><td style="text-align: center">AND（intersection）</td><td style="text-align: left">両方の句が必須。Lexical フィールドの <code>+</code> は既存の required clause として処理される</td></tr>
+</tbody>
+</table>
+</div>
+<p>ルール:</p>
+<ul>
+<li>Vector 句に <code>+</code> プレフィックスが<strong>ない</strong>場合、フュージョンは Lexical と Vector の結果を <strong>union（OR）</strong> で結合します</li>
+<li><strong>1 つでも</strong> Vector 句に <code>+</code> プレフィックスがある場合、フュージョンは <strong>intersection（AND）</strong> に切り替わり、Lexical と Vector の両方の結果セットに存在するドキュメントのみが返されます</li>
+<li>Lexical フィールドの <code>+</code>（例: <code>+title:Rust</code>）は、Lexical クエリパーサーによって <em>required clause</em>（必須句）として解釈されます。これは既存の Tantivy/Lucene スタイルの動作であり、それ自体ではハイブリッドフュージョンの intersection モードをトリガーしません</li>
+</ul>
 <h3 id="統合クエリの例"><a class="header" href="#統合クエリの例">統合クエリの例</a></h3>
 <pre><code class="language-text"># Lexical only — no fusion
 title:hello AND body:world
@@ -3348,8 +3368,11 @@ content:"cute kitten"
 # Vector only — unquoted text
 content:python
 
-# Hybrid — fusion applied automatically
+# Hybrid — fusion applied automatically (OR / union)
 title:hello content:"cute kitten"
+
+# Hybrid with AND / intersection — both result sets required
+title:hello +content:"cute kitten"
 
 # Hybrid with boolean operators
 title:hello AND category:animal content:"cute kitten"^0.8
@@ -7770,7 +7793,9 @@ name: "category"
 <tr><th style="text-align: left">クエリ</th><th style="text-align: left">説明</th></tr>
 </thead>
 <tbody>
-<tr><td style="text-align: left"><code>title:hello content:"cute kitten"</code></td><td style="text-align: left">Lexical + Vector を 1 つのクエリで</td></tr>
+<tr><td style="text-align: left"><code>title:hello content:"cute kitten"</code></td><td style="text-align: left">Lexical + Vector（OR/union — いずれかの結果を返す）</td></tr>
+<tr><td style="text-align: left"><code>title:hello +content:"cute kitten"</code></td><td style="text-align: left">Lexical + Vector（AND/intersection — 両方にマッチした結果のみ）</td></tr>
+<tr><td style="text-align: left"><code>+title:hello +content:"cute kitten"</code></td><td style="text-align: left">両方必須（AND）。Lexical フィールドの <code>+</code> は required clause</td></tr>
 <tr><td style="text-align: left"><code>title:hello AND body:world content:"cats"^0.8</code></td><td style="text-align: left">ブール Lexical + 重み付き Vector</td></tr>
 </tbody>
 </table>

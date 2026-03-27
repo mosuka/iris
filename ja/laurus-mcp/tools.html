@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-aca5f779.js";
+            window.path_to_searchindex_js = "../searchindex-d73688fb.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-c8b18c0d.js"></script>
@@ -441,7 +441,9 @@ name: "category"
 <tr><th style="text-align: left">クエリ</th><th style="text-align: left">説明</th></tr>
 </thead>
 <tbody>
-<tr><td style="text-align: left"><code>title:hello content:"cute kitten"</code></td><td style="text-align: left">Lexical + Vector を 1 つのクエリで</td></tr>
+<tr><td style="text-align: left"><code>title:hello content:"cute kitten"</code></td><td style="text-align: left">Lexical + Vector（OR/union — いずれかの結果を返す）</td></tr>
+<tr><td style="text-align: left"><code>title:hello +content:"cute kitten"</code></td><td style="text-align: left">Lexical + Vector（AND/intersection — 両方にマッチした結果のみ）</td></tr>
+<tr><td style="text-align: left"><code>+title:hello +content:"cute kitten"</code></td><td style="text-align: left">両方必須（AND）。Lexical フィールドの <code>+</code> は required clause</td></tr>
 <tr><td style="text-align: left"><code>title:hello AND body:world content:"cats"^0.8</code></td><td style="text-align: left">ブール Lexical + 重み付き Vector</td></tr>
 </tbody>
 </table>

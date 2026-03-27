@@ -36,7 +36,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-58269999.js";
+            window.path_to_searchindex_js = "searchindex-13f35d9d.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-45ce2278.js"></script>
@@ -3419,6 +3419,26 @@ float_value    = @{ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)? }
 <blockquote>
 <p><strong>Note</strong>: The fusion algorithm cannot be specified in the DSL syntax. It is configured when constructing the <code>UnifiedQueryParser</code> via <code>.with_fusion()</code>. The default is RRF (k=60). See <a href="#custom-fusion">Custom Fusion</a> for a code example.</p>
 </blockquote>
+<h3 id="hybrid-andor-semantics-the--prefix"><a class="header" href="#hybrid-andor-semantics-the--prefix">Hybrid AND/OR Semantics (the <code>+</code> Prefix)</a></h3>
+<p>By default, hybrid queries use <strong>union (OR)</strong> — documents appearing in <em>either</em> the lexical results or the vector results are included. You can switch to <strong>intersection (AND)</strong> by prefixing a vector clause with <code>+</code>, which requires documents to appear in <em>both</em> result sets.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Syntax</th><th style="text-align: center">Mode</th><th style="text-align: left">Behaviour</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>title:Rust content:"system process"</code></td><td style="text-align: center">OR (union)</td><td style="text-align: left">Documents matching the lexical query <strong>or</strong> the vector query are returned.</td></tr>
+<tr><td style="text-align: left"><code>title:Rust +content:"system process"</code></td><td style="text-align: center">AND (intersection)</td><td style="text-align: left">Only documents matching <strong>both</strong> the lexical and vector results are returned.</td></tr>
+<tr><td style="text-align: left"><code>+title:Rust +content:"system process"</code></td><td style="text-align: center">AND (intersection)</td><td style="text-align: left">Both clauses required. <code>+</code> on the lexical field is handled by the lexical parser as a required clause.</td></tr>
+</tbody>
+</table>
+</div>
+<p>Rules:</p>
+<ul>
+<li>When <strong>no</strong> vector clause carries the <code>+</code> prefix, the fusion produces a <strong>union</strong> (OR) of lexical and vector results.</li>
+<li>When <strong>at least one</strong> vector clause carries the <code>+</code> prefix, the fusion switches to <strong>intersection</strong> (AND) — only documents present in both the lexical and vector result sets are returned.</li>
+<li><code>+</code> on a lexical field (e.g., <code>+title:Rust</code>) is interpreted by the lexical query parser as a <em>required clause</em>, which is the existing Tantivy/Lucene-style behaviour. It does not by itself trigger intersection mode for the hybrid fusion.</li>
+</ul>
 <h3 id="unified-query-examples"><a class="header" href="#unified-query-examples">Unified Query Examples</a></h3>
 <pre><code class="language-text"># Lexical only — no fusion
 title:hello AND body:world
@@ -3426,8 +3446,11 @@ title:hello AND body:world
 # Vector only — no fusion
 content:"cute kitten"
 
-# Hybrid — fusion applied automatically
+# Hybrid — fusion applied automatically (OR / union)
 title:hello content:"cute kitten"
+
+# Hybrid with AND / intersection — only docs in both result sets
+title:hello +content:"cute kitten"
 
 # Hybrid with boolean operators
 title:hello AND category:animal content:"cute kitten"^0.8
@@ -7870,7 +7893,9 @@ document: {"title": "Hello World - Part 2", "body": "This is a continuation."}
 <tr><th style="text-align: left">Query</th><th style="text-align: left">Description</th></tr>
 </thead>
 <tbody>
-<tr><td style="text-align: left"><code>title:hello content:"cute kitten"</code></td><td style="text-align: left">Lexical + vector in one query</td></tr>
+<tr><td style="text-align: left"><code>title:hello content:"cute kitten"</code></td><td style="text-align: left">Lexical + vector (OR/union — results from either)</td></tr>
+<tr><td style="text-align: left"><code>title:hello +content:"cute kitten"</code></td><td style="text-align: left">Lexical + vector (AND/intersection — only results in both)</td></tr>
+<tr><td style="text-align: left"><code>+title:hello +content:"cute kitten"</code></td><td style="text-align: left">Both required (AND); <code>+</code> on lexical field = required clause</td></tr>
 <tr><td style="text-align: left"><code>title:hello AND body:world content:"cats"^0.8</code></td><td style="text-align: left">Boolean lexical + weighted vector</td></tr>
 </tbody>
 </table>

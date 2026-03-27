@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-58269999.js";
+            window.path_to_searchindex_js = "../searchindex-13f35d9d.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-45ce2278.js"></script>
@@ -444,7 +444,9 @@ document: {"title": "Hello World - Part 2", "body": "This is a continuation."}
 <tr><th style="text-align: left">Query</th><th style="text-align: left">Description</th></tr>
 </thead>
 <tbody>
-<tr><td style="text-align: left"><code>title:hello content:"cute kitten"</code></td><td style="text-align: left">Lexical + vector in one query</td></tr>
+<tr><td style="text-align: left"><code>title:hello content:"cute kitten"</code></td><td style="text-align: left">Lexical + vector (OR/union — results from either)</td></tr>
+<tr><td style="text-align: left"><code>title:hello +content:"cute kitten"</code></td><td style="text-align: left">Lexical + vector (AND/intersection — only results in both)</td></tr>
+<tr><td style="text-align: left"><code>+title:hello +content:"cute kitten"</code></td><td style="text-align: left">Both required (AND); <code>+</code> on lexical field = required clause</td></tr>
 <tr><td style="text-align: left"><code>title:hello AND body:world content:"cats"^0.8</code></td><td style="text-align: left">Boolean lexical + weighted vector</td></tr>
 </tbody>
 </table>
