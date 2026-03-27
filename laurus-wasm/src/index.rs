@@ -11,9 +11,9 @@ use crate::storage::OpfsPersistence;
 use laurus::embedding::embedder::Embedder;
 use laurus::embedding::per_field::PerFieldEmbedder;
 use laurus::embedding::precomputed::PrecomputedEmbedder;
-use laurus::{Engine, EngineBuilder};
 use laurus::storage::Storage;
 use laurus::storage::memory::{MemoryStorage, MemoryStorageConfig};
+use laurus::{Engine, EngineBuilder};
 use wasm_bindgen::prelude::*;
 
 // ---------------------------------------------------------------------------

@@ -181,9 +181,7 @@ impl AdvancedQuery {
         let mut matcher = matcher;
         while matcher.next()? {
             // Check timeout
-            if self.config.timeout_ms > 0
-                && start_time.elapsed_ms() > self.config.timeout_ms
-            {
+            if self.config.timeout_ms > 0 && start_time.elapsed_ms() > self.config.timeout_ms {
                 break;
             }
 

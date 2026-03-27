@@ -5,7 +5,6 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-
 use ahash::AHashMap;
 
 use crate::analysis::analyzer::analyzer::Analyzer;

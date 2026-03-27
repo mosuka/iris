@@ -278,12 +278,14 @@ impl WasmSchema {
             }
             "callback" => {
                 // Extract the "embed" function from the config
-                let embed_fn = js_sys::Reflect::get(&config, &JsValue::from_str("embed"))
-                    .map_err(|_| {
+                let embed_fn =
+                    js_sys::Reflect::get(&config, &JsValue::from_str("embed")).map_err(|_| {
                         JsValue::from_str("Callback embedder config must have an 'embed' key")
                     })?;
                 let func = embed_fn.dyn_into::<js_sys::Function>().map_err(|_| {
-                    JsValue::from_str("'embed' must be a function: (text: string) => Promise<number[]>")
+                    JsValue::from_str(
+                        "'embed' must be a function: (text: string) => Promise<number[]>",
+                    )
                 })?;
 
                 // Register as precomputed in the schema (so the engine creates the field)

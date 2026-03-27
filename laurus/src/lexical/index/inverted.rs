@@ -17,7 +17,6 @@ use std::path::Path;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-
 use parking_lot::RwLock;
 
 use serde::{Deserialize, Serialize};
