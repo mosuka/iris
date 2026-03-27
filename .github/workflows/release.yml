@@ -813,10 +813,14 @@ jobs:
   # Publish WASM package to npm
   # ============================================================
   publish-wasm-npm:
-    name: Publish WASM to npm
+    name: Publish WASM (${{ matrix.wasm-target }}) to npm
     if: startsWith(github.ref, 'refs/tags/v')
     needs: [create-release]
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        wasm-target: [web, bundler]
     steps:
       - name: Run checkout
         uses: actions/checkout@v6
@@ -837,19 +841,20 @@ jobs:
 
       - name: Build with wasm-pack
         working-directory: laurus-wasm
-        run: wasm-pack build --target web --release
+        run: wasm-pack build --target ${{ matrix.wasm-target }} --release
 
-      - name: Sync version from Cargo.toml
+      - name: Sync version and package name from Cargo.toml
         working-directory: laurus-wasm/pkg
         shell: bash
         run: |
           VERSION=$(cargo metadata --no-deps --format-version=1 \
             --manifest-path "${{ github.workspace }}/laurus-wasm/Cargo.toml" \
             | jq -r '.packages[] | select(.name=="laurus-wasm") | .version')
-          echo "Syncing npm version to ${VERSION}"
+          echo "Syncing npm version to ${VERSION} and package name to laurus-wasm-${{ matrix.wasm-target }}"
           node -e "
             const fs = require('fs');
             const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            pkg.name = 'laurus-wasm-${{ matrix.wasm-target }}';
             pkg.version = '${VERSION}';
             fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
           "

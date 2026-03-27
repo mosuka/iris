@@ -1,6 +1,6 @@
 {
   "name": "laurus-wasm",
-  "version": "0.5.0",
+  "version": "0.0.0",
   "description": "Full-text and vector search engine for browsers and edge runtimes",
   "license": "MIT",
   "repository": {
