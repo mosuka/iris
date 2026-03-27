@@ -175,15 +175,13 @@ impl AdvancedQuery {
         let scorer = self.core_query.scorer(reader)?;
 
         let mut results = Vec::new();
-        let start_time = std::time::Instant::now();
+        let start_time = crate::util::time::Timer::now();
 
         // Execute core query
         let mut matcher = matcher;
         while matcher.next()? {
             // Check timeout
-            if self.config.timeout_ms > 0
-                && start_time.elapsed().as_millis() > self.config.timeout_ms as u128
-            {
+            if self.config.timeout_ms > 0 && start_time.elapsed_ms() > self.config.timeout_ms {
                 break;
             }
 

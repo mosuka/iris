@@ -6,6 +6,7 @@
 //! - Optimization strategies
 //! - Transaction support
 
+#[cfg(not(target_arch = "wasm32"))]
 pub mod background_tasks;
 // pub mod deletion; // Moved to separate crate-level module
 pub mod optimization;

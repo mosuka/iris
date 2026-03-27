@@ -2,6 +2,7 @@
 
 use std::sync::Arc;
 
+#[cfg(not(target_arch = "wasm32"))]
 use rayon::prelude::*;
 
 use crate::error::{LaurusError, Result};
@@ -254,14 +255,16 @@ impl IvfIndexWriter {
             return;
         }
 
+        #[cfg(not(target_arch = "wasm32"))]
         if self.writer_config.parallel_build && vectors.len() > 100 {
             vectors.par_iter_mut().for_each(|(_, _, vector)| {
                 vector.normalize();
             });
-        } else {
-            for (_, _, vector) in vectors {
-                vector.normalize();
-            }
+            return;
+        }
+
+        for (_, _, vector) in vectors {
+            vector.normalize();
         }
     }
 
@@ -379,17 +382,19 @@ impl IvfIndexWriter {
 
     /// Assign each vector to its nearest cluster.
     fn assign_vectors_to_clusters(&self) -> Vec<usize> {
+        #[cfg(not(target_arch = "wasm32"))]
         if self.writer_config.parallel_build && self.vectors.len() as u64 > 1000 {
-            self.vectors
+            return self
+                .vectors
                 .par_iter()
                 .map(|(_, _, vector)| self.find_nearest_centroid(vector))
-                .collect()
-        } else {
-            self.vectors
-                .iter()
-                .map(|(_, _, vector)| self.find_nearest_centroid(vector))
-                .collect()
+                .collect();
         }
+
+        self.vectors
+            .iter()
+            .map(|(_, _, vector)| self.find_nearest_centroid(vector))
+            .collect()
     }
 
     /// Find the index of the nearest centroid for a vector.
@@ -474,14 +479,16 @@ impl IvfIndexWriter {
         }
 
         // Sort each inverted list by document ID
+        #[cfg(not(target_arch = "wasm32"))]
         if self.writer_config.parallel_build {
             self.inverted_lists.par_iter_mut().for_each(|list| {
                 list.sort_by_key(|(doc_id, _, _)| *doc_id);
             });
-        } else {
-            for list in &mut self.inverted_lists {
-                list.sort_by_key(|(doc_id, _, _)| *doc_id);
-            }
+            return Ok(());
+        }
+
+        for list in &mut self.inverted_lists {
+            list.sort_by_key(|(doc_id, _, _)| *doc_id);
         }
 
         Ok(())

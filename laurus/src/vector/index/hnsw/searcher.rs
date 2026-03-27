@@ -40,9 +40,9 @@ impl HnswSearcher {
 
 impl VectorIndexSearcher for HnswSearcher {
     fn search(&self, request: &VectorIndexQuery) -> Result<VectorIndexQueryResults> {
-        use std::time::Instant;
+        use crate::util::time::Timer;
 
-        let start = Instant::now();
+        let start = Timer::now();
 
         // correct approach: usage of downcast_ref to check if we can use graph search
         if let Some(reader) = self.index_reader.as_any().downcast_ref::<HnswIndexReader>()
@@ -383,6 +383,7 @@ impl HnswSearcher {
     /// pointer is valid for the entire lifetime of the search.
     /// `_mm_prefetch` / `prfm` are pure hints that never dereference the pointer.
     #[inline]
+    #[allow(unused_variables)]
     fn prefetch_neighbor(idx: &HashMap<u64, usize>, doc_id: u64, n_bytes: usize) {
         if let Some(&addr) = idx.get(&doc_id) {
             let base_ptr = addr as *const i8;

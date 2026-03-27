@@ -2,6 +2,7 @@
 
 use std::sync::Arc;
 
+#[cfg(not(target_arch = "wasm32"))]
 use rayon::prelude::*;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
@@ -135,11 +136,11 @@ impl Vector {
     ///
     /// The L2 norm as an `f32` value.
     pub fn norm_parallel(&self) -> f32 {
+        #[cfg(not(target_arch = "wasm32"))]
         if self.data.len() > 10000 {
-            self.data.par_iter().map(|x| x * x).sum::<f32>().sqrt()
-        } else {
-            self.norm()
+            return self.data.par_iter().map(|x| x * x).sum::<f32>().sqrt();
         }
+        self.norm()
     }
 
     /// Normalize this vector using parallel processing for large vectors.
@@ -151,12 +152,13 @@ impl Vector {
         let norm = self.norm_parallel();
         if norm > 0.0 {
             let data = Arc::make_mut(&mut self.data);
+            #[cfg(not(target_arch = "wasm32"))]
             if data.len() > 10000 {
                 data.par_iter_mut().for_each(|value| *value /= norm);
-            } else {
-                for value in data.iter_mut() {
-                    *value /= norm;
-                }
+                return;
+            }
+            for value in data.iter_mut() {
+                *value /= norm;
             }
         }
     }
@@ -167,14 +169,15 @@ impl Vector {
     ///
     /// * `vectors` - Mutable slice of vectors to normalize in-place.
     pub fn normalize_batch_parallel(vectors: &mut [Vector]) {
+        #[cfg(not(target_arch = "wasm32"))]
         if vectors.len() > 10 {
             vectors
                 .par_iter_mut()
                 .for_each(|vector| vector.normalize_parallel());
-        } else {
-            for vector in vectors {
-                vector.normalize();
-            }
+            return;
+        }
+        for vector in vectors {
+            vector.normalize();
         }
     }
 }

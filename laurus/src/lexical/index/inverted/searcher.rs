@@ -3,8 +3,11 @@
 use crate::lexical::core::field::FieldValue;
 use std::cmp::Ordering;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
+use crate::util::time::Timer;
+
+#[cfg(not(target_arch = "wasm32"))]
 use rayon::prelude::*;
 
 use crate::analysis::analyzer::standard::StandardAnalyzer;
@@ -168,8 +171,12 @@ impl InvertedIndexSearcher {
         }
 
         // Execute all clauses in parallel, collecting (doc_id, score) per clause
-        let clause_results: Vec<(Occur, Result<Vec<SearchHit>>)> = clauses
-            .par_iter()
+        #[cfg(not(target_arch = "wasm32"))]
+        let iter = clauses.par_iter();
+        #[cfg(target_arch = "wasm32")]
+        let iter = clauses.iter();
+
+        let clause_results: Vec<(Occur, Result<Vec<SearchHit>>)> = iter
             .map(|clause| {
                 // Boolean operations (intersection/union/exclusion) require the
                 // full result set from each clause, so we use an unbounded collector.
@@ -303,8 +310,14 @@ impl InvertedIndexSearcher {
     /// Load documents in parallel for better performance.
     fn load_documents_parallel(&self, hits: &mut [SearchHit]) -> Result<()> {
         // Use a parallel iterator to load documents
+        #[cfg(not(target_arch = "wasm32"))]
         let results: Vec<_> = hits
             .par_iter()
+            .map(|hit| (hit.doc_id, self.reader.document(hit.doc_id)))
+            .collect();
+        #[cfg(target_arch = "wasm32")]
+        let results: Vec<_> = hits
+            .iter()
             .map(|hit| (hit.doc_id, self.reader.document(hit.doc_id)))
             .collect();
 
@@ -325,7 +338,7 @@ impl InvertedIndexSearcher {
         params: &LexicalSearchParams,
         timeout: Duration,
     ) -> Result<LexicalSearchResults> {
-        let start_time = Instant::now();
+        let start_time = Timer::now();
 
         // Create collector based on sort type
         let (mut hits, total_hits) = match &params.sort_by {

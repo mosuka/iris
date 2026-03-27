@@ -54,6 +54,12 @@ format-laurus-mcp: ## Format laurus-mcp
 format-laurus-python: ## Format laurus-python
 	cargo fmt -p laurus-python
 
+format-laurus-nodejs: ## Format laurus-nodejs
+	cargo fmt -p laurus-nodejs
+
+format-laurus-wasm: ## Format laurus-wasm
+	cargo fmt -p laurus-wasm
+
 # ── Lint ───────────────────────────────────────────────────────────────────
 
 lint: ## Lint all crates
@@ -73,6 +79,12 @@ lint-laurus-mcp: ## Lint laurus-mcp
 
 lint-laurus-python: ## Lint laurus-python
 	cargo clippy -p laurus-python -- -D warnings
+
+lint-laurus-nodejs: ## Lint laurus-nodejs
+	cargo clippy -p laurus-nodejs -- -D warnings
+
+lint-laurus-wasm: ## Lint laurus-wasm (wasm32 target)
+	cargo clippy -p laurus-wasm --target wasm32-unknown-unknown -- -D warnings
 
 # ── Test ───────────────────────────────────────────────────────────────────
 
@@ -95,6 +107,12 @@ test-laurus-python: venv ## Test laurus-python (Rust unit tests + Python pytest)
 	cargo test -p laurus-python
 	cd laurus-python && VIRTUAL_ENV=$(abspath $(PYTHON_VENV_DIR)) $(abspath $(MATURIN)) develop --quiet && $(abspath $(PYTEST)) tests/ -v
 
+test-laurus-nodejs: ## Test laurus-nodejs
+	cd laurus-nodejs && npm run build:debug && npm test
+
+test-laurus-wasm: ## Build-test laurus-wasm (wasm32 target)
+	cargo build -p laurus-wasm --target wasm32-unknown-unknown
+
 # ── Build ──────────────────────────────────────────────────────────────────
 
 build: ## Build all crates (release, all features)
@@ -114,6 +132,12 @@ build-laurus-mcp: ## Build laurus-mcp (release)
 
 build-laurus-python: venv ## Build laurus-python wheel (release)
 	cd laurus-python && VIRTUAL_ENV=$(abspath $(PYTHON_VENV_DIR)) $(abspath $(MATURIN)) build --release
+
+build-laurus-nodejs: ## Build laurus-nodejs (release)
+	cd laurus-nodejs && npm run build
+
+build-laurus-wasm: ## Build laurus-wasm (wasm-pack, --target web)
+	cd laurus-wasm && wasm-pack build --target web --release
 
 # ── Benchmark ──────────────────────────────────────────────────────────────
 

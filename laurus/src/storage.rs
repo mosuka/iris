@@ -25,17 +25,20 @@
 //!
 //! ```
 //! use laurus::storage::{StorageFactory, StorageConfig};
-//! use laurus::storage::file::FileStorageConfig;
 //! use laurus::storage::memory::MemoryStorageConfig;
 //!
 //! # fn main() -> laurus::Result<()> {
-//! // Create file storage with mmap enabled
-//! let mut file_config = FileStorageConfig::new("/tmp/test_index");
-//! file_config.use_mmap = true;
-//! let storage = StorageFactory::create(StorageConfig::File(file_config))?;
-//!
 //! // Create memory storage
 //! let storage = StorageFactory::create(StorageConfig::Memory(MemoryStorageConfig::default()))?;
+//!
+//! #[cfg(not(target_arch = "wasm32"))]
+//! {
+//!     use laurus::storage::file::FileStorageConfig;
+//!     // Create file storage with mmap enabled
+//!     let mut file_config = FileStorageConfig::new("/tmp/test_index");
+//!     file_config.use_mmap = true;
+//!     let storage = StorageFactory::create(StorageConfig::File(file_config))?;
+//! }
 //! # Ok(())
 //! # }
 //! ```
@@ -46,6 +49,7 @@ use std::sync::Arc;
 use crate::error::{LaurusError, Result};
 
 pub mod column;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod file;
 pub mod memory;
 pub mod prefixed;
@@ -663,6 +667,7 @@ pub trait StorageLock: Send + std::fmt::Debug {
 #[derive(Debug, Clone)]
 pub enum StorageConfig {
     /// File-based storage configuration (includes path)
+    #[cfg(not(target_arch = "wasm32"))]
     File(file::FileStorageConfig),
 
     /// Memory-based storage configuration
@@ -717,6 +722,7 @@ impl StorageFactory {
                 let storage = memory::MemoryStorage::new(mem_config);
                 Ok(Arc::new(storage))
             }
+            #[cfg(not(target_arch = "wasm32"))]
             StorageConfig::File(file_config) => {
                 let path = file_config.path.clone();
                 let storage = file::FileStorage::new(&path, file_config)?;
@@ -784,6 +790,7 @@ impl From<StorageError> for LaurusError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(target_arch = "wasm32"))]
     use crate::storage::file::FileStorageConfig;
     use crate::storage::memory::MemoryStorageConfig;
 
@@ -796,10 +803,12 @@ mod tests {
             StorageConfig::Memory(mem_config) => {
                 assert_eq!(mem_config.initial_capacity, 16);
             }
+            #[cfg(not(target_arch = "wasm32"))]
             _ => panic!("Expected Memory config"),
         }
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     #[test]
     fn test_file_storage_config() {
         let config = FileStorageConfig::new("/tmp/test");
@@ -863,6 +872,7 @@ mod tests {
         assert!(!storage.file_exists("test.txt"));
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     #[test]
     fn test_storage_factory_file() {
         use tempfile::TempDir;
@@ -876,6 +886,7 @@ mod tests {
         assert!(!storage.file_exists("test.txt"));
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     #[test]
     fn test_storage_factory_with_mmap() {
         use std::io::Write;

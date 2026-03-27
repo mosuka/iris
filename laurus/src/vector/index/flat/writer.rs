@@ -2,6 +2,7 @@
 
 use std::sync::Arc;
 
+#[cfg(not(target_arch = "wasm32"))]
 use rayon::prelude::*;
 
 use crate::error::{LaurusError, Result};
@@ -195,14 +196,16 @@ impl FlatIndexWriter {
             return;
         }
 
+        #[cfg(not(target_arch = "wasm32"))]
         if self.writer_config.parallel_build && vectors.len() > 100 {
             vectors.par_iter_mut().for_each(|(_, _, vector)| {
                 vector.normalize();
             });
-        } else {
-            for (_, _, vector) in vectors {
-                vector.normalize();
-            }
+            return;
+        }
+
+        for (_, _, vector) in vectors {
+            vector.normalize();
         }
     }
 
@@ -221,17 +224,19 @@ impl FlatIndexWriter {
 
     /// Sort vectors by document ID and field name for better cache locality.
     fn sort_vectors(&mut self) {
+        #[cfg(not(target_arch = "wasm32"))]
         if self.writer_config.parallel_build && self.vectors.len() as u64 > 10000 {
             self.vectors
                 .par_sort_by(|(doc_id_a, field_a, _), (doc_id_b, field_b, _)| {
                     doc_id_a.cmp(doc_id_b).then_with(|| field_a.cmp(field_b))
                 });
-        } else {
-            self.vectors
-                .sort_by(|(doc_id_a, field_a, _), (doc_id_b, field_b, _)| {
-                    doc_id_a.cmp(doc_id_b).then_with(|| field_a.cmp(field_b))
-                });
+            return;
         }
+
+        self.vectors
+            .sort_by(|(doc_id_a, field_a, _), (doc_id_b, field_b, _)| {
+                doc_id_a.cmp(doc_id_b).then_with(|| field_a.cmp(field_b))
+            });
     }
 
     /// Remove duplicate vectors (keeping the last one).

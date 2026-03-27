@@ -19,7 +19,7 @@ path = "src/main.rs"
 anyhow = { workspace = true }
 clap = { workspace = true }
 dialoguer = { workspace = true }
-laurus = { workspace = true }
+laurus = { workspace = true, features = ["native"] }
 laurus-mcp = { workspace = true }
 laurus-server = { workspace = true }
 rustyline = { workspace = true }

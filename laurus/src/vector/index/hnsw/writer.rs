@@ -11,6 +11,7 @@ use crate::vector::index::hnsw::graph::HnswGraph;
 use crate::vector::writer::{VectorIndexWriter, VectorIndexWriterConfig};
 use parking_lot::RwLock;
 use rand::RngExt;
+#[cfg(not(target_arch = "wasm32"))]
 use rayon::prelude::*;
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, HashMap, HashSet};
@@ -507,6 +508,7 @@ impl HnswIndexWriter {
 
     /// Normalize vectors if configured to do so.
     /// Normalize vectors if configured to do so.
+    #[allow(unused_variables)]
     fn normalize_vectors_internal(
         index_config: &HnswIndexConfig,
         writer_config: &VectorIndexWriterConfig,
@@ -516,14 +518,16 @@ impl HnswIndexWriter {
             return;
         }
 
+        #[cfg(not(target_arch = "wasm32"))]
         if writer_config.parallel_build && vectors.len() > 100 {
             vectors.par_iter_mut().for_each(|(_, _, vector)| {
                 vector.normalize();
             });
-        } else {
-            for (_, _, vector) in vectors {
-                vector.normalize();
-            }
+            return;
+        }
+
+        for (_, _, vector) in vectors {
+            vector.normalize();
         }
     }
 
@@ -628,89 +632,93 @@ impl HnswIndexWriter {
         // lists are protected by RwLock.
         let writer_ref = &*self;
 
-        new_doc_ids_in_order
-            .into_par_iter()
-            .try_for_each(|doc_id| -> Result<()> {
-                let doc_vector_idx = *writer_ref.doc_id_map.get(&doc_id).ok_or_else(|| {
-                    LaurusError::internal(format!("Doc ID {} not found in doc_id_map", doc_id))
-                })?;
-                let vector = &writer_ref.vectors[doc_vector_idx].2;
+        #[cfg(not(target_arch = "wasm32"))]
+        #[allow(unused_mut)]
+        let mut iter = new_doc_ids_in_order.into_par_iter();
+        #[cfg(target_arch = "wasm32")]
+        let mut iter = new_doc_ids_in_order.into_iter();
 
-                // Determine the starting node for search.
-                // For incremental builds `search_entry_point` is the OLD entry
-                // point so new nodes (including a promoted EP) always get
-                // connected to the existing graph.
-                let start_node = match search_entry_point {
-                    Some(sp) => sp,
-                    None => return Ok(()), // No existing node to search from
-                };
+        iter.try_for_each(|doc_id| -> Result<()> {
+            let doc_vector_idx = *writer_ref.doc_id_map.get(&doc_id).ok_or_else(|| {
+                LaurusError::internal(format!("Doc ID {} not found in doc_id_map", doc_id))
+            })?;
+            let vector = &writer_ref.vectors[doc_vector_idx].2;
 
-                // Skip insertion of the search start node itself (full-build
-                // seed node — other nodes will link TO it via bidirectional edges).
-                if start_node == doc_id {
-                    return Ok(());
-                }
+            // Determine the starting node for search.
+            // For incremental builds `search_entry_point` is the OLD entry
+            // point so new nodes (including a promoted EP) always get
+            // connected to the existing graph.
+            let start_node = match search_entry_point {
+                Some(sp) => sp,
+                None => return Ok(()), // No existing node to search from
+            };
 
-                // Determine the assigned level from the pre-populated graph
-                let layers_len = graph.nodes.get(&doc_id).map(|l| l.len()).unwrap_or(0);
-                if layers_len == 0 {
-                    return Ok(());
-                }
-                let level = layers_len - 1;
+            // Skip insertion of the search start node itself (full-build
+            // seed node — other nodes will link TO it via bidirectional edges).
+            if start_node == doc_id {
+                return Ok(());
+            }
 
-                let max_level = graph.max_level;
-                let mut curr_obj = start_node;
-                let mut dist = writer_ref.calc_dist(vector, curr_obj)?;
+            // Determine the assigned level from the pre-populated graph
+            let layers_len = graph.nodes.get(&doc_id).map(|l| l.len()).unwrap_or(0);
+            if layers_len == 0 {
+                return Ok(());
+            }
+            let level = layers_len - 1;
 
-                // Phase A: Greedy descent from top layer down to level + 1
-                for lc in (level + 1..=max_level).rev() {
-                    let mut changed = true;
-                    while changed {
-                        changed = false;
-                        if let Some(neighbors) = graph.get_neighbors_view(curr_obj, lc) {
-                            for neighbor_id in neighbors {
-                                let d = writer_ref.calc_dist(vector, neighbor_id)?;
-                                if d < dist {
-                                    dist = d;
-                                    curr_obj = neighbor_id;
-                                    changed = true;
-                                }
+            let max_level = graph.max_level;
+            let mut curr_obj = start_node;
+            let mut dist = writer_ref.calc_dist(vector, curr_obj)?;
+
+            // Phase A: Greedy descent from top layer down to level + 1
+            for lc in (level + 1..=max_level).rev() {
+                let mut changed = true;
+                while changed {
+                    changed = false;
+                    if let Some(neighbors) = graph.get_neighbors_view(curr_obj, lc) {
+                        for neighbor_id in neighbors {
+                            let d = writer_ref.calc_dist(vector, neighbor_id)?;
+                            if d < dist {
+                                dist = d;
+                                curr_obj = neighbor_id;
+                                changed = true;
                             }
                         }
                     }
                 }
+            }
 
-                // Phase B: Search & connect from min(max_level, level) down to 0
-                let top_level = usize::min(max_level, level);
-                for lc in (0..=top_level).rev() {
-                    let candidates =
-                        writer_ref.search_layer(&graph, curr_obj, vector, ef_construction, lc)?;
+            // Phase B: Search & connect from min(max_level, level) down to 0
+            let top_level = usize::min(max_level, level);
+            for lc in (0..=top_level).rev() {
+                let candidates =
+                    writer_ref.search_layer(&graph, curr_obj, vector, ef_construction, lc)?;
 
-                    if let Some(min_cand) = candidates.iter().min_by(|a, b| {
-                        a.distance
-                            .partial_cmp(&b.distance)
-                            .unwrap_or(Ordering::Equal)
-                    }) {
-                        curr_obj = min_cand.id;
-                    }
-
-                    let neighbors = writer_ref.select_neighbors(&candidates, m, lc, m_max, m_max_0);
-
-                    graph.set_neighbors(doc_id, lc, neighbors.clone());
-
-                    for neighbor_id in neighbors {
-                        let current_m_max = if lc == 0 { m_max_0 } else { m_max };
-                        graph.add_neighbor_with_pruning(
-                            neighbor_id,
-                            lc,
-                            doc_id,
-                            current_m_max,
-                            writer_ref,
-                        )?;
-                    }
+                if let Some(min_cand) = candidates.iter().min_by(|a, b| {
+                    a.distance
+                        .partial_cmp(&b.distance)
+                        .unwrap_or(Ordering::Equal)
+                }) {
+                    curr_obj = min_cand.id;
                 }
-                Ok(())
-            })?;
+
+                let neighbors = writer_ref.select_neighbors(&candidates, m, lc, m_max, m_max_0);
+
+                graph.set_neighbors(doc_id, lc, neighbors.clone());
+
+                for neighbor_id in neighbors {
+                    let current_m_max = if lc == 0 { m_max_0 } else { m_max };
+                    graph.add_neighbor_with_pruning(
+                        neighbor_id,
+                        lc,
+                        doc_id,
+                        current_m_max,
+                        writer_ref,
+                    )?;
+                }
+            }
+            Ok(())
+        })?;
 
         // 4. Convert ConcurrentGraph to HnswGraph
         let mut final_nodes = HashMap::new();

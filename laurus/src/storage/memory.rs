@@ -234,10 +234,7 @@ impl Storage for MemoryStorage {
 
         let files = self.files.read();
         if let Some(data) = files.get(name) {
-            let now = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_secs();
+            let now = crate::util::time::now_secs();
 
             Ok(crate::storage::FileMetadata {
                 size: data.len() as u64,

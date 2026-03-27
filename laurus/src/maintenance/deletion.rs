@@ -5,7 +5,6 @@
 
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, RwLock};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use ahash::AHashMap;
 use serde::{Deserialize, Serialize};
@@ -92,12 +91,7 @@ impl DeletionBitmap {
             min_doc_id,
             max_doc_id,
             deleted_count: AtomicU64::new(0),
-            last_modified: AtomicU64::new(
-                SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .unwrap()
-                    .as_secs(),
-            ),
+            last_modified: AtomicU64::new(crate::util::time::now_secs()),
             version: AtomicU64::new(1),
         }
     }
@@ -128,13 +122,8 @@ impl DeletionBitmap {
         if !was_already_deleted {
             docs.insert(doc_id);
             self.deleted_count.fetch_add(1, Ordering::SeqCst);
-            self.last_modified.store(
-                SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .unwrap()
-                    .as_secs(),
-                Ordering::SeqCst,
-            );
+            self.last_modified
+                .store(crate::util::time::now_secs(), Ordering::SeqCst);
             self.version.fetch_add(1, Ordering::SeqCst);
         }
 
@@ -391,10 +380,7 @@ impl DeletionLog {
     /// Log a deletion operation.
     pub fn log_deletion(&self, segment_id: &str, doc_id: u64, reason: &str) -> Result<()> {
         let entry = DeletionLogEntry {
-            timestamp: SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_secs(),
+            timestamp: crate::util::time::now_secs(),
             segment_id: segment_id.to_string(),
             doc_id,
             reason: reason.to_string(),
@@ -898,10 +884,7 @@ impl DeletionManager {
         }
 
         let global_state = self.global_state.read().unwrap();
-        let current_time = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let current_time = crate::util::time::now_secs();
 
         // Check if enough time has passed since last compaction
         let time_threshold = global_state.last_compaction + self.config.compaction_interval_secs;
@@ -926,10 +909,7 @@ impl DeletionManager {
 
         // Update global state
         let mut global_state = self.global_state.write().unwrap();
-        global_state.last_compaction = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        global_state.last_compaction = crate::util::time::now_secs();
 
         // Update statistics
         let mut stats = self.stats.write().unwrap();

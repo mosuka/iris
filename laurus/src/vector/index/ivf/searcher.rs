@@ -115,9 +115,9 @@ impl IvfSearcher {
 
 impl VectorIndexSearcher for IvfSearcher {
     fn search(&self, request: &VectorIndexQuery) -> Result<VectorIndexQueryResults> {
-        use std::time::Instant;
+        use crate::util::time::Timer;
 
-        let start = Instant::now();
+        let start = Timer::now();
         let mut results = VectorIndexQueryResults::new();
 
         // Probe only the n_probe nearest clusters

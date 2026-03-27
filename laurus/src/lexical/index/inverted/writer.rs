@@ -4,7 +4,6 @@
 
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use ahash::AHashMap;
 
@@ -963,12 +962,7 @@ impl InvertedIndexWriter {
 
         meta_writer.write_u32(0x494D4554)?; // Magic "IMET"
         meta_writer.write_u32(1)?; // Version
-        meta_writer.write_u64(
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_secs(),
-        )?; // Timestamp
+        meta_writer.write_u64(crate::util::time::now_secs())?; // Timestamp
         meta_writer.write_u64(self.stats.docs_added)?;
         meta_writer.write_u32(self.stats.segments_created)?;
 
@@ -981,10 +975,7 @@ impl InvertedIndexWriter {
         let mut meta = self.base_metadata.clone();
         meta.doc_count += self.stats.docs_added;
         meta.deleted_count += self.stats.deleted_count;
-        meta.modified = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs();
+        meta.modified = crate::util::time::now_secs();
         meta.generation += 1; // Increment generation
         meta.last_wal_seq = self.last_wal_seq;
 

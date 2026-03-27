@@ -57,7 +57,7 @@ impl VectorIndexOptimizer {
     /// Optimize a vector index.
     pub fn optimize(&self, builder: &mut dyn VectorIndexWriter) -> Result<OptimizationResult> {
         let initial_memory = builder.estimated_memory_usage();
-        let start_time = std::time::Instant::now();
+        let start_time = crate::util::time::Timer::now();
 
         let mut report = OptimizationResult {
             initial_memory_bytes: initial_memory,
