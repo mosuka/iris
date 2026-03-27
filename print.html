@@ -36,10 +36,10 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-cb135e87.js";
+            window.path_to_searchindex_js = "searchindex-c0f47b83.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-27beae76.js"></script>
+        <script src="toc-45ce2278.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -1691,7 +1691,7 @@ let request = vector_parser.parse(r#"text_vec:~"systems programming""#).await?;
 </tbody>
 </table>
 </div>
-<p>The <code>embeddings-all</code> feature enables all embedding features at once. See <a href="#feature-flags-2">Feature Flags</a> for details.</p>
+<p>The <code>embeddings-all</code> feature enables all embedding features at once. See <a href="#feature-flags-3">Feature Flags</a> for details.</p>
 <h2 id="choosing-an-embedder"><a class="header" href="#choosing-an-embedder">Choosing an Embedder</a></h2>
 <div class="table-wrapper">
 <table>
@@ -8931,8 +8931,524 @@ rm -rf node_modules
     └── hybrid-search.mjs
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div>
-<h1 id="build--test"><a class="header" href="#build--test">Build &amp; Test</a></h1>
+<h1 id="wasm-binding-overview"><a class="header" href="#wasm-binding-overview">WASM Binding Overview</a></h1>
+<p>The <code>laurus-wasm</code> package provides WebAssembly bindings for the
+Laurus search engine. It enables lexical, vector, and hybrid search
+directly in browsers and edge runtimes (Cloudflare Workers,
+Vercel Edge Functions, Deno Deploy) without a server.</p>
+<h2 id="features-6"><a class="header" href="#features-6">Features</a></h2>
+<ul>
+<li><strong>Lexical Search</strong> – Full-text search powered by an inverted
+index with BM25 scoring</li>
+<li><strong>Vector Search</strong> – Approximate nearest neighbor (ANN) search
+using Flat, HNSW, or IVF indexes</li>
+<li><strong>Hybrid Search</strong> – Combine lexical and vector results with
+fusion algorithms (RRF, WeightedSum)</li>
+<li><strong>Rich Query DSL</strong> – Term, Phrase, Fuzzy, Wildcard,
+NumericRange, Geo, Boolean, Span queries</li>
+<li><strong>Text Analysis</strong> – Tokenizers, filters, and synonym expansion</li>
+<li><strong>In-memory Storage</strong> – Fast ephemeral indexes</li>
+<li><strong>OPFS Persistence</strong> – Indexes survive page reloads via the
+Origin Private File System</li>
+<li><strong>TypeScript Types</strong> – Auto-generated <code>.d.ts</code> type definitions</li>
+<li><strong>Async API</strong> – All I/O operations return Promises</li>
+</ul>
+<h2 id="architecture-5"><a class="header" href="#architecture-5">Architecture</a></h2>
+<pre><code class="language-mermaid">graph LR
+    subgraph "laurus-wasm"
+        WASM[wasm-bindgen API]
+    end
+    subgraph "laurus (core)"
+        Engine
+        MemoryStorage
+    end
+    subgraph "Browser"
+        JS[JavaScript / TypeScript]
+        OPFS[Origin Private File System]
+    end
+    JS --&gt; WASM
+    WASM --&gt; Engine
+    Engine --&gt; MemoryStorage
+    WASM -.-&gt;|persist| OPFS
+</code></pre>
+<h2 id="limitation-no-in-engine-auto-embedding"><a class="header" href="#limitation-no-in-engine-auto-embedding">Limitation: No In-Engine Auto-Embedding</a></h2>
+<p>One of Laurus’s key features on native platforms is <strong>automatic embedding</strong> –
+when a document is indexed, the engine can automatically convert text fields
+into vector embeddings using a registered embedder (Candle BERT, Candle CLIP,
+or OpenAI API). This allows <code>searchVectorText("field", "query text")</code> to
+work seamlessly without the caller computing embeddings.</p>
+<p><strong>In laurus-wasm, this feature is not available.</strong> Only the <code>precomputed</code>
+embedder type is supported. The reasons are:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Embedder</th><th>Dependency</th><th>Why it cannot run in WASM</th></tr>
+</thead>
+<tbody>
+<tr><td><code>candle_bert</code></td><td>candle (GPU/SIMD)</td><td>Requires native SIMD intrinsics and file system for models</td></tr>
+<tr><td><code>candle_clip</code></td><td>candle</td><td>Same as above</td></tr>
+<tr><td><code>openai</code></td><td>reqwest (HTTP)</td><td>Requires a full async HTTP client (tokio + TLS)</td></tr>
+</tbody>
+</table>
+</div>
+<p>These dependencies are excluded from the WASM build via feature flags
+(<code>embeddings-candle</code>, <code>embeddings-openai</code>), which depend on the <code>native</code>
+feature that is disabled for <code>wasm32-unknown-unknown</code>.</p>
+<h3 id="recommended-alternative"><a class="header" href="#recommended-alternative">Recommended Alternative</a></h3>
+<p>Compute embeddings on the <strong>JavaScript side</strong> and pass precomputed vectors
+to <code>putDocument()</code> and <code>searchVector()</code>:</p>
+<pre><code class="language-javascript">// Using Transformers.js (all-MiniLM-L6-v2, 384-dim)
+import { pipeline } from '@huggingface/transformers';
+
+const embedder = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2');
+
+async function embed(text) {
+  const output = await embedder(text, { pooling: 'mean', normalize: true });
+  return Array.from(output.data);
+}
+
+// Index with precomputed embedding
+const vec = await embed("Introduction to Rust");
+await index.putDocument("doc1", { title: "Introduction to Rust", embedding: vec });
+await index.commit();
+
+// Search with precomputed query embedding
+const queryVec = await embed("safe systems programming");
+const results = await index.searchVector("embedding", queryVec);
+</code></pre>
+<p>This approach gives you real semantic search in the browser using the same
+sentence-transformer models available on native platforms, with the embedding
+computation handled by Transformers.js (ONNX Runtime Web) instead of candle.</p>
+<h2 id="when-to-use-laurus-wasm-vs-laurus-nodejs"><a class="header" href="#when-to-use-laurus-wasm-vs-laurus-nodejs">When to Use laurus-wasm vs laurus-nodejs</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Criterion</th><th><code>laurus-wasm</code></th><th><code>laurus-nodejs</code></th></tr>
+</thead>
+<tbody>
+<tr><td>Environment</td><td>Browser, Edge Runtime</td><td>Node.js server</td></tr>
+<tr><td>Performance</td><td>Good (single-threaded)</td><td>Best (native, multi-threaded)</td></tr>
+<tr><td>Storage</td><td>In-memory + OPFS</td><td>In-memory + File system</td></tr>
+<tr><td>Embedding</td><td>Precomputed only</td><td>Candle, OpenAI, Precomputed</td></tr>
+<tr><td>Package</td><td><code>npm install laurus-wasm</code></td><td><code>npm install laurus-nodejs</code></td></tr>
+<tr><td>Binary size</td><td>~5-10 MB (WASM)</td><td>Platform-native</td></tr>
+</tbody>
+</table>
+</div>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="installation-4"><a class="header" href="#installation-4">Installation</a></h1>
+<h2 id="npm--yarn--pnpm"><a class="header" href="#npm--yarn--pnpm">npm / yarn / pnpm</a></h2>
+<pre><code class="language-bash">npm install laurus-wasm
+# or
+yarn add laurus-wasm
+# or
+pnpm add laurus-wasm
+</code></pre>
+<h2 id="cdn-es-module"><a class="header" href="#cdn-es-module">CDN (ES Module)</a></h2>
+<pre><code class="language-html">&lt;script type="module"&gt;
+  import init, { Index, Schema } from 'https://unpkg.com/laurus-wasm/laurus_wasm.js';
+  await init();
+  // ...
+&lt;/script&gt;
+</code></pre>
+<h2 id="build-from-source"><a class="header" href="#build-from-source">Build from Source</a></h2>
+<p>Prerequisites:</p>
+<ul>
+<li><a href="https://rustup.rs/">Rust</a> (stable)</li>
+<li><a href="https://rustwasm.github.io/wasm-pack/installer/">wasm-pack</a></li>
+</ul>
+<pre><code class="language-bash">git clone https://github.com/mosuka/laurus.git
+cd laurus/laurus-wasm
+
+# For use with bundlers (webpack, vite, etc.)
+wasm-pack build --target bundler --release
+
+# For direct browser use (&lt;script type="module"&gt;)
+wasm-pack build --target web --release
+</code></pre>
+<p>The output will be in the <code>pkg/</code> directory.</p>
+<h2 id="browser-compatibility"><a class="header" href="#browser-compatibility">Browser Compatibility</a></h2>
+<p>laurus-wasm requires a browser that supports:</p>
+<ul>
+<li>WebAssembly (all modern browsers)</li>
+<li>ES Modules</li>
+</ul>
+<p>For OPFS persistence, the following browsers are supported:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Browser</th><th>Minimum Version</th></tr>
+</thead>
+<tbody>
+<tr><td>Chrome</td><td>102+</td></tr>
+<tr><td>Firefox</td><td>111+</td></tr>
+<tr><td>Safari</td><td>15.2+</td></tr>
+<tr><td>Edge</td><td>102+</td></tr>
+</tbody>
+</table>
+</div>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="quick-start-7"><a class="header" href="#quick-start-7">Quick Start</a></h1>
+<h2 id="basic-usage-in-memory"><a class="header" href="#basic-usage-in-memory">Basic Usage (In-memory)</a></h2>
+<pre><code class="language-javascript">import init, { Index, Schema } from 'laurus-wasm';
+
+// Initialize the WASM module
+await init();
+
+// Define a schema
+const schema = new Schema();
+schema.addTextField("title");
+schema.addTextField("body");
+schema.setDefaultFields(["title", "body"]);
+
+// Create an in-memory index
+const index = await Index.create(schema);
+
+// Add documents
+await index.putDocument("doc1", {
+  title: "Introduction to Rust",
+  body: "Rust is a systems programming language"
+});
+await index.putDocument("doc2", {
+  title: "WebAssembly Guide",
+  body: "WASM enables near-native performance in the browser"
+});
+await index.commit();
+
+// Search
+const results = await index.search("rust programming");
+for (const result of results) {
+  console.log(`${result.id}: ${result.score}`);
+  console.log(result.document);
+}
+</code></pre>
+<h2 id="persistent-storage-opfs"><a class="header" href="#persistent-storage-opfs">Persistent Storage (OPFS)</a></h2>
+<pre><code class="language-javascript">import init, { Index, Schema } from 'laurus-wasm';
+
+await init();
+
+const schema = new Schema();
+schema.addTextField("title");
+schema.addTextField("body");
+
+// Open a persistent index (data survives page reloads)
+const index = await Index.open("my-index", schema);
+
+// Add documents
+await index.putDocument("doc1", {
+  title: "Hello",
+  body: "World"
+});
+
+// commit() persists to OPFS automatically
+await index.commit();
+
+// On next page load, Index.open("my-index") will restore the data
+</code></pre>
+<h2 id="vector-search-4"><a class="header" href="#vector-search-4">Vector Search</a></h2>
+<pre><code class="language-javascript">import init, { Index, Schema } from 'laurus-wasm';
+
+await init();
+
+const schema = new Schema();
+schema.addTextField("title");
+schema.addHnswField("embedding", 3); // 3-dimensional vectors
+
+const index = await Index.create(schema);
+
+await index.putDocument("doc1", {
+  title: "Rust",
+  embedding: [1.0, 0.0, 0.0]
+});
+await index.putDocument("doc2", {
+  title: "Python",
+  embedding: [0.0, 1.0, 0.0]
+});
+await index.commit();
+
+// Search by vector similarity
+const results = await index.searchVector("embedding", [0.9, 0.1, 0.0]);
+console.log(results[0].document.title); // "Rust"
+</code></pre>
+<h2 id="usage-with-bundlers"><a class="header" href="#usage-with-bundlers">Usage with Bundlers</a></h2>
+<h3 id="vite"><a class="header" href="#vite">Vite</a></h3>
+<pre><code class="language-javascript">// vite.config.js
+import wasm from 'vite-plugin-wasm';
+
+export default {
+  plugins: [wasm()]
+};
+</code></pre>
+<h3 id="webpack-5"><a class="header" href="#webpack-5">Webpack 5</a></h3>
+<p>Webpack 5 supports WASM natively with <code>asyncWebAssembly</code>:</p>
+<pre><code class="language-javascript">// webpack.config.js
+module.exports = {
+  experiments: {
+    asyncWebAssembly: true
+  }
+};
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="api-reference-3"><a class="header" href="#api-reference-3">API Reference</a></h1>
+<h2 id="index-2"><a class="header" href="#index-2">Index</a></h2>
+<p>The main entry point for creating and querying search indexes.</p>
+<h3 id="static-methods"><a class="header" href="#static-methods">Static Methods</a></h3>
+<h4 id="indexcreateschema"><a class="header" href="#indexcreateschema"><code>Index.create(schema?)</code></a></h4>
+<p>Create a new in-memory (ephemeral) index.</p>
+<ul>
+<li><strong>Parameters:</strong>
+<ul>
+<li><code>schema</code> (Schema, optional) – Schema definition.</li>
+</ul>
+</li>
+<li><strong>Returns:</strong> <code>Promise&lt;Index&gt;</code></li>
+</ul>
+<h4 id="indexopenname-schema"><a class="header" href="#indexopenname-schema"><code>Index.open(name, schema?)</code></a></h4>
+<p>Open or create a persistent index backed by OPFS.</p>
+<ul>
+<li><strong>Parameters:</strong>
+<ul>
+<li><code>name</code> (string) – Index name (OPFS subdirectory).</li>
+<li><code>schema</code> (Schema, optional) – Schema definition.</li>
+</ul>
+</li>
+<li><strong>Returns:</strong> <code>Promise&lt;Index&gt;</code></li>
+</ul>
+<h3 id="instance-methods"><a class="header" href="#instance-methods">Instance Methods</a></h3>
+<h4 id="putdocumentid-document"><a class="header" href="#putdocumentid-document"><code>putDocument(id, document)</code></a></h4>
+<p>Replace a document (upsert).</p>
+<ul>
+<li><strong>Parameters:</strong>
+<ul>
+<li><code>id</code> (string) – Document identifier.</li>
+<li><code>document</code> (object) – Key-value pairs matching schema fields.</li>
+</ul>
+</li>
+<li><strong>Returns:</strong> <code>Promise&lt;void&gt;</code></li>
+</ul>
+<h4 id="adddocumentid-document"><a class="header" href="#adddocumentid-document"><code>addDocument(id, document)</code></a></h4>
+<p>Append a document version (multi-version RAG pattern).</p>
+<ul>
+<li><strong>Parameters / Returns:</strong> Same as <code>putDocument</code>.</li>
+</ul>
+<h4 id="getdocumentsid"><a class="header" href="#getdocumentsid"><code>getDocuments(id)</code></a></h4>
+<p>Retrieve all versions of a document.</p>
+<ul>
+<li><strong>Parameters:</strong>
+<ul>
+<li><code>id</code> (string)</li>
+</ul>
+</li>
+<li><strong>Returns:</strong> <code>Promise&lt;object[]&gt;</code></li>
+</ul>
+<h4 id="deletedocumentsid"><a class="header" href="#deletedocumentsid"><code>deleteDocuments(id)</code></a></h4>
+<p>Delete all versions of a document.</p>
+<ul>
+<li><strong>Parameters:</strong>
+<ul>
+<li><code>id</code> (string)</li>
+</ul>
+</li>
+<li><strong>Returns:</strong> <code>Promise&lt;void&gt;</code></li>
+</ul>
+<h4 id="commit-4"><a class="header" href="#commit-4"><code>commit()</code></a></h4>
+<p>Flush writes and make changes searchable. If opened with
+<code>Index.open()</code>, data is also persisted to OPFS.</p>
+<ul>
+<li><strong>Returns:</strong> <code>Promise&lt;void&gt;</code></li>
+</ul>
+<h4 id="searchquery-limit-offset"><a class="header" href="#searchquery-limit-offset"><code>search(query, limit?, offset?)</code></a></h4>
+<p>Search using a DSL string query.</p>
+<ul>
+<li><strong>Parameters:</strong>
+<ul>
+<li><code>query</code> (string) – Query DSL (e.g. <code>"title:hello"</code>).</li>
+<li><code>limit</code> (number, default 10)</li>
+<li><code>offset</code> (number, default 0)</li>
+</ul>
+</li>
+<li><strong>Returns:</strong> <code>Promise&lt;SearchResult[]&gt;</code></li>
+</ul>
+<h4 id="searchtermfield-term-limit-offset"><a class="header" href="#searchtermfield-term-limit-offset"><code>searchTerm(field, term, limit?, offset?)</code></a></h4>
+<p>Search for an exact term.</p>
+<ul>
+<li><strong>Parameters:</strong>
+<ul>
+<li><code>field</code> (string) – Field name.</li>
+<li><code>term</code> (string) – Exact term.</li>
+<li><code>limit</code>, <code>offset</code> (number, optional)</li>
+</ul>
+</li>
+<li><strong>Returns:</strong> <code>Promise&lt;SearchResult[]&gt;</code></li>
+</ul>
+<h4 id="searchvectorfield-vector-limit-offset"><a class="header" href="#searchvectorfield-vector-limit-offset"><code>searchVector(field, vector, limit?, offset?)</code></a></h4>
+<p>Search by vector similarity.</p>
+<ul>
+<li><strong>Parameters:</strong>
+<ul>
+<li><code>field</code> (string) – Vector field name.</li>
+<li><code>vector</code> (number[]) – Query embedding.</li>
+<li><code>limit</code>, <code>offset</code> (number, optional)</li>
+</ul>
+</li>
+<li><strong>Returns:</strong> <code>Promise&lt;SearchResult[]&gt;</code></li>
+</ul>
+<h4 id="searchvectortextfield-text-limit-offset"><a class="header" href="#searchvectortextfield-text-limit-offset"><code>searchVectorText(field, text, limit?, offset?)</code></a></h4>
+<p>Search by text (embedded by the registered embedder).</p>
+<ul>
+<li><strong>Parameters:</strong>
+<ul>
+<li><code>field</code> (string) – Vector field name.</li>
+<li><code>text</code> (string) – Text to embed.</li>
+<li><code>limit</code>, <code>offset</code> (number, optional)</li>
+</ul>
+</li>
+<li><strong>Returns:</strong> <code>Promise&lt;SearchResult[]&gt;</code></li>
+</ul>
+<h4 id="stats"><a class="header" href="#stats"><code>stats()</code></a></h4>
+<p>Return index statistics.</p>
+<ul>
+<li><strong>Returns:</strong> <code>{ documentCount: number, vectorFields: { [name]: { count, dimension } } }</code></li>
+</ul>
+<h2 id="schema-4"><a class="header" href="#schema-4">Schema</a></h2>
+<p>Builder for defining index fields and embedders.</p>
+<h3 id="constructor-1"><a class="header" href="#constructor-1">Constructor</a></h3>
+<h4 id="new-schema"><a class="header" href="#new-schema"><code>new Schema()</code></a></h4>
+<p>Create an empty schema.</p>
+<h3 id="methods-2"><a class="header" href="#methods-2">Methods</a></h3>
+<h4 id="addtextfieldname-stored-indexed-termvectors-analyzer"><a class="header" href="#addtextfieldname-stored-indexed-termvectors-analyzer"><code>addTextField(name, stored?, indexed?, termVectors?, analyzer?)</code></a></h4>
+<p>Add a full-text field.</p>
+<h4 id="addintegerfieldname-stored-indexed"><a class="header" href="#addintegerfieldname-stored-indexed"><code>addIntegerField(name, stored?, indexed?)</code></a></h4>
+<p>Add an integer field.</p>
+<h4 id="addfloatfieldname-stored-indexed"><a class="header" href="#addfloatfieldname-stored-indexed"><code>addFloatField(name, stored?, indexed?)</code></a></h4>
+<p>Add a float field.</p>
+<h4 id="addbooleanfieldname-stored-indexed"><a class="header" href="#addbooleanfieldname-stored-indexed"><code>addBooleanField(name, stored?, indexed?)</code></a></h4>
+<p>Add a boolean field.</p>
+<h4 id="adddatetimefieldname-stored-indexed"><a class="header" href="#adddatetimefieldname-stored-indexed"><code>addDateTimeField(name, stored?, indexed?)</code></a></h4>
+<p>Add a date/time field.</p>
+<h4 id="addgeofieldname-stored-indexed"><a class="header" href="#addgeofieldname-stored-indexed"><code>addGeoField(name, stored?, indexed?)</code></a></h4>
+<p>Add a geographic coordinate field.</p>
+<h4 id="addbytesfieldname-stored"><a class="header" href="#addbytesfieldname-stored"><code>addBytesField(name, stored?)</code></a></h4>
+<p>Add a binary data field.</p>
+<h4 id="addhnswfieldname-dimension-distance-m-efconstruction-embedder"><a class="header" href="#addhnswfieldname-dimension-distance-m-efconstruction-embedder"><code>addHnswField(name, dimension, distance?, m?, efConstruction?, embedder?)</code></a></h4>
+<p>Add an HNSW vector index field.</p>
+<ul>
+<li><code>distance</code>: <code>"cosine"</code> (default), <code>"euclidean"</code>, <code>"dot_product"</code>,
+<code>"manhattan"</code>, <code>"angular"</code></li>
+<li><code>m</code>: Branching factor (default 16)</li>
+<li><code>efConstruction</code>: Build-time expansion (default 200)</li>
+</ul>
+<h4 id="addflatfieldname-dimension-distance-embedder"><a class="header" href="#addflatfieldname-dimension-distance-embedder"><code>addFlatField(name, dimension, distance?, embedder?)</code></a></h4>
+<p>Add a brute-force vector index field.</p>
+<h4 id="addivffieldname-dimension-distance-nclusters-nprobe-embedder"><a class="header" href="#addivffieldname-dimension-distance-nclusters-nprobe-embedder"><code>addIvfField(name, dimension, distance?, nClusters?, nProbe?, embedder?)</code></a></h4>
+<p>Add an IVF vector index field.</p>
+<h4 id="addembeddername-config"><a class="header" href="#addembeddername-config"><code>addEmbedder(name, config)</code></a></h4>
+<p>Register a named embedder. In WASM, only <code>"precomputed"</code> type is supported.</p>
+<pre><code class="language-javascript">schema.addEmbedder("my-embedder", { type: "precomputed" });
+</code></pre>
+<h4 id="setdefaultfieldsfields"><a class="header" href="#setdefaultfieldsfields"><code>setDefaultFields(fields)</code></a></h4>
+<p>Set the default search fields.</p>
+<h4 id="fieldnames"><a class="header" href="#fieldnames"><code>fieldNames()</code></a></h4>
+<p>Returns an array of defined field names.</p>
+<h2 id="searchresult-5"><a class="header" href="#searchresult-5">SearchResult</a></h2>
+<pre><code class="language-typescript">interface SearchResult {
+  id: string;
+  score: number;
+  document: object | null;
+}
+</code></pre>
+<h2 id="analysis"><a class="header" href="#analysis">Analysis</a></h2>
+<h3 id="whitespacetokenizer-2"><a class="header" href="#whitespacetokenizer-2">WhitespaceTokenizer</a></h3>
+<pre><code class="language-javascript">const tokenizer = new WhitespaceTokenizer();
+const tokens = tokenizer.tokenize("hello world");
+// [{ text: "hello", position: 0, ... }, { text: "world", position: 1, ... }]
+</code></pre>
+<h3 id="synonymdictionary-2"><a class="header" href="#synonymdictionary-2">SynonymDictionary</a></h3>
+<pre><code class="language-javascript">const dict = new SynonymDictionary();
+dict.addSynonymGroup(["ml", "machine learning"]);
+</code></pre>
+<h3 id="synonymgraphfilter-2"><a class="header" href="#synonymgraphfilter-2">SynonymGraphFilter</a></h3>
+<pre><code class="language-javascript">const filter = new SynonymGraphFilter(dict, true, 0.8);
+const expanded = filter.apply(tokens);
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="development"><a class="header" href="#development">Development</a></h1>
 <h2 id="prerequisites-5"><a class="header" href="#prerequisites-5">Prerequisites</a></h2>
+<ul>
+<li><a href="https://rustup.rs/">Rust</a> (stable, with <code>wasm32-unknown-unknown</code> target)</li>
+<li><a href="https://rustwasm.github.io/wasm-pack/installer/">wasm-pack</a></li>
+<li><a href="https://nodejs.org/">Node.js</a> (for testing and npm publish)</li>
+</ul>
+<pre><code class="language-bash">rustup target add wasm32-unknown-unknown
+cargo install wasm-pack
+</code></pre>
+<h2 id="build-1"><a class="header" href="#build-1">Build</a></h2>
+<pre><code class="language-bash">cd laurus-wasm
+
+# Debug build (faster compilation)
+wasm-pack build --target web --dev
+
+# Release build (optimized)
+wasm-pack build --target web --release
+
+# For bundler targets (webpack, vite, etc.)
+wasm-pack build --target bundler --release
+</code></pre>
+<h2 id="project-structure-1"><a class="header" href="#project-structure-1">Project Structure</a></h2>
+<pre><code class="language-text">laurus-wasm/
+├── Cargo.toml          # Rust dependencies (wasm-bindgen, laurus core)
+├── package.json        # npm package metadata
+├── src/
+│   ├── lib.rs          # Module declarations
+│   ├── index.rs        # Index class (CRUD + search)
+│   ├── schema.rs       # Schema builder
+│   ├── search.rs       # SearchRequest / SearchResult
+│   ├── query.rs        # Query type definitions
+│   ├── convert.rs      # JsValue ↔ Document conversion
+│   ├── analysis.rs     # Tokenizer / Filter wrappers
+│   ├── errors.rs       # LaurusError → JsValue conversion
+│   └── storage.rs      # OPFS persistence layer
+└── js/
+    └── opfs_bridge.js  # JS glue for Origin Private File System
+</code></pre>
+<h2 id="architecture-notes"><a class="header" href="#architecture-notes">Architecture Notes</a></h2>
+<h3 id="storage-strategy"><a class="header" href="#storage-strategy">Storage Strategy</a></h3>
+<p>laurus-wasm uses a two-layer storage approach:</p>
+<ol>
+<li>
+<p><strong>MemoryStorage</strong> (runtime) – All read/write operations go
+through Laurus’s in-memory storage, which satisfies the
+<code>Storage</code> trait’s <code>Send + Sync</code> requirement.</p>
+</li>
+<li>
+<p><strong>OPFS</strong> (persistence) – On <code>commit()</code>, the entire
+MemoryStorage state is serialized to OPFS files. On
+<code>Index.open()</code>, OPFS files are loaded back into MemoryStorage.</p>
+</li>
+</ol>
+<p>This avoids the <code>Send + Sync</code> incompatibility of JS handles
+while keeping the core engine unchanged.</p>
+<h3 id="feature-flags-2"><a class="header" href="#feature-flags-2">Feature Flags</a></h3>
+<p>The <code>laurus</code> core uses feature flags to support WASM:</p>
+<pre><code class="language-toml"># laurus-wasm depends on laurus without default features
+laurus = { workspace = true, default-features = false }
+</code></pre>
+<p>This excludes native-only dependencies (tokio/full, rayon,
+memmap2, etc.) and uses <code>#[cfg(target_arch = "wasm32")]</code>
+fallbacks for parallelism.</p>
+<h2 id="testing-1"><a class="header" href="#testing-1">Testing</a></h2>
+<pre><code class="language-bash"># Build check
+cargo build -p laurus-wasm --target wasm32-unknown-unknown
+
+# Clippy
+cargo clippy -p laurus-wasm --target wasm32-unknown-unknown -- -D warnings
+</code></pre>
+<p>Browser tests can be run with <code>wasm-pack test</code>:</p>
+<pre><code class="language-bash">wasm-pack test --headless --chrome
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="build--test"><a class="header" href="#build--test">Build &amp; Test</a></h1>
+<h2 id="prerequisites-6"><a class="header" href="#prerequisites-6">Prerequisites</a></h2>
 <ul>
 <li><strong>Rust</strong> 1.85 or later (edition 2024)</li>
 <li><strong>Cargo</strong> (included with Rust)</li>
@@ -8948,7 +9464,7 @@ cargo build --features embeddings-candle
 # Build in release mode
 cargo build --release
 </code></pre>
-<h2 id="testing-1"><a class="header" href="#testing-1">Testing</a></h2>
+<h2 id="testing-2"><a class="header" href="#testing-2">Testing</a></h2>
 <pre><code class="language-bash"># Run all tests
 cargo test
 
@@ -8987,7 +9503,7 @@ mdbook serve docs
 markdownlint-cli2 "docs/src/**/*.md"
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div>
-<h1 id="feature-flags-2"><a class="header" href="#feature-flags-2">Feature Flags</a></h1>
+<h1 id="feature-flags-3"><a class="header" href="#feature-flags-3">Feature Flags</a></h1>
 <p>The <code>laurus</code> crate ships with no default features. Enable embedding support as needed.</p>
 <h2 id="available-flags"><a class="header" href="#available-flags">Available Flags</a></h2>
 <div class="table-wrapper">
@@ -9042,7 +9558,7 @@ laurus = { version = "0.1.0", features = ["embeddings-all"] }
 </div>
 <p>If you only need lexical (keyword) search, you can use Laurus with no features enabled for the smallest binary and fastest compile time.</p>
 <div style="break-before: page; page-break-before: always;"></div>
-<h1 id="project-structure-1"><a class="header" href="#project-structure-1">Project Structure</a></h1>
+<h1 id="project-structure-2"><a class="header" href="#project-structure-2">Project Structure</a></h1>
 <p>Laurus is organized as a Cargo workspace with three crates.</p>
 <h2 id="workspace-layout"><a class="header" href="#workspace-layout">Workspace Layout</a></h2>
 <pre><code class="language-text">laurus/                          # Repository root

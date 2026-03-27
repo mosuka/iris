@@ -36,10 +36,10 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-09404469.js";
+            window.path_to_searchindex_js = "searchindex-9b18d6f5.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-c4adc502.js"></script>
+        <script src="toc-c8b18c0d.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -1687,7 +1687,7 @@ let request = vector_parser.parse(r#"text_vec:~"systems programming""#).await?;
 </tbody>
 </table>
 </div>
-<p><code>embeddings-all</code> Feature ですべての Embedding 機能を一括で有効にできます。詳細は <a href="#feature-flags-1">Feature Flags</a> を参照してください。</p>
+<p><code>embeddings-all</code> Feature ですべての Embedding 機能を一括で有効にできます。詳細は <a href="#feature-flags-2">Feature Flags</a> を参照してください。</p>
 <h2 id="embedder-の選択"><a class="header" href="#embedder-の選択">Embedder の選択</a></h2>
 <div class="table-wrapper">
 <table>
@@ -8827,14 +8827,497 @@ rm -rf node_modules
     └── hybrid-search.mjs
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div>
-<h1 id="ビルドとテスト"><a class="header" href="#ビルドとテスト">ビルドとテスト</a></h1>
+<h1 id="wasm-バインディング概要"><a class="header" href="#wasm-バインディング概要">WASM バインディング概要</a></h1>
+<p><code>laurus-wasm</code> パッケージは、Laurus 検索エンジンの WebAssembly バインディングです。
+サーバーなしで、ブラウザやエッジランタイム（Cloudflare Workers、Vercel Edge Functions、Deno Deploy）
+上で直接、レキシカル検索・ベクトル検索・ハイブリッド検索を実行できます。</p>
+<h2 id="機能-5"><a class="header" href="#機能-5">機能</a></h2>
+<ul>
+<li><strong>レキシカル検索</strong> – BM25 スコアリングによる転置インデックスベースの全文検索</li>
+<li><strong>ベクトル検索</strong> – Flat、HNSW、IVF インデックスによる近似最近傍探索</li>
+<li><strong>ハイブリッド検索</strong> – RRF、WeightedSum による融合アルゴリズム</li>
+<li><strong>クエリ DSL</strong> – Term、Phrase、Fuzzy、Wildcard、NumericRange、Geo、Boolean、Span</li>
+<li><strong>テキスト分析</strong> – トークナイザー、フィルター、同義語展開</li>
+<li><strong>インメモリストレージ</strong> – 高速な一時インデックス</li>
+<li><strong>OPFS 永続化</strong> – Origin Private File System によるページリロード後のデータ保持</li>
+<li><strong>TypeScript 型定義</strong> – 自動生成される <code>.d.ts</code> ファイル</li>
+<li><strong>非同期 API</strong> – すべての I/O 操作は Promise を返す</li>
+</ul>
+<h2 id="アーキテクチャ-5"><a class="header" href="#アーキテクチャ-5">アーキテクチャ</a></h2>
+<pre><code class="language-mermaid">graph LR
+    subgraph "laurus-wasm"
+        WASM[wasm-bindgen API]
+    end
+    subgraph "laurus（コア）"
+        Engine
+        MemoryStorage
+    end
+    subgraph "ブラウザ"
+        JS[JavaScript / TypeScript]
+        OPFS[Origin Private File System]
+    end
+    JS --&gt; WASM
+    WASM --&gt; Engine
+    Engine --&gt; MemoryStorage
+    WASM -.-&gt;|永続化| OPFS
+</code></pre>
+<h2 id="制限事項-エンジン内自動-embedding-の非対応"><a class="header" href="#制限事項-エンジン内自動-embedding-の非対応">制限事項: エンジン内自動 Embedding の非対応</a></h2>
+<p>ネイティブ環境での Laurus の特徴の一つに<strong>自動 Embedding</strong> があります。
+ドキュメントをインデックスする際、エンジンが登録された Embedder（Candle BERT、
+Candle CLIP、OpenAI API）を使ってテキストフィールドを自動的にベクトル埋め込みに
+変換します。これにより <code>searchVectorText("field", "query text")</code> がシームレスに
+動作し、呼び出し側で埋め込みを計算する必要がありません。</p>
+<p><strong>laurus-wasm ではこの機能を利用できません。</strong> <code>precomputed</code>（事前計算済み）
+Embedder のみがサポートされます。理由は以下の通りです:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Embedder</th><th>Dependency</th><th>Why it cannot run in WASM</th></tr>
+</thead>
+<tbody>
+<tr><td><code>candle_bert</code></td><td>candle (GPU/SIMD)</td><td>Requires native SIMD intrinsics and file system for models</td></tr>
+<tr><td><code>candle_clip</code></td><td>candle</td><td>Same as above</td></tr>
+<tr><td><code>openai</code></td><td>reqwest (HTTP)</td><td>Requires a full async HTTP client (tokio + TLS)</td></tr>
+</tbody>
+</table>
+</div>
+<p>これらの依存は Feature Flags（<code>embeddings-candle</code>、<code>embeddings-openai</code>）で
+管理されており、<code>wasm32-unknown-unknown</code> ビルドで無効化される <code>native</code> feature
+に依存しているため除外されます。</p>
+<h3 id="推奨される代替手段"><a class="header" href="#推奨される代替手段">推奨される代替手段</a></h3>
+<p><strong>JavaScript 側で埋め込みを計算</strong>し、事前計算済みベクトルを <code>putDocument()</code> と
+<code>searchVector()</code> に渡します:</p>
+<pre><code class="language-javascript">// Transformers.js を使用（all-MiniLM-L6-v2、384次元）
+import { pipeline } from '@huggingface/transformers';
+
+const embedder = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2');
+
+async function embed(text) {
+  const output = await embedder(text, { pooling: 'mean', normalize: true });
+  return Array.from(output.data);
+}
+
+// 事前計算済み埋め込みでインデックス
+const vec = await embed("Rust 入門");
+await index.putDocument("doc1", { title: "Rust 入門", embedding: vec });
+await index.commit();
+
+// 事前計算済みクエリ埋め込みで検索
+const queryVec = await embed("安全なシステムプログラミング");
+const results = await index.searchVector("embedding", queryVec);
+</code></pre>
+<p>このアプローチにより、ネイティブ環境と同じ Sentence Transformer モデルを使った
+セマンティック検索がブラウザ内で実現できます。埋め込み計算は candle ではなく
+Transformers.js（ONNX Runtime Web）が担当します。</p>
+<h2 id="laurus-wasm-と-laurus-nodejs-の使い分け"><a class="header" href="#laurus-wasm-と-laurus-nodejs-の使い分け">laurus-wasm と laurus-nodejs の使い分け</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>基準</th><th><code>laurus-wasm</code></th><th><code>laurus-nodejs</code></th></tr>
+</thead>
+<tbody>
+<tr><td>実行環境</td><td>ブラウザ、エッジランタイム</td><td>Node.js サーバー</td></tr>
+<tr><td>パフォーマンス</td><td>良好（シングルスレッド）</td><td>最高（ネイティブ、マルチスレッド）</td></tr>
+<tr><td>ストレージ</td><td>インメモリ + OPFS</td><td>インメモリ + ファイルシステム</td></tr>
+<tr><td>埋め込み</td><td>事前計算のみ</td><td>Candle、OpenAI、事前計算</td></tr>
+<tr><td>パッケージ</td><td><code>npm install laurus-wasm</code></td><td><code>npm install laurus-nodejs</code></td></tr>
+<tr><td>バイナリサイズ</td><td>約 5-10 MB（WASM）</td><td>プラットフォームネイティブ</td></tr>
+</tbody>
+</table>
+</div>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="インストール-4"><a class="header" href="#インストール-4">インストール</a></h1>
+<h2 id="npm--yarn--pnpm"><a class="header" href="#npm--yarn--pnpm">npm / yarn / pnpm</a></h2>
+<pre><code class="language-bash">npm install laurus-wasm
+# または
+yarn add laurus-wasm
+# または
+pnpm add laurus-wasm
+</code></pre>
+<h2 id="cdnes-module"><a class="header" href="#cdnes-module">CDN（ES Module）</a></h2>
+<pre><code class="language-html">&lt;script type="module"&gt;
+  import init, { Index, Schema } from 'https://unpkg.com/laurus-wasm/laurus_wasm.js';
+  await init();
+  // ...
+&lt;/script&gt;
+</code></pre>
+<h2 id="ソースからビルド-1"><a class="header" href="#ソースからビルド-1">ソースからビルド</a></h2>
+<p>前提条件:</p>
+<ul>
+<li><a href="https://rustup.rs/">Rust</a>（stable）</li>
+<li><a href="https://rustwasm.github.io/wasm-pack/installer/">wasm-pack</a></li>
+</ul>
+<pre><code class="language-bash">git clone https://github.com/mosuka/laurus.git
+cd laurus/laurus-wasm
+
+# バンドラー向け（webpack、vite 等）
+wasm-pack build --target bundler --release
+
+# ブラウザ直接利用向け（&lt;script type="module"&gt;）
+wasm-pack build --target web --release
+</code></pre>
+<p>出力は <code>pkg/</code> ディレクトリに生成されます。</p>
+<h2 id="ブラウザ対応状況"><a class="header" href="#ブラウザ対応状況">ブラウザ対応状況</a></h2>
+<p>laurus-wasm は以下をサポートするブラウザが必要です:</p>
+<ul>
+<li>WebAssembly（すべてのモダンブラウザ）</li>
+<li>ES Modules</li>
+</ul>
+<p>OPFS 永続化には以下のブラウザが対応しています:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>ブラウザ</th><th>最小バージョン</th></tr>
+</thead>
+<tbody>
+<tr><td>Chrome</td><td>102+</td></tr>
+<tr><td>Firefox</td><td>111+</td></tr>
+<tr><td>Safari</td><td>15.2+</td></tr>
+<tr><td>Edge</td><td>102+</td></tr>
+</tbody>
+</table>
+</div>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="クイックスタート-7"><a class="header" href="#クイックスタート-7">クイックスタート</a></h1>
+<h2 id="基本的な使い方インメモリ"><a class="header" href="#基本的な使い方インメモリ">基本的な使い方（インメモリ）</a></h2>
+<pre><code class="language-javascript">import init, { Index, Schema } from 'laurus-wasm';
+
+// WASM モジュールを初期化
+await init();
+
+// スキーマを定義
+const schema = new Schema();
+schema.addTextField("title");
+schema.addTextField("body");
+schema.setDefaultFields(["title", "body"]);
+
+// インメモリインデックスを作成
+const index = await Index.create(schema);
+
+// ドキュメントを追加
+await index.putDocument("doc1", {
+  title: "Rust 入門",
+  body: "Rust はシステムプログラミング言語です"
+});
+await index.putDocument("doc2", {
+  title: "WebAssembly ガイド",
+  body: "WASM はブラウザでネイティブに近いパフォーマンスを実現します"
+});
+await index.commit();
+
+// 検索
+const results = await index.search("rust");
+for (const result of results) {
+  console.log(`${result.id}: ${result.score}`);
+  console.log(result.document);
+}
+</code></pre>
+<h2 id="永続化ストレージopfs"><a class="header" href="#永続化ストレージopfs">永続化ストレージ（OPFS）</a></h2>
+<pre><code class="language-javascript">import init, { Index, Schema } from 'laurus-wasm';
+
+await init();
+
+const schema = new Schema();
+schema.addTextField("title");
+schema.addTextField("body");
+
+// 永続化インデックスを開く（ページリロード後もデータが保持される）
+const index = await Index.open("my-index", schema);
+
+// ドキュメントを追加
+await index.putDocument("doc1", {
+  title: "Hello",
+  body: "World"
+});
+
+// commit() で自動的に OPFS に永続化される
+await index.commit();
+
+// 次のページロード時、Index.open("my-index") でデータが復元される
+</code></pre>
+<h2 id="ベクトル検索-1"><a class="header" href="#ベクトル検索-1">ベクトル検索</a></h2>
+<pre><code class="language-javascript">import init, { Index, Schema } from 'laurus-wasm';
+
+await init();
+
+const schema = new Schema();
+schema.addTextField("title");
+schema.addHnswField("embedding", 3); // 3次元ベクトル
+
+const index = await Index.create(schema);
+
+await index.putDocument("doc1", {
+  title: "Rust",
+  embedding: [1.0, 0.0, 0.0]
+});
+await index.putDocument("doc2", {
+  title: "Python",
+  embedding: [0.0, 1.0, 0.0]
+});
+await index.commit();
+
+// ベクトル類似度で検索
+const results = await index.searchVector("embedding", [0.9, 0.1, 0.0]);
+console.log(results[0].document.title); // "Rust"
+</code></pre>
+<h2 id="バンドラーでの利用"><a class="header" href="#バンドラーでの利用">バンドラーでの利用</a></h2>
+<h3 id="vite"><a class="header" href="#vite">Vite</a></h3>
+<pre><code class="language-javascript">// vite.config.js
+import wasm from 'vite-plugin-wasm';
+
+export default {
+  plugins: [wasm()]
+};
+</code></pre>
+<h3 id="webpack-5"><a class="header" href="#webpack-5">Webpack 5</a></h3>
+<p>Webpack 5 は <code>asyncWebAssembly</code> で WASM をネイティブサポートしています:</p>
+<pre><code class="language-javascript">// webpack.config.js
+module.exports = {
+  experiments: {
+    asyncWebAssembly: true
+  }
+};
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="api-リファレンス-2"><a class="header" href="#api-リファレンス-2">API リファレンス</a></h1>
+<h2 id="index-2"><a class="header" href="#index-2">Index</a></h2>
+<p>検索インデックスの作成・クエリを行うメインエントリポイントです。</p>
+<h3 id="静的メソッド"><a class="header" href="#静的メソッド">静的メソッド</a></h3>
+<h4 id="indexcreateschema"><a class="header" href="#indexcreateschema"><code>Index.create(schema?)</code></a></h4>
+<p>新しいインメモリ（一時）インデックスを作成します。</p>
+<ul>
+<li><strong>引数:</strong>
+<ul>
+<li><code>schema</code> (Schema, 省略可) – スキーマ定義</li>
+</ul>
+</li>
+<li><strong>戻り値:</strong> <code>Promise&lt;Index&gt;</code></li>
+</ul>
+<h4 id="indexopenname-schema"><a class="header" href="#indexopenname-schema"><code>Index.open(name, schema?)</code></a></h4>
+<p>OPFS で永続化されたインデックスを開くか、新規作成します。</p>
+<ul>
+<li><strong>引数:</strong>
+<ul>
+<li><code>name</code> (string) – インデックス名（OPFS サブディレクトリ）</li>
+<li><code>schema</code> (Schema, 省略可) – スキーマ定義</li>
+</ul>
+</li>
+<li><strong>戻り値:</strong> <code>Promise&lt;Index&gt;</code></li>
+</ul>
+<h3 id="インスタンスメソッド"><a class="header" href="#インスタンスメソッド">インスタンスメソッド</a></h3>
+<h4 id="putdocumentid-document"><a class="header" href="#putdocumentid-document"><code>putDocument(id, document)</code></a></h4>
+<p>ドキュメントを置換（upsert）します。</p>
+<ul>
+<li><strong>引数:</strong>
+<ul>
+<li><code>id</code> (string) – ドキュメント識別子</li>
+<li><code>document</code> (object) – スキーマフィールドに対応するキーバリューペア</li>
+</ul>
+</li>
+<li><strong>戻り値:</strong> <code>Promise&lt;void&gt;</code></li>
+</ul>
+<h4 id="adddocumentid-document"><a class="header" href="#adddocumentid-document"><code>addDocument(id, document)</code></a></h4>
+<p>ドキュメントバージョンを追加します（マルチバージョン RAG パターン）。</p>
+<ul>
+<li><strong>引数・戻り値:</strong> <code>putDocument</code> と同じ</li>
+</ul>
+<h4 id="getdocumentsid"><a class="header" href="#getdocumentsid"><code>getDocuments(id)</code></a></h4>
+<p>ドキュメントの全バージョンを取得します。</p>
+<ul>
+<li><strong>引数:</strong> <code>id</code> (string)</li>
+<li><strong>戻り値:</strong> <code>Promise&lt;object[]&gt;</code></li>
+</ul>
+<h4 id="deletedocumentsid"><a class="header" href="#deletedocumentsid"><code>deleteDocuments(id)</code></a></h4>
+<p>ドキュメントの全バージョンを削除します。</p>
+<ul>
+<li><strong>引数:</strong> <code>id</code> (string)</li>
+<li><strong>戻り値:</strong> <code>Promise&lt;void&gt;</code></li>
+</ul>
+<h4 id="commit-3"><a class="header" href="#commit-3"><code>commit()</code></a></h4>
+<p>書き込みをフラッシュし、変更を検索可能にします。
+<code>Index.open()</code> で作成したインデックスの場合、OPFS にも自動永続化されます。</p>
+<ul>
+<li><strong>戻り値:</strong> <code>Promise&lt;void&gt;</code></li>
+</ul>
+<h4 id="searchquery-limit-offset"><a class="header" href="#searchquery-limit-offset"><code>search(query, limit?, offset?)</code></a></h4>
+<p>DSL 文字列クエリで検索します。</p>
+<ul>
+<li><strong>引数:</strong>
+<ul>
+<li><code>query</code> (string) – クエリ DSL（例: <code>"title:hello"</code>）</li>
+<li><code>limit</code> (number, デフォルト 10)</li>
+<li><code>offset</code> (number, デフォルト 0)</li>
+</ul>
+</li>
+<li><strong>戻り値:</strong> <code>Promise&lt;SearchResult[]&gt;</code></li>
+</ul>
+<h4 id="searchtermfield-term-limit-offset"><a class="header" href="#searchtermfield-term-limit-offset"><code>searchTerm(field, term, limit?, offset?)</code></a></h4>
+<p>完全一致タームで検索します。</p>
+<ul>
+<li><strong>引数:</strong>
+<ul>
+<li><code>field</code> (string) – フィールド名</li>
+<li><code>term</code> (string) – 検索ターム</li>
+<li><code>limit</code>, <code>offset</code> (number, 省略可)</li>
+</ul>
+</li>
+<li><strong>戻り値:</strong> <code>Promise&lt;SearchResult[]&gt;</code></li>
+</ul>
+<h4 id="searchvectorfield-vector-limit-offset"><a class="header" href="#searchvectorfield-vector-limit-offset"><code>searchVector(field, vector, limit?, offset?)</code></a></h4>
+<p>ベクトル類似度で検索します。</p>
+<ul>
+<li><strong>引数:</strong>
+<ul>
+<li><code>field</code> (string) – ベクトルフィールド名</li>
+<li><code>vector</code> (number[]) – クエリ埋め込みベクトル</li>
+<li><code>limit</code>, <code>offset</code> (number, 省略可)</li>
+</ul>
+</li>
+<li><strong>戻り値:</strong> <code>Promise&lt;SearchResult[]&gt;</code></li>
+</ul>
+<h4 id="searchvectortextfield-text-limit-offset"><a class="header" href="#searchvectortextfield-text-limit-offset"><code>searchVectorText(field, text, limit?, offset?)</code></a></h4>
+<p>テキストで検索します（登録された埋め込み器で変換）。</p>
+<ul>
+<li><strong>引数:</strong>
+<ul>
+<li><code>field</code> (string) – ベクトルフィールド名</li>
+<li><code>text</code> (string) – 埋め込み対象テキスト</li>
+<li><code>limit</code>, <code>offset</code> (number, 省略可)</li>
+</ul>
+</li>
+<li><strong>戻り値:</strong> <code>Promise&lt;SearchResult[]&gt;</code></li>
+</ul>
+<h4 id="stats"><a class="header" href="#stats"><code>stats()</code></a></h4>
+<p>インデックス統計を返します。</p>
+<ul>
+<li><strong>戻り値:</strong> <code>{ documentCount: number, vectorFields: { [name]: { count, dimension } } }</code></li>
+</ul>
+<h2 id="schema-4"><a class="header" href="#schema-4">Schema</a></h2>
+<p>インデックスフィールドと埋め込み器を定義するビルダーです。</p>
+<h3 id="コンストラクタ-1"><a class="header" href="#コンストラクタ-1">コンストラクタ</a></h3>
+<h4 id="new-schema"><a class="header" href="#new-schema"><code>new Schema()</code></a></h4>
+<p>空のスキーマを作成します。</p>
+<h3 id="メソッド-3"><a class="header" href="#メソッド-3">メソッド</a></h3>
+<h4 id="addtextfieldname-stored-indexed-termvectors-analyzer"><a class="header" href="#addtextfieldname-stored-indexed-termvectors-analyzer"><code>addTextField(name, stored?, indexed?, termVectors?, analyzer?)</code></a></h4>
+<p>全文検索テキストフィールドを追加します。</p>
+<h4 id="addintegerfieldname-stored-indexed"><a class="header" href="#addintegerfieldname-stored-indexed"><code>addIntegerField(name, stored?, indexed?)</code></a></h4>
+<p>整数フィールドを追加します。</p>
+<h4 id="addfloatfieldname-stored-indexed"><a class="header" href="#addfloatfieldname-stored-indexed"><code>addFloatField(name, stored?, indexed?)</code></a></h4>
+<p>浮動小数点フィールドを追加します。</p>
+<h4 id="addbooleanfieldname-stored-indexed"><a class="header" href="#addbooleanfieldname-stored-indexed"><code>addBooleanField(name, stored?, indexed?)</code></a></h4>
+<p>真偽値フィールドを追加します。</p>
+<h4 id="adddatetimefieldname-stored-indexed"><a class="header" href="#adddatetimefieldname-stored-indexed"><code>addDateTimeField(name, stored?, indexed?)</code></a></h4>
+<p>日時フィールドを追加します。</p>
+<h4 id="addgeofieldname-stored-indexed"><a class="header" href="#addgeofieldname-stored-indexed"><code>addGeoField(name, stored?, indexed?)</code></a></h4>
+<p>地理座標フィールドを追加します。</p>
+<h4 id="addbytesfieldname-stored"><a class="header" href="#addbytesfieldname-stored"><code>addBytesField(name, stored?)</code></a></h4>
+<p>バイナリデータフィールドを追加します。</p>
+<h4 id="addhnswfieldname-dimension-distance-m-efconstruction-embedder"><a class="header" href="#addhnswfieldname-dimension-distance-m-efconstruction-embedder"><code>addHnswField(name, dimension, distance?, m?, efConstruction?, embedder?)</code></a></h4>
+<p>HNSW ベクトルインデックスフィールドを追加します。</p>
+<ul>
+<li><code>distance</code>: <code>"cosine"</code>（デフォルト）、<code>"euclidean"</code>、<code>"dot_product"</code>、<code>"manhattan"</code>、<code>"angular"</code></li>
+</ul>
+<h4 id="addflatfieldname-dimension-distance-embedder"><a class="header" href="#addflatfieldname-dimension-distance-embedder"><code>addFlatField(name, dimension, distance?, embedder?)</code></a></h4>
+<p>全探索ベクトルインデックスフィールドを追加します。</p>
+<h4 id="addivffieldname-dimension-distance-nclusters-nprobe-embedder"><a class="header" href="#addivffieldname-dimension-distance-nclusters-nprobe-embedder"><code>addIvfField(name, dimension, distance?, nClusters?, nProbe?, embedder?)</code></a></h4>
+<p>IVF ベクトルインデックスフィールドを追加します。</p>
+<h4 id="addembeddername-config"><a class="header" href="#addembeddername-config"><code>addEmbedder(name, config)</code></a></h4>
+<p>名前付き埋め込み器を登録します。WASM では <code>"precomputed"</code> のみ対応しています。</p>
+<h4 id="setdefaultfieldsfields"><a class="header" href="#setdefaultfieldsfields"><code>setDefaultFields(fields)</code></a></h4>
+<p>デフォルト検索フィールドを設定します。</p>
+<h4 id="fieldnames"><a class="header" href="#fieldnames"><code>fieldNames()</code></a></h4>
+<p>定義済みフィールド名の配列を返します。</p>
+<h2 id="searchresult-5"><a class="header" href="#searchresult-5">SearchResult</a></h2>
+<pre><code class="language-typescript">interface SearchResult {
+  id: string;
+  score: number;
+  document: object | null;
+}
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="開発"><a class="header" href="#開発">開発</a></h1>
 <h2 id="前提条件-5"><a class="header" href="#前提条件-5">前提条件</a></h2>
+<ul>
+<li><a href="https://rustup.rs/">Rust</a>（stable、<code>wasm32-unknown-unknown</code> ターゲット付き）</li>
+<li><a href="https://rustwasm.github.io/wasm-pack/installer/">wasm-pack</a></li>
+<li><a href="https://nodejs.org/">Node.js</a>（テストと npm publish 用）</li>
+</ul>
+<pre><code class="language-bash">rustup target add wasm32-unknown-unknown
+cargo install wasm-pack
+</code></pre>
+<h2 id="ビルド-1"><a class="header" href="#ビルド-1">ビルド</a></h2>
+<pre><code class="language-bash">cd laurus-wasm
+
+# デバッグビルド（コンパイル高速）
+wasm-pack build --target web --dev
+
+# リリースビルド（最適化）
+wasm-pack build --target web --release
+
+# バンドラーターゲット（webpack、vite 等）
+wasm-pack build --target bundler --release
+</code></pre>
+<h2 id="プロジェクト構成-2"><a class="header" href="#プロジェクト構成-2">プロジェクト構成</a></h2>
+<pre><code class="language-text">laurus-wasm/
+├── Cargo.toml          # Rust 依存関係（wasm-bindgen、laurus コア）
+├── package.json        # npm パッケージメタデータ
+├── src/
+│   ├── lib.rs          # モジュール宣言
+│   ├── index.rs        # Index クラス（CRUD + 検索）
+│   ├── schema.rs       # Schema ビルダー
+│   ├── search.rs       # SearchRequest / SearchResult
+│   ├── query.rs        # クエリ型定義
+│   ├── convert.rs      # JsValue ↔ Document 変換
+│   ├── analysis.rs     # トークナイザー / フィルターラッパー
+│   ├── errors.rs       # LaurusError → JsValue 変換
+│   └── storage.rs      # OPFS 永続化レイヤー
+└── js/
+    └── opfs_bridge.js  # Origin Private File System 用 JS グルーコード
+</code></pre>
+<h2 id="アーキテクチャノート"><a class="header" href="#アーキテクチャノート">アーキテクチャノート</a></h2>
+<h3 id="ストレージ戦略"><a class="header" href="#ストレージ戦略">ストレージ戦略</a></h3>
+<p>laurus-wasm は二層ストレージアプローチを採用しています:</p>
+<ol>
+<li>
+<p><strong>MemoryStorage</strong>（ランタイム） – すべての読み書き操作は Laurus の
+インメモリストレージを経由します。これは <code>Storage</code> トレイトの
+<code>Send + Sync</code> 要件を満たします。</p>
+</li>
+<li>
+<p><strong>OPFS</strong>（永続化） – <code>commit()</code> 時に MemoryStorage の全状態が
+OPFS ファイルにシリアライズされます。<code>Index.open()</code> 時に OPFS
+ファイルが MemoryStorage にロードされます。</p>
+</li>
+</ol>
+<p>この設計により、JS ハンドルの <code>Send + Sync</code> 非互換性を回避しつつ、
+コアエンジンを変更せずに永続化を実現しています。</p>
+<h3 id="feature-flags-1"><a class="header" href="#feature-flags-1">Feature Flags</a></h3>
+<p><code>laurus</code> コアは Feature Flags で WASM をサポートしています:</p>
+<pre><code class="language-toml"># laurus-wasm はデフォルト機能なしで laurus に依存
+laurus = { workspace = true, default-features = false }
+</code></pre>
+<p>これにより、ネイティブ専用の依存関係（tokio/full、rayon、memmap2 等）が
+除外され、<code>#[cfg(target_arch = "wasm32")]</code> フォールバックで並列処理が
+逐次処理に切り替わります。</p>
+<h2 id="テスト-1"><a class="header" href="#テスト-1">テスト</a></h2>
+<pre><code class="language-bash"># ビルド確認
+cargo build -p laurus-wasm --target wasm32-unknown-unknown
+
+# Clippy
+cargo clippy -p laurus-wasm --target wasm32-unknown-unknown -- -D warnings
+</code></pre>
+<p>ブラウザテストは <code>wasm-pack test</code> で実行できます:</p>
+<pre><code class="language-bash">wasm-pack test --headless --chrome
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="ビルドとテスト"><a class="header" href="#ビルドとテスト">ビルドとテスト</a></h1>
+<h2 id="前提条件-6"><a class="header" href="#前提条件-6">前提条件</a></h2>
 <ul>
 <li><strong>Rust</strong> 1.85 以降（edition 2024）</li>
 <li><strong>Cargo</strong>（Rust に付属）</li>
 <li><strong>protobuf コンパイラ</strong>（<code>protoc</code>）– <code>laurus-server</code> のビルドに必要</li>
 </ul>
-<h2 id="ビルド-1"><a class="header" href="#ビルド-1">ビルド</a></h2>
+<h2 id="ビルド-2"><a class="header" href="#ビルド-2">ビルド</a></h2>
 <pre><code class="language-bash"># すべてのクレートをビルド
 cargo build
 
@@ -8844,7 +9327,7 @@ cargo build --features embeddings-candle
 # リリースモードでビルド
 cargo build --release
 </code></pre>
-<h2 id="テスト-1"><a class="header" href="#テスト-1">テスト</a></h2>
+<h2 id="テスト-2"><a class="header" href="#テスト-2">テスト</a></h2>
 <pre><code class="language-bash"># すべてのテストを実行
 cargo test
 
@@ -8883,7 +9366,7 @@ mdbook serve docs
 markdownlint-cli2 "docs/src/**/*.md"
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div>
-<h1 id="feature-flags-1"><a class="header" href="#feature-flags-1">Feature Flags</a></h1>
+<h1 id="feature-flags-2"><a class="header" href="#feature-flags-2">Feature Flags</a></h1>
 <p><code>laurus</code> クレートはデフォルトでは Feature が無効の状態で提供されます。必要に応じて Embedding サポートを有効にしてください。</p>
 <h2 id="利用可能な-feature"><a class="header" href="#利用可能な-feature">利用可能な Feature</a></h2>
 <div class="table-wrapper">
@@ -8938,7 +9421,7 @@ laurus = { version = "0.1.0", features = ["embeddings-all"] }
 </div>
 <p>Lexical（キーワード）検索のみが必要な場合は、Feature を有効にせずに Laurus を使用することで、最小のバイナリサイズと最速のコンパイル時間を実現できます。</p>
 <div style="break-before: page; page-break-before: always;"></div>
-<h1 id="プロジェクト構成-2"><a class="header" href="#プロジェクト構成-2">プロジェクト構成</a></h1>
+<h1 id="プロジェクト構成-3"><a class="header" href="#プロジェクト構成-3">プロジェクト構成</a></h1>
 <p>Laurus は 3 つのクレートを持つ Cargo ワークスペースとして構成されています。</p>
 <h2 id="ワークスペースレイアウト"><a class="header" href="#ワークスペースレイアウト">ワークスペースレイアウト</a></h2>
 <pre><code class="language-text">laurus/                          # リポジトリルート
