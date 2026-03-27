@@ -26,10 +26,16 @@ using laurus-wasm.
 
 ## What the Demo Does
 
-- Creates an in-memory search index with `title` and `body` fields
-- Loads 5 sample documents about Rust, WASM, and search
-- Provides a search box with DSL query support (e.g. `"title:rust"`,
-  `"browser programming"`)
+- Creates an OPFS-persistent search index with `title` and `body` fields
+  (data survives page reloads)
+- Seeds 8 sample documents on first visit; skips seeding when existing
+  data is loaded from OPFS
+- Uses Transformers.js (all-MiniLM-L6-v2) for real 384-dim semantic
+  embeddings via the callback embedder
+- Provides a search box with unified query DSL support:
+  - Lexical: `rust`, `title:wasm`, `"memory safety"`
+  - Vector: `embedding:~"how to make code faster"`
+  - Hybrid: `rust embedding:~"systems programming"`
 - Allows adding new documents interactively
 - Shows search results with relevance scores
 - Logs all operations in the console panel
