@@ -568,7 +568,16 @@ jobs:
     name: Test All
     if: ${{ !failure() && !cancelled() }}
     needs:
-      [test-laurus, test-cli, test-server, test-mcp, test-python, test-nodejs, test-wasm, test-ruby]
+      [
+        test-laurus,
+        test-cli,
+        test-server,
+        test-mcp,
+        test-python,
+        test-nodejs,
+        test-wasm,
+        test-ruby,
+      ]
     runs-on: ubuntu-latest
     steps:
       - name: All tests passed
