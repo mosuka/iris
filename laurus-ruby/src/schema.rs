@@ -1,0 +1,536 @@
+//! Ruby wrapper for the Laurus [`Schema`] type.
+
+use std::cell::RefCell;
+
+use laurus::{
+    BooleanOption, BytesOption, DateTimeOption, DistanceMetric, EmbedderDefinition, FieldOption,
+    FloatOption, GeoOption, HnswOption, IntegerOption, IvfOption, Schema, TextOption,
+};
+use magnus::prelude::*;
+use magnus::scan_args::{get_kwargs, scan_args};
+use magnus::{Error, RArray, RHash, RModule, Ruby, Value};
+
+/// Parse a distance metric string into [`DistanceMetric`].
+fn parse_distance(s: &str) -> Result<DistanceMetric, Error> {
+    let ruby = Ruby::get().expect("called from Ruby thread");
+    match s.to_lowercase().as_str() {
+        "cosine" => Ok(DistanceMetric::Cosine),
+        "euclidean" => Ok(DistanceMetric::Euclidean),
+        "dot_product" | "dot" => Ok(DistanceMetric::DotProduct),
+        "manhattan" => Ok(DistanceMetric::Manhattan),
+        "angular" => Ok(DistanceMetric::Angular),
+        other => Err(Error::new(
+            ruby.exception_arg_error(),
+            format!(
+                "Unknown distance metric: '{}'. Valid: cosine, euclidean, dot_product, manhattan, angular",
+                other
+            ),
+        )),
+    }
+}
+
+/// Ruby-facing schema builder (`Laurus::Schema`).
+///
+/// Uses `RefCell` for interior mutability since magnus methods receive `&self`.
+#[magnus::wrap(class = "Laurus::Schema")]
+pub struct RbSchema {
+    pub inner: RefCell<Schema>,
+}
+
+impl RbSchema {
+    /// Create a new empty schema.
+    fn new() -> Self {
+        Self {
+            inner: RefCell::new(Schema::new()),
+        }
+    }
+
+    /// Add a full-text searchable text field.
+    ///
+    /// # Arguments
+    ///
+    /// * `args` - Positional and keyword arguments:
+    ///   - `name` (String): Field name.
+    ///   - `stored:` (bool, default true): Whether the original value is retrievable.
+    ///   - `indexed:` (bool, default true): Whether the field is searchable.
+    ///   - `term_vectors:` (bool, default false): Whether term position information is stored.
+    ///   - `analyzer:` (String, optional): Named analyzer to use.
+    fn add_text_field(&self, args: &[Value]) -> Result<(), Error> {
+        let args = scan_args::<(String,), (), (), (), RHash, ()>(args)?;
+        let (name,) = args.required;
+        let kwargs = get_kwargs::<
+            _,
+            (),
+            (
+                Option<bool>,
+                Option<bool>,
+                Option<bool>,
+                Option<Option<String>>,
+            ),
+            (),
+        >(
+            args.keywords,
+            &[],
+            &["stored", "indexed", "term_vectors", "analyzer"],
+        )?;
+        let (stored, indexed, term_vectors, analyzer) = kwargs.optional;
+        let stored = stored.unwrap_or(true);
+        let indexed = indexed.unwrap_or(true);
+        let term_vectors = term_vectors.unwrap_or(false);
+        let analyzer = analyzer.flatten();
+        self.inner.borrow_mut().fields.insert(
+            name,
+            FieldOption::Text(TextOption {
+                indexed,
+                stored,
+                term_vectors,
+                analyzer,
+            }),
+        );
+        Ok(())
+    }
+
+    /// Add an integer (i64) field.
+    ///
+    /// # Arguments
+    ///
+    /// * `args` - Positional and keyword arguments:
+    ///   - `name` (String): Field name.
+    ///   - `stored:` (bool, default true): Whether the value is retrievable.
+    ///   - `indexed:` (bool, default true): Whether the field is searchable.
+    fn add_integer_field(&self, args: &[Value]) -> Result<(), Error> {
+        let args = scan_args::<(String,), (), (), (), RHash, ()>(args)?;
+        let (name,) = args.required;
+        let kwargs = get_kwargs::<_, (), (Option<bool>, Option<bool>), ()>(
+            args.keywords,
+            &[],
+            &["stored", "indexed"],
+        )?;
+        let (stored, indexed) = kwargs.optional;
+        self.inner.borrow_mut().fields.insert(
+            name,
+            FieldOption::Integer(IntegerOption {
+                indexed: indexed.unwrap_or(true),
+                stored: stored.unwrap_or(true),
+            }),
+        );
+        Ok(())
+    }
+
+    /// Add a float (f64) field.
+    ///
+    /// # Arguments
+    ///
+    /// * `args` - Positional and keyword arguments:
+    ///   - `name` (String): Field name.
+    ///   - `stored:` (bool, default true): Whether the value is retrievable.
+    ///   - `indexed:` (bool, default true): Whether the field is searchable.
+    fn add_float_field(&self, args: &[Value]) -> Result<(), Error> {
+        let args = scan_args::<(String,), (), (), (), RHash, ()>(args)?;
+        let (name,) = args.required;
+        let kwargs = get_kwargs::<_, (), (Option<bool>, Option<bool>), ()>(
+            args.keywords,
+            &[],
+            &["stored", "indexed"],
+        )?;
+        let (stored, indexed) = kwargs.optional;
+        self.inner.borrow_mut().fields.insert(
+            name,
+            FieldOption::Float(FloatOption {
+                indexed: indexed.unwrap_or(true),
+                stored: stored.unwrap_or(true),
+            }),
+        );
+        Ok(())
+    }
+
+    /// Add a boolean field.
+    ///
+    /// # Arguments
+    ///
+    /// * `args` - Positional and keyword arguments:
+    ///   - `name` (String): Field name.
+    ///   - `stored:` (bool, default true): Whether the value is retrievable.
+    ///   - `indexed:` (bool, default true): Whether the field is searchable.
+    fn add_boolean_field(&self, args: &[Value]) -> Result<(), Error> {
+        let args = scan_args::<(String,), (), (), (), RHash, ()>(args)?;
+        let (name,) = args.required;
+        let kwargs = get_kwargs::<_, (), (Option<bool>, Option<bool>), ()>(
+            args.keywords,
+            &[],
+            &["stored", "indexed"],
+        )?;
+        let (stored, indexed) = kwargs.optional;
+        self.inner.borrow_mut().fields.insert(
+            name,
+            FieldOption::Boolean(BooleanOption {
+                indexed: indexed.unwrap_or(true),
+                stored: stored.unwrap_or(true),
+            }),
+        );
+        Ok(())
+    }
+
+    /// Add a date/time field.
+    ///
+    /// # Arguments
+    ///
+    /// * `args` - Positional and keyword arguments:
+    ///   - `name` (String): Field name.
+    ///   - `stored:` (bool, default true): Whether the value is retrievable.
+    ///   - `indexed:` (bool, default true): Whether the field is searchable.
+    fn add_datetime_field(&self, args: &[Value]) -> Result<(), Error> {
+        let args = scan_args::<(String,), (), (), (), RHash, ()>(args)?;
+        let (name,) = args.required;
+        let kwargs = get_kwargs::<_, (), (Option<bool>, Option<bool>), ()>(
+            args.keywords,
+            &[],
+            &["stored", "indexed"],
+        )?;
+        let (stored, indexed) = kwargs.optional;
+        self.inner.borrow_mut().fields.insert(
+            name,
+            FieldOption::DateTime(DateTimeOption {
+                indexed: indexed.unwrap_or(true),
+                stored: stored.unwrap_or(true),
+            }),
+        );
+        Ok(())
+    }
+
+    /// Add a geographic coordinate field (latitude, longitude).
+    ///
+    /// # Arguments
+    ///
+    /// * `args` - Positional and keyword arguments:
+    ///   - `name` (String): Field name.
+    ///   - `stored:` (bool, default true): Whether the value is retrievable.
+    ///   - `indexed:` (bool, default true): Whether the field is searchable.
+    fn add_geo_field(&self, args: &[Value]) -> Result<(), Error> {
+        let args = scan_args::<(String,), (), (), (), RHash, ()>(args)?;
+        let (name,) = args.required;
+        let kwargs = get_kwargs::<_, (), (Option<bool>, Option<bool>), ()>(
+            args.keywords,
+            &[],
+            &["stored", "indexed"],
+        )?;
+        let (stored, indexed) = kwargs.optional;
+        self.inner.borrow_mut().fields.insert(
+            name,
+            FieldOption::Geo(GeoOption {
+                indexed: indexed.unwrap_or(true),
+                stored: stored.unwrap_or(true),
+            }),
+        );
+        Ok(())
+    }
+
+    /// Add a binary data field.
+    ///
+    /// # Arguments
+    ///
+    /// * `args` - Positional and keyword arguments:
+    ///   - `name` (String): Field name.
+    ///   - `stored:` (bool, default true): Whether the value is retrievable.
+    fn add_bytes_field(&self, args: &[Value]) -> Result<(), Error> {
+        let args = scan_args::<(String,), (), (), (), RHash, ()>(args)?;
+        let (name,) = args.required;
+        let kwargs = get_kwargs::<_, (), (Option<bool>,), ()>(args.keywords, &[], &["stored"])?;
+        let (stored,) = kwargs.optional;
+        self.inner.borrow_mut().fields.insert(
+            name,
+            FieldOption::Bytes(BytesOption {
+                stored: stored.unwrap_or(true),
+            }),
+        );
+        Ok(())
+    }
+
+    /// Add an HNSW approximate nearest-neighbor vector index field.
+    ///
+    /// # Arguments
+    ///
+    /// * `args` - Positional and keyword arguments:
+    ///   - `name` (String): Field name.
+    ///   - `dimension` (usize): Vector dimensionality.
+    ///   - `distance:` (String, default "cosine"): Distance metric.
+    ///   - `m:` (usize, default 16): HNSW branching factor.
+    ///   - `ef_construction:` (usize, default 200): Build-time expansion factor.
+    ///   - `embedder:` (String, optional): Embedder name registered via `add_embedder`.
+    fn add_hnsw_field(&self, args: &[Value]) -> Result<(), Error> {
+        let args = scan_args::<(String, usize), (), (), (), RHash, ()>(args)?;
+        let (name, dimension) = args.required;
+        let kwargs = get_kwargs::<
+            _,
+            (),
+            (
+                Option<String>,
+                Option<usize>,
+                Option<usize>,
+                Option<Option<String>>,
+            ),
+            (),
+        >(
+            args.keywords,
+            &[],
+            &["distance", "m", "ef_construction", "embedder"],
+        )?;
+        let (distance, m, ef_construction, embedder) = kwargs.optional;
+        let distance_str = distance.as_deref().unwrap_or("cosine");
+        let opt = HnswOption {
+            dimension,
+            distance: parse_distance(distance_str)?,
+            m: m.unwrap_or(16),
+            ef_construction: ef_construction.unwrap_or(200),
+            embedder: embedder.flatten(),
+            ..Default::default()
+        };
+        self.inner
+            .borrow_mut()
+            .fields
+            .insert(name, FieldOption::Hnsw(opt));
+        Ok(())
+    }
+
+    /// Add a flat (brute-force) vector index field.
+    ///
+    /// # Arguments
+    ///
+    /// * `args` - Positional and keyword arguments:
+    ///   - `name` (String): Field name.
+    ///   - `dimension` (usize): Vector dimensionality.
+    ///   - `distance:` (String, default "cosine"): Distance metric.
+    ///   - `embedder:` (String, optional): Embedder name registered via `add_embedder`.
+    fn add_flat_field(&self, args: &[Value]) -> Result<(), Error> {
+        let args = scan_args::<(String, usize), (), (), (), RHash, ()>(args)?;
+        let (name, dimension) = args.required;
+        let kwargs = get_kwargs::<_, (), (Option<String>, Option<Option<String>>), ()>(
+            args.keywords,
+            &[],
+            &["distance", "embedder"],
+        )?;
+        let (distance, embedder) = kwargs.optional;
+        let distance_str = distance.as_deref().unwrap_or("cosine");
+        let opt = laurus::FlatOption {
+            dimension,
+            distance: parse_distance(distance_str)?,
+            embedder: embedder.flatten(),
+            ..Default::default()
+        };
+        self.inner
+            .borrow_mut()
+            .fields
+            .insert(name, FieldOption::Flat(opt));
+        Ok(())
+    }
+
+    /// Add an IVF (Inverted File Index) approximate nearest-neighbor vector field.
+    ///
+    /// # Arguments
+    ///
+    /// * `args` - Positional and keyword arguments:
+    ///   - `name` (String): Field name.
+    ///   - `dimension` (usize): Vector dimensionality.
+    ///   - `distance:` (String, default "cosine"): Distance metric.
+    ///   - `n_clusters:` (usize, default 100): Number of Voronoi clusters.
+    ///   - `n_probe:` (usize, default 1): Number of clusters to probe at search time.
+    ///   - `embedder:` (String, optional): Embedder name registered via `add_embedder`.
+    fn add_ivf_field(&self, args: &[Value]) -> Result<(), Error> {
+        let args = scan_args::<(String, usize), (), (), (), RHash, ()>(args)?;
+        let (name, dimension) = args.required;
+        let kwargs = get_kwargs::<
+            _,
+            (),
+            (
+                Option<String>,
+                Option<usize>,
+                Option<usize>,
+                Option<Option<String>>,
+            ),
+            (),
+        >(
+            args.keywords,
+            &[],
+            &["distance", "n_clusters", "n_probe", "embedder"],
+        )?;
+        let (distance, n_clusters, n_probe, embedder) = kwargs.optional;
+        let distance_str = distance.as_deref().unwrap_or("cosine");
+        let opt = IvfOption {
+            dimension,
+            distance: parse_distance(distance_str)?,
+            n_clusters: n_clusters.unwrap_or(100),
+            n_probe: n_probe.unwrap_or(1),
+            embedder: embedder.flatten(),
+            ..Default::default()
+        };
+        self.inner
+            .borrow_mut()
+            .fields
+            .insert(name, FieldOption::Ivf(opt));
+        Ok(())
+    }
+
+    /// Register a named embedder definition in the schema.
+    ///
+    /// The `config` Hash must have a `"type"` key selecting the backend:
+    ///
+    /// | type              | required keys | feature flag            |
+    /// |-------------------|---------------|-------------------------|
+    /// | `"precomputed"`   | —             | (always available)      |
+    /// | `"candle_bert"`   | `"model"`     | `embeddings-candle`     |
+    /// | `"candle_clip"`   | `"model"`     | `embeddings-multimodal` |
+    /// | `"openai"`        | `"model"`     | `embeddings-openai`     |
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - Unique embedder name referenced from vector fields.
+    /// * `config` - Hash describing the embedder.
+    fn add_embedder(&self, name: String, config: RHash) -> Result<(), Error> {
+        let ruby = Ruby::get().expect("called from Ruby thread");
+        let embedder_type: Option<Value> = config.get(ruby.str_new("type"));
+        let embedder_type: String = embedder_type
+            .ok_or_else(|| {
+                Error::new(
+                    ruby.exception_arg_error(),
+                    "embedder config must have a 'type' key",
+                )
+            })
+            .and_then(magnus::TryConvert::try_convert)?;
+
+        let definition = match embedder_type.as_str() {
+            "precomputed" => EmbedderDefinition::Precomputed,
+            "candle_bert" => {
+                let model_val: Option<Value> = config.get(ruby.str_new("model"));
+                let model: String = model_val
+                    .ok_or_else(|| {
+                        Error::new(
+                            ruby.exception_arg_error(),
+                            "candle_bert embedder requires a 'model' key",
+                        )
+                    })
+                    .and_then(magnus::TryConvert::try_convert)?;
+                EmbedderDefinition::CandleBert { model }
+            }
+            "candle_clip" => {
+                let model_val: Option<Value> = config.get(ruby.str_new("model"));
+                let model: String = model_val
+                    .ok_or_else(|| {
+                        Error::new(
+                            ruby.exception_arg_error(),
+                            "candle_clip embedder requires a 'model' key",
+                        )
+                    })
+                    .and_then(magnus::TryConvert::try_convert)?;
+                EmbedderDefinition::CandleClip { model }
+            }
+            "openai" => {
+                let model_val: Option<Value> = config.get(ruby.str_new("model"));
+                let model: String = model_val
+                    .ok_or_else(|| {
+                        Error::new(
+                            ruby.exception_arg_error(),
+                            "openai embedder requires a 'model' key",
+                        )
+                    })
+                    .and_then(magnus::TryConvert::try_convert)?;
+                EmbedderDefinition::Openai { model }
+            }
+            other => {
+                return Err(Error::new(
+                    ruby.exception_arg_error(),
+                    format!(
+                        "Unknown embedder type: '{}'. Valid types: precomputed, candle_bert, candle_clip, openai",
+                        other
+                    ),
+                ));
+            }
+        };
+
+        self.inner.borrow_mut().embedders.insert(name, definition);
+        Ok(())
+    }
+
+    /// Set the default fields used when no field is specified in a query.
+    ///
+    /// # Arguments
+    ///
+    /// * `fields` - Array of field name strings.
+    fn set_default_fields(&self, fields: RArray) -> Result<(), Error> {
+        let field_names: Vec<String> = fields.to_vec()?;
+        self.inner.borrow_mut().default_fields = field_names;
+        Ok(())
+    }
+
+    /// Return the list of field names defined in this schema.
+    fn field_names(&self) -> Vec<String> {
+        self.inner.borrow().fields.keys().cloned().collect()
+    }
+
+    /// Return a string representation of this schema.
+    fn inspect(&self) -> String {
+        format!(
+            "Schema(fields={:?})",
+            self.inner.borrow().fields.keys().collect::<Vec<_>>()
+        )
+    }
+}
+
+/// Register the `Laurus::Schema` class and its methods.
+///
+/// # Arguments
+///
+/// * `ruby` - Ruby interpreter handle.
+/// * `module` - The `Laurus` module to define the class under.
+pub fn define(ruby: &Ruby, module: &RModule) -> Result<(), Error> {
+    let class = module.define_class("Schema", ruby.class_object())?;
+    class.define_singleton_method("new", magnus::function!(RbSchema::new, 0))?;
+    class.define_method(
+        "add_text_field",
+        magnus::method!(RbSchema::add_text_field, -1),
+    )?;
+    class.define_method(
+        "add_integer_field",
+        magnus::method!(RbSchema::add_integer_field, -1),
+    )?;
+    class.define_method(
+        "add_float_field",
+        magnus::method!(RbSchema::add_float_field, -1),
+    )?;
+    class.define_method(
+        "add_boolean_field",
+        magnus::method!(RbSchema::add_boolean_field, -1),
+    )?;
+    class.define_method(
+        "add_datetime_field",
+        magnus::method!(RbSchema::add_datetime_field, -1),
+    )?;
+    class.define_method(
+        "add_geo_field",
+        magnus::method!(RbSchema::add_geo_field, -1),
+    )?;
+    class.define_method(
+        "add_bytes_field",
+        magnus::method!(RbSchema::add_bytes_field, -1),
+    )?;
+    class.define_method(
+        "add_hnsw_field",
+        magnus::method!(RbSchema::add_hnsw_field, -1),
+    )?;
+    class.define_method(
+        "add_flat_field",
+        magnus::method!(RbSchema::add_flat_field, -1),
+    )?;
+    class.define_method(
+        "add_ivf_field",
+        magnus::method!(RbSchema::add_ivf_field, -1),
+    )?;
+    class.define_method("add_embedder", magnus::method!(RbSchema::add_embedder, 2))?;
+    class.define_method(
+        "set_default_fields",
+        magnus::method!(RbSchema::set_default_fields, 1),
+    )?;
+    class.define_method("field_names", magnus::method!(RbSchema::field_names, 0))?;
+    class.define_method("inspect", magnus::method!(RbSchema::inspect, 0))?;
+    class.define_method("to_s", magnus::method!(RbSchema::inspect, 0))?;
+    Ok(())
+}

@@ -1,0 +1,188 @@
+//! Conversions between Ruby values and Laurus types.
+
+use chrono::{DateTime, Utc};
+use laurus::{DataValue, Document};
+use magnus::prelude::*;
+use magnus::r_hash::ForEach;
+use magnus::{Error, RArray, RHash, RString, Ruby, Symbol, Value};
+
+/// Convert a Ruby `Hash` to a [`Document`].
+///
+/// Each key must be a `String` or `Symbol`; values are converted via
+/// [`rb_to_data_value`].
+///
+/// # Arguments
+///
+/// * `ruby` - Ruby interpreter handle.
+/// * `hash` - Ruby Hash mapping field names to values.
+///
+/// # Returns
+///
+/// A `Document` with fields populated from the Hash.
+pub fn hash_to_document(ruby: &Ruby, hash: RHash) -> Result<Document, Error> {
+    let mut builder = Document::builder();
+    hash.foreach(|key: Value, value: Value| {
+        let field: String = if key.is_kind_of(ruby.class_symbol()) {
+            let sym = Symbol::from_value(key)
+                .ok_or_else(|| Error::new(ruby.exception_type_error(), "expected Symbol key"))?;
+            sym.name()?.to_string()
+        } else {
+            let s = RString::from_value(key).ok_or_else(|| {
+                Error::new(
+                    ruby.exception_type_error(),
+                    "hash key must be String or Symbol",
+                )
+            })?;
+            s.to_string()?
+        };
+        let dv = rb_to_data_value(ruby, value)?;
+        builder = std::mem::take(&mut builder).add_field(&field, dv);
+        Ok(ForEach::Continue)
+    })?;
+    Ok(builder.build())
+}
+
+/// Convert a Ruby value to a [`DataValue`].
+///
+/// # Type mapping
+///
+/// | Ruby type                     | DataValue variant    |
+/// |-------------------------------|----------------------|
+/// | `nil`                         | `Null`               |
+/// | `true` / `false`              | `Bool`               |
+/// | `Integer`                     | `Int64`              |
+/// | `Float`                       | `Float64`            |
+/// | `String`                      | `Text`               |
+/// | `Array` of numerics           | `Vector`             |
+/// | `Hash` with `"lat"`, `"lon"`  | `Geo`                |
+/// | `Time` / ISO 8601 string      | `DateTime`           |
+///
+/// # Arguments
+///
+/// * `ruby` - Ruby interpreter handle.
+/// * `value` - Arbitrary Ruby value to convert.
+///
+/// # Returns
+///
+/// The corresponding `DataValue`, or an error if the type is unsupported.
+pub fn rb_to_data_value(ruby: &Ruby, value: Value) -> Result<DataValue, Error> {
+    // nil → Null
+    if value.is_nil() {
+        return Ok(DataValue::Null);
+    }
+    // bool must come before Integer (Ruby true/false are not Integer)
+    if value.is_kind_of(ruby.class_true_class()) || value.is_kind_of(ruby.class_false_class()) {
+        let b: bool = magnus::TryConvert::try_convert(value)?;
+        return Ok(DataValue::Bool(b));
+    }
+    // Integer → Int64
+    if value.is_kind_of(ruby.class_integer()) {
+        let i: i64 = magnus::TryConvert::try_convert(value)?;
+        return Ok(DataValue::Int64(i));
+    }
+    // Float → Float64
+    if value.is_kind_of(ruby.class_float()) {
+        let f: f64 = magnus::TryConvert::try_convert(value)?;
+        return Ok(DataValue::Float64(f));
+    }
+    // String → Text
+    if value.is_kind_of(ruby.class_string()) {
+        let s: String = magnus::TryConvert::try_convert(value)?;
+        return Ok(DataValue::Text(s));
+    }
+    // Array → Vector (array of numerics) or check for Geo hash below
+    if value.is_kind_of(ruby.class_array()) {
+        let arr = RArray::from_value(value)
+            .ok_or_else(|| Error::new(ruby.exception_type_error(), "expected Array"))?;
+        let vec: Vec<f32> = arr.to_vec()?;
+        return Ok(DataValue::Vector(vec));
+    }
+    // Hash with "lat"/"lon" → Geo
+    if value.is_kind_of(ruby.class_hash()) {
+        let hash = RHash::from_value(value)
+            .ok_or_else(|| Error::new(ruby.exception_type_error(), "expected Hash"))?;
+        let lat_val: Option<Value> = hash.get(ruby.str_new("lat"));
+        let lon_val: Option<Value> = hash.get(ruby.str_new("lon"));
+        if let (Some(lat_v), Some(lon_v)) = (lat_val, lon_val) {
+            let lat: f64 = magnus::TryConvert::try_convert(lat_v)?;
+            let lon: f64 = magnus::TryConvert::try_convert(lon_v)?;
+            return Ok(DataValue::Geo(lat, lon));
+        }
+        return Err(Error::new(
+            ruby.exception_arg_error(),
+            "Hash must have 'lat' and 'lon' keys for Geo conversion",
+        ));
+    }
+    // Try Time → DateTime (call .iso8601 or .to_s)
+    if let Ok(s) = value.funcall::<_, _, String>("iso8601", ())
+        && let Ok(dt) = s.parse::<DateTime<Utc>>()
+    {
+        return Ok(DataValue::DateTime(dt));
+    }
+
+    Err(Error::new(
+        ruby.exception_type_error(),
+        format!(
+            "cannot convert Ruby value of type {} to DataValue",
+            value.class()
+        ),
+    ))
+}
+
+/// Convert a [`Document`] to a Ruby `Hash`.
+///
+/// # Arguments
+///
+/// * `ruby` - Ruby interpreter handle.
+/// * `doc` - Document to convert.
+///
+/// # Returns
+///
+/// A Ruby Hash mapping field names to Ruby values.
+pub fn document_to_hash(ruby: &Ruby, doc: &Document) -> Result<RHash, Error> {
+    let hash = ruby.hash_new();
+    for (field, value) in &doc.fields {
+        let rb_value = data_value_to_rb(ruby, value)?;
+        hash.aset(ruby.str_new(field), rb_value)?;
+    }
+    Ok(hash)
+}
+
+/// Convert a [`DataValue`] to a Ruby value.
+///
+/// # Arguments
+///
+/// * `ruby` - Ruby interpreter handle.
+/// * `value` - DataValue to convert.
+///
+/// # Returns
+///
+/// The corresponding Ruby value.
+pub fn data_value_to_rb(ruby: &Ruby, value: &DataValue) -> Result<Value, Error> {
+    match value {
+        DataValue::Null => Ok(ruby.qnil().as_value()),
+        DataValue::Bool(b) => Ok(if *b {
+            ruby.qtrue().as_value()
+        } else {
+            ruby.qfalse().as_value()
+        }),
+        DataValue::Int64(i) => Ok(ruby.integer_from_i64(*i).as_value()),
+        DataValue::Float64(f) => Ok(ruby.float_from_f64(*f).as_value()),
+        DataValue::Text(s) => Ok(ruby.str_new(s).as_value()),
+        DataValue::Bytes(b, _mime) => Ok(ruby.str_from_slice(b).as_value()),
+        DataValue::Vector(v) => {
+            let arr = ruby.ary_new_capa(v.len());
+            for &f in v {
+                arr.push(ruby.float_from_f64(f as f64))?;
+            }
+            Ok(arr.as_value())
+        }
+        DataValue::DateTime(dt) => Ok(ruby.str_new(&dt.to_rfc3339()).as_value()),
+        DataValue::Geo(lat, lon) => {
+            let hash = ruby.hash_new();
+            hash.aset(ruby.str_new("lat"), ruby.float_from_f64(*lat))?;
+            hash.aset(ruby.str_new("lon"), ruby.float_from_f64(*lon))?;
+            Ok(hash.as_value())
+        }
+    }
+}

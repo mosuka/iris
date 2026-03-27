@@ -87,6 +87,14 @@
   - [API リファレンス](laurus-wasm/api_reference.md)
   - [開発](laurus-wasm/development.md)
 
+# laurus-ruby
+
+- [Ruby バインディング概要](laurus-ruby.md)
+  - [インストール](laurus-ruby/installation.md)
+  - [クイックスタート](laurus-ruby/quickstart.md)
+  - [API リファレンス](laurus-ruby/api_reference.md)
+  - [開発](laurus-ruby/development.md)
+
 # 開発ガイド
 
 - [ビルドとテスト](development/build_and_test.md)

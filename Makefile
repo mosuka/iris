@@ -60,6 +60,9 @@ format-laurus-nodejs: ## Format laurus-nodejs
 format-laurus-wasm: ## Format laurus-wasm
 	cargo fmt -p laurus-wasm
 
+format-laurus-ruby: ## Format laurus-ruby
+	cargo fmt -p laurus-ruby
+
 # ── Lint ───────────────────────────────────────────────────────────────────
 
 lint: ## Lint all crates
@@ -86,6 +89,9 @@ lint-laurus-nodejs: ## Lint laurus-nodejs
 lint-laurus-wasm: ## Lint laurus-wasm (wasm32 target)
 	cargo clippy -p laurus-wasm --target wasm32-unknown-unknown -- -D warnings
 
+lint-laurus-ruby: ## Lint laurus-ruby
+	cargo clippy -p laurus-ruby -- -D warnings
+
 # ── Test ───────────────────────────────────────────────────────────────────
 
 test: ## Test all crates
@@ -109,6 +115,10 @@ test-laurus-python: venv ## Test laurus-python (Rust unit tests + Python pytest)
 
 test-laurus-nodejs: ## Test laurus-nodejs
 	cd laurus-nodejs && npm run build:debug && npm test
+
+test-laurus-ruby: ## Test laurus-ruby (Rust unit tests + Ruby minitest)
+	cargo test -p laurus-ruby
+	cd laurus-ruby && bundle install --quiet && bundle exec rake compile && bundle exec ruby -Ilib -Itest -e 'Dir["test/test_*.rb"].each { |f| require_relative f }'
 
 test-laurus-wasm: ## Build-test laurus-wasm (wasm32 target)
 	cargo build -p laurus-wasm --target wasm32-unknown-unknown
@@ -135,6 +145,9 @@ build-laurus-python: venv ## Build laurus-python wheel (release)
 
 build-laurus-nodejs: ## Build laurus-nodejs (release)
 	cd laurus-nodejs && npm run build
+
+build-laurus-ruby: ## Build laurus-ruby gem (release)
+	cd laurus-ruby && bundle install --quiet && bundle exec rake compile
 
 build-laurus-wasm: ## Build laurus-wasm (wasm-pack, --target web)
 	cd laurus-wasm && wasm-pack build --target web --release

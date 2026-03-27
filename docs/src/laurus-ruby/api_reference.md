@@ -1,0 +1,314 @@
+# API Reference
+
+## Index
+
+The primary entry point. Wraps the Laurus search engine.
+
+```ruby
+Laurus::Index.new(path: nil, schema: nil)
+```
+
+### Constructor
+
+| Parameter | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `path:` | `String \| nil` | `nil` | Directory path for persistent storage. `nil` creates an in-memory index. |
+| `schema:` | `Schema \| nil` | `nil` | Schema definition. An empty schema is used when omitted. |
+
+### Methods
+
+| Method | Description |
+| :--- | :--- |
+| `put_document(id, doc)` | Upsert a document. Replaces all existing versions with the same ID. |
+| `add_document(id, doc)` | Append a document chunk without removing existing versions. |
+| `get_documents(id) -> Array<Hash>` | Return all stored versions for the given ID. |
+| `delete_documents(id)` | Delete all versions for the given ID. |
+| `commit` | Flush buffered writes and make all pending changes searchable. |
+| `search(query, limit: 10, offset: 0) -> Array<SearchResult>` | Execute a search query. |
+| `stats -> Hash` | Return index statistics (`"document_count"`, `"vector_fields"`). |
+
+### `search` query argument
+
+The `query` parameter accepts any of the following:
+
+- A **DSL string** (e.g. `"title:hello"`, `"embedding:\"memory safety\""`)
+- A **lexical query object** (`TermQuery`, `PhraseQuery`, `BooleanQuery`, ...)
+- A **vector query object** (`VectorQuery`, `VectorTextQuery`)
+- A **`SearchRequest`** for full control
+
+---
+
+## Schema
+
+Defines the fields and index types for an `Index`.
+
+```ruby
+Laurus::Schema.new
+```
+
+### Field methods
+
+| Method | Description |
+| :--- | :--- |
+| `add_text_field(name, stored: true, indexed: true, term_vectors: false, analyzer: nil)` | Full-text field (inverted index, BM25). |
+| `add_integer_field(name, stored: true, indexed: true)` | 64-bit integer field. |
+| `add_float_field(name, stored: true, indexed: true)` | 64-bit float field. |
+| `add_boolean_field(name, stored: true, indexed: true)` | Boolean field. |
+| `add_bytes_field(name, stored: true)` | Raw bytes field. |
+| `add_geo_field(name, stored: true, indexed: true)` | Geographic coordinate field (lat/lon). |
+| `add_datetime_field(name, stored: true, indexed: true)` | UTC datetime field. |
+| `add_hnsw_field(name, dimension, distance: "cosine", m: 16, ef_construction: 200, embedder: nil)` | HNSW approximate nearest-neighbor vector field. |
+| `add_flat_field(name, dimension, distance: "cosine", embedder: nil)` | Flat (brute-force) vector field. |
+| `add_ivf_field(name, dimension, distance: "cosine", n_clusters: 100, n_probe: 1, embedder: nil)` | IVF approximate nearest-neighbor vector field. |
+
+### Other methods
+
+| Method | Description |
+| :--- | :--- |
+| `add_embedder(name, config)` | Register a named embedder definition. `config` is a Hash with a `"type"` key (see below). |
+| `set_default_fields(fields)` | Set the default fields used when no field is specified in a query. `fields` is an Array of Strings. |
+| `field_names -> Array<String>` | Return the list of field names defined in this schema. |
+
+### Embedder types
+
+| `"type"` | Required keys | Feature flag |
+| :--- | :--- | :--- |
+| `"precomputed"` | -- | (always available) |
+| `"candle_bert"` | `"model"` | `embeddings-candle` |
+| `"candle_clip"` | `"model"` | `embeddings-multimodal` |
+| `"openai"` | `"model"` | `embeddings-openai` |
+
+### Distance metrics
+
+| Value | Description |
+| :--- | :--- |
+| `"cosine"` | Cosine similarity (default) |
+| `"euclidean"` | Euclidean distance |
+| `"dot_product"` | Dot product |
+| `"manhattan"` | Manhattan distance |
+| `"angular"` | Angular distance |
+
+---
+
+## Query classes
+
+### TermQuery
+
+```ruby
+Laurus::TermQuery.new(field, term)
+```
+
+Matches documents containing the exact term in the given field.
+
+### PhraseQuery
+
+```ruby
+Laurus::PhraseQuery.new(field, terms)
+```
+
+Matches documents containing the terms in order. `terms` is an Array of Strings.
+
+### FuzzyQuery
+
+```ruby
+Laurus::FuzzyQuery.new(field, term, max_edits: 2)
+```
+
+Approximate match allowing up to `max_edits` edit-distance errors.
+
+### WildcardQuery
+
+```ruby
+Laurus::WildcardQuery.new(field, pattern)
+```
+
+Pattern match. `*` matches any sequence of characters, `?` matches any single character.
+
+### NumericRangeQuery
+
+```ruby
+Laurus::NumericRangeQuery.new(field, min: nil, max: nil)
+```
+
+Matches numeric values in the range `[min, max]`. Pass `nil` for an open bound. The type (integer or float) is inferred from the Ruby type of `min`/`max`.
+
+### GeoQuery
+
+```ruby
+# Radius search
+Laurus::GeoQuery.within_radius(field, lat, lon, distance_km)
+
+# Bounding box search
+Laurus::GeoQuery.within_bounding_box(field, min_lat, min_lon, max_lat, max_lon)
+```
+
+`within_radius` returns documents whose coordinate is within `distance_km` of the given point. `within_bounding_box` returns documents within the specified bounding box.
+
+### BooleanQuery
+
+```ruby
+bq = Laurus::BooleanQuery.new
+bq.must(query)
+bq.should(query)
+bq.must_not(query)
+```
+
+Compound boolean query. `must` clauses all have to match; at least one `should` clause must match; `must_not` clauses must not match.
+
+### SpanQuery
+
+```ruby
+# Single term
+Laurus::SpanQuery.term(field, term)
+
+# Near: terms within slop positions
+Laurus::SpanQuery.near(field, terms, slop: 0, ordered: true)
+
+# Near with nested SpanQuery clauses
+Laurus::SpanQuery.near_spans(field, clauses, slop: 0, ordered: true)
+
+# Containing: big span contains little span
+Laurus::SpanQuery.containing(field, big, little)
+
+# Within: include span within exclude span at max distance
+Laurus::SpanQuery.within(field, include_span, exclude_span, distance)
+```
+
+Positional / proximity span queries. `near` takes an Array of term Strings, while `near_spans` takes an Array of `SpanQuery` objects for nested expressions.
+
+### VectorQuery
+
+```ruby
+Laurus::VectorQuery.new(field, vector)
+```
+
+Approximate nearest-neighbor search using a pre-computed embedding vector. `vector` is an Array of Floats.
+
+### VectorTextQuery
+
+```ruby
+Laurus::VectorTextQuery.new(field, text)
+```
+
+Converts `text` to an embedding at query time and runs vector search. Requires an embedder configured on the index.
+
+---
+
+## SearchRequest
+
+Full-featured search request for advanced control.
+
+```ruby
+Laurus::SearchRequest.new(
+  query: nil,
+  lexical_query: nil,
+  vector_query: nil,
+  filter_query: nil,
+  fusion: nil,
+  limit: 10,
+  offset: 0,
+)
+```
+
+| Parameter | Description |
+| :--- | :--- |
+| `query:` | A DSL string or single query object. Mutually exclusive with `lexical_query:` / `vector_query:`. |
+| `lexical_query:` | Lexical component for explicit hybrid search. |
+| `vector_query:` | Vector component for explicit hybrid search. |
+| `filter_query:` | Lexical filter applied after scoring. |
+| `fusion:` | Fusion algorithm (`RRF` or `WeightedSum`). Defaults to `RRF(k: 60)` when both components are set. |
+| `limit:` | Maximum number of results (default 10). |
+| `offset:` | Pagination offset (default 0). |
+
+---
+
+## SearchResult
+
+Returned by `Index#search`.
+
+```ruby
+result.id        # => String   -- External document identifier
+result.score     # => Float    -- Relevance score
+result.document  # => Hash|nil -- Retrieved field values, or nil if deleted
+```
+
+---
+
+## Fusion algorithms
+
+### RRF
+
+```ruby
+Laurus::RRF.new(k: 60.0)
+```
+
+Reciprocal Rank Fusion. Merges lexical and vector result lists by rank position. `k` is a smoothing constant; higher values reduce the influence of top-ranked results.
+
+### WeightedSum
+
+```ruby
+Laurus::WeightedSum.new(lexical_weight: 0.5, vector_weight: 0.5)
+```
+
+Normalises both score lists independently, then combines them as `lexical_weight * lexical_score + vector_weight * vector_score`.
+
+---
+
+## Text analysis
+
+### SynonymDictionary
+
+```ruby
+dict = Laurus::SynonymDictionary.new
+dict.add_synonym_group(["fast", "quick", "rapid"])
+```
+
+A dictionary of synonym groups. All terms in a group are treated as synonyms of each other.
+
+### WhitespaceTokenizer
+
+```ruby
+tokenizer = Laurus::WhitespaceTokenizer.new
+tokens = tokenizer.tokenize("hello world")
+```
+
+Splits text on whitespace boundaries and returns an Array of `Token` objects.
+
+### SynonymGraphFilter
+
+```ruby
+filter = Laurus::SynonymGraphFilter.new(dictionary, keep_original: true, boost: 1.0)
+expanded = filter.apply(tokens)
+```
+
+Token filter that expands tokens with their synonyms from a `SynonymDictionary`.
+
+### Token
+
+```ruby
+token.text                # => String  -- The token text
+token.position            # => Integer -- Position in the token stream
+token.start_offset        # => Integer -- Character start offset in the original text
+token.end_offset          # => Integer -- Character end offset in the original text
+token.boost               # => Float   -- Score boost factor (1.0 = no adjustment)
+token.stopped             # => Boolean -- Whether removed by a stop filter
+token.position_increment  # => Integer -- Difference from the previous token's position
+token.position_length     # => Integer -- Number of positions spanned
+```
+
+---
+
+## Field value types
+
+Ruby values are automatically converted to Laurus `DataValue` types:
+
+| Ruby type | Laurus type | Notes |
+| :--- | :--- | :--- |
+| `nil` | `Null` | |
+| `true` / `false` | `Bool` | |
+| `Integer` | `Int64` | |
+| `Float` | `Float64` | |
+| `String` | `Text` | |
+| `Array` of numerics | `Vector` | Elements coerced to `f32` |
+| `Hash` with `"lat"`, `"lon"` | `Geo` | Two `Float` values |
+| `Time` (responds to `iso8601`) | `DateTime` | Converted via `iso8601` |

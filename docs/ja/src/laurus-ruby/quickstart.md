@@ -1,0 +1,121 @@
+# クイックスタート
+
+## 1. インデックスを作成する
+
+```ruby
+require "laurus"
+
+# インメモリインデックス（一時的、プロトタイピングに最適）
+index = Laurus::Index.new
+
+# ファイルベースインデックス（永続的）
+schema = Laurus::Schema.new
+schema.add_text_field("title")
+schema.add_text_field("body")
+index = Laurus::Index.new(path: "./myindex", schema: schema)
+```
+
+## 2. ドキュメントをインデックスする
+
+```ruby
+index.put_document("doc1", {
+  "title" => "Rust 入門",
+  "body" => "Rust は安全性とパフォーマンスに重点を置いたシステムプログラミング言語です。",
+})
+index.put_document("doc2", {
+  "title" => "Ruby Web 開発",
+  "body" => "Ruby は Web アプリケーションと高速プロトタイピングに広く使われています。",
+})
+index.commit
+```
+
+## 3. Lexical 検索
+
+```ruby
+# DSL 文字列
+results = index.search("title:rust", limit: 5)
+
+# クエリオブジェクト
+results = index.search(Laurus::TermQuery.new("body", "ruby"), limit: 5)
+
+# 結果を表示
+results.each do |r|
+  puts "[#{r.id}] score=#{format('%.4f', r.score)}  #{r.document['title']}"
+end
+```
+
+## 4. Vector 検索
+
+Vector 検索にはベクトルフィールドを含むスキーマと事前計算済みエンベディングが必要です。
+
+```ruby
+require "laurus"
+
+schema = Laurus::Schema.new
+schema.add_text_field("title")
+schema.add_hnsw_field("embedding", 4)
+
+index = Laurus::Index.new(schema: schema)
+index.put_document("doc1", { "title" => "Rust", "embedding" => [0.1, 0.2, 0.3, 0.4] })
+index.put_document("doc2", { "title" => "Ruby", "embedding" => [0.9, 0.8, 0.7, 0.6] })
+index.commit
+
+query_vec = [0.1, 0.2, 0.3, 0.4]
+results = index.search(Laurus::VectorQuery.new("embedding", query_vec), limit: 3)
+```
+
+## 5. ハイブリッド検索
+
+```ruby
+request = Laurus::SearchRequest.new(
+  lexical_query: Laurus::TermQuery.new("title", "rust"),
+  vector_query: Laurus::VectorQuery.new("embedding", query_vec),
+  fusion: Laurus::RRF.new(k: 60.0),
+  limit: 5,
+)
+results = index.search(request)
+```
+
+## 6. 更新と削除
+
+```ruby
+# 更新: put_document は同じ ID の全バージョンを置換する
+index.put_document("doc1", { "title" => "更新されたタイトル", "body" => "新しいコンテンツ。" })
+index.commit
+
+# 既存バージョンを削除せずに新しいバージョンを追記（RAG チャンキングパターン）
+index.add_document("doc1", { "title" => "チャンク 2", "body" => "追加のチャンク。" })
+index.commit
+
+# 全バージョンを取得
+docs = index.get_documents("doc1")
+
+# 削除
+index.delete_documents("doc1")
+index.commit
+```
+
+## 7. スキーマ管理
+
+```ruby
+schema = Laurus::Schema.new
+schema.add_text_field("title")
+schema.add_text_field("body")
+schema.add_integer_field("year")
+schema.add_float_field("score")
+schema.add_boolean_field("published")
+schema.add_bytes_field("thumbnail")
+schema.add_geo_field("location")
+schema.add_datetime_field("created_at")
+schema.add_hnsw_field("embedding", 384)
+schema.add_flat_field("small_vec", 64)
+schema.add_ivf_field("ivf_vec", 128, n_clusters: 100)
+```
+
+## 8. インデックス統計
+
+```ruby
+stats = index.stats
+puts stats["document_count"]
+puts stats["vector_fields"]
+```
