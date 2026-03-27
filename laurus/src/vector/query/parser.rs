@@ -1,7 +1,9 @@
 //! DSL parser for vector search queries.
 //!
-//! Parses `field:~"text"` syntax into VectorSearchRequest,
-//! embedding text into vectors at parse time.
+//! Parses `field:"text"` or `field:text` syntax into VectorSearchRequest,
+//! embedding text into vectors at parse time. The caller (typically the
+//! unified query parser) is responsible for routing only vector-field
+//! clauses to this parser.
 
 use std::sync::Arc;
 
@@ -24,17 +26,19 @@ struct VectorQueryStringParser;
 
 /// Parser for vector search DSL.
 ///
-/// Converts `field:~"text"` syntax into `VectorSearchRequest` with
-/// embedded vectors. Requires an `Embedder` to convert text into vectors
+/// Converts `field:"text"` or `field:text` syntax into `VectorSearchRequest`
+/// with embedded vectors. Requires an `Embedder` to convert text into vectors
 /// at parse time, following the same pattern as the lexical `QueryParser`
 /// which requires an `Analyzer`.
 ///
 /// # Supported Syntax
 ///
-/// - `content:~"cute kitten"` — field-specific text query
-/// - `content:~"cute kitten"^0.8` — with weight (boost)
-/// - `~"cute kitten"` — uses default field
-/// - `content:~"cats" image:~"dogs"^0.5` — multiple queries
+/// - `content:"cute kitten"` — field-specific quoted text query
+/// - `content:python` — field-specific unquoted text query
+/// - `content:"cute kitten"^0.8` — with weight (boost)
+/// - `content:python^0.8` — unquoted with weight (boost)
+/// - `"cute kitten"` — uses default field (quoted)
+/// - `content:"cats" image:"dogs"^0.5` — multiple queries
 ///
 /// # Example
 ///
@@ -45,7 +49,7 @@ struct VectorQueryStringParser;
 /// let parser = VectorQueryParser::new(embedder)
 ///     .with_default_field("content");
 ///
-/// let request = parser.parse(r#"content:~"cute kitten""#).await.unwrap();
+/// let request = parser.parse(r#"content:"cute kitten""#).await.unwrap();
 /// // request.query is VectorSearchQuery::Vectors(vec![...])
 /// ```
 pub struct VectorQueryParser {
@@ -137,7 +141,7 @@ impl VectorQueryParser {
         }
     }
 
-    /// Parse a single vector clause (e.g., `content:~"cute kitten"^0.8`).
+    /// Parse a single vector clause (e.g., `content:"cute kitten"^0.8` or `content:python`).
     fn parse_vector_clause(&self, pair: pest::iterators::Pair<Rule>) -> Result<QueryPayload> {
         let mut field_name: Option<String> = None;
         let mut text: Option<String> = None;
@@ -160,6 +164,9 @@ impl VectorQueryParser {
                             text = Some(qt_inner.as_str().to_string());
                         }
                     }
+                }
+                Rule::plain_text => {
+                    text = Some(inner.as_str().to_string());
                 }
                 Rule::boost => {
                     // Extract weight from boost → float_value
@@ -191,8 +198,8 @@ impl VectorQueryParser {
             }
         };
 
-        let text = text
-            .ok_or_else(|| LaurusError::invalid_argument("Missing quoted text in vector clause"))?;
+        let text =
+            text.ok_or_else(|| LaurusError::invalid_argument("Missing text in vector clause"))?;
 
         Ok(QueryPayload::with_weight(
             field,
@@ -246,10 +253,15 @@ mod tests {
         }
     }
 
+    /// Helper to extract the first field name from a QueryVector.
+    fn qv_field(qv: &QueryVector) -> &str {
+        &qv.fields.as_ref().unwrap()[0]
+    }
+
     #[tokio::test]
-    async fn test_basic_query() {
+    async fn test_basic_quoted_query() {
         let parser = VectorQueryParser::new(mock_embedder());
-        let request = parser.parse(r#"content:~"cute kitten""#).await.unwrap();
+        let request = parser.parse(r#"content:"cute kitten""#).await.unwrap();
 
         let vecs = get_vectors(&request);
         assert_eq!(vecs.len(), 1);
@@ -260,9 +272,22 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_boost() {
+    async fn test_basic_unquoted_query() {
         let parser = VectorQueryParser::new(mock_embedder());
-        let request = parser.parse(r#"content:~"text"^0.8"#).await.unwrap();
+        let request = parser.parse("content:python").await.unwrap();
+
+        let vecs = get_vectors(&request);
+        assert_eq!(vecs.len(), 1);
+        let qv = &vecs[0];
+        assert_eq!(qv.fields.as_ref().unwrap()[0], "content");
+        assert_eq!(qv.weight, 1.0);
+        assert_eq!(qv.vector.dimension(), 4);
+    }
+
+    #[tokio::test]
+    async fn test_quoted_boost() {
+        let parser = VectorQueryParser::new(mock_embedder());
+        let request = parser.parse(r#"content:"text"^0.8"#).await.unwrap();
 
         let vecs = get_vectors(&request);
         assert_eq!(vecs.len(), 1);
@@ -272,9 +297,29 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_default_field() {
+    async fn test_unquoted_boost() {
+        let parser = VectorQueryParser::new(mock_embedder());
+        let request = parser.parse("content:python^0.8").await.unwrap();
+
+        let vecs = get_vectors(&request);
+        assert_eq!(vecs.len(), 1);
+        assert!((vecs[0].weight - 0.8).abs() < f32::EPSILON);
+    }
+
+    #[tokio::test]
+    async fn test_default_field_quoted() {
         let parser = VectorQueryParser::new(mock_embedder()).with_default_field("embedding");
-        let request = parser.parse(r#"~"cute kitten""#).await.unwrap();
+        let request = parser.parse(r#""cute kitten""#).await.unwrap();
+
+        let vecs = get_vectors(&request);
+        assert_eq!(vecs.len(), 1);
+        assert_eq!(vecs[0].fields.as_ref().unwrap()[0], "embedding");
+    }
+
+    #[tokio::test]
+    async fn test_default_field_unquoted() {
+        let parser = VectorQueryParser::new(mock_embedder()).with_default_field("embedding");
+        let request = parser.parse("python").await.unwrap();
 
         let vecs = get_vectors(&request);
         assert_eq!(vecs.len(), 1);
@@ -285,7 +330,7 @@ mod tests {
     async fn test_multiple_clauses() {
         let parser = VectorQueryParser::new(mock_embedder());
         let request = parser
-            .parse(r#"content:~"cats" image:~"dogs"^0.5"#)
+            .parse(r#"content:"cats" image:"dogs"^0.5"#)
             .await
             .unwrap();
 
@@ -300,28 +345,36 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_mixed_quoted_unquoted() {
+        let parser = VectorQueryParser::new(mock_embedder());
+        let request = parser
+            .parse(r#"content:"cute kitten" image:dogs^0.5"#)
+            .await
+            .unwrap();
+
+        let vecs = get_vectors(&request);
+        assert_eq!(vecs.len(), 2);
+        assert_eq!(qv_field(&vecs[0]), "content");
+        assert_eq!(qv_field(&vecs[1]), "image");
+        assert!((vecs[1].weight - 0.5).abs() < f32::EPSILON);
+    }
+
+    #[tokio::test]
     async fn test_empty_query_error() {
         let parser = VectorQueryParser::new(mock_embedder());
         assert!(parser.parse("").await.is_err());
     }
 
     #[tokio::test]
-    async fn test_missing_tilde_error() {
-        let parser = VectorQueryParser::new(mock_embedder());
-        // content:"text" without ~ should fail
-        assert!(parser.parse(r#"content:"text""#).await.is_err());
-    }
-
-    #[tokio::test]
     async fn test_no_field_no_default_error() {
         let parser = VectorQueryParser::new(mock_embedder()); // no default field
-        assert!(parser.parse(r#"~"text""#).await.is_err());
+        assert!(parser.parse(r#""text""#).await.is_err());
     }
 
     #[tokio::test]
     async fn test_unicode_text() {
         let parser = VectorQueryParser::new(mock_embedder());
-        let request = parser.parse(r#"content:~"日本語テスト""#).await.unwrap();
+        let request = parser.parse(r#"content:"日本語テスト""#).await.unwrap();
 
         let vecs = get_vectors(&request);
         assert_eq!(vecs.len(), 1);
@@ -332,7 +385,7 @@ mod tests {
     #[tokio::test]
     async fn test_integer_boost() {
         let parser = VectorQueryParser::new(mock_embedder());
-        let request = parser.parse(r#"content:~"text"^2"#).await.unwrap();
+        let request = parser.parse(r#"content:"text"^2"#).await.unwrap();
 
         let vecs = get_vectors(&request);
         assert!((vecs[0].weight - 2.0).abs() < f32::EPSILON);
@@ -341,7 +394,7 @@ mod tests {
     #[tokio::test]
     async fn test_field_with_underscore() {
         let parser = VectorQueryParser::new(mock_embedder());
-        let request = parser.parse(r#"my_field:~"text""#).await.unwrap();
+        let request = parser.parse(r#"my_field:"text""#).await.unwrap();
 
         let vecs = get_vectors(&request);
         assert_eq!(qv_field(&vecs[0]), "my_field");
@@ -350,14 +403,9 @@ mod tests {
     #[tokio::test]
     async fn test_field_with_dot() {
         let parser = VectorQueryParser::new(mock_embedder());
-        let request = parser.parse(r#"nested.field:~"text""#).await.unwrap();
+        let request = parser.parse(r#"nested.field:"text""#).await.unwrap();
 
         let vecs = get_vectors(&request);
         assert_eq!(qv_field(&vecs[0]), "nested.field");
-    }
-
-    /// Helper to extract the first field name from a QueryVector.
-    fn qv_field(qv: &QueryVector) -> &str {
-        &qv.fields.as_ref().unwrap()[0]
     }
 }

@@ -88,11 +88,11 @@ let unified = UnifiedQueryParser::new(
 );
 
 // Lexical + vector in one query
-let request = unified.parse(r#"body:rust text_vec:~"systems programming""#).await?;
+let request = unified.parse(r#"body:rust text_vec:"systems programming""#).await?;
 let results = engine.search(request).await?;
 ```
 
-The `~"..."` syntax identifies vector clauses. Everything else is parsed as lexical.
+The parser uses the schema to identify vector clauses by field type. Fields defined as vector fields (e.g., HNSW) are parsed as vector queries; everything else is parsed as lexical.
 
 ## Fusion Algorithms
 

@@ -58,8 +58,16 @@ pub async fn run(cmd: SearchCommand, index_dir: &Path, format: OutputFormat) -> 
     let embedder = engine.embedder();
     let vector_parser = VectorQueryParser::new(embedder);
 
+    // Collect vector field names from the schema for query routing.
+    let vector_fields: std::collections::HashSet<String> = schema
+        .fields
+        .iter()
+        .filter(|(_, opt)| opt.is_vector())
+        .map(|(name, _)| name.clone())
+        .collect();
+
     // Create the unified parser that handles both lexical and vector clauses.
-    let unified_parser = UnifiedQueryParser::new(lexical_parser, vector_parser);
+    let unified_parser = UnifiedQueryParser::new(lexical_parser, vector_parser, vector_fields);
 
     // Parse the query string (may embed vector queries asynchronously).
     let mut request = unified_parser

@@ -34,8 +34,8 @@ laurus-wasm を使用したブラウザ上での全文検索を実演する
   Embedding をコールバック Embedder 経由で自動生成
 - 統合クエリ DSL 対応の検索ボックスを提供:
   - Lexical 検索: `rust`、`title:wasm`、`"memory safety"`
-  - Vector 検索: `embedding:~"how to make code faster"`
-  - Hybrid 検索: `rust embedding:~"systems programming"`
+  - Vector 検索: `embedding:"how to make code faster"`、`embedding:python`
+  - Hybrid 検索: `rust embedding:"systems programming"`
 - 新しいドキュメントをインタラクティブに追加可能
 - 関連度スコア付きの検索結果を表示
 - すべての操作をコンソールパネルにログ出力

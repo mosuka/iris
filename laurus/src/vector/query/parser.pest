@@ -1,12 +1,13 @@
 // Vector query DSL grammar.
 //
-// Supports: field:~"text"^weight syntax for vector similarity search.
+// Supports: field:"text"^weight and field:text^weight syntax for vector similarity search.
+// The field type (vector vs. lexical) is determined by the schema, not by a special marker.
 
 WHITESPACE = _{ " " | "\t" | "\n" | "\r" }
 
 query = { SOI ~ vector_clause+ ~ EOI }
 
-vector_clause = { field_prefix? ~ "~" ~ quoted_text ~ boost? }
+vector_clause = { field_prefix? ~ (quoted_text | plain_text) ~ boost? }
 
 field_prefix = { field_name ~ ":" }
 
@@ -14,6 +15,8 @@ field_name = @{ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_" | ".")* }
 
 quoted_text = ${ "\"" ~ inner_text ~ "\"" }
 inner_text = @{ (!("\"") ~ ANY)* }
+
+plain_text = @{ (!(WHITESPACE | "\"" | "^") ~ ANY)+ }
 
 boost = { "^" ~ float_value }
 float_value = @{ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)? }

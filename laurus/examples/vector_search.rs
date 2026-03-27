@@ -3,7 +3,7 @@
 //! Demonstrates vector search capabilities:
 //! - Basic vector search (semantic similarity)
 //! - Filtered vector search (with lexical filters)
-//! - Vector search via DSL syntax (`field:~"query"`)
+//! - Vector search via DSL syntax (`field:"query"` / `field:query`)
 //!
 //! Uses a mock embedder for demonstration. For real embedders, see
 //! `search_with_candle` or `search_with_openai`.

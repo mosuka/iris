@@ -42,7 +42,7 @@ cargo run --example lexical_search
 cargo run --example vector_search
 ```
 
-デモ内容: `PerFieldEmbedder`、`VectorSearchRequestBuilder`、フィルタ付き検索、DSL 構文（`field:~"query"`）
+デモ内容: `PerFieldEmbedder`、`VectorSearchRequestBuilder`、フィルタ付き検索、DSL 構文（`field:"query"`）
 
 ### hybrid_search
 

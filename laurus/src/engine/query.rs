@@ -5,20 +5,22 @@
 //!
 //! # Syntax
 //!
-//! Lexical and vector clauses can be freely mixed in a single query string:
+//! Lexical and vector clauses can be freely mixed in a single query string.
+//! Vector fields are identified by schema — any `field:value` clause where
+//! `field` is a vector field is routed to the vector parser:
 //!
 //! - **Lexical**: Standard query syntax (`title:hello`, `"phrase"`, `AND`/`OR`, etc.)
-//! - **Vector**: `field:~"text"` syntax with optional boost (`^0.8`)
+//! - **Vector**: `field:"text"` or `field:text` where `field` is a vector field
 //!
 //! # Examples
 //!
 //! ```ignore
 //! use laurus::engine::query::UnifiedQueryParser;
 //!
-//! let parser = UnifiedQueryParser::new(lexical_parser, vector_parser);
+//! let parser = UnifiedQueryParser::new(lexical_parser, vector_parser, vector_fields);
 //!
 //! // Hybrid search
-//! let request = parser.parse(r#"title:hello content:~"cute kitten"^0.8"#).await?;
+//! let request = parser.parse(r#"title:hello content:"cute kitten"^0.8"#).await?;
 //! assert!(matches!(request.query, SearchQuery::Hybrid { .. }));
 //!
 //! // Lexical only
@@ -26,10 +28,11 @@
 //! assert!(matches!(request.query, SearchQuery::Lexical(_)));
 //!
 //! // Vector only
-//! let request = parser.parse(r#"content:~"cats" image:~"dogs"^0.5"#).await?;
+//! let request = parser.parse(r#"content:"cats" image:"dogs"^0.5"#).await?;
 //! assert!(matches!(request.query, SearchQuery::Vector(_)));
 //! ```
 
+use std::collections::HashSet;
 use std::sync::LazyLock;
 
 use regex::Regex;
@@ -45,9 +48,10 @@ use crate::vector::query::parser::VectorQueryParser;
 /// Parses a single DSL string into a [`SearchRequest`] by splitting the input
 /// into lexical and vector portions and delegating to the appropriate sub-parser.
 ///
-/// Vector clauses are identified by the `~"` pattern (tilde immediately before
-/// a double quote), which is unambiguous with lexical syntax (where `~` only
-/// appears after terms or phrases, e.g. `roam~2`, `"hello world"~10`).
+/// Vector clauses are identified by their field name: any `field:value` clause
+/// where `field` matches a known vector field (from the schema) is routed to
+/// the vector parser. This approach is unambiguous because field names are
+/// unique within a schema and each field has a single type.
 ///
 /// After vector clauses are extracted, any leftover dangling boolean operators
 /// (`AND`, `OR`) at the edges or in consecutive positions are cleaned up
@@ -55,6 +59,7 @@ use crate::vector::query::parser::VectorQueryParser;
 pub struct UnifiedQueryParser {
     lexical_parser: LexicalQueryParser,
     vector_parser: VectorQueryParser,
+    vector_fields: HashSet<String>,
     default_fusion: FusionAlgorithm,
 }
 
@@ -67,11 +72,17 @@ impl UnifiedQueryParser {
     /// # Parameters
     ///
     /// - `lexical_parser` - Parser for lexical (text) query clauses.
-    /// - `vector_parser` - Parser for vector (`~"text"`) query clauses.
-    pub fn new(lexical_parser: LexicalQueryParser, vector_parser: VectorQueryParser) -> Self {
+    /// - `vector_parser` - Parser for vector query clauses.
+    /// - `vector_fields` - Set of field names that are vector fields in the schema.
+    pub fn new(
+        lexical_parser: LexicalQueryParser,
+        vector_parser: VectorQueryParser,
+        vector_fields: HashSet<String>,
+    ) -> Self {
         Self {
             lexical_parser,
             vector_parser,
+            vector_fields,
             default_fusion: FusionAlgorithm::RRF { k: 60.0 },
         }
     }
@@ -89,7 +100,8 @@ impl UnifiedQueryParser {
     /// Parse a unified query string into a [`SearchRequest`].
     ///
     /// The query string may contain both lexical and vector clauses:
-    /// - Vector clauses: `field:~"text"`, `~"text"`, `field:~"text"^0.8`
+    /// - Vector clauses: `field:"text"`, `field:text`, `field:"text"^0.8`
+    ///   (where `field` is a vector field)
     /// - Lexical clauses: everything else (`title:hello`, `AND`, `"phrase"`, etc.)
     ///
     /// Vector text is embedded into vectors at parse time via the
@@ -118,7 +130,7 @@ impl UnifiedQueryParser {
             ));
         }
 
-        let (lexical_str, vector_str) = self.split_query(query_str);
+        let (lexical_str, vector_str) = self.split_query(query_str)?;
 
         let lexical = if let Some(ref s) = lexical_str {
             Some(self.lexical_parser.parse(s)?)
@@ -163,24 +175,47 @@ impl UnifiedQueryParser {
 
     /// Split a query string into lexical and vector portions.
     ///
-    /// Uses a regex to identify vector clauses (patterns matching
-    /// `[field:]~"text"[^boost]`) and extracts them. The remainder, after
-    /// cleanup via [`clean_lexical_string`], is treated as the lexical
-    /// query text. Returns `(lexical, vector)` where either may be `None`.
-    fn split_query(&self, input: &str) -> (Option<String>, Option<String>) {
-        static VECTOR_RE: LazyLock<Regex> = LazyLock::new(|| {
-            // Pattern: optional field prefix + ~"text" + optional boost
-            // - (?:[\w][\w.]*:)? — optional field name with colon
-            // - ~"[^"]*"         — tilde + quoted text
-            // - (?:\^[\d]+(?:\.[\d]+)?)? — optional boost value
-            Regex::new(r#"(?:[\w][\w.]*:)?~"[^"]*"(?:\^[\d]+(?:\.[\d]+)?)?"#).unwrap()
-        });
+    /// Uses the set of known vector field names to identify vector clauses.
+    /// A clause is considered a vector clause if it starts with a known
+    /// vector field name followed by `:`, e.g. `embedding:"text"` or
+    /// `embedding:python^0.8`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a vector field clause uses lexical-only syntax
+    /// such as proximity/fuzzy modifiers (`~`) or range queries (`[`/`{`).
+    ///
+    /// # Returns
+    ///
+    /// `(lexical, vector)` where either may be `None`.
+    fn split_query(&self, input: &str) -> Result<(Option<String>, Option<String>)> {
+        if self.vector_fields.is_empty() {
+            // No vector fields → everything is lexical
+            return Ok((Some(input.to_string()), None));
+        }
+
+        let fields_pattern: String = self
+            .vector_fields
+            .iter()
+            .map(|f| regex::escape(f))
+            .collect::<Vec<_>>()
+            .join("|");
+
+        // Detect lexical-only syntax on vector fields and reject with
+        // clear error messages.
+        self.check_unsupported_vector_syntax(input, &fields_pattern)?;
+
+        let clause_pattern = format!(
+            r#"(?:{fields})(?::(?:"[^"]*"|[^\s"^~\[\{{]+)(?:\^[\d]+(?:\.[\d]+)?)?)"#,
+            fields = fields_pattern,
+        );
+        let vector_re = Regex::new(&clause_pattern).unwrap();
 
         // Collect vector clauses
-        let vector_clauses: Vec<&str> = VECTOR_RE.find_iter(input).map(|m| m.as_str()).collect();
+        let vector_clauses: Vec<&str> = vector_re.find_iter(input).map(|m| m.as_str()).collect();
 
         // Remove vector clauses from input to get lexical part
-        let lexical_raw = VECTOR_RE.replace_all(input, " ");
+        let lexical_raw = vector_re.replace_all(input, " ");
         let lexical_cleaned = clean_lexical_string(&lexical_raw);
 
         let lexical = if lexical_cleaned.is_empty() {
@@ -195,7 +230,50 @@ impl UnifiedQueryParser {
             Some(vector_clauses.join(" "))
         };
 
-        (lexical, vector)
+        Ok((lexical, vector))
+    }
+
+    /// Check for lexical-only syntax used on vector fields and return a
+    /// descriptive error if found.
+    ///
+    /// Detects:
+    /// - Proximity/fuzzy modifiers: `content:"text"~2`, `content:word~`
+    /// - Range queries: `content:[A TO Z]`, `content:{100 TO 500}`
+    fn check_unsupported_vector_syntax(&self, input: &str, fields_pattern: &str) -> Result<()> {
+        // Proximity/fuzzy: vector_field:value~[digits]
+        let tilde_pattern = format!(
+            r#"((?:{fields})(?::(?:"[^"]*"|[^\s"^~]+)(?:\^[\d]+(?:\.[\d]+)?)?))(~[\d]*)"#,
+            fields = fields_pattern,
+        );
+        let tilde_re = Regex::new(&tilde_pattern).unwrap();
+        if let Some(caps) = tilde_re.captures(input) {
+            let clause = caps.get(1).unwrap().as_str();
+            let modifier = caps.get(2).unwrap().as_str();
+            return Err(LaurusError::invalid_argument(format!(
+                "Proximity/fuzzy modifier '{modifier}' is not supported on vector field \
+                 clause '{clause}'. The '~' modifier is only valid for lexical queries \
+                 (e.g. \"term~2\" for fuzzy, '\"phrase\"~10' for proximity)."
+            )));
+        }
+
+        // Range queries: vector_field:[...] or vector_field:{...}
+        let range_pattern = format!(r#"({fields}):(\[|\{{)"#, fields = fields_pattern,);
+        let range_re = Regex::new(&range_pattern).unwrap();
+        if let Some(caps) = range_re.captures(input) {
+            let field = caps.get(1).unwrap().as_str();
+            let bracket = caps.get(2).unwrap().as_str();
+            let kind = if bracket == "[" {
+                "inclusive range ([...TO...])"
+            } else {
+                "exclusive range ({...TO...})"
+            };
+            return Err(LaurusError::invalid_argument(format!(
+                "Range query on vector field '{field}' is not supported. \
+                 The {kind} syntax is only valid for lexical fields."
+            )));
+        }
+
+        Ok(())
     }
 }
 
@@ -318,7 +396,8 @@ mod tests {
         let lexical = LexicalQueryParser::new(analyzer).with_default_field("title");
         let embedder: Arc<dyn Embedder> = Arc::new(MockEmbedder);
         let vector = VectorQueryParser::new(embedder).with_default_field("content");
-        UnifiedQueryParser::new(lexical, vector)
+        let vector_fields: HashSet<String> = ["content".to_string()].into_iter().collect();
+        UnifiedQueryParser::new(lexical, vector, vector_fields)
     }
 
     #[tokio::test]
@@ -331,9 +410,9 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_vector_only() {
+    async fn test_vector_only_quoted() {
         let parser = make_parser();
-        let request = parser.parse(r#"content:~"cats""#).await.unwrap();
+        let request = parser.parse(r#"content:"cats""#).await.unwrap();
 
         let vq = assert_vector_only(&request);
         assert!(request.fusion_algorithm.is_none());
@@ -344,12 +423,20 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_vector_only_unquoted() {
+        let parser = make_parser();
+        let request = parser.parse("content:cats").await.unwrap();
+
+        let vq = assert_vector_only(&request);
+        let vecs = get_vectors(vq);
+        assert_eq!(vecs.len(), 1);
+        assert_eq!(vecs[0].fields.as_ref().unwrap()[0], "content");
+    }
+
+    #[tokio::test]
     async fn test_hybrid() {
         let parser = make_parser();
-        let request = parser
-            .parse(r#"title:hello content:~"cats""#)
-            .await
-            .unwrap();
+        let request = parser.parse(r#"title:hello content:"cats""#).await.unwrap();
 
         assert_hybrid(&request);
         assert!(request.fusion_algorithm.is_some());
@@ -363,9 +450,27 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_hybrid_unquoted_vector() {
+        let parser = make_parser();
+        let request = parser.parse("title:hello content:cats").await.unwrap();
+
+        assert_hybrid(&request);
+    }
+
+    #[tokio::test]
     async fn test_vector_with_boost() {
         let parser = make_parser();
-        let request = parser.parse(r#"content:~"text"^0.8"#).await.unwrap();
+        let request = parser.parse(r#"content:"text"^0.8"#).await.unwrap();
+
+        let vq = assert_vector_only(&request);
+        let vecs = get_vectors(vq);
+        assert!((vecs[0].weight - 0.8).abs() < f32::EPSILON);
+    }
+
+    #[tokio::test]
+    async fn test_unquoted_vector_with_boost() {
+        let parser = make_parser();
+        let request = parser.parse("content:python^0.8").await.unwrap();
 
         let vq = assert_vector_only(&request);
         let vecs = get_vectors(vq);
@@ -374,8 +479,15 @@ mod tests {
 
     #[tokio::test]
     async fn test_multiple_vector_clauses() {
-        let parser = make_parser();
-        let request = parser.parse(r#"a:~"x" b:~"y"^0.5"#).await.unwrap();
+        let analyzer = Arc::new(StandardAnalyzer::new().unwrap());
+        let lexical = LexicalQueryParser::new(analyzer).with_default_field("title");
+        let embedder: Arc<dyn Embedder> = Arc::new(MockEmbedder);
+        let vector = VectorQueryParser::new(embedder);
+        let vector_fields: HashSet<String> =
+            ["a".to_string(), "b".to_string()].into_iter().collect();
+        let parser = UnifiedQueryParser::new(lexical, vector, vector_fields);
+
+        let request = parser.parse(r#"a:"x" b:"y"^0.5"#).await.unwrap();
 
         let vq = assert_vector_only(&request);
         let vecs = get_vectors(vq);
@@ -389,7 +501,7 @@ mod tests {
     async fn test_lexical_and_with_vector() {
         let parser = make_parser();
         let request = parser
-            .parse(r#"title:hello AND title:world content:~"cats""#)
+            .parse(r#"title:hello AND title:world content:"cats""#)
             .await
             .unwrap();
 
@@ -400,25 +512,14 @@ mod tests {
     #[tokio::test]
     async fn test_vector_between_and() {
         let parser = make_parser();
-        // After removing content:~"cats", we get "title:hello AND AND title:world"
+        // After removing content:"cats", we get "title:hello AND AND title:world"
         // which should be cleaned to "title:hello AND title:world"
         let request = parser
-            .parse(r#"title:hello AND content:~"cats" AND title:world"#)
+            .parse(r#"title:hello AND content:"cats" AND title:world"#)
             .await
             .unwrap();
 
         assert_hybrid(&request);
-    }
-
-    #[tokio::test]
-    async fn test_default_fields() {
-        let parser = make_parser();
-        // Lexical uses default field "title", vector uses default field "content"
-        let request = parser.parse(r#"hello ~"cats""#).await.unwrap();
-
-        let (_, vq) = assert_hybrid(&request);
-        let vecs = get_vectors(vq);
-        assert_eq!(vecs[0].fields.as_ref().unwrap()[0], "content");
     }
 
     #[tokio::test]
@@ -434,16 +535,15 @@ mod tests {
         let lexical = LexicalQueryParser::new(analyzer).with_default_field("title");
         let embedder: Arc<dyn Embedder> = Arc::new(MockEmbedder);
         let vector = VectorQueryParser::new(embedder).with_default_field("content");
-        let parser =
-            UnifiedQueryParser::new(lexical, vector).with_fusion(FusionAlgorithm::WeightedSum {
+        let vector_fields: HashSet<String> = ["content".to_string()].into_iter().collect();
+        let parser = UnifiedQueryParser::new(lexical, vector, vector_fields).with_fusion(
+            FusionAlgorithm::WeightedSum {
                 lexical_weight: 0.7,
                 vector_weight: 0.3,
-            });
+            },
+        );
 
-        let request = parser
-            .parse(r#"title:hello content:~"cats""#)
-            .await
-            .unwrap();
+        let request = parser.parse(r#"title:hello content:"cats""#).await.unwrap();
 
         if let Some(FusionAlgorithm::WeightedSum {
             lexical_weight,
@@ -460,13 +560,103 @@ mod tests {
     #[tokio::test]
     async fn test_unicode_vector_text() {
         let parser = make_parser();
-        let request = parser.parse(r#"content:~"日本語テスト""#).await.unwrap();
+        let request = parser.parse(r#"content:"日本語テスト""#).await.unwrap();
 
         let vq = assert_vector_only(&request);
         let vecs = get_vectors(vq);
         assert_eq!(vecs.len(), 1);
         assert_eq!(vecs[0].fields.as_ref().unwrap()[0], "content");
         assert_eq!(vecs[0].vector.dimension(), 4);
+    }
+
+    #[tokio::test]
+    async fn test_no_vector_fields_all_lexical() {
+        let analyzer = Arc::new(StandardAnalyzer::new().unwrap());
+        let lexical = LexicalQueryParser::new(analyzer).with_default_field("title");
+        let embedder: Arc<dyn Embedder> = Arc::new(MockEmbedder);
+        let vector = VectorQueryParser::new(embedder);
+        let parser = UnifiedQueryParser::new(lexical, vector, HashSet::new());
+
+        let request = parser.parse("title:hello").await.unwrap();
+        assert_lexical_only(&request);
+    }
+
+    // -- Tests for proximity/fuzzy modifier rejection on vector fields --
+
+    #[tokio::test]
+    async fn test_vector_field_with_proximity_error() {
+        let parser = make_parser();
+        let result = parser.parse(r#"content:"hello world"~2"#).await;
+        assert!(result.is_err());
+        let msg = result.err().unwrap().to_string();
+        assert!(msg.contains("Proximity/fuzzy modifier"), "got: {msg}");
+        assert!(msg.contains("content:"), "got: {msg}");
+    }
+
+    #[tokio::test]
+    async fn test_vector_field_with_fuzzy_error() {
+        let parser = make_parser();
+        let result = parser.parse("content:python~2").await;
+        assert!(result.is_err());
+        let msg = result.err().unwrap().to_string();
+        assert!(msg.contains("Proximity/fuzzy modifier"), "got: {msg}");
+    }
+
+    #[tokio::test]
+    async fn test_vector_field_with_tilde_only_error() {
+        let parser = make_parser();
+        let result = parser.parse("content:python~").await;
+        assert!(result.is_err());
+        let msg = result.err().unwrap().to_string();
+        assert!(msg.contains("Proximity/fuzzy modifier"), "got: {msg}");
+    }
+
+    #[tokio::test]
+    async fn test_vector_field_with_inclusive_range_error() {
+        let parser = make_parser();
+        let result = parser.parse("content:[A TO Z]").await;
+        assert!(result.is_err());
+        let msg = result.err().unwrap().to_string();
+        assert!(msg.contains("Range query"), "got: {msg}");
+        assert!(msg.contains("content"), "got: {msg}");
+        assert!(msg.contains("inclusive"), "got: {msg}");
+    }
+
+    #[tokio::test]
+    async fn test_vector_field_with_exclusive_range_error() {
+        let parser = make_parser();
+        let result = parser.parse("content:{100 TO 500}").await;
+        assert!(result.is_err());
+        let msg = result.err().unwrap().to_string();
+        assert!(msg.contains("Range query"), "got: {msg}");
+        assert!(msg.contains("exclusive"), "got: {msg}");
+    }
+
+    #[tokio::test]
+    async fn test_lexical_field_range_still_works() {
+        // title is a lexical field — range should work fine
+        let parser = make_parser();
+        let request = parser.parse("title:[A TO Z]").await.unwrap();
+        assert_lexical_only(&request);
+    }
+
+    #[tokio::test]
+    async fn test_lexical_field_fuzzy_still_works() {
+        // title is a lexical field — fuzzy should work fine
+        let parser = make_parser();
+        let request = parser.parse("title:hello~2").await.unwrap();
+        assert_lexical_only(&request);
+    }
+
+    #[tokio::test]
+    async fn test_tilde_inside_quotes_is_valid_vector_text() {
+        // ~2 is inside quotes — treated as literal text for embedding
+        let parser = make_parser();
+        let request = parser.parse(r#"content:"python~2""#).await.unwrap();
+        let vq = assert_vector_only(&request);
+        let vecs = get_vectors(vq);
+        assert_eq!(vecs.len(), 1);
+        assert_eq!(vecs[0].fields.as_ref().unwrap()[0], "content");
     }
 
     // -- Tests for clean_lexical_string helper --

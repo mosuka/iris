@@ -386,6 +386,9 @@ impl Engine {
             .map(|(name, _)| name.clone())
             .collect();
 
+        let vector_field_set: std::collections::HashSet<String> =
+            vector_fields.iter().cloned().collect();
+
         let mut vector_parser = crate::vector::query::parser::VectorQueryParser::new(embedder);
         if !vector_fields.is_empty() {
             vector_parser = vector_parser.with_default_fields(vector_fields);
@@ -394,6 +397,7 @@ impl Engine {
         Ok(self::query::UnifiedQueryParser::new(
             lexical_parser,
             vector_parser,
+            vector_field_set,
         ))
     }
 

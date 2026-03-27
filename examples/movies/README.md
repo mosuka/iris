@@ -79,9 +79,9 @@ Runs several example queries:
 
 **Multimodal (vector) searches:**
 
-- `poster_vec:~"space adventure"` — find movies whose poster looks like a space adventure
-- `poster_vec:~"romantic couple"` — find movies with romantic poster imagery
-- `poster_vec:~"scary monster horror"` — find movies with horror-style posters
+- `poster_vec:"space adventure"` — find movies whose poster looks like a space adventure
+- `poster_vec:"romantic couple"` — find movies with romantic poster imagery
+- `poster_vec:"scary monster horror"` — find movies with horror-style posters
 
 ### Manual search
 
@@ -92,7 +92,7 @@ You can also search directly:
 ./target/release/laurus --data-dir examples/movies/index search "title:matrix" --limit 10
 
 # Multimodal vector search (text-to-image)
-./target/release/laurus --data-dir examples/movies/index search 'poster_vec:~"action hero"' --limit 10
+./target/release/laurus --data-dir examples/movies/index search 'poster_vec:"action hero"' --limit 10
 ```
 
 Or start an interactive session:

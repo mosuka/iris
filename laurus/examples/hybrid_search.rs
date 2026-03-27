@@ -174,16 +174,17 @@ async fn main() -> Result<()> {
     // [D] Hybrid Search via DSL
     // =====================================================================
     println!("\n{}", "=".repeat(60));
-    println!("[D] Hybrid DSL: text:async text_vec:~\"concurrent\"");
+    println!("[D] Hybrid DSL: text:async text_vec:\"concurrent\"");
     println!("{}", "=".repeat(60));
 
     let unified_parser = UnifiedQueryParser::new(
         LexicalQueryParser::new(std_analyzer).with_default_field("text"),
         VectorQueryParser::new(per_field_embedder.clone()),
+        ["text_vec".to_string()].into_iter().collect(),
     );
 
     let mut request = unified_parser
-        .parse("text:async text_vec:~\"concurrent\"")
+        .parse("text:async text_vec:\"concurrent\"")
         .await?;
     request.limit = 3;
     let results = engine.search(request).await?;

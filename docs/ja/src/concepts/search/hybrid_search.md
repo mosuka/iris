@@ -82,11 +82,11 @@ let unified = UnifiedQueryParser::new(
 );
 
 // Lexical + vector in one query
-let request = unified.parse(r#"body:rust text_vec:~"systems programming""#).await?;
+let request = unified.parse(r#"body:rust text_vec:"systems programming""#).await?;
 let results = engine.search(request).await?;
 ```
 
-`~"..."` 構文は Vector 句を識別します。それ以外はすべて Lexical として解析されます。
+Vector 句の識別はスキーマのフィールド型に基づいて行われます。ベクトルフィールドとして定義されたフィールド名を持つ句は Vector クエリとして、それ以外は Lexical クエリとして解析されます。
 
 ## フュージョンアルゴリズム（Fusion Algorithms）
 

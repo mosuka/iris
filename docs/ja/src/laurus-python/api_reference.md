@@ -32,7 +32,7 @@ class Index:
 
 `query` パラメータは以下のいずれかを受け付けます：
 
-- **DSL 文字列**（例: `"title:hello"`、`"~\"memory safety\""`)
+- **DSL 文字列**（例: `"title:hello"`、`"content:\"memory safety\""`)
 - **Lexical クエリオブジェクト**（`TermQuery`、`PhraseQuery`、`BooleanQuery` など）
 - **Vector クエリオブジェクト**（`VectorQuery`、`VectorTextQuery`）
 - **`SearchRequest`**（完全な制御が必要な場合）

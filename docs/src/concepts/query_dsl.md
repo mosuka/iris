@@ -5,11 +5,11 @@ Laurus provides a unified query DSL (Domain Specific Language) that allows lexic
 ## Overview
 
 ```text
-title:hello AND content:~"cute kitten"^0.8
+title:hello AND content:"cute kitten"^0.8
 |--- lexical --|    |--- vector --------|
 ```
 
-The `~"` pattern distinguishes vector clauses from lexical clauses. Everything else is treated as a lexical query.
+The field type in the schema determines whether a clause is lexical or vector. If the field is a vector field (e.g., HNSW), the clause is treated as a vector query. Everything else is treated as a lexical query.
 
 ## Lexical Query Syntax
 
@@ -128,34 +128,36 @@ Vector queries embed text into vectors at parse time and perform similarity sear
 ### Basic Syntax
 
 ```text
-field:~"text"
-field:~"text"^weight
+field:"text"
+field:text
+field:"text"^weight
 ```
+
+The field name must refer to a vector field defined in the schema. The parser uses the schema to determine whether a clause is a vector query.
 
 | Element | Required | Description | Example |
 | :--- | :---: | :--- | :--- |
-| `field:` | No | Target vector field name | `content:` |
-| `~` | **Yes** | Vector query marker | |
-| `"text"` | **Yes** | Text to embed | `"cute kitten"` |
+| `field:` | **Yes** | Target vector field name (must be a vector field in the schema) | `content:` |
+| `"text"` or `text` | **Yes** | Text to embed (quoted or unquoted) | `"cute kitten"`, `python` |
 | `^weight` | No | Score weight (default: 1.0) | `^0.8` |
 
 ### Vector Query Examples
 
 ```text
-# Single field
-content:~"cute kitten"
+# Single field (quoted text)
+content:"cute kitten"
+
+# Unquoted text
+content:python
 
 # With boost weight
-content:~"cute kitten"^0.8
-
-# Default field (when configured)
-~"cute kitten"
+content:"cute kitten"^0.8
 
 # Multiple clauses
-content:~"cats" image:~"dogs"^0.5
+content:"cats" image:"dogs"^0.5
 
 # Nested field name (dot notation)
-metadata.embedding:~"text"
+metadata.embedding:"text"
 ```
 
 ### Multiple Clauses
@@ -163,7 +165,7 @@ metadata.embedding:~"text"
 Multiple vector clauses are space-separated. All clauses are executed and their scores are combined using the `score_mode` (default: `WeightedSum`):
 
 ```text
-content:~"cats" image:~"dogs"^0.5
+content:"cats" image:"dogs"^0.5
 ```
 
 This produces:
@@ -186,7 +188,7 @@ There are no `AND`/`OR` operators in the vector DSL. Vector search is inherently
 Score mode cannot be set from DSL syntax. Use the Rust API to override:
 
 ```rust
-let mut request = parser.parse(r#"content:~"cats" image:~"dogs""#).await?;
+let mut request = parser.parse(r#"content:"cats" image:"dogs""#).await?;
 request.vector_options.score_mode = VectorScoreMode::MaxSim;
 ```
 
@@ -196,11 +198,12 @@ The full vector grammar ([parser.pest](https://github.com/mosuka/laurus/blob/mai
 
 ```pest
 query          = { SOI ~ vector_clause+ ~ EOI }
-vector_clause  = { field_prefix? ~ "~" ~ quoted_text ~ boost? }
+vector_clause  = { field_prefix ~ (quoted_text | unquoted_text) ~ boost? }
 field_prefix   = { field_name ~ ":" }
 field_name     = @{ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_" | ".")* }
 quoted_text    = ${ "\"" ~ inner_text ~ "\"" }
 inner_text     = @{ (!("\"") ~ ANY)* }
+unquoted_text  = @{ (!(" " | "^" | "\"") ~ ANY)+ }
 boost          = { "^" ~ float_value }
 float_value    = @{ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)? }
 ```
@@ -210,18 +213,18 @@ float_value    = @{ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)? }
 The `UnifiedQueryParser` allows mixing lexical and vector clauses freely in a single query string:
 
 ```text
-title:hello content:~"cute kitten"^0.8
+title:hello content:"cute kitten"^0.8
 ```
 
 ### How It Works
 
-1. **Split**: Vector clauses (matching `field:~"text"^boost` pattern) are extracted via regex.
+1. **Split**: The parser checks each field name against the schema. Fields defined as vector fields (e.g., HNSW, Flat, IVF) are routed to the vector parser; all other fields are routed to the lexical parser.
 2. **Delegate**: Vector portion goes to `VectorQueryParser`, remainder goes to lexical `QueryParser`.
 3. **Fuse**: If both lexical and vector results exist, they are combined using a fusion algorithm.
 
 ### Disambiguation
 
-The `~"` pattern unambiguously identifies vector clauses because in lexical syntax, `~` only appears _after_ a term or phrase (e.g., `roam~2`, `"hello world"~10`), never before a quote.
+The parser uses the schema's field type information to distinguish vector clauses from lexical clauses. A clause like `content:"cute kitten"` is a vector query if `content` is a vector field, or a phrase query if `content` is a text field. Lexical `~` syntax (e.g., `roam~2` for fuzzy, `"hello world"~10` for proximity) is unaffected.
 
 ### Fusion Algorithms
 
@@ -241,19 +244,19 @@ When a query contains both lexical and vector clauses, results are fused:
 title:hello AND body:world
 
 # Vector only — no fusion
-content:~"cute kitten"
+content:"cute kitten"
 
 # Hybrid — fusion applied automatically
-title:hello content:~"cute kitten"
+title:hello content:"cute kitten"
 
 # Hybrid with boolean operators
-title:hello AND category:animal content:~"cute kitten"^0.8
+title:hello AND category:animal content:"cute kitten"^0.8
 
 # Multiple vector clauses + lexical
-category:animal content:~"cats" image:~"dogs"^0.5
+category:animal content:"cats" image:"dogs"^0.5
 
-# Default fields (when configured)
-hello ~"cats"
+# Unquoted vector text
+category:animal content:python
 ```
 
 ## Code Examples
@@ -281,7 +284,7 @@ use laurus::vector::query::VectorQueryParser;
 let parser = VectorQueryParser::new(embedder)
     .with_default_field("content");
 
-let request = parser.parse(r#"content:~"cute kitten"^0.8"#).await?;
+let request = parser.parse(r#"content:"cute kitten"^0.8"#).await?;
 ```
 
 ### Hybrid Search with Unified DSL
@@ -292,7 +295,7 @@ use laurus::engine::query::UnifiedQueryParser;
 let unified = UnifiedQueryParser::new(lexical_parser, vector_parser);
 
 let request = unified.parse(
-    r#"title:hello content:~"cute kitten"^0.8"#
+    r#"title:hello content:"cute kitten"^0.8"#
 ).await?;
 // request.query              -> SearchQuery::Hybrid { lexical, vector }
 // request.fusion_algorithm   -> Some(RRF)  — fusion algorithm

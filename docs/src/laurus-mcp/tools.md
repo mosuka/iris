@@ -281,17 +281,17 @@ Search documents using the laurus unified query DSL. Supports lexical search, ve
 
 | Query | Description |
 | :--- | :--- |
-| `content:~"cute kitten"` | Vector search on a specific field |
-| `~"cute kitten"` | Vector search on default field |
-| `content:~"cute kitten"^0.8` | Vector search with weight/boost |
-| `a:~"cats" b:~"dogs"^0.5` | Multiple vector queries |
+| `content:"cute kitten"` | Vector search on a field (field must be a vector field in schema) |
+| `content:python` | Vector search with unquoted text |
+| `content:"cute kitten"^0.8` | Vector search with weight/boost |
+| `a:"cats" b:"dogs"^0.5` | Multiple vector queries |
 
 #### Hybrid search
 
 | Query | Description |
 | :--- | :--- |
-| `title:hello content:~"cute kitten"` | Lexical + vector in one query |
-| `title:hello AND body:world content:~"cats"^0.8` | Boolean lexical + weighted vector |
+| `title:hello content:"cute kitten"` | Lexical + vector in one query |
+| `title:hello AND body:world content:"cats"^0.8` | Boolean lexical + weighted vector |
 
 ### Fusion algorithm examples
 
