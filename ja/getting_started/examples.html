@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-9b18d6f5.js";
+            window.path_to_searchindex_js = "../searchindex-aca5f779.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-c8b18c0d.js"></script>
@@ -204,7 +204,7 @@ cargo run --example &lt;name&gt; --features &lt;flag&gt;
 <p>モックエンベッダを使用した Vector 検索のサンプルです。フィルタ付き Vector 検索や DSL 構文も含みます。</p>
 <pre><code class="language-bash">cargo run --example vector_search
 </code></pre>
-<p>デモ内容: <code>PerFieldEmbedder</code>、<code>VectorSearchRequestBuilder</code>、フィルタ付き検索、DSL 構文（<code>field:~"query"</code>）</p>
+<p>デモ内容: <code>PerFieldEmbedder</code>、<code>VectorSearchRequestBuilder</code>、フィルタ付き検索、DSL 構文（<code>field:"query"</code>）</p>
 <h3 id="hybrid_search"><a class="header" href="#hybrid_search">hybrid_search</a></h3>
 <p>異なる融合アルゴリズムを用いた Lexical 検索と Vector 検索の統合サンプルです。</p>
 <pre><code class="language-bash">cargo run --example hybrid_search

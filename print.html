@@ -36,7 +36,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-c0f47b83.js";
+            window.path_to_searchindex_js = "searchindex-58269999.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-45ce2278.js"></script>
@@ -855,7 +855,7 @@ cargo run --example &lt;name&gt; --features &lt;flag&gt;
 <p>Vector search with a mock embedder, including filtered vector search and DSL syntax.</p>
 <pre><code class="language-bash">cargo run --example vector_search
 </code></pre>
-<p>Demonstrates: <code>PerFieldEmbedder</code>, <code>VectorSearchRequestBuilder</code>, filtered search, DSL syntax (<code>field:~"query"</code>).</p>
+<p>Demonstrates: <code>PerFieldEmbedder</code>, <code>VectorSearchRequestBuilder</code>, filtered search, DSL syntax (<code>field:"query"</code>).</p>
 <h3 id="hybrid_search"><a class="header" href="#hybrid_search">hybrid_search</a></h3>
 <p>Combining lexical and vector search with different fusion algorithms.</p>
 <pre><code class="language-bash">cargo run --example hybrid_search
@@ -1673,7 +1673,7 @@ let request = VectorSearchRequestBuilder::new()
     .build();
 
 // Query DSL
-let request = vector_parser.parse(r#"text_vec:~"systems programming""#).await?;
+let request = vector_parser.parse(r#"text_vec:"systems programming""#).await?;
 <span class="boring">}</span></code></pre>
 <p>Both approaches embed the query text using the same embedder that was used at index time, ensuring consistent vector spaces.</p>
 <h2 id="feature-flags-summary"><a class="header" href="#feature-flags-summary">Feature Flags Summary</a></h2>
@@ -2707,7 +2707,7 @@ let results = engine.search(request).await?;
 let parser = VectorQueryParser::new(embedder.clone())
     .with_default_field("embedding");
 
-let request = parser.parse(r#"embedding:~"systems programming""#).await?;
+let request = parser.parse(r#"embedding:"systems programming""#).await?;
 <span class="boring">}</span></code></pre>
 <h2 id="vectorsearchquery"><a class="header" href="#vectorsearchquery">VectorSearchQuery</a></h2>
 <p>The vector search query is specified as a <code>VectorSearchQuery</code> enum:</p>
@@ -2811,7 +2811,7 @@ let query = VectorSearchQuery::Payloads(vec![
 </div>
 <h3 id="weights"><a class="header" href="#weights">Weights</a></h3>
 <p>Use the <code>^</code> boost syntax in DSL or <code>weight</code> in <code>QueryVector</code> to adjust how much each field contributes:</p>
-<pre><code class="language-text">text_vec:~"cute kitten"^1.0 image_vec:~"fluffy cat"^0.5
+<pre><code class="language-text">text_vec:"cute kitten"^1.0 image_vec:"fluffy cat"^0.5
 </code></pre>
 <p>This means text similarity counts twice as much as image similarity.</p>
 <h2 id="filtered-vector-search"><a class="header" href="#filtered-vector-search">Filtered Vector Search</a></h2>
@@ -3036,10 +3036,10 @@ let unified = UnifiedQueryParser::new(
 );
 
 // Lexical + vector in one query
-let request = unified.parse(r#"body:rust text_vec:~"systems programming""#).await?;
+let request = unified.parse(r#"body:rust text_vec:"systems programming""#).await?;
 let results = engine.search(request).await?;
 <span class="boring">}</span></code></pre>
-<p>The <code>~"..."</code> syntax identifies vector clauses. Everything else is parsed as lexical.</p>
+<p>The parser uses the schema to identify vector clauses by field type. Fields defined as vector fields (e.g., HNSW) are parsed as vector queries; everything else is parsed as lexical.</p>
 <h2 id="fusion-algorithms"><a class="header" href="#fusion-algorithms">Fusion Algorithms</a></h2>
 <p>When both lexical and vector results exist, they must be merged into a single ranked list. Laurus supports two fusion algorithms:</p>
 <h3 id="rrf-reciprocal-rank-fusion"><a class="header" href="#rrf-reciprocal-rank-fusion">RRF (Reciprocal Rank Fusion)</a></h3>
@@ -3244,10 +3244,10 @@ async fn main() -&gt; laurus::Result&lt;()&gt; {
 <h1 id="query-dsl-2"><a class="header" href="#query-dsl-2">Query DSL</a></h1>
 <p>Laurus provides a unified query DSL (Domain Specific Language) that allows lexical (keyword) and vector (semantic) search in a single query string. The <code>UnifiedQueryParser</code> splits the input into lexical and vector portions and delegates to the appropriate sub-parser.</p>
 <h2 id="overview"><a class="header" href="#overview">Overview</a></h2>
-<pre><code class="language-text">title:hello AND content:~"cute kitten"^0.8
+<pre><code class="language-text">title:hello AND content:"cute kitten"^0.8
 |--- lexical --|    |--- vector --------|
 </code></pre>
-<p>The <code>~"</code> pattern distinguishes vector clauses from lexical clauses. Everything else is treated as a lexical query.</p>
+<p>The field type in the schema determines whether a clause is lexical or vector. If the field is a vector field (e.g., HNSW), the clause is treated as a vector query. Everything else is treated as a lexical query.</p>
 <h2 id="lexical-query-syntax"><a class="header" href="#lexical-query-syntax">Lexical Query Syntax</a></h2>
 <p>Lexical queries search the inverted index using exact or approximate keyword matching.</p>
 <h3 id="term-query"><a class="header" href="#term-query">Term Query</a></h3>
@@ -3318,41 +3318,42 @@ boost          = { "^" ~ boost_value }
 <h2 id="vector-query-syntax"><a class="header" href="#vector-query-syntax">Vector Query Syntax</a></h2>
 <p>Vector queries embed text into vectors at parse time and perform similarity search.</p>
 <h3 id="basic-syntax"><a class="header" href="#basic-syntax">Basic Syntax</a></h3>
-<pre><code class="language-text">field:~"text"
-field:~"text"^weight
+<pre><code class="language-text">field:"text"
+field:text
+field:"text"^weight
 </code></pre>
+<p>The field name must refer to a vector field defined in the schema. The parser uses the schema to determine whether a clause is a vector query.</p>
 <div class="table-wrapper">
 <table>
 <thead>
 <tr><th style="text-align: left">Element</th><th style="text-align: center">Required</th><th style="text-align: left">Description</th><th style="text-align: left">Example</th></tr>
 </thead>
 <tbody>
-<tr><td style="text-align: left"><code>field:</code></td><td style="text-align: center">No</td><td style="text-align: left">Target vector field name</td><td style="text-align: left"><code>content:</code></td></tr>
-<tr><td style="text-align: left"><code>~</code></td><td style="text-align: center"><strong>Yes</strong></td><td style="text-align: left">Vector query marker</td><td style="text-align: left"></td></tr>
-<tr><td style="text-align: left"><code>"text"</code></td><td style="text-align: center"><strong>Yes</strong></td><td style="text-align: left">Text to embed</td><td style="text-align: left"><code>"cute kitten"</code></td></tr>
+<tr><td style="text-align: left"><code>field:</code></td><td style="text-align: center"><strong>Yes</strong></td><td style="text-align: left">Target vector field name (must be a vector field in the schema)</td><td style="text-align: left"><code>content:</code></td></tr>
+<tr><td style="text-align: left"><code>"text"</code> or <code>text</code></td><td style="text-align: center"><strong>Yes</strong></td><td style="text-align: left">Text to embed (quoted or unquoted)</td><td style="text-align: left"><code>"cute kitten"</code>, <code>python</code></td></tr>
 <tr><td style="text-align: left"><code>^weight</code></td><td style="text-align: center">No</td><td style="text-align: left">Score weight (default: 1.0)</td><td style="text-align: left"><code>^0.8</code></td></tr>
 </tbody>
 </table>
 </div>
 <h3 id="vector-query-examples"><a class="header" href="#vector-query-examples">Vector Query Examples</a></h3>
-<pre><code class="language-text"># Single field
-content:~"cute kitten"
+<pre><code class="language-text"># Single field (quoted text)
+content:"cute kitten"
+
+# Unquoted text
+content:python
 
 # With boost weight
-content:~"cute kitten"^0.8
-
-# Default field (when configured)
-~"cute kitten"
+content:"cute kitten"^0.8
 
 # Multiple clauses
-content:~"cats" image:~"dogs"^0.5
+content:"cats" image:"dogs"^0.5
 
 # Nested field name (dot notation)
-metadata.embedding:~"text"
+metadata.embedding:"text"
 </code></pre>
 <h3 id="multiple-clauses"><a class="header" href="#multiple-clauses">Multiple Clauses</a></h3>
 <p>Multiple vector clauses are space-separated. All clauses are executed and their scores are combined using the <code>score_mode</code> (default: <code>WeightedSum</code>):</p>
-<pre><code class="language-text">content:~"cats" image:~"dogs"^0.5
+<pre><code class="language-text">content:"cats" image:"dogs"^0.5
 </code></pre>
 <p>This produces:</p>
 <pre><code class="language-text">score = similarity("cats", content) * 1.0
@@ -3375,32 +3376,33 @@ metadata.embedding:~"text"
 <p>Score mode cannot be set from DSL syntax. Use the Rust API to override:</p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>let mut request = parser.parse(r#"content:~"cats" image:~"dogs""#).await?;
+</span>let mut request = parser.parse(r#"content:"cats" image:"dogs""#).await?;
 request.vector_options.score_mode = VectorScoreMode::MaxSim;
 <span class="boring">}</span></code></pre>
 <h3 id="vector-peg-grammar"><a class="header" href="#vector-peg-grammar">Vector PEG Grammar</a></h3>
 <p>The full vector grammar (<a href="https://github.com/mosuka/laurus/blob/main/laurus/src/vector/query/parser.pest">parser.pest</a>):</p>
 <pre><code class="language-pest">query          = { SOI ~ vector_clause+ ~ EOI }
-vector_clause  = { field_prefix? ~ "~" ~ quoted_text ~ boost? }
+vector_clause  = { field_prefix ~ (quoted_text | unquoted_text) ~ boost? }
 field_prefix   = { field_name ~ ":" }
 field_name     = @{ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_" | ".")* }
 quoted_text    = ${ "\"" ~ inner_text ~ "\"" }
 inner_text     = @{ (!("\"") ~ ANY)* }
+unquoted_text  = @{ (!(" " | "^" | "\"") ~ ANY)+ }
 boost          = { "^" ~ float_value }
 float_value    = @{ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)? }
 </code></pre>
 <h2 id="unified-hybrid-query-syntax"><a class="header" href="#unified-hybrid-query-syntax">Unified (Hybrid) Query Syntax</a></h2>
 <p>The <code>UnifiedQueryParser</code> allows mixing lexical and vector clauses freely in a single query string:</p>
-<pre><code class="language-text">title:hello content:~"cute kitten"^0.8
+<pre><code class="language-text">title:hello content:"cute kitten"^0.8
 </code></pre>
 <h3 id="how-it-works-2"><a class="header" href="#how-it-works-2">How It Works</a></h3>
 <ol>
-<li><strong>Split</strong>: Vector clauses (matching <code>field:~"text"^boost</code> pattern) are extracted via regex.</li>
+<li><strong>Split</strong>: The parser checks each field name against the schema. Fields defined as vector fields (e.g., HNSW, Flat, IVF) are routed to the vector parser; all other fields are routed to the lexical parser.</li>
 <li><strong>Delegate</strong>: Vector portion goes to <code>VectorQueryParser</code>, remainder goes to lexical <code>QueryParser</code>.</li>
 <li><strong>Fuse</strong>: If both lexical and vector results exist, they are combined using a fusion algorithm.</li>
 </ol>
 <h3 id="disambiguation"><a class="header" href="#disambiguation">Disambiguation</a></h3>
-<p>The <code>~"</code> pattern unambiguously identifies vector clauses because in lexical syntax, <code>~</code> only appears <em>after</em> a term or phrase (e.g., <code>roam~2</code>, <code>"hello world"~10</code>), never before a quote.</p>
+<p>The parser uses the schema’s field type information to distinguish vector clauses from lexical clauses. A clause like <code>content:"cute kitten"</code> is a vector query if <code>content</code> is a vector field, or a phrase query if <code>content</code> is a text field. Lexical <code>~</code> syntax (e.g., <code>roam~2</code> for fuzzy, <code>"hello world"~10</code> for proximity) is unaffected.</p>
 <h3 id="fusion-algorithms-1"><a class="header" href="#fusion-algorithms-1">Fusion Algorithms</a></h3>
 <p>When a query contains both lexical and vector clauses, results are fused:</p>
 <div class="table-wrapper">
@@ -3422,19 +3424,19 @@ float_value    = @{ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)? }
 title:hello AND body:world
 
 # Vector only — no fusion
-content:~"cute kitten"
+content:"cute kitten"
 
 # Hybrid — fusion applied automatically
-title:hello content:~"cute kitten"
+title:hello content:"cute kitten"
 
 # Hybrid with boolean operators
-title:hello AND category:animal content:~"cute kitten"^0.8
+title:hello AND category:animal content:"cute kitten"^0.8
 
 # Multiple vector clauses + lexical
-category:animal content:~"cats" image:~"dogs"^0.5
+category:animal content:"cats" image:"dogs"^0.5
 
-# Default fields (when configured)
-hello ~"cats"
+# Unquoted vector text
+category:animal content:python
 </code></pre>
 <h2 id="code-examples"><a class="header" href="#code-examples">Code Examples</a></h2>
 <h3 id="lexical-search-with-dsl"><a class="header" href="#lexical-search-with-dsl">Lexical Search with DSL</a></h3>
@@ -3459,7 +3461,7 @@ use laurus::vector::query::VectorQueryParser;
 let parser = VectorQueryParser::new(embedder)
     .with_default_field("content");
 
-let request = parser.parse(r#"content:~"cute kitten"^0.8"#).await?;
+let request = parser.parse(r#"content:"cute kitten"^0.8"#).await?;
 <span class="boring">}</span></code></pre>
 <h3 id="hybrid-search-with-unified-dsl"><a class="header" href="#hybrid-search-with-unified-dsl">Hybrid Search with Unified DSL</a></h3>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
@@ -3469,7 +3471,7 @@ let request = parser.parse(r#"content:~"cute kitten"^0.8"#).await?;
 let unified = UnifiedQueryParser::new(lexical_parser, vector_parser);
 
 let request = unified.parse(
-    r#"title:hello content:~"cute kitten"^0.8"#
+    r#"title:hello content:"cute kitten"^0.8"#
 ).await?;
 // request.query              -&gt; SearchQuery::Hybrid { lexical, vector }
 // request.fusion_algorithm   -&gt; Some(RRF)  — fusion algorithm
@@ -7854,10 +7856,10 @@ document: {"title": "Hello World - Part 2", "body": "This is a continuation."}
 <tr><th style="text-align: left">Query</th><th style="text-align: left">Description</th></tr>
 </thead>
 <tbody>
-<tr><td style="text-align: left"><code>content:~"cute kitten"</code></td><td style="text-align: left">Vector search on a specific field</td></tr>
-<tr><td style="text-align: left"><code>~"cute kitten"</code></td><td style="text-align: left">Vector search on default field</td></tr>
-<tr><td style="text-align: left"><code>content:~"cute kitten"^0.8</code></td><td style="text-align: left">Vector search with weight/boost</td></tr>
-<tr><td style="text-align: left"><code>a:~"cats" b:~"dogs"^0.5</code></td><td style="text-align: left">Multiple vector queries</td></tr>
+<tr><td style="text-align: left"><code>content:"cute kitten"</code></td><td style="text-align: left">Vector search on a field (field must be a vector field in schema)</td></tr>
+<tr><td style="text-align: left"><code>content:python</code></td><td style="text-align: left">Vector search with unquoted text</td></tr>
+<tr><td style="text-align: left"><code>content:"cute kitten"^0.8</code></td><td style="text-align: left">Vector search with weight/boost</td></tr>
+<tr><td style="text-align: left"><code>a:"cats" b:"dogs"^0.5</code></td><td style="text-align: left">Multiple vector queries</td></tr>
 </tbody>
 </table>
 </div>
@@ -7868,8 +7870,8 @@ document: {"title": "Hello World - Part 2", "body": "This is a continuation."}
 <tr><th style="text-align: left">Query</th><th style="text-align: left">Description</th></tr>
 </thead>
 <tbody>
-<tr><td style="text-align: left"><code>title:hello content:~"cute kitten"</code></td><td style="text-align: left">Lexical + vector in one query</td></tr>
-<tr><td style="text-align: left"><code>title:hello AND body:world content:~"cats"^0.8</code></td><td style="text-align: left">Boolean lexical + weighted vector</td></tr>
+<tr><td style="text-align: left"><code>title:hello content:"cute kitten"</code></td><td style="text-align: left">Lexical + vector in one query</td></tr>
+<tr><td style="text-align: left"><code>title:hello AND body:world content:"cats"^0.8</code></td><td style="text-align: left">Boolean lexical + weighted vector</td></tr>
 </tbody>
 </table>
 </div>
@@ -8143,7 +8145,7 @@ print(stats["vector_fields"])
 <h3 id="search-query-argument"><a class="header" href="#search-query-argument"><code>search</code> query argument</a></h3>
 <p>The <code>query</code> parameter accepts any of the following:</p>
 <ul>
-<li>A <strong>DSL string</strong> (e.g. <code>"title:hello"</code>, <code>"~\"memory safety\""</code>)</li>
+<li>A <strong>DSL string</strong> (e.g. <code>"title:hello"</code>, <code>"embedding:\"memory safety\""</code>)</li>
 <li>A <strong>lexical query object</strong> (<code>TermQuery</code>, <code>PhraseQuery</code>, <code>BooleanQuery</code>, …)</li>
 <li>A <strong>vector query object</strong> (<code>VectorQuery</code>, <code>VectorTextQuery</code>)</li>
 <li>A <strong><code>SearchRequest</code></strong> for full control</li>

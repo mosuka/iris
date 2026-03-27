@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-9b18d6f5.js";
+            window.path_to_searchindex_js = "../searchindex-aca5f779.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-c8b18c0d.js"></script>
@@ -354,7 +354,7 @@ let request = VectorSearchRequestBuilder::new()
     .build();
 
 // Query DSL
-let request = vector_parser.parse(r#"text_vec:~"systems programming""#).await?;
+let request = vector_parser.parse(r#"text_vec:"systems programming""#).await?;
 <span class="boring">}</span></code></pre>
 <p>どちらのアプローチも、インデクシング時と同じ Embedder を使用してクエリテキストを Embedding 化するため、一貫したベクトル空間が保証されます。</p>
 <h2 id="feature-flag-まとめ"><a class="header" href="#feature-flag-まとめ">Feature Flag まとめ</a></h2>

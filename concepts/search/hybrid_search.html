@@ -35,7 +35,7 @@
             const path_to_root = "../../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../../searchindex-c0f47b83.js";
+            window.path_to_searchindex_js = "../../searchindex-58269999.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../../toc-45ce2278.js"></script>
@@ -264,10 +264,10 @@ let unified = UnifiedQueryParser::new(
 );
 
 // Lexical + vector in one query
-let request = unified.parse(r#"body:rust text_vec:~"systems programming""#).await?;
+let request = unified.parse(r#"body:rust text_vec:"systems programming""#).await?;
 let results = engine.search(request).await?;
 <span class="boring">}</span></code></pre>
-<p>The <code>~"..."</code> syntax identifies vector clauses. Everything else is parsed as lexical.</p>
+<p>The parser uses the schema to identify vector clauses by field type. Fields defined as vector fields (e.g., HNSW) are parsed as vector queries; everything else is parsed as lexical.</p>
 <h2 id="fusion-algorithms"><a class="header" href="#fusion-algorithms">Fusion Algorithms</a></h2>
 <p>When both lexical and vector results exist, they must be merged into a single ranked list. Laurus supports two fusion algorithms:</p>
 <h3 id="rrf-reciprocal-rank-fusion"><a class="header" href="#rrf-reciprocal-rank-fusion">RRF (Reciprocal Rank Fusion)</a></h3>

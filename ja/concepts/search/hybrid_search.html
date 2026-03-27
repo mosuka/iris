@@ -35,7 +35,7 @@
             const path_to_root = "../../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../../searchindex-9b18d6f5.js";
+            window.path_to_searchindex_js = "../../searchindex-aca5f779.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../../toc-c8b18c0d.js"></script>
@@ -261,10 +261,10 @@ let unified = UnifiedQueryParser::new(
 );
 
 // Lexical + vector in one query
-let request = unified.parse(r#"body:rust text_vec:~"systems programming""#).await?;
+let request = unified.parse(r#"body:rust text_vec:"systems programming""#).await?;
 let results = engine.search(request).await?;
 <span class="boring">}</span></code></pre>
-<p><code>~"..."</code> 構文は Vector 句を識別します。それ以外はすべて Lexical として解析されます。</p>
+<p>Vector 句の識別はスキーマのフィールド型に基づいて行われます。ベクトルフィールドとして定義されたフィールド名を持つ句は Vector クエリとして、それ以外は Lexical クエリとして解析されます。</p>
 <h2 id="フュージョンアルゴリズムfusion-algorithms"><a class="header" href="#フュージョンアルゴリズムfusion-algorithms">フュージョンアルゴリズム（Fusion Algorithms）</a></h2>
 <p>Lexical と Vector の両方の結果が存在する場合、それらを単一のランキングリストにマージする必要があります。Laurus は 2 つのフュージョンアルゴリズムをサポートしています。</p>
 <h3 id="rrfreciprocal-rank-fusion"><a class="header" href="#rrfreciprocal-rank-fusion">RRF（Reciprocal Rank Fusion）</a></h3>

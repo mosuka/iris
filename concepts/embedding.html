@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-c0f47b83.js";
+            window.path_to_searchindex_js = "../searchindex-58269999.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-45ce2278.js"></script>
@@ -351,7 +351,7 @@ let request = VectorSearchRequestBuilder::new()
     .build();
 
 // Query DSL
-let request = vector_parser.parse(r#"text_vec:~"systems programming""#).await?;
+let request = vector_parser.parse(r#"text_vec:"systems programming""#).await?;
 <span class="boring">}</span></code></pre>
 <p>Both approaches embed the query text using the same embedder that was used at index time, ensuring consistent vector spaces.</p>
 <h2 id="feature-flags-summary"><a class="header" href="#feature-flags-summary">Feature Flags Summary</a></h2>

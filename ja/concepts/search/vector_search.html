@@ -35,7 +35,7 @@
             const path_to_root = "../../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../../searchindex-9b18d6f5.js";
+            window.path_to_searchindex_js = "../../searchindex-aca5f779.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../../toc-c8b18c0d.js"></script>
@@ -209,7 +209,7 @@ let results = engine.search(request).await?;
 let parser = VectorQueryParser::new(embedder.clone())
     .with_default_field("embedding");
 
-let request = parser.parse(r#"embedding:~"systems programming""#).await?;
+let request = parser.parse(r#"embedding:"systems programming""#).await?;
 <span class="boring">}</span></code></pre>
 <h2 id="vectorsearchrequestbuilder"><a class="header" href="#vectorsearchrequestbuilder">VectorSearchRequestBuilder</a></h2>
 <p>Builder API により、きめ細かな制御が可能です。</p>
@@ -277,7 +277,7 @@ let request = VectorSearchRequestBuilder::new()
 </div>
 <h3 id="ウェイト"><a class="header" href="#ウェイト">ウェイト</a></h3>
 <p>DSL では <code>^</code> ブースト構文を使用するか、<code>QueryVector</code> の <code>weight</code> で各フィールドの寄与度を調整します。</p>
-<pre><code class="language-text">text_vec:~"cute kitten"^1.0 image_vec:~"fluffy cat"^0.5
+<pre><code class="language-text">text_vec:"cute kitten"^1.0 image_vec:"fluffy cat"^0.5
 </code></pre>
 <p>これは、テキストの類似度が画像の類似度の 2 倍の重みを持つことを意味します。</p>
 <h2 id="フィルター付き-vector-検索"><a class="header" href="#フィルター付き-vector-検索">フィルター付き Vector 検索</a></h2>
