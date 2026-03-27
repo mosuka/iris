@@ -7,6 +7,7 @@ pub mod searcher;
 pub mod segment;
 pub mod writer;
 
+#[cfg(not(target_arch = "wasm32"))]
 use std::path::Path;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -40,10 +41,7 @@ struct IndexMetadata {
 
 impl Default for IndexMetadata {
     fn default() -> Self {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = crate::util::time::now_secs();
         Self {
             vector_count: 0,
             dimension: 0,
@@ -129,6 +127,7 @@ impl FlatIndex {
     }
 
     /// Create an index in a directory.
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn create_in_dir<P: AsRef<Path>>(
         dir: P,
         name: &str,
@@ -142,6 +141,7 @@ impl FlatIndex {
     }
 
     /// Open an index from a directory.
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn open_dir<P: AsRef<Path>>(dir: P, name: &str, config: FlatIndexConfig) -> Result<Self> {
         use crate::storage::file::{FileStorage, FileStorageConfig};
 
@@ -176,10 +176,7 @@ impl FlatIndex {
     fn update_metadata(&self) -> Result<()> {
         {
             let mut metadata = self.metadata.write();
-            metadata.modified = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs();
+            metadata.modified = crate::util::time::now_secs();
         }
         self.write_metadata()
     }

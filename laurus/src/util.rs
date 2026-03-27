@@ -3,4 +3,5 @@
 pub mod id;
 pub mod levenshtein;
 pub mod simd;
+pub mod time;
 pub mod varint;

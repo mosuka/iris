@@ -4,7 +4,6 @@
 //! segment organization, and query performance improvements.
 
 use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::error::{LaurusError, Result};
 use crate::lexical::index::inverted::segment::manager::{
@@ -172,7 +171,7 @@ impl IndexOptimizer {
         segment_manager: &mut SegmentManager,
         deletion_manager: &mut DeletionManager,
     ) -> Result<OptimizationResult> {
-        let start_time = SystemTime::now();
+        let start_millis = crate::util::time::now_millis();
         let mut result = OptimizationResult::default();
 
         // Collect initial statistics
@@ -211,7 +210,7 @@ impl IndexOptimizer {
                 * 100.0;
         }
 
-        result.optimization_time_ms = start_time.elapsed().unwrap_or_default().as_millis() as u64;
+        result.optimization_time_ms = crate::util::time::now_millis().saturating_sub(start_millis);
 
         result.completed = true;
 
@@ -390,10 +389,7 @@ impl IndexOptimizer {
         };
 
         // Generate next generation ID
-        let next_generation = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_millis() as u64;
+        let next_generation = crate::util::time::now_millis();
 
         // Perform merge
         let merge_result =

@@ -1,5 +1,6 @@
 //! Distance metrics for vector similarity calculation.
 
+#[cfg(not(target_arch = "wasm32"))]
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -282,10 +283,20 @@ impl DistanceMetric {
                 .collect::<Result<Vec<_>>>();
         }
 
-        vectors
-            .par_iter()
-            .map(|v| self.distance(query, v))
-            .collect::<Result<Vec<_>>>()
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            vectors
+                .par_iter()
+                .map(|v| self.distance(query, v))
+                .collect::<Result<Vec<_>>>()
+        }
+        #[cfg(target_arch = "wasm32")]
+        {
+            vectors
+                .iter()
+                .map(|v| self.distance(query, v))
+                .collect::<Result<Vec<_>>>()
+        }
     }
 
     /// Calculate similarities between a query vector and multiple vectors in parallel.
@@ -301,9 +312,19 @@ impl DistanceMetric {
                 .collect::<Result<Vec<_>>>();
         }
 
-        vectors
-            .par_iter()
-            .map(|v| self.similarity(query, v))
-            .collect::<Result<Vec<_>>>()
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            vectors
+                .par_iter()
+                .map(|v| self.similarity(query, v))
+                .collect::<Result<Vec<_>>>()
+        }
+        #[cfg(target_arch = "wasm32")]
+        {
+            vectors
+                .iter()
+                .map(|v| self.similarity(query, v))
+                .collect::<Result<Vec<_>>>()
+        }
     }
 }

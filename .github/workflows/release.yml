@@ -352,13 +352,41 @@ jobs:
           npm test
 
   # ============================================================
+  # Test laurus-wasm
+  # ============================================================
+  test-wasm:
+    name: Test laurus-wasm
+    needs: [test-laurus]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run checkout
+        uses: actions/checkout@v6
+
+      - name: Install toolchain
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+          target: wasm32-unknown-unknown
+
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "stable-wasm32-unknown-unknown"
+
+      - name: Build
+        run: cargo build -p laurus-wasm --target wasm32-unknown-unknown
+
+      - name: Run clippy
+        run: cargo clippy -p laurus-wasm --target wasm32-unknown-unknown -- -D warnings
+
+  # ============================================================
   # Gate: ensure all tests pass before proceeding to build
   # ============================================================
   test-all:
     name: Test All
     if: ${{ !failure() && !cancelled() }}
     needs:
-      [test-laurus, test-cli, test-server, test-mcp, test-python, test-nodejs]
+      [test-laurus, test-cli, test-server, test-mcp, test-python, test-nodejs, test-wasm]
     runs-on: ubuntu-latest
     steps:
       - name: All tests passed
@@ -561,12 +589,52 @@ jobs:
           if-no-files-found: error
 
   # ============================================================
+  # Build WASM packages
+  # ============================================================
+  build-wasm:
+    name: Build WASM
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [test-all]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        wasm-target: [web, bundler]
+    steps:
+      - name: Run checkout
+        uses: actions/checkout@v6
+
+      - name: Install toolchain
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "stable-wasm32-unknown-unknown"
+
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+      - name: Build with wasm-pack
+        working-directory: laurus-wasm
+        run: wasm-pack build --target ${{ matrix.wasm-target }} --release
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wasm-${{ matrix.wasm-target }}
+          path: laurus-wasm/pkg/
+          if-no-files-found: error
+
+  # ============================================================
   # Create GitHub Release and upload all artifacts
   # ============================================================
   create-release:
     name: Create Release
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [build-binary, build-wheel, build-python-sdist, build-nodejs]
+    needs: [build-binary, build-wheel, build-python-sdist, build-nodejs, build-wasm]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -739,4 +807,65 @@ jobs:
           done
 
           # Publish the main package
+          npm publish --access public
+
+  # ============================================================
+  # Publish WASM package to npm
+  # ============================================================
+  publish-wasm-npm:
+    name: Publish WASM to npm
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [create-release]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Install toolchain
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+      - name: Build with wasm-pack
+        working-directory: laurus-wasm
+        run: wasm-pack build --target web --release
+
+      - name: Sync version from Cargo.toml
+        working-directory: laurus-wasm/pkg
+        shell: bash
+        run: |
+          VERSION=$(cargo metadata --no-deps --format-version=1 \
+            --manifest-path "${{ github.workspace }}/laurus-wasm/Cargo.toml" \
+            | jq -r '.packages[] | select(.name=="laurus-wasm") | .version')
+          echo "Syncing npm version to ${VERSION}"
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            pkg.version = '${VERSION}';
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          "
+
+      - name: Publish to npm
+        working-directory: laurus-wasm/pkg
+        shell: bash
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          PACKAGE_NAME=$(node -p "require('./package.json').name")
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+
+          if npm view "${PACKAGE_NAME}@${PACKAGE_VERSION}" version 2>/dev/null; then
+            echo "${PACKAGE_NAME}@${PACKAGE_VERSION} has already been published, skipping"
+            exit 0
+          fi
+
           npm publish --access public

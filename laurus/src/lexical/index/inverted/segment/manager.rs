@@ -6,7 +6,7 @@
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, RwLock};
-use std::time::{SystemTime, UNIX_EPOCH};
+
 
 use serde::{Deserialize, Serialize};
 
@@ -85,10 +85,7 @@ pub struct ManagedSegmentInfo {
 impl ManagedSegmentInfo {
     /// Create new managed segment info.
     pub fn new(segment_info: SegmentInfo) -> Self {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = crate::util::time::now_secs();
 
         ManagedSegmentInfo {
             segment_info,
@@ -427,10 +424,7 @@ impl SegmentManager {
         writer.close()?;
 
         // Update last write time and clear dirty flag
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs();
+        let now = crate::util::time::now_secs();
         self.last_manifest_write.store(now, Ordering::Relaxed);
         self.manifest_dirty.store(false, Ordering::Relaxed);
 
@@ -443,10 +437,7 @@ impl SegmentManager {
             return false;
         }
 
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs();
+        let now = crate::util::time::now_secs();
         let last_write = self.last_manifest_write.load(Ordering::Relaxed);
 
         // Write if it's been more than 1 second since last write
@@ -554,10 +545,7 @@ impl SegmentManager {
         let mut segments = self.segments.write().unwrap();
         if let Some(managed_info) = segments.get_mut(segment_id) {
             managed_info.deleted_count += deleted_count;
-            managed_info.last_modified = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_secs();
+            managed_info.last_modified = crate::util::time::now_secs();
 
             if managed_info.deleted_count > 0 {
                 managed_info.segment_info.has_deletions = true;
@@ -591,10 +579,7 @@ impl SegmentManager {
             for (segment_id, deleted_count) in updates {
                 if let Some(managed_info) = segments.get_mut(segment_id) {
                     managed_info.deleted_count += deleted_count;
-                    managed_info.last_modified = SystemTime::now()
-                        .duration_since(UNIX_EPOCH)
-                        .unwrap()
-                        .as_secs();
+                    managed_info.last_modified = crate::util::time::now_secs();
 
                     if managed_info.deleted_count > 0 {
                         managed_info.segment_info.has_deletions = true;
@@ -855,10 +840,7 @@ impl SegmentManager {
             return 0.0;
         }
 
-        let current_time = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let current_time = crate::util::time::now_secs();
 
         let avg_age: f64 = segments
             .iter()
@@ -877,10 +859,7 @@ impl SegmentManager {
             if let Some(segment) = segments.get_mut(segment_id) {
                 segment.is_merging = merging;
                 if merging {
-                    segment.last_modified = SystemTime::now()
-                        .duration_since(UNIX_EPOCH)
-                        .unwrap()
-                        .as_secs();
+                    segment.last_modified = crate::util::time::now_secs();
                 }
             }
         }
@@ -920,10 +899,7 @@ impl SegmentManager {
         {
             let mut stats = self.stats.write().unwrap();
             stats.merge_operations += 1;
-            stats.last_merge_time = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_secs();
+            stats.last_merge_time = crate::util::time::now_secs();
         }
 
         self.mark_manifest_dirty();
@@ -1029,10 +1005,7 @@ impl SegmentManager {
             let new_tier = self.calculate_tier(segment.size_bytes);
             if new_tier != segment.tier {
                 segment.tier = new_tier;
-                segment.last_modified = SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .unwrap()
-                    .as_secs();
+                segment.last_modified = crate::util::time::now_secs();
             }
         }
 

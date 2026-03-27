@@ -93,29 +93,27 @@ pub mod utils {
 
     /// Normalize a batch of vectors in parallel.
     pub fn normalize_vectors_parallel(vectors: &mut [Vector], method: VectorNormalization) {
-        use rayon::prelude::*;
-
         match method {
             VectorNormalization::None => {
                 // No normalization needed
             }
             VectorNormalization::L2 => {
-                vectors.par_iter_mut().for_each(|vector| {
+                for vector in vectors.iter_mut() {
                     vector.normalize();
-                });
+                }
             }
             VectorNormalization::L1 => {
-                vectors.par_iter_mut().for_each(|vector| {
+                for vector in vectors.iter_mut() {
                     let l1_norm: f32 = vector.data.iter().map(|x| x.abs()).sum();
                     if l1_norm > 0.0 {
                         for value in Arc::make_mut(&mut vector.data) {
                             *value /= l1_norm;
                         }
                     }
-                });
+                }
             }
             VectorNormalization::MinMax => {
-                vectors.par_iter_mut().for_each(|vector| {
+                for vector in vectors.iter_mut() {
                     if let (Some(&min_val), Some(&max_val)) =
                         (
                             vector.data.iter().min_by(|a, b| {
@@ -133,7 +131,7 @@ pub mod utils {
                             }
                         }
                     }
-                });
+                }
             }
         }
     }

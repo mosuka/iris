@@ -79,6 +79,14 @@
   - [API リファレンス](laurus-nodejs/api_reference.md)
   - [開発](laurus-nodejs/development.md)
 
+# laurus-wasm
+
+- [WASM バインディング概要](laurus-wasm.md)
+  - [インストール](laurus-wasm/installation.md)
+  - [クイックスタート](laurus-wasm/quickstart.md)
+  - [API リファレンス](laurus-wasm/api_reference.md)
+  - [開発](laurus-wasm/development.md)
+
 # 開発ガイド
 
 - [ビルドとテスト](development/build_and_test.md)

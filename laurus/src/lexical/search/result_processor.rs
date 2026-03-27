@@ -281,7 +281,7 @@ impl ResultProcessor {
         raw_results: Vec<QueryResult>,
         query: &Q,
     ) -> Result<ProcessedSearchResults> {
-        let start_time = std::time::Instant::now();
+        let start_time = crate::util::time::Timer::now();
 
         // Limit results
         let limited_results: Vec<_> = raw_results
@@ -327,7 +327,7 @@ impl ResultProcessor {
         // Generate suggestions (placeholder)
         let suggestions = Vec::new();
 
-        let processing_time_ms = start_time.elapsed().as_millis() as u64;
+        let processing_time_ms = start_time.elapsed_ms();
 
         Ok(ProcessedSearchResults {
             hits: processed_hits,

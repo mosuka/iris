@@ -5,7 +5,6 @@
 
 use crate::lexical::core::field::FieldValue;
 use std::sync::Arc;
-use std::time::SystemTime;
 
 use ahash::AHashSet;
 
@@ -139,7 +138,7 @@ impl MergeEngine {
         segments: &[ManagedSegmentInfo],
         next_generation: u64,
     ) -> Result<MergeResult> {
-        let start_time = SystemTime::now();
+        let start_millis = crate::util::time::now_millis();
 
         // Filter segments to merge
         let segments_to_merge: Vec<_> = segments
@@ -172,11 +171,8 @@ impl MergeEngine {
         };
 
         // Calculate final statistics
-        let end_time = SystemTime::now();
-        stats.merge_time_ms = end_time
-            .duration_since(start_time)
-            .unwrap_or_default()
-            .as_millis() as u64;
+        let end_millis = crate::util::time::now_millis();
+        stats.merge_time_ms = end_millis.saturating_sub(start_millis);
 
         stats.size_after = merge_result.new_segment.size_bytes;
         stats.compression_ratio = if stats.size_before > 0 {

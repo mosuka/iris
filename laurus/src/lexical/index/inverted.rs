@@ -12,10 +12,11 @@
 
 use std::collections::HashMap;
 use std::io::Read;
+#[cfg(not(target_arch = "wasm32"))]
 use std::path::Path;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::{SystemTime, UNIX_EPOCH};
+
 
 use parking_lot::RwLock;
 
@@ -29,6 +30,7 @@ use crate::lexical::reader::LexicalIndexReader;
 use crate::lexical::search::searcher::LexicalSearcher;
 use crate::lexical::writer::LexicalIndexWriter;
 use crate::storage::Storage;
+#[cfg(not(target_arch = "wasm32"))]
 use crate::storage::file::{FileStorage, FileStorageConfig};
 
 pub mod core;
@@ -94,10 +96,7 @@ pub struct InvertedIndexStats {
 
 impl Default for IndexMetadata {
     fn default() -> Self {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = crate::util::time::now_secs();
 
         IndexMetadata {
             version: 1,
@@ -176,6 +175,7 @@ impl InvertedIndex {
     }
 
     /// Create an index in a directory.
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn create_in_dir<P: AsRef<Path>>(dir: P, config: InvertedIndexConfig) -> Result<Self> {
         let storage_config = FileStorageConfig::new(&dir);
         let storage = Arc::new(FileStorage::new(&dir, storage_config)?);
@@ -183,6 +183,7 @@ impl InvertedIndex {
     }
 
     /// Open an index from a directory.
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn open_dir<P: AsRef<Path>>(dir: P, config: InvertedIndexConfig) -> Result<Self> {
         let storage_config = FileStorageConfig::new(&dir);
         let storage = Arc::new(FileStorage::new(&dir, storage_config)?);
@@ -228,10 +229,7 @@ impl InvertedIndex {
     fn update_metadata(&self) -> Result<()> {
         {
             let mut metadata = self.metadata.write();
-            metadata.modified = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_secs();
+            metadata.modified = crate::util::time::now_secs();
         }
 
         self.write_metadata()
@@ -280,12 +278,14 @@ impl InvertedIndex {
     }
 
     /// Check if an index exists in the given directory.
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn exists_in_dir<P: AsRef<Path>>(dir: P) -> bool {
         let metadata_path = dir.as_ref().join("metadata.json");
         metadata_path.exists()
     }
 
     /// Delete an index from the given directory.
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn delete_in_dir<P: AsRef<Path>>(dir: P) -> Result<()> {
         let storage_config = FileStorageConfig::new(&dir);
         let storage = FileStorage::new(&dir, storage_config)?;

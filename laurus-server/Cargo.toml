@@ -19,7 +19,7 @@ path = "src/lib.rs"
 anyhow = { workspace = true }
 axum = { workspace = true }
 chrono = { workspace = true }
-laurus = { workspace = true }
+laurus = { workspace = true, features = ["native"] }
 prost = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

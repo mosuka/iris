@@ -79,6 +79,14 @@
   - [API Reference](laurus-nodejs/api_reference.md)
   - [Development](laurus-nodejs/development.md)
 
+# laurus-wasm
+
+- [WASM Binding Overview](laurus-wasm.md)
+  - [Installation](laurus-wasm/installation.md)
+  - [Quick Start](laurus-wasm/quickstart.md)
+  - [API Reference](laurus-wasm/api_reference.md)
+  - [Development](laurus-wasm/development.md)
+
 # Development Guide
 
 - [Build & Test](development/build_and_test.md)

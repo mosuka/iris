@@ -23,9 +23,9 @@ impl FlatVectorSearcher {
 
 impl VectorIndexSearcher for FlatVectorSearcher {
     fn search(&self, request: &VectorIndexQuery) -> Result<VectorIndexQueryResults> {
-        use std::time::Instant;
+        use crate::util::time::Timer;
 
-        let start = Instant::now();
+        let start = Timer::now();
         let mut results = VectorIndexQueryResults::new();
 
         // Get all vectors from the index

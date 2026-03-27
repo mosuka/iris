@@ -121,7 +121,7 @@ impl MergeEngine {
         segments: Vec<ManagedSegmentInfo>,
         new_segment_id: String,
     ) -> Result<MergeResult> {
-        let start_time = std::time::Instant::now();
+        let start_time = crate::util::time::Timer::now();
 
         // Calculate statistics
         let segments_merged = segments.len() as u32;
@@ -145,7 +145,7 @@ impl MergeEngine {
             size_bytes: total_size,
         };
 
-        let merge_time_ms = start_time.elapsed().as_millis() as u64;
+        let merge_time_ms = start_time.elapsed_ms();
 
         let stats = MergeStats {
             segments_merged,

@@ -5,7 +5,6 @@
 //! consistent even under heavy ingestion workloads.
 
 use std::sync::{Arc, Mutex, RwLock};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use ahash::AHashMap;
 use uuid::Uuid;
@@ -91,10 +90,7 @@ impl Transaction {
     /// Create a new transaction.
     pub fn new(isolation_level: IsolationLevel) -> Self {
         let id = Uuid::new_v4().to_string();
-        let start_time = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_millis() as u64;
+        let start_time = crate::util::time::now_millis();
 
         Transaction {
             id,
@@ -154,10 +150,7 @@ impl Transaction {
 
     /// Get transaction duration in milliseconds.
     pub fn duration_ms(&self) -> u64 {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_millis() as u64;
+        let now = crate::util::time::now_millis();
         now.saturating_sub(self.start_time)
     }
 }
