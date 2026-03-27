@@ -91,8 +91,8 @@ pub use engine::schema::analyzer::{
 pub use engine::schema::embedder::EmbedderDefinition;
 pub use engine::schema::{FieldOption, Schema};
 pub use engine::search::{
-    FusionAlgorithm, LexicalSearchOptions, SearchQuery, SearchRequest, SearchRequestBuilder,
-    SearchResult, VectorSearchOptions, VectorSearchQuery,
+    FusionAlgorithm, HybridMode, LexicalSearchOptions, SearchQuery, SearchRequest,
+    SearchRequestBuilder, SearchResult, VectorSearchOptions, VectorSearchQuery,
 };
 pub use error::{LaurusError, Result};
 pub use lexical::core::field::{

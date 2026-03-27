@@ -37,7 +37,7 @@ use std::sync::LazyLock;
 
 use regex::Regex;
 
-use crate::engine::search::{FusionAlgorithm, SearchQuery, SearchRequest};
+use crate::engine::search::{FusionAlgorithm, HybridMode, SearchQuery, SearchRequest};
 use crate::error::{LaurusError, Result};
 use crate::lexical::query::parser::LexicalQueryParser;
 use crate::lexical::search::searcher::LexicalSearchQuery;
@@ -130,7 +130,7 @@ impl UnifiedQueryParser {
             ));
         }
 
-        let (lexical_str, vector_str) = self.split_query(query_str)?;
+        let (lexical_str, vector_str, hybrid_mode) = self.split_query(query_str)?;
 
         let lexical = if let Some(ref s) = lexical_str {
             Some(self.lexical_parser.parse(s)?)
@@ -160,6 +160,7 @@ impl UnifiedQueryParser {
             (Some(lex_query), Some(vec_req)) => SearchQuery::Hybrid {
                 lexical: LexicalSearchQuery::Obj(lex_query),
                 vector: vec_req.query,
+                mode: hybrid_mode,
             },
             (Some(lex_query), None) => SearchQuery::Lexical(LexicalSearchQuery::Obj(lex_query)),
             (None, Some(vec_req)) => SearchQuery::Vector(vec_req.query),
@@ -180,6 +181,10 @@ impl UnifiedQueryParser {
     /// vector field name followed by `:`, e.g. `embedding:"text"` or
     /// `embedding:python^0.8`.
     ///
+    /// A `+` prefix before a vector field clause (e.g. `+embedding:"text"`)
+    /// triggers [`HybridMode::Intersection`], requiring documents to appear
+    /// in both lexical and vector results.
+    ///
     /// # Errors
     ///
     /// Returns an error if a vector field clause uses lexical-only syntax
@@ -187,11 +192,11 @@ impl UnifiedQueryParser {
     ///
     /// # Returns
     ///
-    /// `(lexical, vector)` where either may be `None`.
-    fn split_query(&self, input: &str) -> Result<(Option<String>, Option<String>)> {
+    /// `(lexical, vector, mode)` where either string may be `None`.
+    fn split_query(&self, input: &str) -> Result<(Option<String>, Option<String>, HybridMode)> {
         if self.vector_fields.is_empty() {
             // No vector fields → everything is lexical
-            return Ok((Some(input.to_string()), None));
+            return Ok((Some(input.to_string()), None, HybridMode::Union));
         }
 
         let fields_pattern: String = self
@@ -205,16 +210,29 @@ impl UnifiedQueryParser {
         // clear error messages.
         self.check_unsupported_vector_syntax(input, &fields_pattern)?;
 
+        // Match vector field clauses with an optional leading `+` prefix.
+        // Group 1: optional `+` prefix
+        // Group 2: the vector clause itself (field:value[^boost])
         let clause_pattern = format!(
-            r#"(?:{fields})(?::(?:"[^"]*"|[^\s"^~\[\{{]+)(?:\^[\d]+(?:\.[\d]+)?)?)"#,
+            r#"(\+)?({fields})(?::(?:"[^"]*"|[^\s"^~\[\{{]+)(?:\^[\d]+(?:\.[\d]+)?)?)"#,
             fields = fields_pattern,
         );
         let vector_re = Regex::new(&clause_pattern).unwrap();
 
-        // Collect vector clauses
-        let vector_clauses: Vec<&str> = vector_re.find_iter(input).map(|m| m.as_str()).collect();
+        let mut vector_clauses: Vec<String> = Vec::new();
+        let mut has_required = false;
 
-        // Remove vector clauses from input to get lexical part
+        for caps in vector_re.captures_iter(input) {
+            if caps.get(1).is_some() {
+                has_required = true;
+            }
+            // Group 0 minus the `+` prefix = the actual vector clause
+            let full_match = caps.get(0).unwrap().as_str();
+            let clause = full_match.strip_prefix('+').unwrap_or(full_match);
+            vector_clauses.push(clause.to_string());
+        }
+
+        // Remove the full matches (including `+`) from input to get lexical part
         let lexical_raw = vector_re.replace_all(input, " ");
         let lexical_cleaned = clean_lexical_string(&lexical_raw);
 
@@ -230,7 +248,13 @@ impl UnifiedQueryParser {
             Some(vector_clauses.join(" "))
         };
 
-        Ok((lexical, vector))
+        let mode = if has_required {
+            HybridMode::Intersection
+        } else {
+            HybridMode::Union
+        };
+
+        Ok((lexical, vector, mode))
     }
 
     /// Check for lexical-only syntax used on vector fields and return a
@@ -375,10 +399,16 @@ mod tests {
     }
 
     /// Assert that the request contains a hybrid query and return references
-    /// to the lexical and vector components.
-    fn assert_hybrid(request: &SearchRequest) -> (&LexicalSearchQuery, &VectorSearchQuery) {
+    /// to the lexical and vector components along with the hybrid mode.
+    fn assert_hybrid(
+        request: &SearchRequest,
+    ) -> (&LexicalSearchQuery, &VectorSearchQuery, &HybridMode) {
         match &request.query {
-            SearchQuery::Hybrid { lexical, vector } => (lexical, vector),
+            SearchQuery::Hybrid {
+                lexical,
+                vector,
+                mode,
+            } => (lexical, vector, mode),
             _ => panic!("Expected SearchQuery::Hybrid"),
         }
     }
@@ -657,6 +687,57 @@ mod tests {
         let vecs = get_vectors(vq);
         assert_eq!(vecs.len(), 1);
         assert_eq!(vecs[0].fields.as_ref().unwrap()[0], "content");
+    }
+
+    // -- Tests for HybridMode (AND/OR semantics) --
+
+    #[tokio::test]
+    async fn test_hybrid_union_by_default() {
+        let parser = make_parser();
+        let request = parser.parse(r#"title:hello content:"cats""#).await.unwrap();
+        let (_, _, mode) = assert_hybrid(&request);
+        assert_eq!(*mode, HybridMode::Union);
+    }
+
+    #[tokio::test]
+    async fn test_hybrid_intersection_with_plus_vector() {
+        let parser = make_parser();
+        let request = parser
+            .parse(r#"title:hello +content:"cats""#)
+            .await
+            .unwrap();
+        let (_, _, mode) = assert_hybrid(&request);
+        assert_eq!(*mode, HybridMode::Intersection);
+    }
+
+    #[tokio::test]
+    async fn test_hybrid_intersection_plus_on_both() {
+        // + on lexical field is preserved for the lexical parser;
+        // + on vector field triggers Intersection mode.
+        let parser = make_parser();
+        let request = parser
+            .parse(r#"+title:hello +content:"cats""#)
+            .await
+            .unwrap();
+        let (_, _, mode) = assert_hybrid(&request);
+        assert_eq!(*mode, HybridMode::Intersection);
+    }
+
+    #[tokio::test]
+    async fn test_hybrid_intersection_unquoted_vector() {
+        let parser = make_parser();
+        let request = parser.parse("title:hello +content:cats").await.unwrap();
+        let (_, _, mode) = assert_hybrid(&request);
+        assert_eq!(*mode, HybridMode::Intersection);
+    }
+
+    #[tokio::test]
+    async fn test_vector_only_with_plus_stays_vector() {
+        // + on a vector-only query (no lexical part) → still vector-only, not hybrid
+        let parser = make_parser();
+        let request = parser.parse(r#"+content:"cats""#).await.unwrap();
+        // No lexical component, so it's vector-only (mode is irrelevant)
+        assert_vector_only(&request);
     }
 
     // -- Tests for clean_lexical_string helper --

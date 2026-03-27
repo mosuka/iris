@@ -43,13 +43,34 @@ pub enum SearchQuery {
     /// Hybrid search combining lexical and vector components.
     ///
     /// Results are merged using the [`fusion_algorithm`](SearchRequest::fusion_algorithm)
-    /// specified on the [`SearchRequest`].
+    /// specified on the [`SearchRequest`]. The [`mode`](HybridMode) controls
+    /// whether results are unioned (OR) or intersected (AND).
     Hybrid {
         /// Lexical search component.
         lexical: LexicalSearchQuery,
         /// Vector search component.
         vector: VectorSearchQuery,
+        /// Controls how lexical and vector results are combined.
+        /// Defaults to [`HybridMode::Union`].
+        mode: HybridMode,
     },
+}
+
+/// Controls how lexical and vector results are combined in hybrid search.
+///
+/// - [`Union`](Self::Union) — documents from **either** lexical or vector
+///   results are included (OR semantics). This is the default.
+/// - [`Intersection`](Self::Intersection) — only documents appearing in
+///   **both** result sets are included (AND semantics). Triggered by
+///   the `+` prefix on vector field clauses in the query DSL, e.g.
+///   `title:hello +embedding:"cute kitten"`.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum HybridMode {
+    /// Documents from either source are included (default).
+    #[default]
+    Union,
+    /// Only documents appearing in BOTH result sets are included.
+    Intersection,
 }
 
 // ── Option types (how to search) ─────────────────────────────────────────────
@@ -385,7 +406,11 @@ impl SearchRequestBuilder {
             SearchQuery::Dsl(dsl)
         } else {
             match (self.lexical_query, self.vector_query) {
-                (Some(lexical), Some(vector)) => SearchQuery::Hybrid { lexical, vector },
+                (Some(lexical), Some(vector)) => SearchQuery::Hybrid {
+                    lexical,
+                    vector,
+                    mode: HybridMode::default(),
+                },
                 (Some(lexical), None) => SearchQuery::Lexical(lexical),
                 (None, Some(vector)) => SearchQuery::Vector(vector),
                 (None, None) => SearchQuery::Dsl(String::new()),

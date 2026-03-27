@@ -2,7 +2,7 @@ pub mod query;
 pub mod schema;
 pub mod search;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use parking_lot::RwLock;
@@ -615,6 +615,7 @@ impl Engine {
     ///
     /// Panics (via `unreachable!`) if called with `SearchQuery::Dsl`, which
     /// must be resolved before calling this method.
+    #[allow(clippy::type_complexity)]
     fn resolve_search_query_from_parts(
         &self,
         query: self::search::SearchQuery,
@@ -627,6 +628,7 @@ impl Engine {
         Option<crate::lexical::search::searcher::LexicalSearchRequest>,
         Option<crate::vector::store::request::VectorSearchRequest>,
         Option<FusionAlgorithm>,
+        self::search::HybridMode,
     )> {
         let fetch_count = offset.saturating_add(limit);
 
@@ -648,13 +650,17 @@ impl Engine {
                     },
                     field_boosts: lexical_options.field_boosts.clone(),
                 };
-                Ok((Some(lex_req), None, None))
+                Ok((Some(lex_req), None, None, self::search::HybridMode::Union))
             }
             self::search::SearchQuery::Vector(vector_query) => {
                 let vec_req = self.build_vector_request(vector_query, vector_options, fetch_count);
-                Ok((None, Some(vec_req), None))
+                Ok((None, Some(vec_req), None, self::search::HybridMode::Union))
             }
-            self::search::SearchQuery::Hybrid { lexical, vector } => {
+            self::search::SearchQuery::Hybrid {
+                lexical,
+                vector,
+                mode,
+            } => {
                 let lex_req = crate::lexical::search::searcher::LexicalSearchRequest {
                     query: lexical,
                     params: crate::lexical::search::searcher::LexicalSearchParams {
@@ -669,7 +675,7 @@ impl Engine {
                 };
                 let vec_req = self.build_vector_request(vector, vector_options, fetch_count);
                 let fusion = fusion_algorithm.or(Some(FusionAlgorithm::RRF { k: 60.0 }));
-                Ok((Some(lex_req), Some(vec_req), fusion))
+                Ok((Some(lex_req), Some(vec_req), fusion, mode))
             }
         }
     }
@@ -1010,35 +1016,35 @@ impl Engine {
             vector_options,
         } = request;
 
-        let (lexical_search_request, vector_search_request, fusion_algorithm) = match request_query
-        {
-            self::search::SearchQuery::Dsl(ref dsl) => {
-                let parser = self.unified_query_parser()?;
-                let parser = if let Some(fusion) = request_fusion {
-                    parser.with_fusion(fusion)
-                } else {
-                    parser
-                };
-                let parsed = parser.parse(dsl).await?;
-                // UnifiedQueryParser now returns Lexical/Vector/Hybrid variants
-                self.resolve_search_query_from_parts(
-                    parsed.query,
+        let (lexical_search_request, vector_search_request, fusion_algorithm, hybrid_mode) =
+            match request_query {
+                self::search::SearchQuery::Dsl(ref dsl) => {
+                    let parser = self.unified_query_parser()?;
+                    let parser = if let Some(fusion) = request_fusion {
+                        parser.with_fusion(fusion)
+                    } else {
+                        parser
+                    };
+                    let parsed = parser.parse(dsl).await?;
+                    // UnifiedQueryParser now returns Lexical/Vector/Hybrid variants
+                    self.resolve_search_query_from_parts(
+                        parsed.query,
+                        request_offset,
+                        request_limit,
+                        request_fusion,
+                        &lexical_options,
+                        &vector_options,
+                    )?
+                }
+                other => self.resolve_search_query_from_parts(
+                    other,
                     request_offset,
                     request_limit,
                     request_fusion,
                     &lexical_options,
                     &vector_options,
-                )?
-            }
-            other => self.resolve_search_query_from_parts(
-                other,
-                request_offset,
-                request_limit,
-                request_fusion,
-                &lexical_options,
-                &vector_options,
-            )?,
-        };
+                )?,
+            };
 
         // 0b. Pre-process Filter
         let (allowed_ids, lexical_query_override) = if let Some(filter_query) = &request_filter {
@@ -1168,8 +1174,13 @@ impl Engine {
         // 3. Fusion
         if lexical_search_request.is_some() && vector_search_request.is_some() {
             let algorithm = fusion_algorithm.unwrap_or(FusionAlgorithm::RRF { k: 60.0 });
-            let mut results =
-                self.fuse_results(lexical_hits, vector_hits, algorithm, fetch_count)?;
+            let mut results = self.fuse_results(
+                lexical_hits,
+                vector_hits,
+                algorithm,
+                hybrid_mode,
+                fetch_count,
+            )?;
             if request_offset > 0 {
                 results = results.into_iter().skip(request_offset).collect();
             }
@@ -1224,8 +1235,13 @@ impl Engine {
         lexical_hits: Vec<crate::lexical::query::SearchHit>,
         vector_hits: Vec<crate::vector::store::response::VectorHit>,
         fusion: FusionAlgorithm,
+        mode: self::search::HybridMode,
         limit: usize,
     ) -> Result<Vec<SearchResult>> {
+        // Collect doc_id sets upfront for intersection filtering.
+        let lexical_ids: HashSet<u64> = lexical_hits.iter().map(|h| h.doc_id).collect();
+        let vector_ids: HashSet<u64> = vector_hits.iter().map(|h| h.doc_id).collect();
+
         let mut fused_scores: HashMap<u64, (f32, Option<crate::data::Document>)> = HashMap::new();
 
         match fusion {
@@ -1287,6 +1303,11 @@ impl Engine {
                     entry.0 += norm_score * vector_weight;
                 }
             }
+        }
+
+        // Intersection mode: keep only documents appearing in BOTH result sets.
+        if mode == self::search::HybridMode::Intersection {
+            fused_scores.retain(|id, _| lexical_ids.contains(id) && vector_ids.contains(id));
         }
 
         let mut intermediate: Vec<(u64, f32, Option<crate::data::Document>)> = fused_scores

@@ -121,7 +121,8 @@ struct SearchParams {
     /// - `content:"cute kitten"^0.8` — with weight/boost
     ///
     /// **Hybrid search** — combine both in one query:
-    /// - `title:hello content:"cute kitten"` — lexical + vector
+    /// - `title:hello content:"cute kitten"` — OR: union of lexical + vector results
+    /// - `title:hello +content:"cute kitten"` — AND: only documents matching both
     query: String,
 
     /// Maximum number of results to return. Defaults to `10`.

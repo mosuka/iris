@@ -290,7 +290,9 @@ Search documents using the laurus unified query DSL. Supports lexical search, ve
 
 | Query | Description |
 | :--- | :--- |
-| `title:hello content:"cute kitten"` | Lexical + vector in one query |
+| `title:hello content:"cute kitten"` | Lexical + vector (OR/union — results from either) |
+| `title:hello +content:"cute kitten"` | Lexical + vector (AND/intersection — only results in both) |
+| `+title:hello +content:"cute kitten"` | Both required (AND); `+` on lexical field = required clause |
 | `title:hello AND body:world content:"cats"^0.8` | Boolean lexical + weighted vector |
 
 ### Fusion algorithm examples

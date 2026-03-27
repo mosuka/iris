@@ -237,6 +237,22 @@ When a query contains both lexical and vector clauses, results are fused:
 
 > **Note**: The fusion algorithm cannot be specified in the DSL syntax. It is configured when constructing the `UnifiedQueryParser` via `.with_fusion()`. The default is RRF (k=60). See [Custom Fusion](#custom-fusion) for a code example.
 
+### Hybrid AND/OR Semantics (the `+` Prefix)
+
+By default, hybrid queries use **union (OR)** — documents appearing in *either* the lexical results or the vector results are included. You can switch to **intersection (AND)** by prefixing a vector clause with `+`, which requires documents to appear in *both* result sets.
+
+| Syntax | Mode | Behaviour |
+| :--- | :---: | :--- |
+| `title:Rust content:"system process"` | OR (union) | Documents matching the lexical query **or** the vector query are returned. |
+| `title:Rust +content:"system process"` | AND (intersection) | Only documents matching **both** the lexical and vector results are returned. |
+| `+title:Rust +content:"system process"` | AND (intersection) | Both clauses required. `+` on the lexical field is handled by the lexical parser as a required clause. |
+
+Rules:
+
+- When **no** vector clause carries the `+` prefix, the fusion produces a **union** (OR) of lexical and vector results.
+- When **at least one** vector clause carries the `+` prefix, the fusion switches to **intersection** (AND) — only documents present in both the lexical and vector result sets are returned.
+- `+` on a lexical field (e.g., `+title:Rust`) is interpreted by the lexical query parser as a *required clause*, which is the existing Tantivy/Lucene-style behaviour. It does not by itself trigger intersection mode for the hybrid fusion.
+
 ### Unified Query Examples
 
 ```text
@@ -246,8 +262,11 @@ title:hello AND body:world
 # Vector only — no fusion
 content:"cute kitten"
 
-# Hybrid — fusion applied automatically
+# Hybrid — fusion applied automatically (OR / union)
 title:hello content:"cute kitten"
+
+# Hybrid with AND / intersection — only docs in both result sets
+title:hello +content:"cute kitten"
 
 # Hybrid with boolean operators
 title:hello AND category:animal content:"cute kitten"^0.8
