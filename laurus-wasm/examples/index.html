@@ -199,7 +199,7 @@
 <body>
   <div class="container">
     <h1>Laurus WASM Search Demo</h1>
-    <p class="subtitle">Lexical, vector, and hybrid search in the browser</p>
+    <p class="subtitle">Lexical, vector, and hybrid search in the browser (OPFS persistent storage)</p>
 
     <!-- Status -->
     <div class="card">
@@ -207,7 +207,7 @@
       <div class="stats">
         <div>Documents: <span id="doc-count">0</span></div>
         <div>Embedding: <span id="embed-dim">loading...</span></div>
-        <div>Storage: <span id="storage-mode">in-memory</span></div>
+        <div>Storage: <span id="storage-mode">OPFS</span></div>
       </div>
     </div>
 
@@ -330,35 +330,44 @@
         schema.setDefaultFields(['title', 'body']);
         appendLog(`Schema: title (text), body (text), embedding (hnsw ${EMBED_DIM}-dim, embedder: minilm)`);
 
-        // Create in-memory index
-        index = await Index.create(schema);
-        appendLog('In-memory index created.', 'ok');
+        // Open OPFS-persistent index (data survives page reloads)
+        const INDEX_NAME = 'demo-index';
+        index = await Index.open(INDEX_NAME, schema);
+        appendLog(`OPFS index "${INDEX_NAME}" opened.`, 'ok');
 
-        // Seed with sample documents
-        const samples = [
-          { id: 'rust-intro', title: 'Introduction to Rust', body: 'Rust is a systems programming language focused on safety, speed, and concurrency. It guarantees memory safety without a garbage collector.' },
-          { id: 'wasm-guide', title: 'WebAssembly Guide', body: 'WebAssembly enables near-native performance for web applications running in the browser. It is a compilation target for languages like Rust and C++.' },
-          { id: 'search-101', title: 'Full-Text Search 101', body: 'Full-text search indexes documents and retrieves them based on keyword relevance using algorithms like BM25 and TF-IDF scoring.' },
-          { id: 'vector-search', title: 'Vector Search Explained', body: 'Vector search finds similar items by comparing high-dimensional embeddings using distance metrics like cosine similarity and dot product.' },
-          { id: 'hybrid', title: 'Hybrid Search', body: 'Hybrid search combines lexical keyword matching with vector similarity to deliver more relevant results using fusion algorithms like RRF.' },
-          { id: 'ml-basics', title: 'Machine Learning Basics', body: 'Machine learning is a branch of artificial intelligence that enables systems to learn from data and improve performance on tasks.' },
-          { id: 'embeddings', title: 'Understanding Embeddings', body: 'Embeddings are dense vector representations of data that capture semantic meaning. Words with similar meanings have similar embeddings.' },
-          { id: 'rust-wasm', title: 'Rust and WebAssembly', body: 'Rust compiles to WebAssembly efficiently, making it ideal for performance-critical browser applications like search engines and games.' },
-        ];
+        // Check if the index already has data (persisted from a previous session)
+        const stats = index.stats();
+        docCounter = stats.documentCount;
 
-        appendLog('Indexing sample documents (auto-embedding by engine)...');
-        for (const doc of samples) {
-          // Pass text in the vector field — the engine auto-embeds it
-          // via the registered callback embedder
-          await index.putDocument(doc.id, {
-            title: doc.title,
-            body: doc.body,
-            embedding: `${doc.title} ${doc.body}`,
-          });
-          docCounter++;
+        if (docCounter > 0) {
+          appendLog(`Loaded ${docCounter} document(s) from OPFS — data persisted from previous session.`, 'ok');
+        } else {
+          // Seed with sample documents on first visit
+          const samples = [
+            { id: 'rust-intro', title: 'Introduction to Rust', body: 'Rust is a systems programming language focused on safety, speed, and concurrency. It guarantees memory safety without a garbage collector.' },
+            { id: 'wasm-guide', title: 'WebAssembly Guide', body: 'WebAssembly enables near-native performance for web applications running in the browser. It is a compilation target for languages like Rust and C++.' },
+            { id: 'search-101', title: 'Full-Text Search 101', body: 'Full-text search indexes documents and retrieves them based on keyword relevance using algorithms like BM25 and TF-IDF scoring.' },
+            { id: 'vector-search', title: 'Vector Search Explained', body: 'Vector search finds similar items by comparing high-dimensional embeddings using distance metrics like cosine similarity and dot product.' },
+            { id: 'hybrid', title: 'Hybrid Search', body: 'Hybrid search combines lexical keyword matching with vector similarity to deliver more relevant results using fusion algorithms like RRF.' },
+            { id: 'ml-basics', title: 'Machine Learning Basics', body: 'Machine learning is a branch of artificial intelligence that enables systems to learn from data and improve performance on tasks.' },
+            { id: 'embeddings', title: 'Understanding Embeddings', body: 'Embeddings are dense vector representations of data that capture semantic meaning. Words with similar meanings have similar embeddings.' },
+            { id: 'rust-wasm', title: 'Rust and WebAssembly', body: 'Rust compiles to WebAssembly efficiently, making it ideal for performance-critical browser applications like search engines and games.' },
+          ];
+
+          appendLog('Indexing sample documents (auto-embedding by engine)...');
+          for (const doc of samples) {
+            // Pass text in the vector field — the engine auto-embeds it
+            // via the registered callback embedder
+            await index.putDocument(doc.id, {
+              title: doc.title,
+              body: doc.body,
+              embedding: `${doc.title} ${doc.body}`,
+            });
+            docCounter++;
+          }
+          await index.commit();
+          appendLog(`Indexed ${samples.length} documents. Embeddings computed and persisted to OPFS.`, 'ok');
         }
-        await index.commit();
-        appendLog(`Indexed ${samples.length} documents. Embeddings computed automatically.`, 'ok');
 
         // Update UI
         document.getElementById('doc-count').textContent = docCounter;

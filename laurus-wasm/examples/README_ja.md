@@ -26,9 +26,16 @@ laurus-wasm を使用したブラウザ上での全文検索を実演する
 
 ## デモの内容
 
-- `title` と `body` フィールドを持つインメモリ検索インデックスを作成
-- Rust、WASM、検索に関する 5 件のサンプルドキュメントを読み込み
-- DSL クエリ対応の検索ボックスを提供（例: `"title:rust"`、`"browser programming"`）
+- OPFS 永続化ストレージを使用した検索インデックスを作成
+  （ページリロード後もデータが保持されます）
+- 初回アクセス時に 8 件のサンプルドキュメントを投入。
+  既存データが OPFS にある場合はロードのみ
+- Transformers.js（all-MiniLM-L6-v2）による 384 次元セマンティック
+  Embedding をコールバック Embedder 経由で自動生成
+- 統合クエリ DSL 対応の検索ボックスを提供:
+  - Lexical 検索: `rust`、`title:wasm`、`"memory safety"`
+  - Vector 検索: `embedding:~"how to make code faster"`
+  - Hybrid 検索: `rust embedding:~"systems programming"`
 - 新しいドキュメントをインタラクティブに追加可能
 - 関連度スコア付きの検索結果を表示
 - すべての操作をコンソールパネルにログ出力
