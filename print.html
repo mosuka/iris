@@ -36,10 +36,10 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-13f35d9d.js";
+            window.path_to_searchindex_js = "searchindex-a88fb1c8.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-45ce2278.js"></script>
+        <script src="toc-6cc5bf7f.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -9474,8 +9474,550 @@ cargo clippy -p laurus-wasm --target wasm32-unknown-unknown -- -D warnings
 <pre><code class="language-bash">wasm-pack test --headless --chrome
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div>
-<h1 id="build--test"><a class="header" href="#build--test">Build &amp; Test</a></h1>
+<h1 id="ruby-binding-overview"><a class="header" href="#ruby-binding-overview">Ruby Binding Overview</a></h1>
+<p>The <code>laurus</code> gem provides Ruby bindings for the Laurus search engine. It is built as a native Rust extension using <a href="https://github.com/matsadler/magnus">Magnus</a> and <a href="https://github.com/oxidize-rb/rb-sys">rb_sys</a>, giving Ruby programs direct access to Laurus’s lexical, vector, and hybrid search capabilities with near-native performance.</p>
+<h2 id="features-7"><a class="header" href="#features-7">Features</a></h2>
+<ul>
+<li><strong>Lexical Search</strong> – Full-text search powered by an inverted index with BM25 scoring</li>
+<li><strong>Vector Search</strong> – Approximate nearest neighbor (ANN) search using Flat, HNSW, or IVF indexes</li>
+<li><strong>Hybrid Search</strong> – Combine lexical and vector results with fusion algorithms (RRF, WeightedSum)</li>
+<li><strong>Rich Query DSL</strong> – Term, Phrase, Fuzzy, Wildcard, NumericRange, Geo, Boolean, Span queries</li>
+<li><strong>Text Analysis</strong> – Tokenizers, filters, stemmers, and synonym expansion</li>
+<li><strong>Flexible Storage</strong> – In-memory (ephemeral) or file-based (persistent) indexes</li>
+<li><strong>Idiomatic Ruby API</strong> – Clean, intuitive Ruby classes under the <code>Laurus::</code> namespace</li>
+</ul>
+<h2 id="architecture-6"><a class="header" href="#architecture-6">Architecture</a></h2>
+<pre><code class="language-mermaid">graph LR
+    subgraph "laurus-ruby (gem)"
+        RbIndex["Index\n(Ruby class)"]
+        RbQuery["Query classes"]
+        RbSearch["SearchRequest\n/ SearchResult"]
+    end
+
+    Ruby["Ruby application"] --&gt;|"method calls"| RbIndex
+    Ruby --&gt;|"query objects"| RbQuery
+    RbIndex --&gt;|"Magnus FFI"| Engine["laurus::Engine\n(Rust)"]
+    RbQuery --&gt;|"Magnus FFI"| Engine
+    Engine --&gt; Storage["Storage\n(Memory / File)"]
+</code></pre>
+<p>The Ruby classes are thin wrappers around the Rust engine.
+Each call crosses the Magnus FFI boundary once; the Rust engine
+then executes the operation entirely in native code.</p>
+<p>Although the Rust engine uses async I/O internally, all Ruby
+methods are exposed as <strong>synchronous</strong> functions. Each method
+calls <code>tokio::Runtime::block_on()</code> under the hood to bridge
+async Rust to synchronous Ruby.</p>
+<h2 id="quick-start-8"><a class="header" href="#quick-start-8">Quick Start</a></h2>
+<pre><code class="language-ruby">require "laurus"
+
+# Create an in-memory index
+index = Laurus::Index.new
+
+# Index documents
+index.put_document("doc1", { "title" =&gt; "Introduction to Rust", "body" =&gt; "Systems programming language." })
+index.put_document("doc2", { "title" =&gt; "Ruby for Web Development", "body" =&gt; "Web applications with Ruby." })
+index.commit
+
+# Search
+results = index.search("title:rust", limit: 5)
+results.each do |r|
+  puts "[#{r.id}] score=#{format('%.4f', r.score)}  #{r.document['title']}"
+end
+</code></pre>
+<h2 id="sections-5"><a class="header" href="#sections-5">Sections</a></h2>
+<ul>
+<li><a href="#installation-5">Installation</a> – How to install the gem</li>
+<li><a href="#quick-start-9">Quick Start</a> – Hands-on introduction with examples</li>
+<li><a href="#api-reference-4">API Reference</a> – Complete class and method reference</li>
+<li><a href="#development-setup-1">Development</a> – Building from source and running tests</li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="installation-5"><a class="header" href="#installation-5">Installation</a></h1>
+<h2 id="from-rubygems"><a class="header" href="#from-rubygems">From RubyGems</a></h2>
+<pre><code class="language-bash">gem install laurus
+</code></pre>
+<p>Or add it to your <code>Gemfile</code>:</p>
+<pre><code class="language-ruby">gem "laurus"
+</code></pre>
+<p>Then run:</p>
+<pre><code class="language-bash">bundle install
+</code></pre>
+<h2 id="from-source-3"><a class="header" href="#from-source-3">From source</a></h2>
+<p>Building from source requires a Rust toolchain (1.85 or later) and <a href="https://github.com/oxidize-rb/rb-sys">rb_sys</a>.</p>
+<pre><code class="language-bash"># Clone the repository
+git clone https://github.com/mosuka/laurus.git
+cd laurus/laurus-ruby
+
+# Install dependencies
+bundle install
+
+# Compile the native extension
+bundle exec rake compile
+
+# Or install the gem locally
+gem build laurus.gemspec
+gem install laurus-*.gem
+</code></pre>
+<h2 id="verify-3"><a class="header" href="#verify-3">Verify</a></h2>
+<pre><code class="language-ruby">require "laurus"
+index = Laurus::Index.new
+puts index  # Index()
+</code></pre>
+<h2 id="requirements-2"><a class="header" href="#requirements-2">Requirements</a></h2>
+<ul>
+<li>Ruby 3.1 or later</li>
+<li>Rust toolchain (automatically invoked during gem install via <code>rb_sys</code>)</li>
+<li>No runtime dependencies beyond the compiled native extension</li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="quick-start-9"><a class="header" href="#quick-start-9">Quick Start</a></h1>
+<h2 id="1-create-an-index-2"><a class="header" href="#1-create-an-index-2">1. Create an index</a></h2>
+<pre><code class="language-ruby">require "laurus"
+
+# In-memory index (ephemeral, useful for prototyping)
+index = Laurus::Index.new
+
+# File-based index (persistent)
+schema = Laurus::Schema.new
+schema.add_text_field("title")
+schema.add_text_field("body")
+index = Laurus::Index.new(path: "./myindex", schema: schema)
+</code></pre>
+<h2 id="2-index-documents-2"><a class="header" href="#2-index-documents-2">2. Index documents</a></h2>
+<pre><code class="language-ruby">index.put_document("doc1", {
+  "title" =&gt; "Introduction to Rust",
+  "body" =&gt; "Rust is a systems programming language focused on safety and performance.",
+})
+index.put_document("doc2", {
+  "title" =&gt; "Ruby for Web Development",
+  "body" =&gt; "Ruby is widely used for web applications and rapid prototyping.",
+})
+index.commit
+</code></pre>
+<h2 id="3-lexical-search-2"><a class="header" href="#3-lexical-search-2">3. Lexical search</a></h2>
+<pre><code class="language-ruby"># DSL string
+results = index.search("title:rust", limit: 5)
+
+# Query object
+results = index.search(Laurus::TermQuery.new("body", "ruby"), limit: 5)
+
+# Print results
+results.each do |r|
+  puts "[#{r.id}] score=#{format('%.4f', r.score)}  #{r.document['title']}"
+end
+</code></pre>
+<h2 id="4-vector-search-2"><a class="header" href="#4-vector-search-2">4. Vector search</a></h2>
+<p>Vector search requires a schema with a vector field and pre-computed embeddings.</p>
+<pre><code class="language-ruby">require "laurus"
+
+schema = Laurus::Schema.new
+schema.add_text_field("title")
+schema.add_hnsw_field("embedding", 4)
+
+index = Laurus::Index.new(schema: schema)
+index.put_document("doc1", { "title" =&gt; "Rust", "embedding" =&gt; [0.1, 0.2, 0.3, 0.4] })
+index.put_document("doc2", { "title" =&gt; "Ruby", "embedding" =&gt; [0.9, 0.8, 0.7, 0.6] })
+index.commit
+
+query_vec = [0.1, 0.2, 0.3, 0.4]
+results = index.search(Laurus::VectorQuery.new("embedding", query_vec), limit: 3)
+</code></pre>
+<h2 id="5-hybrid-search-2"><a class="header" href="#5-hybrid-search-2">5. Hybrid search</a></h2>
+<pre><code class="language-ruby">request = Laurus::SearchRequest.new(
+  lexical_query: Laurus::TermQuery.new("title", "rust"),
+  vector_query: Laurus::VectorQuery.new("embedding", query_vec),
+  fusion: Laurus::RRF.new(k: 60.0),
+  limit: 5,
+)
+results = index.search(request)
+</code></pre>
+<h2 id="6-update-and-delete-2"><a class="header" href="#6-update-and-delete-2">6. Update and delete</a></h2>
+<pre><code class="language-ruby"># Update: put_document replaces all existing versions
+index.put_document("doc1", { "title" =&gt; "Updated Title", "body" =&gt; "New content." })
+index.commit
+
+# Append a new version without removing existing ones (RAG chunking pattern)
+index.add_document("doc1", { "title" =&gt; "Chunk 2", "body" =&gt; "Additional chunk." })
+index.commit
+
+# Retrieve all versions
+docs = index.get_documents("doc1")
+
+# Delete
+index.delete_documents("doc1")
+index.commit
+</code></pre>
+<h2 id="7-schema-management-2"><a class="header" href="#7-schema-management-2">7. Schema management</a></h2>
+<pre><code class="language-ruby">schema = Laurus::Schema.new
+schema.add_text_field("title")
+schema.add_text_field("body")
+schema.add_integer_field("year")
+schema.add_float_field("score")
+schema.add_boolean_field("published")
+schema.add_bytes_field("thumbnail")
+schema.add_geo_field("location")
+schema.add_datetime_field("created_at")
+schema.add_hnsw_field("embedding", 384)
+schema.add_flat_field("small_vec", 64)
+schema.add_ivf_field("ivf_vec", 128, n_clusters: 100)
+</code></pre>
+<h2 id="8-index-statistics-2"><a class="header" href="#8-index-statistics-2">8. Index statistics</a></h2>
+<pre><code class="language-ruby">stats = index.stats
+puts stats["document_count"]
+puts stats["vector_fields"]
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="api-reference-4"><a class="header" href="#api-reference-4">API Reference</a></h1>
+<h2 id="index-3"><a class="header" href="#index-3">Index</a></h2>
+<p>The primary entry point. Wraps the Laurus search engine.</p>
+<pre><code class="language-ruby">Laurus::Index.new(path: nil, schema: nil)
+</code></pre>
+<h3 id="constructor-2"><a class="header" href="#constructor-2">Constructor</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Parameter</th><th style="text-align: left">Type</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>path:</code></td><td style="text-align: left"><code>String | nil</code></td><td style="text-align: left"><code>nil</code></td><td style="text-align: left">Directory path for persistent storage. <code>nil</code> creates an in-memory index.</td></tr>
+<tr><td style="text-align: left"><code>schema:</code></td><td style="text-align: left"><code>Schema | nil</code></td><td style="text-align: left"><code>nil</code></td><td style="text-align: left">Schema definition. An empty schema is used when omitted.</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="methods-3"><a class="header" href="#methods-3">Methods</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Method</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>put_document(id, doc)</code></td><td style="text-align: left">Upsert a document. Replaces all existing versions with the same ID.</td></tr>
+<tr><td style="text-align: left"><code>add_document(id, doc)</code></td><td style="text-align: left">Append a document chunk without removing existing versions.</td></tr>
+<tr><td style="text-align: left"><code>get_documents(id) -&gt; Array&lt;Hash&gt;</code></td><td style="text-align: left">Return all stored versions for the given ID.</td></tr>
+<tr><td style="text-align: left"><code>delete_documents(id)</code></td><td style="text-align: left">Delete all versions for the given ID.</td></tr>
+<tr><td style="text-align: left"><code>commit</code></td><td style="text-align: left">Flush buffered writes and make all pending changes searchable.</td></tr>
+<tr><td style="text-align: left"><code>search(query, limit: 10, offset: 0) -&gt; Array&lt;SearchResult&gt;</code></td><td style="text-align: left">Execute a search query.</td></tr>
+<tr><td style="text-align: left"><code>stats -&gt; Hash</code></td><td style="text-align: left">Return index statistics (<code>"document_count"</code>, <code>"vector_fields"</code>).</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="search-query-argument-1"><a class="header" href="#search-query-argument-1"><code>search</code> query argument</a></h3>
+<p>The <code>query</code> parameter accepts any of the following:</p>
+<ul>
+<li>A <strong>DSL string</strong> (e.g. <code>"title:hello"</code>, <code>"embedding:\"memory safety\""</code>)</li>
+<li>A <strong>lexical query object</strong> (<code>TermQuery</code>, <code>PhraseQuery</code>, <code>BooleanQuery</code>, …)</li>
+<li>A <strong>vector query object</strong> (<code>VectorQuery</code>, <code>VectorTextQuery</code>)</li>
+<li>A <strong><code>SearchRequest</code></strong> for full control</li>
+</ul>
+<hr>
+<h2 id="schema-5"><a class="header" href="#schema-5">Schema</a></h2>
+<p>Defines the fields and index types for an <code>Index</code>.</p>
+<pre><code class="language-ruby">Laurus::Schema.new
+</code></pre>
+<h3 id="field-methods-2"><a class="header" href="#field-methods-2">Field methods</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Method</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>add_text_field(name, stored: true, indexed: true, term_vectors: false, analyzer: nil)</code></td><td style="text-align: left">Full-text field (inverted index, BM25).</td></tr>
+<tr><td style="text-align: left"><code>add_integer_field(name, stored: true, indexed: true)</code></td><td style="text-align: left">64-bit integer field.</td></tr>
+<tr><td style="text-align: left"><code>add_float_field(name, stored: true, indexed: true)</code></td><td style="text-align: left">64-bit float field.</td></tr>
+<tr><td style="text-align: left"><code>add_boolean_field(name, stored: true, indexed: true)</code></td><td style="text-align: left">Boolean field.</td></tr>
+<tr><td style="text-align: left"><code>add_bytes_field(name, stored: true)</code></td><td style="text-align: left">Raw bytes field.</td></tr>
+<tr><td style="text-align: left"><code>add_geo_field(name, stored: true, indexed: true)</code></td><td style="text-align: left">Geographic coordinate field (lat/lon).</td></tr>
+<tr><td style="text-align: left"><code>add_datetime_field(name, stored: true, indexed: true)</code></td><td style="text-align: left">UTC datetime field.</td></tr>
+<tr><td style="text-align: left"><code>add_hnsw_field(name, dimension, distance: "cosine", m: 16, ef_construction: 200, embedder: nil)</code></td><td style="text-align: left">HNSW approximate nearest-neighbor vector field.</td></tr>
+<tr><td style="text-align: left"><code>add_flat_field(name, dimension, distance: "cosine", embedder: nil)</code></td><td style="text-align: left">Flat (brute-force) vector field.</td></tr>
+<tr><td style="text-align: left"><code>add_ivf_field(name, dimension, distance: "cosine", n_clusters: 100, n_probe: 1, embedder: nil)</code></td><td style="text-align: left">IVF approximate nearest-neighbor vector field.</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="other-methods"><a class="header" href="#other-methods">Other methods</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Method</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>add_embedder(name, config)</code></td><td style="text-align: left">Register a named embedder definition. <code>config</code> is a Hash with a <code>"type"</code> key (see below).</td></tr>
+<tr><td style="text-align: left"><code>set_default_fields(fields)</code></td><td style="text-align: left">Set the default fields used when no field is specified in a query. <code>fields</code> is an Array of Strings.</td></tr>
+<tr><td style="text-align: left"><code>field_names -&gt; Array&lt;String&gt;</code></td><td style="text-align: left">Return the list of field names defined in this schema.</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="embedder-types"><a class="header" href="#embedder-types">Embedder types</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left"><code>"type"</code></th><th style="text-align: left">Required keys</th><th style="text-align: left">Feature flag</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>"precomputed"</code></td><td style="text-align: left">–</td><td style="text-align: left">(always available)</td></tr>
+<tr><td style="text-align: left"><code>"candle_bert"</code></td><td style="text-align: left"><code>"model"</code></td><td style="text-align: left"><code>embeddings-candle</code></td></tr>
+<tr><td style="text-align: left"><code>"candle_clip"</code></td><td style="text-align: left"><code>"model"</code></td><td style="text-align: left"><code>embeddings-multimodal</code></td></tr>
+<tr><td style="text-align: left"><code>"openai"</code></td><td style="text-align: left"><code>"model"</code></td><td style="text-align: left"><code>embeddings-openai</code></td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="distance-metrics-5"><a class="header" href="#distance-metrics-5">Distance metrics</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Value</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>"cosine"</code></td><td style="text-align: left">Cosine similarity (default)</td></tr>
+<tr><td style="text-align: left"><code>"euclidean"</code></td><td style="text-align: left">Euclidean distance</td></tr>
+<tr><td style="text-align: left"><code>"dot_product"</code></td><td style="text-align: left">Dot product</td></tr>
+<tr><td style="text-align: left"><code>"manhattan"</code></td><td style="text-align: left">Manhattan distance</td></tr>
+<tr><td style="text-align: left"><code>"angular"</code></td><td style="text-align: left">Angular distance</td></tr>
+</tbody>
+</table>
+</div>
+<hr>
+<h2 id="query-classes-2"><a class="header" href="#query-classes-2">Query classes</a></h2>
+<h3 id="termquery-3"><a class="header" href="#termquery-3">TermQuery</a></h3>
+<pre><code class="language-ruby">Laurus::TermQuery.new(field, term)
+</code></pre>
+<p>Matches documents containing the exact term in the given field.</p>
+<h3 id="phrasequery-3"><a class="header" href="#phrasequery-3">PhraseQuery</a></h3>
+<pre><code class="language-ruby">Laurus::PhraseQuery.new(field, terms)
+</code></pre>
+<p>Matches documents containing the terms in order. <code>terms</code> is an Array of Strings.</p>
+<h3 id="fuzzyquery-3"><a class="header" href="#fuzzyquery-3">FuzzyQuery</a></h3>
+<pre><code class="language-ruby">Laurus::FuzzyQuery.new(field, term, max_edits: 2)
+</code></pre>
+<p>Approximate match allowing up to <code>max_edits</code> edit-distance errors.</p>
+<h3 id="wildcardquery-3"><a class="header" href="#wildcardquery-3">WildcardQuery</a></h3>
+<pre><code class="language-ruby">Laurus::WildcardQuery.new(field, pattern)
+</code></pre>
+<p>Pattern match. <code>*</code> matches any sequence of characters, <code>?</code> matches any single character.</p>
+<h3 id="numericrangequery-3"><a class="header" href="#numericrangequery-3">NumericRangeQuery</a></h3>
+<pre><code class="language-ruby">Laurus::NumericRangeQuery.new(field, min: nil, max: nil)
+</code></pre>
+<p>Matches numeric values in the range <code>[min, max]</code>. Pass <code>nil</code> for an open bound. The type (integer or float) is inferred from the Ruby type of <code>min</code>/<code>max</code>.</p>
+<h3 id="geoquery-3"><a class="header" href="#geoquery-3">GeoQuery</a></h3>
+<pre><code class="language-ruby"># Radius search
+Laurus::GeoQuery.within_radius(field, lat, lon, distance_km)
+
+# Bounding box search
+Laurus::GeoQuery.within_bounding_box(field, min_lat, min_lon, max_lat, max_lon)
+</code></pre>
+<p><code>within_radius</code> returns documents whose coordinate is within <code>distance_km</code> of the given point. <code>within_bounding_box</code> returns documents within the specified bounding box.</p>
+<h3 id="booleanquery-3"><a class="header" href="#booleanquery-3">BooleanQuery</a></h3>
+<pre><code class="language-ruby">bq = Laurus::BooleanQuery.new
+bq.must(query)
+bq.should(query)
+bq.must_not(query)
+</code></pre>
+<p>Compound boolean query. <code>must</code> clauses all have to match; at least one <code>should</code> clause must match; <code>must_not</code> clauses must not match.</p>
+<h3 id="spanquery-2"><a class="header" href="#spanquery-2">SpanQuery</a></h3>
+<pre><code class="language-ruby"># Single term
+Laurus::SpanQuery.term(field, term)
+
+# Near: terms within slop positions
+Laurus::SpanQuery.near(field, terms, slop: 0, ordered: true)
+
+# Near with nested SpanQuery clauses
+Laurus::SpanQuery.near_spans(field, clauses, slop: 0, ordered: true)
+
+# Containing: big span contains little span
+Laurus::SpanQuery.containing(field, big, little)
+
+# Within: include span within exclude span at max distance
+Laurus::SpanQuery.within(field, include_span, exclude_span, distance)
+</code></pre>
+<p>Positional / proximity span queries. <code>near</code> takes an Array of term Strings, while <code>near_spans</code> takes an Array of <code>SpanQuery</code> objects for nested expressions.</p>
+<h3 id="vectorquery-2"><a class="header" href="#vectorquery-2">VectorQuery</a></h3>
+<pre><code class="language-ruby">Laurus::VectorQuery.new(field, vector)
+</code></pre>
+<p>Approximate nearest-neighbor search using a pre-computed embedding vector. <code>vector</code> is an Array of Floats.</p>
+<h3 id="vectortextquery-2"><a class="header" href="#vectortextquery-2">VectorTextQuery</a></h3>
+<pre><code class="language-ruby">Laurus::VectorTextQuery.new(field, text)
+</code></pre>
+<p>Converts <code>text</code> to an embedding at query time and runs vector search. Requires an embedder configured on the index.</p>
+<hr>
+<h2 id="searchrequest-3"><a class="header" href="#searchrequest-3">SearchRequest</a></h2>
+<p>Full-featured search request for advanced control.</p>
+<pre><code class="language-ruby">Laurus::SearchRequest.new(
+  query: nil,
+  lexical_query: nil,
+  vector_query: nil,
+  filter_query: nil,
+  fusion: nil,
+  limit: 10,
+  offset: 0,
+)
+</code></pre>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Parameter</th><th style="text-align: left">Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>query:</code></td><td style="text-align: left">A DSL string or single query object. Mutually exclusive with <code>lexical_query:</code> / <code>vector_query:</code>.</td></tr>
+<tr><td style="text-align: left"><code>lexical_query:</code></td><td style="text-align: left">Lexical component for explicit hybrid search.</td></tr>
+<tr><td style="text-align: left"><code>vector_query:</code></td><td style="text-align: left">Vector component for explicit hybrid search.</td></tr>
+<tr><td style="text-align: left"><code>filter_query:</code></td><td style="text-align: left">Lexical filter applied after scoring.</td></tr>
+<tr><td style="text-align: left"><code>fusion:</code></td><td style="text-align: left">Fusion algorithm (<code>RRF</code> or <code>WeightedSum</code>). Defaults to <code>RRF(k: 60)</code> when both components are set.</td></tr>
+<tr><td style="text-align: left"><code>limit:</code></td><td style="text-align: left">Maximum number of results (default 10).</td></tr>
+<tr><td style="text-align: left"><code>offset:</code></td><td style="text-align: left">Pagination offset (default 0).</td></tr>
+</tbody>
+</table>
+</div>
+<hr>
+<h2 id="searchresult-6"><a class="header" href="#searchresult-6">SearchResult</a></h2>
+<p>Returned by <code>Index#search</code>.</p>
+<pre><code class="language-ruby">result.id        # =&gt; String   -- External document identifier
+result.score     # =&gt; Float    -- Relevance score
+result.document  # =&gt; Hash|nil -- Retrieved field values, or nil if deleted
+</code></pre>
+<hr>
+<h2 id="fusion-algorithms-4"><a class="header" href="#fusion-algorithms-4">Fusion algorithms</a></h2>
+<h3 id="rrf-2"><a class="header" href="#rrf-2">RRF</a></h3>
+<pre><code class="language-ruby">Laurus::RRF.new(k: 60.0)
+</code></pre>
+<p>Reciprocal Rank Fusion. Merges lexical and vector result lists by rank position. <code>k</code> is a smoothing constant; higher values reduce the influence of top-ranked results.</p>
+<h3 id="weightedsum-4"><a class="header" href="#weightedsum-4">WeightedSum</a></h3>
+<pre><code class="language-ruby">Laurus::WeightedSum.new(lexical_weight: 0.5, vector_weight: 0.5)
+</code></pre>
+<p>Normalises both score lists independently, then combines them as <code>lexical_weight * lexical_score + vector_weight * vector_score</code>.</p>
+<hr>
+<h2 id="text-analysis-3"><a class="header" href="#text-analysis-3">Text analysis</a></h2>
+<h3 id="synonymdictionary-3"><a class="header" href="#synonymdictionary-3">SynonymDictionary</a></h3>
+<pre><code class="language-ruby">dict = Laurus::SynonymDictionary.new
+dict.add_synonym_group(["fast", "quick", "rapid"])
+</code></pre>
+<p>A dictionary of synonym groups. All terms in a group are treated as synonyms of each other.</p>
+<h3 id="whitespacetokenizer-3"><a class="header" href="#whitespacetokenizer-3">WhitespaceTokenizer</a></h3>
+<pre><code class="language-ruby">tokenizer = Laurus::WhitespaceTokenizer.new
+tokens = tokenizer.tokenize("hello world")
+</code></pre>
+<p>Splits text on whitespace boundaries and returns an Array of <code>Token</code> objects.</p>
+<h3 id="synonymgraphfilter-3"><a class="header" href="#synonymgraphfilter-3">SynonymGraphFilter</a></h3>
+<pre><code class="language-ruby">filter = Laurus::SynonymGraphFilter.new(dictionary, keep_original: true, boost: 1.0)
+expanded = filter.apply(tokens)
+</code></pre>
+<p>Token filter that expands tokens with their synonyms from a <code>SynonymDictionary</code>.</p>
+<h3 id="token-2"><a class="header" href="#token-2">Token</a></h3>
+<pre><code class="language-ruby">token.text                # =&gt; String  -- The token text
+token.position            # =&gt; Integer -- Position in the token stream
+token.start_offset        # =&gt; Integer -- Character start offset in the original text
+token.end_offset          # =&gt; Integer -- Character end offset in the original text
+token.boost               # =&gt; Float   -- Score boost factor (1.0 = no adjustment)
+token.stopped             # =&gt; Boolean -- Whether removed by a stop filter
+token.position_increment  # =&gt; Integer -- Difference from the previous token's position
+token.position_length     # =&gt; Integer -- Number of positions spanned
+</code></pre>
+<hr>
+<h2 id="field-value-types-2"><a class="header" href="#field-value-types-2">Field value types</a></h2>
+<p>Ruby values are automatically converted to Laurus <code>DataValue</code> types:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Ruby type</th><th style="text-align: left">Laurus type</th><th style="text-align: left">Notes</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>nil</code></td><td style="text-align: left"><code>Null</code></td><td style="text-align: left"></td></tr>
+<tr><td style="text-align: left"><code>true</code> / <code>false</code></td><td style="text-align: left"><code>Bool</code></td><td style="text-align: left"></td></tr>
+<tr><td style="text-align: left"><code>Integer</code></td><td style="text-align: left"><code>Int64</code></td><td style="text-align: left"></td></tr>
+<tr><td style="text-align: left"><code>Float</code></td><td style="text-align: left"><code>Float64</code></td><td style="text-align: left"></td></tr>
+<tr><td style="text-align: left"><code>String</code></td><td style="text-align: left"><code>Text</code></td><td style="text-align: left"></td></tr>
+<tr><td style="text-align: left"><code>Array</code> of numerics</td><td style="text-align: left"><code>Vector</code></td><td style="text-align: left">Elements coerced to <code>f32</code></td></tr>
+<tr><td style="text-align: left"><code>Hash</code> with <code>"lat"</code>, <code>"lon"</code></td><td style="text-align: left"><code>Geo</code></td><td style="text-align: left">Two <code>Float</code> values</td></tr>
+<tr><td style="text-align: left"><code>Time</code> (responds to <code>iso8601</code>)</td><td style="text-align: left"><code>DateTime</code></td><td style="text-align: left">Converted via <code>iso8601</code></td></tr>
+</tbody>
+</table>
+</div>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="development-setup-1"><a class="header" href="#development-setup-1">Development Setup</a></h1>
+<p>This page covers how to set up a local development environment
+for the <code>laurus-ruby</code> binding, build it, and run the test
+suite.</p>
 <h2 id="prerequisites-6"><a class="header" href="#prerequisites-6">Prerequisites</a></h2>
+<ul>
+<li><strong>Rust</strong> 1.85 or later with Cargo</li>
+<li><strong>Ruby</strong> 3.1 or later with Bundler</li>
+<li>Repository cloned locally</li>
+</ul>
+<pre><code class="language-bash">git clone https://github.com/mosuka/laurus.git
+cd laurus
+</code></pre>
+<h2 id="build-2"><a class="header" href="#build-2">Build</a></h2>
+<h3 id="development-build-1"><a class="header" href="#development-build-1">Development build</a></h3>
+<p>Compiles the Rust native extension in debug mode. Re-run after
+any Rust source change.</p>
+<pre><code class="language-bash">cd laurus-ruby
+bundle install
+bundle exec rake compile
+</code></pre>
+<h3 id="release-build-1"><a class="header" href="#release-build-1">Release build</a></h3>
+<pre><code class="language-bash">gem build laurus.gemspec
+</code></pre>
+<h3 id="verify-the-build-1"><a class="header" href="#verify-the-build-1">Verify the build</a></h3>
+<pre><code class="language-ruby">ruby -e "
+require 'laurus'
+index = Laurus::Index.new
+puts index.stats
+"
+# {"document_count"=&gt;0, "vector_fields"=&gt;{}}
+</code></pre>
+<h2 id="testing-2"><a class="header" href="#testing-2">Testing</a></h2>
+<p>Tests use <a href="https://github.com/minitest/minitest">Minitest</a> and are located in
+<code>test/</code>.</p>
+<pre><code class="language-bash"># Run all tests
+bundle exec rake test
+</code></pre>
+<p>To run a specific test file:</p>
+<pre><code class="language-bash">bundle exec ruby -Ilib -Itest test/test_index.rb
+</code></pre>
+<h2 id="linting-and-formatting-1"><a class="header" href="#linting-and-formatting-1">Linting and formatting</a></h2>
+<pre><code class="language-bash"># Rust lint (Clippy)
+cargo clippy -p laurus-ruby -- -D warnings
+
+# Rust formatting
+cargo fmt -p laurus-ruby --check
+
+# Apply formatting
+cargo fmt -p laurus-ruby
+</code></pre>
+<h2 id="cleaning-up-1"><a class="header" href="#cleaning-up-1">Cleaning up</a></h2>
+<pre><code class="language-bash"># Remove build artifacts
+bundle exec rake clean
+
+# Remove installed gems
+rm -rf vendor/bundle
+</code></pre>
+<h2 id="project-layout-1"><a class="header" href="#project-layout-1">Project layout</a></h2>
+<pre><code class="language-text">laurus-ruby/
+├── Cargo.toml          # Rust crate manifest
+├── laurus.gemspec      # Gem specification
+├── Gemfile             # Bundler dependency file
+├── Rakefile            # Rake tasks (compile, test, clean)
+├── lib/
+│   └── laurus.rb       # Ruby entrypoint (loads native extension)
+├── ext/
+│   └── laurus_ruby/    # Native extension build configuration
+│       └── extconf.rb  # rb_sys extension configuration
+├── src/                # Rust source (Magnus binding)
+│   ├── lib.rs          # Module registration
+│   ├── index.rs        # Index class
+│   ├── schema.rs       # Schema class
+│   ├── query.rs        # Query classes
+│   ├── search.rs       # SearchRequest / SearchResult / Fusion
+│   ├── analysis.rs     # Tokenizer / Filter / Token
+│   ├── convert.rs      # Ruby ↔ DataValue conversion
+│   └── errors.rs       # Error mapping
+├── test/               # Minitest tests
+│   ├── test_helper.rb
+│   └── test_index.rb
+└── examples/           # Runnable Ruby examples
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="build--test"><a class="header" href="#build--test">Build &amp; Test</a></h1>
+<h2 id="prerequisites-7"><a class="header" href="#prerequisites-7">Prerequisites</a></h2>
 <ul>
 <li><strong>Rust</strong> 1.85 or later (edition 2024)</li>
 <li><strong>Cargo</strong> (included with Rust)</li>
@@ -9491,7 +10033,7 @@ cargo build --features embeddings-candle
 # Build in release mode
 cargo build --release
 </code></pre>
-<h2 id="testing-2"><a class="header" href="#testing-2">Testing</a></h2>
+<h2 id="testing-3"><a class="header" href="#testing-3">Testing</a></h2>
 <pre><code class="language-bash"># Run all tests
 cargo test
 

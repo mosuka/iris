@@ -36,10 +36,10 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-d73688fb.js";
+            window.path_to_searchindex_js = "searchindex-238a729d.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-c8b18c0d.js"></script>
+        <script src="toc-88be6a53.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -9336,14 +9336,552 @@ cargo clippy -p laurus-wasm --target wasm32-unknown-unknown -- -D warnings
 <pre><code class="language-bash">wasm-pack test --headless --chrome
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div>
-<h1 id="ビルドとテスト"><a class="header" href="#ビルドとテスト">ビルドとテスト</a></h1>
+<h1 id="ruby-バインディング概要"><a class="header" href="#ruby-バインディング概要">Ruby バインディング概要</a></h1>
+<p><code>laurus</code> gem は Laurus 検索エンジンの Ruby バインディングです。<a href="https://github.com/matsadler/magnus">Magnus</a> と <a href="https://github.com/oxidize-rb/rb-sys">rb_sys</a> を使ってネイティブ Rust 拡張としてビルドされており、Ruby プログラムからネイティブに近いパフォーマンスで Laurus の Lexical 検索、Vector 検索、ハイブリッド検索機能を利用できます。</p>
+<h2 id="機能-6"><a class="header" href="#機能-6">機能</a></h2>
+<ul>
+<li><strong>Lexical 検索</strong> – BM25 スコアリングを備えた転置インデックスによる全文検索</li>
+<li><strong>Vector 検索</strong> – Flat、HNSW、IVF インデックスを使用した近似最近傍（ANN）検索</li>
+<li><strong>ハイブリッド検索</strong> – フュージョンアルゴリズム（RRF、WeightedSum）で Lexical と Vector の結果を統合</li>
+<li><strong>豊富なクエリ DSL</strong> – Term、Phrase、Fuzzy、Wildcard、NumericRange、Geo、Boolean、Span クエリ</li>
+<li><strong>テキスト解析</strong> – トークナイザー、フィルター、ステマー、同義語展開</li>
+<li><strong>柔軟なストレージ</strong> – インメモリ（一時的）またはファイルベース（永続的）インデックス</li>
+<li><strong>Ruby らしい API</strong> – <code>Laurus::</code> 名前空間の直感的な Ruby クラス</li>
+</ul>
+<h2 id="アーキテクチャ-6"><a class="header" href="#アーキテクチャ-6">アーキテクチャ</a></h2>
+<pre><code class="language-mermaid">graph LR
+    subgraph "laurus-ruby (gem)"
+        RbIndex["Index\n(Ruby クラス)"]
+        RbQuery["クエリクラス"]
+        RbSearch["SearchRequest\n/ SearchResult"]
+    end
+
+    Ruby["Ruby アプリケーション"] --&gt;|"メソッド呼び出し"| RbIndex
+    Ruby --&gt;|"クエリオブジェクト"| RbQuery
+    RbIndex --&gt;|"Magnus FFI"| Engine["laurus::Engine\n(Rust)"]
+    RbQuery --&gt;|"Magnus FFI"| Engine
+    Engine --&gt; Storage["ストレージ\n(Memory / File)"]
+</code></pre>
+<p>Ruby クラスは Rust エンジンの薄いラッパーです。
+各呼び出しは Magnus の FFI 境界を一度だけ越え、その後
+Rust エンジンが操作をネイティブコードで実行します。</p>
+<p>Rust エンジン内部は非同期 I/O を使用していますが、
+Ruby 側のメソッドはすべて<strong>同期関数</strong>として公開されています。
+各メソッドは内部で <code>tokio::Runtime::block_on()</code> を呼び出し、
+非同期 Rust を同期 Ruby にブリッジしています。</p>
+<h2 id="クイックスタート-8"><a class="header" href="#クイックスタート-8">クイックスタート</a></h2>
+<pre><code class="language-ruby">require "laurus"
+
+# インメモリインデックスを作成
+index = Laurus::Index.new
+
+# ドキュメントをインデックス
+index.put_document("doc1", { "title" =&gt; "Rust 入門", "body" =&gt; "システムプログラミング言語です。" })
+index.put_document("doc2", { "title" =&gt; "Ruby Web 開発", "body" =&gt; "Ruby による Web アプリケーション。" })
+index.commit
+
+# 検索
+results = index.search("title:rust", limit: 5)
+results.each do |r|
+  puts "[#{r.id}] score=#{format('%.4f', r.score)}  #{r.document['title']}"
+end
+</code></pre>
+<h2 id="セクション-5"><a class="header" href="#セクション-5">セクション</a></h2>
+<ul>
+<li><a href="#インストール-5">インストール</a> – gem のインストール方法</li>
+<li><a href="#クイックスタート-9">クイックスタート</a> – サンプルによるハンズオン入門</li>
+<li><a href="#api-リファレンス-3">API リファレンス</a> – クラスとメソッドの完全リファレンス</li>
+<li><a href="#開発環境のセットアップ-1">開発</a> – ソースからのビルドとテスト実行</li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="インストール-5"><a class="header" href="#インストール-5">インストール</a></h1>
+<h2 id="rubygems-からインストール"><a class="header" href="#rubygems-からインストール">RubyGems からインストール</a></h2>
+<pre><code class="language-bash">gem install laurus
+</code></pre>
+<p>または <code>Gemfile</code> に追加します：</p>
+<pre><code class="language-ruby">gem "laurus"
+</code></pre>
+<p>その後、以下を実行します：</p>
+<pre><code class="language-bash">bundle install
+</code></pre>
+<h2 id="ソースからビルド-2"><a class="header" href="#ソースからビルド-2">ソースからビルド</a></h2>
+<p>ソースからビルドするには Rust ツールチェーン（1.85 以降）と <a href="https://github.com/oxidize-rb/rb-sys">rb_sys</a> が必要です。</p>
+<pre><code class="language-bash"># リポジトリをクローン
+git clone https://github.com/mosuka/laurus.git
+cd laurus/laurus-ruby
+
+# 依存関係をインストール
+bundle install
+
+# ネイティブ拡張をコンパイル
+bundle exec rake compile
+
+# またはローカルに gem をインストール
+gem build laurus.gemspec
+gem install laurus-*.gem
+</code></pre>
+<h2 id="動作確認-1"><a class="header" href="#動作確認-1">動作確認</a></h2>
+<pre><code class="language-ruby">require "laurus"
+index = Laurus::Index.new
+puts index  # Index()
+</code></pre>
+<h2 id="動作要件-1"><a class="header" href="#動作要件-1">動作要件</a></h2>
+<ul>
+<li>Ruby 3.1 以降</li>
+<li>Rust ツールチェーン（gem インストール時に <code>rb_sys</code> 経由で自動的に呼び出されます）</li>
+<li>コンパイル済みネイティブ拡張以外のランタイム依存関係なし</li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="クイックスタート-9"><a class="header" href="#クイックスタート-9">クイックスタート</a></h1>
+<h2 id="1-インデックスを作成する-1"><a class="header" href="#1-インデックスを作成する-1">1. インデックスを作成する</a></h2>
+<pre><code class="language-ruby">require "laurus"
+
+# インメモリインデックス（一時的、プロトタイピングに最適）
+index = Laurus::Index.new
+
+# ファイルベースインデックス（永続的）
+schema = Laurus::Schema.new
+schema.add_text_field("title")
+schema.add_text_field("body")
+index = Laurus::Index.new(path: "./myindex", schema: schema)
+</code></pre>
+<h2 id="2-ドキュメントをインデックスする-1"><a class="header" href="#2-ドキュメントをインデックスする-1">2. ドキュメントをインデックスする</a></h2>
+<pre><code class="language-ruby">index.put_document("doc1", {
+  "title" =&gt; "Rust 入門",
+  "body" =&gt; "Rust は安全性とパフォーマンスに重点を置いたシステムプログラミング言語です。",
+})
+index.put_document("doc2", {
+  "title" =&gt; "Ruby Web 開発",
+  "body" =&gt; "Ruby は Web アプリケーションと高速プロトタイピングに広く使われています。",
+})
+index.commit
+</code></pre>
+<h2 id="3-lexical-検索-2"><a class="header" href="#3-lexical-検索-2">3. Lexical 検索</a></h2>
+<pre><code class="language-ruby"># DSL 文字列
+results = index.search("title:rust", limit: 5)
+
+# クエリオブジェクト
+results = index.search(Laurus::TermQuery.new("body", "ruby"), limit: 5)
+
+# 結果を表示
+results.each do |r|
+  puts "[#{r.id}] score=#{format('%.4f', r.score)}  #{r.document['title']}"
+end
+</code></pre>
+<h2 id="4-vector-検索-2"><a class="header" href="#4-vector-検索-2">4. Vector 検索</a></h2>
+<p>Vector 検索にはベクトルフィールドを含むスキーマと事前計算済みエンベディングが必要です。</p>
+<pre><code class="language-ruby">require "laurus"
+
+schema = Laurus::Schema.new
+schema.add_text_field("title")
+schema.add_hnsw_field("embedding", 4)
+
+index = Laurus::Index.new(schema: schema)
+index.put_document("doc1", { "title" =&gt; "Rust", "embedding" =&gt; [0.1, 0.2, 0.3, 0.4] })
+index.put_document("doc2", { "title" =&gt; "Ruby", "embedding" =&gt; [0.9, 0.8, 0.7, 0.6] })
+index.commit
+
+query_vec = [0.1, 0.2, 0.3, 0.4]
+results = index.search(Laurus::VectorQuery.new("embedding", query_vec), limit: 3)
+</code></pre>
+<h2 id="5-ハイブリッド検索-2"><a class="header" href="#5-ハイブリッド検索-2">5. ハイブリッド検索</a></h2>
+<pre><code class="language-ruby">request = Laurus::SearchRequest.new(
+  lexical_query: Laurus::TermQuery.new("title", "rust"),
+  vector_query: Laurus::VectorQuery.new("embedding", query_vec),
+  fusion: Laurus::RRF.new(k: 60.0),
+  limit: 5,
+)
+results = index.search(request)
+</code></pre>
+<h2 id="6-更新と削除-2"><a class="header" href="#6-更新と削除-2">6. 更新と削除</a></h2>
+<pre><code class="language-ruby"># 更新: put_document は同じ ID の全バージョンを置換する
+index.put_document("doc1", { "title" =&gt; "更新されたタイトル", "body" =&gt; "新しいコンテンツ。" })
+index.commit
+
+# 既存バージョンを削除せずに新しいバージョンを追記（RAG チャンキングパターン）
+index.add_document("doc1", { "title" =&gt; "チャンク 2", "body" =&gt; "追加のチャンク。" })
+index.commit
+
+# 全バージョンを取得
+docs = index.get_documents("doc1")
+
+# 削除
+index.delete_documents("doc1")
+index.commit
+</code></pre>
+<h2 id="7-スキーマ管理-2"><a class="header" href="#7-スキーマ管理-2">7. スキーマ管理</a></h2>
+<pre><code class="language-ruby">schema = Laurus::Schema.new
+schema.add_text_field("title")
+schema.add_text_field("body")
+schema.add_integer_field("year")
+schema.add_float_field("score")
+schema.add_boolean_field("published")
+schema.add_bytes_field("thumbnail")
+schema.add_geo_field("location")
+schema.add_datetime_field("created_at")
+schema.add_hnsw_field("embedding", 384)
+schema.add_flat_field("small_vec", 64)
+schema.add_ivf_field("ivf_vec", 128, n_clusters: 100)
+</code></pre>
+<h2 id="8-インデックス統計-2"><a class="header" href="#8-インデックス統計-2">8. インデックス統計</a></h2>
+<pre><code class="language-ruby">stats = index.stats
+puts stats["document_count"]
+puts stats["vector_fields"]
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="api-リファレンス-3"><a class="header" href="#api-リファレンス-3">API リファレンス</a></h1>
+<h2 id="index-3"><a class="header" href="#index-3">Index</a></h2>
+<p>Laurus 検索エンジンをラップするメインクラスです。</p>
+<pre><code class="language-ruby">Laurus::Index.new(path: nil, schema: nil)
+</code></pre>
+<h3 id="コンストラクタ-2"><a class="header" href="#コンストラクタ-2">コンストラクタ</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">パラメータ</th><th style="text-align: left">型</th><th style="text-align: left">デフォルト</th><th style="text-align: left">説明</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>path:</code></td><td style="text-align: left"><code>String | nil</code></td><td style="text-align: left"><code>nil</code></td><td style="text-align: left">永続ストレージのディレクトリパス。<code>nil</code> の場合はインメモリインデックスを作成します。</td></tr>
+<tr><td style="text-align: left"><code>schema:</code></td><td style="text-align: left"><code>Schema | nil</code></td><td style="text-align: left"><code>nil</code></td><td style="text-align: left">スキーマ定義。省略時は空のスキーマが使用されます。</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="メソッド-4"><a class="header" href="#メソッド-4">メソッド</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">メソッド</th><th style="text-align: left">説明</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>put_document(id, doc)</code></td><td style="text-align: left">ドキュメントをアップサート（upsert）します。同じ ID の既存バージョンをすべて置換します。</td></tr>
+<tr><td style="text-align: left"><code>add_document(id, doc)</code></td><td style="text-align: left">既存バージョンを削除せずにドキュメントチャンクを追記します。</td></tr>
+<tr><td style="text-align: left"><code>get_documents(id) -&gt; Array&lt;Hash&gt;</code></td><td style="text-align: left">指定 ID の全保存バージョンを返します。</td></tr>
+<tr><td style="text-align: left"><code>delete_documents(id)</code></td><td style="text-align: left">指定 ID の全バージョンを削除します。</td></tr>
+<tr><td style="text-align: left"><code>commit</code></td><td style="text-align: left">バッファリングされた書き込みをフラッシュし、すべての保留中の変更を検索可能にします。</td></tr>
+<tr><td style="text-align: left"><code>search(query, limit: 10, offset: 0) -&gt; Array&lt;SearchResult&gt;</code></td><td style="text-align: left">検索クエリを実行します。</td></tr>
+<tr><td style="text-align: left"><code>stats -&gt; Hash</code></td><td style="text-align: left">インデックス統計（<code>"document_count"</code>、<code>"vector_fields"</code>）を返します。</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="search-の-query-引数-1"><a class="header" href="#search-の-query-引数-1"><code>search</code> の query 引数</a></h3>
+<p><code>query</code> パラメータは以下のいずれかを受け付けます：</p>
+<ul>
+<li><strong>DSL 文字列</strong>（例: <code>"title:hello"</code>、<code>"content:\"memory safety\""</code>)</li>
+<li><strong>Lexical クエリオブジェクト</strong>（<code>TermQuery</code>、<code>PhraseQuery</code>、<code>BooleanQuery</code> など）</li>
+<li><strong>Vector クエリオブジェクト</strong>（<code>VectorQuery</code>、<code>VectorTextQuery</code>）</li>
+<li><strong><code>SearchRequest</code></strong>（完全な制御が必要な場合）</li>
+</ul>
+<hr>
+<h2 id="schema-5"><a class="header" href="#schema-5">Schema</a></h2>
+<p><code>Index</code> のフィールドとインデックスタイプを定義します。</p>
+<pre><code class="language-ruby">Laurus::Schema.new
+</code></pre>
+<h3 id="フィールドメソッド-2"><a class="header" href="#フィールドメソッド-2">フィールドメソッド</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">メソッド</th><th style="text-align: left">説明</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>add_text_field(name, stored: true, indexed: true, term_vectors: false, analyzer: nil)</code></td><td style="text-align: left">全文フィールド（転置インデックス、BM25）。</td></tr>
+<tr><td style="text-align: left"><code>add_integer_field(name, stored: true, indexed: true)</code></td><td style="text-align: left">64 ビット整数フィールド。</td></tr>
+<tr><td style="text-align: left"><code>add_float_field(name, stored: true, indexed: true)</code></td><td style="text-align: left">64 ビット浮動小数点フィールド。</td></tr>
+<tr><td style="text-align: left"><code>add_boolean_field(name, stored: true, indexed: true)</code></td><td style="text-align: left">ブールフィールド。</td></tr>
+<tr><td style="text-align: left"><code>add_bytes_field(name, stored: true)</code></td><td style="text-align: left">生バイトフィールド。</td></tr>
+<tr><td style="text-align: left"><code>add_geo_field(name, stored: true, indexed: true)</code></td><td style="text-align: left">地理座標フィールド（緯度/経度）。</td></tr>
+<tr><td style="text-align: left"><code>add_datetime_field(name, stored: true, indexed: true)</code></td><td style="text-align: left">UTC 日時フィールド。</td></tr>
+<tr><td style="text-align: left"><code>add_hnsw_field(name, dimension, distance: "cosine", m: 16, ef_construction: 200, embedder: nil)</code></td><td style="text-align: left">HNSW 近似最近傍ベクトルフィールド。</td></tr>
+<tr><td style="text-align: left"><code>add_flat_field(name, dimension, distance: "cosine", embedder: nil)</code></td><td style="text-align: left">Flat（総当たり）ベクトルフィールド。</td></tr>
+<tr><td style="text-align: left"><code>add_ivf_field(name, dimension, distance: "cosine", n_clusters: 100, n_probe: 1, embedder: nil)</code></td><td style="text-align: left">IVF 近似最近傍ベクトルフィールド。</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="その他のメソッド"><a class="header" href="#その他のメソッド">その他のメソッド</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">メソッド</th><th style="text-align: left">説明</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>add_embedder(name, config)</code></td><td style="text-align: left">名前付きエンベダー定義を登録します。<code>config</code> は <code>"type"</code> キーを持つ Hash です（下記参照）。</td></tr>
+<tr><td style="text-align: left"><code>set_default_fields(fields)</code></td><td style="text-align: left">クエリでフィールドが指定されていない場合に使用するデフォルトフィールドを設定します。<code>fields</code> は文字列の配列です。</td></tr>
+<tr><td style="text-align: left"><code>field_names -&gt; Array&lt;String&gt;</code></td><td style="text-align: left">このスキーマに定義されたフィールド名のリストを返します。</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="エンベダータイプ"><a class="header" href="#エンベダータイプ">エンベダータイプ</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left"><code>"type"</code></th><th style="text-align: left">必須キー</th><th style="text-align: left">Feature Flag</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>"precomputed"</code></td><td style="text-align: left">–</td><td style="text-align: left">（常に利用可能）</td></tr>
+<tr><td style="text-align: left"><code>"candle_bert"</code></td><td style="text-align: left"><code>"model"</code></td><td style="text-align: left"><code>embeddings-candle</code></td></tr>
+<tr><td style="text-align: left"><code>"candle_clip"</code></td><td style="text-align: left"><code>"model"</code></td><td style="text-align: left"><code>embeddings-multimodal</code></td></tr>
+<tr><td style="text-align: left"><code>"openai"</code></td><td style="text-align: left"><code>"model"</code></td><td style="text-align: left"><code>embeddings-openai</code></td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="距離メトリクス-2"><a class="header" href="#距離メトリクス-2">距離メトリクス</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">値</th><th style="text-align: left">説明</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>"cosine"</code></td><td style="text-align: left">コサイン類似度（デフォルト）</td></tr>
+<tr><td style="text-align: left"><code>"euclidean"</code></td><td style="text-align: left">ユークリッド距離</td></tr>
+<tr><td style="text-align: left"><code>"dot_product"</code></td><td style="text-align: left">内積</td></tr>
+<tr><td style="text-align: left"><code>"manhattan"</code></td><td style="text-align: left">マンハッタン距離</td></tr>
+<tr><td style="text-align: left"><code>"angular"</code></td><td style="text-align: left">角度距離</td></tr>
+</tbody>
+</table>
+</div>
+<hr>
+<h2 id="クエリクラス-2"><a class="header" href="#クエリクラス-2">クエリクラス</a></h2>
+<h3 id="termquery-3"><a class="header" href="#termquery-3">TermQuery</a></h3>
+<pre><code class="language-ruby">Laurus::TermQuery.new(field, term)
+</code></pre>
+<p>指定フィールドに完全一致する語句を含むドキュメントを検索します。</p>
+<h3 id="phrasequery-3"><a class="header" href="#phrasequery-3">PhraseQuery</a></h3>
+<pre><code class="language-ruby">Laurus::PhraseQuery.new(field, terms)
+</code></pre>
+<p>指定した語句が順序どおりに含まれるドキュメントを検索します。<code>terms</code> は文字列の配列です。</p>
+<h3 id="fuzzyquery-3"><a class="header" href="#fuzzyquery-3">FuzzyQuery</a></h3>
+<pre><code class="language-ruby">Laurus::FuzzyQuery.new(field, term, max_edits: 2)
+</code></pre>
+<p>編集距離が <code>max_edits</code> 以内の近似一致を検索します。</p>
+<h3 id="wildcardquery-3"><a class="header" href="#wildcardquery-3">WildcardQuery</a></h3>
+<pre><code class="language-ruby">Laurus::WildcardQuery.new(field, pattern)
+</code></pre>
+<p>ワイルドカードパターン検索。<code>*</code> は任意の文字列、<code>?</code> は任意の1文字に一致します。</p>
+<h3 id="numericrangequery-3"><a class="header" href="#numericrangequery-3">NumericRangeQuery</a></h3>
+<pre><code class="language-ruby">Laurus::NumericRangeQuery.new(field, min: nil, max: nil)
+</code></pre>
+<p><code>[min, max]</code> の範囲内の数値を検索します。開いた境界には <code>nil</code> を指定します。型（整数または浮動小数点）は <code>min</code>/<code>max</code> の Ruby 型から推論されます。</p>
+<h3 id="geoquery-3"><a class="header" href="#geoquery-3">GeoQuery</a></h3>
+<pre><code class="language-ruby"># 半径検索
+Laurus::GeoQuery.within_radius(field, lat, lon, distance_km)
+
+# バウンディングボックス検索
+Laurus::GeoQuery.within_bounding_box(field, min_lat, min_lon, max_lat, max_lon)
+</code></pre>
+<p><code>within_radius</code> は指定した地点から <code>distance_km</code> 以内の座標を持つドキュメントを返します。<code>within_bounding_box</code> は指定したバウンディングボックス内のドキュメントを返します。</p>
+<h3 id="booleanquery-3"><a class="header" href="#booleanquery-3">BooleanQuery</a></h3>
+<pre><code class="language-ruby">bq = Laurus::BooleanQuery.new
+bq.must(query)
+bq.should(query)
+bq.must_not(query)
+</code></pre>
+<p>複合ブールクエリ。<code>must</code> 節はすべて一致する必要があります。<code>should</code> 節は少なくとも1つ一致する必要があります。<code>must_not</code> 節は一致してはなりません。</p>
+<h3 id="spanquery-2"><a class="header" href="#spanquery-2">SpanQuery</a></h3>
+<pre><code class="language-ruby"># 単一語句
+Laurus::SpanQuery.term(field, term)
+
+# Near: slop 位置以内の語句
+Laurus::SpanQuery.near(field, terms, slop: 0, ordered: true)
+
+# ネストされた SpanQuery 句を使った Near
+Laurus::SpanQuery.near_spans(field, clauses, slop: 0, ordered: true)
+
+# Containing: big スパンが little スパンを含む
+Laurus::SpanQuery.containing(field, big, little)
+
+# Within: 最大距離での include スパンと exclude スパン
+Laurus::SpanQuery.within(field, include_span, exclude_span, distance)
+</code></pre>
+<p>位置・近接スパンクエリ。<code>near</code> は語句文字列の配列を受け取り、<code>near_spans</code> はネスト式のために <code>SpanQuery</code> オブジェクトの配列を受け取ります。</p>
+<h3 id="vectorquery-2"><a class="header" href="#vectorquery-2">VectorQuery</a></h3>
+<pre><code class="language-ruby">Laurus::VectorQuery.new(field, vector)
+</code></pre>
+<p>事前計算済みエンベディングベクトルを使った近似最近傍検索を行います。<code>vector</code> は Float の配列です。</p>
+<h3 id="vectortextquery-2"><a class="header" href="#vectortextquery-2">VectorTextQuery</a></h3>
+<pre><code class="language-ruby">Laurus::VectorTextQuery.new(field, text)
+</code></pre>
+<p>クエリ時に <code>text</code> をエンベディングに変換してベクトル検索を行います。インデックスにエンベダーの設定が必要です。</p>
+<hr>
+<h2 id="searchrequest-3"><a class="header" href="#searchrequest-3">SearchRequest</a></h2>
+<p>高度な制御が必要な場合の完全なリクエストクラスです。</p>
+<pre><code class="language-ruby">Laurus::SearchRequest.new(
+  query: nil,
+  lexical_query: nil,
+  vector_query: nil,
+  filter_query: nil,
+  fusion: nil,
+  limit: 10,
+  offset: 0,
+)
+</code></pre>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">パラメータ</th><th style="text-align: left">説明</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>query:</code></td><td style="text-align: left">DSL 文字列または単一クエリオブジェクト。<code>lexical_query:</code> / <code>vector_query:</code> と排他的。</td></tr>
+<tr><td style="text-align: left"><code>lexical_query:</code></td><td style="text-align: left">明示的なハイブリッド検索の Lexical コンポーネント。</td></tr>
+<tr><td style="text-align: left"><code>vector_query:</code></td><td style="text-align: left">明示的なハイブリッド検索の Vector コンポーネント。</td></tr>
+<tr><td style="text-align: left"><code>filter_query:</code></td><td style="text-align: left">スコアリング後に適用する Lexical フィルター。</td></tr>
+<tr><td style="text-align: left"><code>fusion:</code></td><td style="text-align: left">フュージョンアルゴリズム（<code>RRF</code> または <code>WeightedSum</code>）。両コンポーネント指定時のデフォルトは <code>RRF(k: 60)</code>。</td></tr>
+<tr><td style="text-align: left"><code>limit:</code></td><td style="text-align: left">最大結果件数（デフォルト 10）。</td></tr>
+<tr><td style="text-align: left"><code>offset:</code></td><td style="text-align: left">ページネーションオフセット（デフォルト 0）。</td></tr>
+</tbody>
+</table>
+</div>
+<hr>
+<h2 id="searchresult-6"><a class="header" href="#searchresult-6">SearchResult</a></h2>
+<p><code>Index#search</code> が返すクラスです。</p>
+<pre><code class="language-ruby">result.id        # =&gt; String   -- 外部ドキュメント識別子
+result.score     # =&gt; Float    -- 関連性スコア
+result.document  # =&gt; Hash|nil -- 取得されたフィールド値。削除済みの場合は nil
+</code></pre>
+<hr>
+<h2 id="フュージョンアルゴリズム-2"><a class="header" href="#フュージョンアルゴリズム-2">フュージョンアルゴリズム</a></h2>
+<h3 id="rrf-2"><a class="header" href="#rrf-2">RRF</a></h3>
+<pre><code class="language-ruby">Laurus::RRF.new(k: 60.0)
+</code></pre>
+<p>逆順位フュージョン（Reciprocal Rank Fusion）。Lexical と Vector の結果リストを順位位置によってマージします。<code>k</code> は平滑化定数で、値が大きいほど上位ランクの影響が小さくなります。</p>
+<h3 id="weightedsum-4"><a class="header" href="#weightedsum-4">WeightedSum</a></h3>
+<pre><code class="language-ruby">Laurus::WeightedSum.new(lexical_weight: 0.5, vector_weight: 0.5)
+</code></pre>
+<p>両スコアリストをそれぞれ正規化した後、<code>lexical_weight * lexical_score + vector_weight * vector_score</code> として結合します。</p>
+<hr>
+<h2 id="テキスト解析-3"><a class="header" href="#テキスト解析-3">テキスト解析</a></h2>
+<h3 id="synonymdictionary-2"><a class="header" href="#synonymdictionary-2">SynonymDictionary</a></h3>
+<pre><code class="language-ruby">dict = Laurus::SynonymDictionary.new
+dict.add_synonym_group(["fast", "quick", "rapid"])
+</code></pre>
+<p>同義語グループの辞書です。グループ内のすべての語句は互いの同義語として扱われます。</p>
+<h3 id="whitespacetokenizer-2"><a class="header" href="#whitespacetokenizer-2">WhitespaceTokenizer</a></h3>
+<pre><code class="language-ruby">tokenizer = Laurus::WhitespaceTokenizer.new
+tokens = tokenizer.tokenize("hello world")
+</code></pre>
+<p>空白で分割してテキストをトークン化し、<code>Token</code> オブジェクトの配列を返します。</p>
+<h3 id="synonymgraphfilter-2"><a class="header" href="#synonymgraphfilter-2">SynonymGraphFilter</a></h3>
+<pre><code class="language-ruby">filter = Laurus::SynonymGraphFilter.new(dictionary, keep_original: true, boost: 1.0)
+expanded = filter.apply(tokens)
+</code></pre>
+<p><code>SynonymDictionary</code> の同義語でトークンを展開するトークンフィルターです。</p>
+<h3 id="token-2"><a class="header" href="#token-2">Token</a></h3>
+<pre><code class="language-ruby">token.text                # =&gt; String  -- トークンテキスト
+token.position            # =&gt; Integer -- トークンストリーム内の位置
+token.start_offset        # =&gt; Integer -- 元テキスト内の文字開始オフセット
+token.end_offset          # =&gt; Integer -- 元テキスト内の文字終了オフセット
+token.boost               # =&gt; Float   -- スコアブースト係数（1.0 = 調整なし）
+token.stopped             # =&gt; Boolean -- ストップフィルターによって除去されたかどうか
+token.position_increment  # =&gt; Integer -- 前のトークンの位置との差分
+token.position_length     # =&gt; Integer -- このトークンがカバーする位置数
+</code></pre>
+<hr>
+<h2 id="フィールド値の型マッピング-1"><a class="header" href="#フィールド値の型マッピング-1">フィールド値の型マッピング</a></h2>
+<p>Ruby の値は自動的に Laurus の <code>DataValue</code> 型に変換されます：</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Ruby 型</th><th style="text-align: left">Laurus 型</th><th style="text-align: left">備考</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>nil</code></td><td style="text-align: left"><code>Null</code></td><td style="text-align: left"></td></tr>
+<tr><td style="text-align: left"><code>true</code> / <code>false</code></td><td style="text-align: left"><code>Bool</code></td><td style="text-align: left"></td></tr>
+<tr><td style="text-align: left"><code>Integer</code></td><td style="text-align: left"><code>Int64</code></td><td style="text-align: left"></td></tr>
+<tr><td style="text-align: left"><code>Float</code></td><td style="text-align: left"><code>Float64</code></td><td style="text-align: left"></td></tr>
+<tr><td style="text-align: left"><code>String</code></td><td style="text-align: left"><code>Text</code></td><td style="text-align: left"></td></tr>
+<tr><td style="text-align: left"><code>Array</code>（数値）</td><td style="text-align: left"><code>Vector</code></td><td style="text-align: left">要素は <code>f32</code> に変換</td></tr>
+<tr><td style="text-align: left"><code>Hash</code>（<code>"lat"</code>, <code>"lon"</code>）</td><td style="text-align: left"><code>Geo</code></td><td style="text-align: left">2 つの <code>Float</code> 値</td></tr>
+<tr><td style="text-align: left"><code>Time</code>（<code>iso8601</code> に応答）</td><td style="text-align: left"><code>DateTime</code></td><td style="text-align: left"><code>iso8601</code> 経由で変換</td></tr>
+</tbody>
+</table>
+</div>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="開発環境のセットアップ-1"><a class="header" href="#開発環境のセットアップ-1">開発環境のセットアップ</a></h1>
+<p>このページでは <code>laurus-ruby</code> バインディングのローカル開発環境の構築、ビルド、テストスイートの実行方法について説明します。</p>
 <h2 id="前提条件-6"><a class="header" href="#前提条件-6">前提条件</a></h2>
+<ul>
+<li><strong>Rust</strong> 1.85 以降（Cargo 含む）</li>
+<li><strong>Ruby</strong> 3.1 以降（Bundler 含む）</li>
+<li>リポジトリがローカルにクローンされていること</li>
+</ul>
+<pre><code class="language-bash">git clone https://github.com/mosuka/laurus.git
+cd laurus
+</code></pre>
+<h2 id="ビルド-2"><a class="header" href="#ビルド-2">ビルド</a></h2>
+<h3 id="開発ビルド-1"><a class="header" href="#開発ビルド-1">開発ビルド</a></h3>
+<p>Rust ネイティブ拡張をデバッグモードでコンパイルします。Rust ソースを変更した場合は再実行してください。</p>
+<pre><code class="language-bash">cd laurus-ruby
+bundle install
+bundle exec rake compile
+</code></pre>
+<h3 id="リリースビルド-1"><a class="header" href="#リリースビルド-1">リリースビルド</a></h3>
+<pre><code class="language-bash">gem build laurus.gemspec
+</code></pre>
+<h3 id="ビルドの確認-1"><a class="header" href="#ビルドの確認-1">ビルドの確認</a></h3>
+<pre><code class="language-ruby">ruby -e "
+require 'laurus'
+index = Laurus::Index.new
+puts index.stats
+"
+# {"document_count"=&gt;0, "vector_fields"=&gt;{}}
+</code></pre>
+<h2 id="テスト-2"><a class="header" href="#テスト-2">テスト</a></h2>
+<p>テストは <a href="https://github.com/minitest/minitest">Minitest</a> を使用しており、<code>test/</code> ディレクトリにあります。</p>
+<pre><code class="language-bash"># 全テスト実行
+bundle exec rake test
+</code></pre>
+<p>特定のテストファイルを実行する場合：</p>
+<pre><code class="language-bash">bundle exec ruby -Ilib -Itest test/test_index.rb
+</code></pre>
+<h2 id="lint-とフォーマット"><a class="header" href="#lint-とフォーマット">Lint とフォーマット</a></h2>
+<pre><code class="language-bash"># Rust lint（Clippy）
+cargo clippy -p laurus-ruby -- -D warnings
+
+# Rust フォーマットチェック
+cargo fmt -p laurus-ruby --check
+
+# フォーマット適用
+cargo fmt -p laurus-ruby
+</code></pre>
+<h2 id="クリーンアップ-1"><a class="header" href="#クリーンアップ-1">クリーンアップ</a></h2>
+<pre><code class="language-bash"># ビルド成果物を削除
+bundle exec rake clean
+
+# インストールされた gem を削除
+rm -rf vendor/bundle
+</code></pre>
+<h2 id="プロジェクト構成-3"><a class="header" href="#プロジェクト構成-3">プロジェクト構成</a></h2>
+<pre><code class="language-text">laurus-ruby/
+├── Cargo.toml          # Rust クレートマニフェスト
+├── laurus.gemspec      # Gem 仕様
+├── Gemfile             # Bundler 依存関係ファイル
+├── Rakefile            # Rake タスク（compile、test、clean）
+├── lib/
+│   └── laurus.rb       # Ruby エントリポイント（ネイティブ拡張をロード）
+├── ext/
+│   └── laurus_ruby/    # ネイティブ拡張ビルド設定
+│       └── extconf.rb  # rb_sys 拡張設定
+├── src/                # Rust ソース（Magnus バインディング）
+│   ├── lib.rs          # モジュール登録
+│   ├── index.rs        # Index クラス
+│   ├── schema.rs       # Schema クラス
+│   ├── query.rs        # クエリクラス
+│   ├── search.rs       # SearchRequest / SearchResult / Fusion
+│   ├── analysis.rs     # Tokenizer / Filter / Token
+│   ├── convert.rs      # Ruby ↔ DataValue 変換
+│   └── errors.rs       # エラーマッピング
+├── test/               # Minitest テスト
+│   ├── test_helper.rb
+│   └── test_index.rb
+└── examples/           # 実行可能な Ruby サンプル
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="ビルドとテスト"><a class="header" href="#ビルドとテスト">ビルドとテスト</a></h1>
+<h2 id="前提条件-7"><a class="header" href="#前提条件-7">前提条件</a></h2>
 <ul>
 <li><strong>Rust</strong> 1.85 以降（edition 2024）</li>
 <li><strong>Cargo</strong>（Rust に付属）</li>
 <li><strong>protobuf コンパイラ</strong>（<code>protoc</code>）– <code>laurus-server</code> のビルドに必要</li>
 </ul>
-<h2 id="ビルド-2"><a class="header" href="#ビルド-2">ビルド</a></h2>
+<h2 id="ビルド-3"><a class="header" href="#ビルド-3">ビルド</a></h2>
 <pre><code class="language-bash"># すべてのクレートをビルド
 cargo build
 
@@ -9353,7 +9891,7 @@ cargo build --features embeddings-candle
 # リリースモードでビルド
 cargo build --release
 </code></pre>
-<h2 id="テスト-2"><a class="header" href="#テスト-2">テスト</a></h2>
+<h2 id="テスト-3"><a class="header" href="#テスト-3">テスト</a></h2>
 <pre><code class="language-bash"># すべてのテストを実行
 cargo test
 
@@ -9447,7 +9985,7 @@ laurus = { version = "0.1.0", features = ["embeddings-all"] }
 </div>
 <p>Lexical（キーワード）検索のみが必要な場合は、Feature を有効にせずに Laurus を使用することで、最小のバイナリサイズと最速のコンパイル時間を実現できます。</p>
 <div style="break-before: page; page-break-before: always;"></div>
-<h1 id="プロジェクト構成-3"><a class="header" href="#プロジェクト構成-3">プロジェクト構成</a></h1>
+<h1 id="プロジェクト構成-4"><a class="header" href="#プロジェクト構成-4">プロジェクト構成</a></h1>
 <p>Laurus は 3 つのクレートを持つ Cargo ワークスペースとして構成されています。</p>
 <h2 id="ワークスペースレイアウト"><a class="header" href="#ワークスペースレイアウト">ワークスペースレイアウト</a></h2>
 <pre><code class="language-text">laurus/                          # リポジトリルート
