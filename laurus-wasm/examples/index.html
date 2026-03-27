@@ -216,11 +216,11 @@
       <h2>Search — Unified Query DSL</h2>
       <p class="dsl-hint">
         Lexical: <code>rust</code> <code>title:wasm</code> <code>"memory safety"</code> &nbsp;
-        Vector: <code>embedding:~"how to make code faster"</code> &nbsp;
-        Hybrid: <code>rust embedding:~"systems programming"</code>
+        Vector: <code>embedding:"how to make code faster"</code> <code>embedding:python</code> &nbsp;
+        Hybrid: <code>rust embedding:"systems programming"</code>
       </p>
       <div class="search-box">
-        <input type="text" id="query" placeholder='Try: rust, embedding:~"systems programming", or both!' disabled>
+        <input type="text" id="query" placeholder='Try: rust, embedding:"systems programming", or both!' disabled>
         <button id="search-btn" onclick="doSearch()" disabled>Search</button>
       </div>
       <ul class="results" id="results">

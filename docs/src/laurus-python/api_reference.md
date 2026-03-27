@@ -32,7 +32,7 @@ class Index:
 
 The `query` parameter accepts any of the following:
 
-- A **DSL string** (e.g. `"title:hello"`, `"~\"memory safety\""`)
+- A **DSL string** (e.g. `"title:hello"`, `"embedding:\"memory safety\""`)
 - A **lexical query object** (`TermQuery`, `PhraseQuery`, `BooleanQuery`, …)
 - A **vector query object** (`VectorQuery`, `VectorTextQuery`)
 - A **`SearchRequest`** for full control

@@ -175,7 +175,7 @@ let request = VectorSearchRequestBuilder::new()
     .build();
 
 // Query DSL
-let request = vector_parser.parse(r#"text_vec:~"systems programming""#).await?;
+let request = vector_parser.parse(r#"text_vec:"systems programming""#).await?;
 ```
 
 Both approaches embed the query text using the same embedder that was used at index time, ensuring consistent vector spaces.

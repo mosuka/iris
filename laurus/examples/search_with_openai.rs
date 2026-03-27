@@ -236,11 +236,12 @@ async fn main() -> Result<()> {
     let unified_parser = UnifiedQueryParser::new(
         LexicalQueryParser::new(std_analyzer).with_default_field("text"),
         VectorQueryParser::new(per_field_embedder.clone()),
+        ["text_vec".to_string()].into_iter().collect(),
     );
 
     // Case F: Vector Search via DSL
-    println!("\n[F] Vector DSL: text_vec:~\"memory safety\"");
-    let parsed = vector_parser.parse("text_vec:~\"memory safety\"").await?;
+    println!("\n[F] Vector DSL: text_vec:\"memory safety\"");
+    let parsed = vector_parser.parse("text_vec:\"memory safety\"").await?;
     let results = engine
         .search(
             SearchRequestBuilder::new()
@@ -252,9 +253,9 @@ async fn main() -> Result<()> {
     common::print_search_results(&results);
 
     // Case G: Hybrid Search via DSL
-    println!("\n[G] Hybrid DSL: text:async text_vec:~\"concurrent\"");
+    println!("\n[G] Hybrid DSL: text:async text_vec:\"concurrent\"");
     let mut request = unified_parser
-        .parse("text:async text_vec:~\"concurrent\"")
+        .parse("text:async text_vec:\"concurrent\"")
         .await?;
     request.limit = 3;
     let results = engine.search(request).await?;
@@ -268,8 +269,8 @@ async fn main() -> Result<()> {
     common::print_search_results(&results);
 
     // Case I: Vector-only via DSL
-    println!("\n[I] Vector DSL: text_vec:~\"type system\"");
-    let mut request = unified_parser.parse("text_vec:~\"type system\"").await?;
+    println!("\n[I] Vector DSL: text_vec:\"type system\"");
+    let mut request = unified_parser.parse("text_vec:\"type system\"").await?;
     request.limit = 3;
     let results = engine.search(request).await?;
     common::print_search_results(&results);

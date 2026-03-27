@@ -115,13 +115,13 @@ struct SearchParams {
     /// - Fuzzy queries: `roam~2`
     /// - Range queries: `date:[2024-01-01 TO 2024-12-31]`
     ///
-    /// **Vector search** — semantic similarity using `~"text"` syntax:
-    /// - `content:~"cute kitten"` — vector search on a specific field
-    /// - `~"cute kitten"` — vector search on default field
-    /// - `content:~"cute kitten"^0.8` — with weight/boost
+    /// **Vector search** — semantic similarity on vector fields:
+    /// - `content:"cute kitten"` — vector search on a specific field
+    /// - `content:python` — unquoted text vector search
+    /// - `content:"cute kitten"^0.8` — with weight/boost
     ///
     /// **Hybrid search** — combine both in one query:
-    /// - `title:hello content:~"cute kitten"` — lexical + vector
+    /// - `title:hello content:"cute kitten"` — lexical + vector
     query: String,
 
     /// Maximum number of results to return. Defaults to `10`.

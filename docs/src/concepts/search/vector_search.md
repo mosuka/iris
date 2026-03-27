@@ -38,7 +38,7 @@ use laurus::vector::VectorQueryParser;
 let parser = VectorQueryParser::new(embedder.clone())
     .with_default_field("embedding");
 
-let request = parser.parse(r#"embedding:~"systems programming""#).await?;
+let request = parser.parse(r#"embedding:"systems programming""#).await?;
 ```
 
 ## VectorSearchQuery
@@ -131,7 +131,7 @@ Each clause produces a vector that is searched against its respective field. Res
 Use the `^` boost syntax in DSL or `weight` in `QueryVector` to adjust how much each field contributes:
 
 ```text
-text_vec:~"cute kitten"^1.0 image_vec:~"fluffy cat"^0.5
+text_vec:"cute kitten"^1.0 image_vec:"fluffy cat"^0.5
 ```
 
 This means text similarity counts twice as much as image similarity.

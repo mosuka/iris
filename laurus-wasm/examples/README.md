@@ -34,8 +34,8 @@ using laurus-wasm.
   embeddings via the callback embedder
 - Provides a search box with unified query DSL support:
   - Lexical: `rust`, `title:wasm`, `"memory safety"`
-  - Vector: `embedding:~"how to make code faster"`
-  - Hybrid: `rust embedding:~"systems programming"`
+  - Vector: `embedding:"how to make code faster"`, `embedding:python`
+  - Hybrid: `rust embedding:"systems programming"`
 - Allows adding new documents interactively
 - Shows search results with relevance scores
 - Logs all operations in the console panel

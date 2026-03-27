@@ -175,7 +175,7 @@ let request = VectorSearchRequestBuilder::new()
     .build();
 
 // Query DSL
-let request = vector_parser.parse(r#"text_vec:~"systems programming""#).await?;
+let request = vector_parser.parse(r#"text_vec:"systems programming""#).await?;
 ```
 
 どちらのアプローチも、インデクシング時と同じ Embedder を使用してクエリテキストを Embedding 化するため、一貫したベクトル空間が保証されます。

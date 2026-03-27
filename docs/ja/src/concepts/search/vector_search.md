@@ -32,7 +32,7 @@ use laurus::vector::VectorQueryParser;
 let parser = VectorQueryParser::new(embedder.clone())
     .with_default_field("embedding");
 
-let request = parser.parse(r#"embedding:~"systems programming""#).await?;
+let request = parser.parse(r#"embedding:"systems programming""#).await?;
 ```
 
 ## VectorSearchRequestBuilder
@@ -99,7 +99,7 @@ let request = VectorSearchRequestBuilder::new()
 DSL では `^` ブースト構文を使用するか、`QueryVector` の `weight` で各フィールドの寄与度を調整します。
 
 ```text
-text_vec:~"cute kitten"^1.0 image_vec:~"fluffy cat"^0.5
+text_vec:"cute kitten"^1.0 image_vec:"fluffy cat"^0.5
 ```
 
 これは、テキストの類似度が画像の類似度の 2 倍の重みを持つことを意味します。

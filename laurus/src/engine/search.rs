@@ -30,8 +30,8 @@ pub enum SearchQuery {
     ///
     /// - **Lexical**: `title:hello`, `"exact phrase"`, `AND`/`OR`, `term~2`,
     ///   `[a TO z]`, etc.
-    /// - **Vector**: `field:~"text"`, `~"text"^0.8` (with boost).
-    /// - **Hybrid**: mix both — `title:hello content:~"cute kitten"^0.8`.
+    /// - **Vector**: `field:"text"`, `field:text^0.8` (with boost).
+    /// - **Hybrid**: mix both — `title:hello content:"cute kitten"^0.8`.
     Dsl(String),
 
     /// Pre-built lexical (BM25) search query.

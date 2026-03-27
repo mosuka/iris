@@ -42,7 +42,7 @@ Vector search with a mock embedder, including filtered vector search and DSL syn
 cargo run --example vector_search
 ```
 
-Demonstrates: `PerFieldEmbedder`, `VectorSearchRequestBuilder`, filtered search, DSL syntax (`field:~"query"`).
+Demonstrates: `PerFieldEmbedder`, `VectorSearchRequestBuilder`, filtered search, DSL syntax (`field:"query"`).
 
 ### hybrid_search
 

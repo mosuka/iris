@@ -78,9 +78,9 @@ bash examples/movies/scripts/search_movies.sh
 
 **マルチモーダル（ベクトル）検索:**
 
-- `poster_vec:~"space adventure"` — 宇宙冒険風のポスターの映画を検索
-- `poster_vec:~"romantic couple"` — ロマンチックなポスターの映画を検索
-- `poster_vec:~"scary monster horror"` — ホラー風のポスターの映画を検索
+- `poster_vec:"space adventure"` — 宇宙冒険風のポスターの映画を検索
+- `poster_vec:"romantic couple"` — ロマンチックなポスターの映画を検索
+- `poster_vec:"scary monster horror"` — ホラー風のポスターの映画を検索
 
 ### 手動検索
 
@@ -91,7 +91,7 @@ bash examples/movies/scripts/search_movies.sh
 ./target/release/laurus --data-dir examples/movies/index search "title:matrix" --limit 10
 
 # マルチモーダルベクトル検索（テキスト→画像）
-./target/release/laurus --data-dir examples/movies/index search 'poster_vec:~"action hero"' --limit 10
+./target/release/laurus --data-dir examples/movies/index search 'poster_vec:"action hero"' --limit 10
 ```
 
 対話モードで操作する場合:
