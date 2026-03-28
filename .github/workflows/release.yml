@@ -371,13 +371,22 @@ jobs:
       - name: Run checkout
         uses: actions/checkout@v6
 
-      - name: Set up Ruby and Rust
-        uses: oxidize-rb/actions/setup-ruby-and-rust@v1
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
         with:
           ruby-version: ${{ matrix.ruby }}
           bundler-cache: true
-          cargo-cache: true
           working-directory: laurus-ruby
+
+      - name: Install toolchain
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "stable-${{ matrix.platform.target }}"
 
       - name: Run tests
         working-directory: laurus-ruby
@@ -692,22 +701,28 @@ jobs:
             target: aarch64-apple-darwin
           - runner: macos-15-intel
             target: x86_64-apple-darwin
-          - runner: windows-latest
-            target: x86_64-pc-windows-msvc
-          - runner: windows-11-arm
-            target: aarch64-pc-windows-msvc
     runs-on: ${{ matrix.platform.runner }}
     steps:
       - name: Run checkout
         uses: actions/checkout@v6
 
-      - name: Set up Ruby and Rust
-        uses: oxidize-rb/actions/setup-ruby-and-rust@v1
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
         with:
           ruby-version: "4.0"
           bundler-cache: true
-          cargo-cache: true
           working-directory: laurus-ruby
+
+      - name: Install toolchain
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+          target: ${{ matrix.platform.target }}
+
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "stable-${{ matrix.platform.target }}"
 
       - name: Build native extension
         working-directory: laurus-ruby
@@ -990,13 +1005,17 @@ jobs:
       - name: Run checkout
         uses: actions/checkout@v6
 
-      - name: Set up Ruby and Rust
-        uses: oxidize-rb/actions/setup-ruby-and-rust@v1
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
         with:
           ruby-version: "4.0"
           bundler-cache: true
-          cargo-cache: true
           working-directory: laurus-ruby
+
+      - name: Install toolchain
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
 
       - name: Download Ruby artifacts
         uses: actions/download-artifact@v4

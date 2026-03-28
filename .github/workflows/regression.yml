@@ -536,13 +536,22 @@ jobs:
       - name: Run checkout
         uses: actions/checkout@v6
 
-      - name: Set up Ruby and Rust
-        uses: oxidize-rb/actions/setup-ruby-and-rust@v1
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
         with:
           ruby-version: ${{ matrix.ruby }}
           bundler-cache: true
-          cargo-cache: true
           working-directory: laurus-ruby
+
+      - name: Install toolchain
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "stable-${{ matrix.platform.target }}"
 
       - name: Run tests
         working-directory: laurus-ruby
