@@ -803,17 +803,32 @@ jobs:
 
       - name: Publish crates
         run: |
+          wait_for_crate() {
+            local crate=$1 version=$2
+            echo "Waiting for $crate $version to appear in crates.io index..."
+            for i in $(seq 1 30); do
+              if curl -s -A "laurus-release-workflow" "https://crates.io/api/v1/crates/$crate/$version" | jq -e '.version' >/dev/null 2>&1; then
+                echo "$crate $version is now available"
+                return 0
+              fi
+              echo "  attempt $i/30 — not yet available, waiting 10s..."
+              sleep 10
+            done
+            echo "WARNING: timed out waiting for $crate $version (5 min), proceeding anyway"
+            return 0
+          }
+
           for crate in laurus laurus-server laurus-mcp laurus-cli; do
             VERSION=$(cargo metadata --no-deps --format-version=1 | jq -r ".packages[] | select(.name==\"$crate\") | .version")
             PUBLISHED_VERSIONS=$(curl -s -A "laurus-release-workflow (https://github.com/mosuka/laurus)" "https://crates.io/api/v1/crates/$crate" | jq -r 'select(.versions != null) | .versions[].num')
             if echo "${PUBLISHED_VERSIONS}" | grep -Fx "${VERSION}" >/dev/null; then
-              echo "$crate $VERSION has already published"
+              echo "$crate $VERSION has already been published"
             else
               echo "Publishing $crate $VERSION..."
               pushd $crate
               cargo publish
               popd
-              sleep 20
+              wait_for_crate "$crate" "$VERSION"
             fi
           done
         env:
