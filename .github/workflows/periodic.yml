@@ -393,3 +393,56 @@ jobs:
         run: |
           bundle exec rake compile
           bundle exec ruby -Ilib -Itest -e 'Dir["test/test_*.rb"].each { |f| require_relative f }'
+
+  # ============================================================
+  # Test laurus-php
+  # ============================================================
+  test-php:
+    name: Test laurus-php
+    needs: [test-laurus]
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - runner: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            skip_embedding_features: true
+        php: ["8.5"]
+    runs-on: ${{ matrix.platform.runner }}
+    steps:
+      - name: Run checkout
+        uses: actions/checkout@v6
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+
+      - name: Install toolchain
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "stable-${{ matrix.platform.target }}"
+
+      - name: Build PHP extension
+        shell: bash
+        run: |
+          cd laurus-php
+          if [ "${{ matrix.platform.skip_embedding_features }}" == "true" ]; then
+            cargo build --release
+          else
+            cargo build --release --features embeddings-all
+          fi
+
+      - name: Run tests
+        shell: bash
+        run: |
+          cd laurus-php
+          composer install
+          php -d extension=target/release/liblaurus_php.so vendor/bin/phpunit tests/LaurusTest.php
