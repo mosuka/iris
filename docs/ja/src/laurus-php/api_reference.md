@@ -1,0 +1,311 @@
+# API リファレンス
+
+## Index
+
+Laurus 検索エンジンをラップするメインクラスです。
+
+```php
+new \Laurus\Index(?string $path = null, ?Schema $schema = null)
+```
+
+### コンストラクタ
+
+| パラメータ | 型 | デフォルト | 説明 |
+| :--- | :--- | :--- | :--- |
+| `$path` | `string\|null` | `null` | 永続ストレージのディレクトリパス。`null` の場合はインメモリインデックスを作成します。 |
+| `$schema` | `Schema\|null` | `null` | スキーマ定義。省略時は空のスキーマが使用されます。 |
+
+### メソッド
+
+| メソッド | 説明 |
+| :--- | :--- |
+| `putDocument(string $id, array $doc): void` | ドキュメントをアップサート（upsert）します。同じ ID の既存バージョンをすべて置換します。 |
+| `addDocument(string $id, array $doc): void` | 既存バージョンを削除せずにドキュメントチャンクを追記します。 |
+| `getDocuments(string $id): array` | 指定 ID の全保存バージョンを返します。 |
+| `deleteDocuments(string $id): void` | 指定 ID の全バージョンを削除します。 |
+| `commit(): void` | バッファリングされた書き込みをフラッシュし、すべての保留中の変更を検索可能にします。 |
+| `search(mixed $query, int $limit = 10, int $offset = 0): array` | 検索クエリを実行します。`SearchResult` の配列を返します。 |
+| `stats(): array` | インデックス統計（`"document_count"`、`"vector_fields"`）を返します。 |
+
+### `search` の query 引数
+
+`$query` パラメータは以下のいずれかを受け付けます：
+
+- **DSL 文字列**（例: `"title:hello"`、`"embedding:\"memory safety\""`)
+- **Lexical クエリオブジェクト**（`TermQuery`、`PhraseQuery`、`BooleanQuery` など）
+- **Vector クエリオブジェクト**（`VectorQuery`、`VectorTextQuery`）
+- **`SearchRequest`**（完全な制御が必要な場合）
+
+---
+
+## Schema
+
+`Index` のフィールドとインデックスタイプを定義します。
+
+```php
+new \Laurus\Schema()
+```
+
+### フィールドメソッド
+
+| メソッド | 説明 |
+| :--- | :--- |
+| `addTextField(string $name, bool $stored = true, bool $indexed = true, bool $termVectors = false, ?string $analyzer = null): void` | 全文フィールド（転置インデックス、BM25）。 |
+| `addIntegerField(string $name, bool $stored = true, bool $indexed = true): void` | 64 ビット整数フィールド。 |
+| `addFloatField(string $name, bool $stored = true, bool $indexed = true): void` | 64 ビット浮動小数点フィールド。 |
+| `addBooleanField(string $name, bool $stored = true, bool $indexed = true): void` | ブールフィールド。 |
+| `addBytesField(string $name, bool $stored = true): void` | 生バイトフィールド。 |
+| `addGeoField(string $name, bool $stored = true, bool $indexed = true): void` | 地理座標フィールド（緯度/経度）。 |
+| `addDatetimeField(string $name, bool $stored = true, bool $indexed = true): void` | UTC 日時フィールド。 |
+| `addHnswField(string $name, int $dimension, ?string $distance = "cosine", int $m = 16, int $efConstruction = 200, ?string $embedder = null): void` | HNSW 近似最近傍ベクトルフィールド。 |
+| `addFlatField(string $name, int $dimension, ?string $distance = "cosine", ?string $embedder = null): void` | Flat（総当たり）ベクトルフィールド。 |
+| `addIvfField(string $name, int $dimension, ?string $distance = "cosine", int $nClusters = 100, int $nProbe = 1, ?string $embedder = null): void` | IVF 近似最近傍ベクトルフィールド。 |
+
+### その他のメソッド
+
+| メソッド | 説明 |
+| :--- | :--- |
+| `addEmbedder(string $name, array $config): void` | 名前付きエンベダー定義を登録します。`$config` は `"type"` キーを持つ連想配列です（下記参照）。 |
+| `setDefaultFields(array $fieldNames): void` | クエリでフィールドが指定されていない場合に使用するデフォルトフィールドを設定します。`$fieldNames` は文字列の配列です。 |
+| `fieldNames(): array` | このスキーマに定義されたフィールド名のリストを返します。 |
+
+### エンベダータイプ
+
+| `"type"` | 必須キー | Feature Flag |
+| :--- | :--- | :--- |
+| `"precomputed"` | -- | （常に利用可能） |
+| `"candle_bert"` | `"model"` | `embeddings-candle` |
+| `"candle_clip"` | `"model"` | `embeddings-multimodal` |
+| `"openai"` | `"model"` | `embeddings-openai` |
+
+### 距離メトリクス
+
+| 値 | 説明 |
+| :--- | :--- |
+| `"cosine"` | コサイン類似度（デフォルト） |
+| `"euclidean"` | ユークリッド距離 |
+| `"dot_product"` | 内積 |
+| `"manhattan"` | マンハッタン距離 |
+| `"angular"` | 角度距離 |
+
+---
+
+## クエリクラス
+
+### TermQuery
+
+```php
+new \Laurus\TermQuery(string $field, string $term)
+```
+
+指定フィールドに完全一致する語句を含むドキュメントを検索します。
+
+### PhraseQuery
+
+```php
+new \Laurus\PhraseQuery(string $field, array $terms)
+```
+
+指定した語句が順序どおりに含まれるドキュメントを検索します。`$terms` は文字列の配列です。
+
+### FuzzyQuery
+
+```php
+new \Laurus\FuzzyQuery(string $field, string $term, int $maxEdits = 2)
+```
+
+編集距離が `$maxEdits` 以内の近似一致を検索します。
+
+### WildcardQuery
+
+```php
+new \Laurus\WildcardQuery(string $field, string $pattern)
+```
+
+ワイルドカードパターン検索。`*` は任意の文字列、`?` は任意の1文字に一致します。
+
+### NumericRangeQuery
+
+```php
+new \Laurus\NumericRangeQuery(string $field, mixed $min, mixed $max, ?string $numericType = "integer")
+```
+
+`[$min, $max]` の範囲内の数値を検索します。開いた境界には `null` を指定します。`$numericType` には `"integer"` または `"float"` を設定します。
+
+### GeoQuery
+
+```php
+// 半径検索
+\Laurus\GeoQuery::withinRadius(string $field, float $lat, float $lon, float $distanceKm): GeoQuery
+
+// バウンディングボックス検索
+\Laurus\GeoQuery::withinBoundingBox(string $field, float $minLat, float $minLon, float $maxLat, float $maxLon): GeoQuery
+```
+
+`withinRadius` は指定した地点から `$distanceKm` 以内の座標を持つドキュメントを返します。`withinBoundingBox` は指定したバウンディングボックス内のドキュメントを返します。
+
+### BooleanQuery
+
+```php
+$bq = new \Laurus\BooleanQuery();
+$bq->must($query);
+$bq->should($query);
+$bq->mustNot($query);
+```
+
+複合ブールクエリ。`must` 節はすべて一致する必要があります。`should` 節は少なくとも1つ一致する必要があります。`mustNot` 節は一致してはなりません。
+
+### SpanQuery
+
+```php
+// 単一語句
+\Laurus\SpanQuery::term(string $field, string $term): SpanQuery
+
+// Near: slop 位置以内の語句
+\Laurus\SpanQuery::near(string $field, array $terms, int $slop = 0, bool $ordered = true): SpanQuery
+
+// Containing: big スパンが little スパンを含む
+\Laurus\SpanQuery::containing(string $field, SpanQuery $big, SpanQuery $little): SpanQuery
+
+// Within: 最大距離での include スパンと exclude スパン
+\Laurus\SpanQuery::within(string $field, SpanQuery $include, SpanQuery $exclude, int $distance): SpanQuery
+```
+
+位置・近接スパンクエリ。`near` は語句文字列の配列を受け取ります。
+
+### VectorQuery
+
+```php
+new \Laurus\VectorQuery(string $field, array $vector)
+```
+
+事前計算済みエンベディングベクトルを使った近似最近傍検索を行います。`$vector` は Float の配列です。
+
+### VectorTextQuery
+
+```php
+new \Laurus\VectorTextQuery(string $field, string $text)
+```
+
+クエリ時に `$text` をエンベディングに変換してベクトル検索を行います。インデックスにエンベダーの設定が必要です。
+
+---
+
+## SearchRequest
+
+高度な制御が必要な場合の完全なリクエストクラスです。
+
+```php
+new \Laurus\SearchRequest(
+    mixed $query = null,
+    mixed $lexicalQuery = null,
+    mixed $vectorQuery = null,
+    mixed $filterQuery = null,
+    mixed $fusion = null,
+    int $limit = 10,
+    int $offset = 0,
+)
+```
+
+| パラメータ | 説明 |
+| :--- | :--- |
+| `$query` | DSL 文字列または単一クエリオブジェクト。`$lexicalQuery` / `$vectorQuery` と排他的。 |
+| `$lexicalQuery` | 明示的なハイブリッド検索の Lexical コンポーネント。 |
+| `$vectorQuery` | 明示的なハイブリッド検索の Vector コンポーネント。 |
+| `$filterQuery` | スコアリング後に適用する Lexical フィルター。 |
+| `$fusion` | フュージョンアルゴリズム（`RRF` または `WeightedSum`）。両コンポーネント指定時のデフォルトは `RRF(k: 60)`。 |
+| `$limit` | 最大結果件数（デフォルト 10）。 |
+| `$offset` | ページネーションオフセット（デフォルト 0）。 |
+
+---
+
+## SearchResult
+
+`Index->search()` が返すクラスです。
+
+```php
+$result->getId()        // string   -- 外部ドキュメント識別子
+$result->getScore()     // float    -- 関連性スコア
+$result->getDocument()  // array|null -- 取得されたフィールド値。削除済みの場合は null
+```
+
+---
+
+## フュージョンアルゴリズム
+
+### RRF
+
+```php
+new \Laurus\RRF(float $k = 60.0)
+```
+
+逆順位フュージョン（Reciprocal Rank Fusion）。Lexical と Vector の結果リストを順位位置によってマージします。`$k` は平滑化定数で、値が大きいほど上位ランクの影響が小さくなります。
+
+### WeightedSum
+
+```php
+new \Laurus\WeightedSum(float $lexicalWeight = 0.5, float $vectorWeight = 0.5)
+```
+
+両スコアリストをそれぞれ正規化した後、`$lexicalWeight * lexical_score + $vectorWeight * vector_score` として結合します。
+
+---
+
+## テキスト解析
+
+### SynonymDictionary
+
+```php
+$dict = new \Laurus\SynonymDictionary();
+$dict->addSynonymGroup(["fast", "quick", "rapid"]);
+```
+
+同義語グループの辞書です。グループ内のすべての語句は互いの同義語として扱われます。
+
+### WhitespaceTokenizer
+
+```php
+$tokenizer = new \Laurus\WhitespaceTokenizer();
+$tokens = $tokenizer->tokenize("hello world");
+```
+
+空白で分割してテキストをトークン化し、`Token` オブジェクトの配列を返します。
+
+### SynonymGraphFilter
+
+```php
+$filter = new \Laurus\SynonymGraphFilter($dictionary, true, 1.0);
+$expanded = $filter->apply($tokens);
+```
+
+`SynonymDictionary` の同義語でトークンを展開するトークンフィルターです。
+
+### Token
+
+```php
+$token->getText()               // string  -- トークンテキスト
+$token->getPosition()           // int     -- トークンストリーム内の位置
+$token->getStartOffset()        // int     -- 元テキスト内の文字開始オフセット
+$token->getEndOffset()          // int     -- 元テキスト内の文字終了オフセット
+$token->getBoost()              // float   -- スコアブースト係数（1.0 = 調整なし）
+$token->isStopped()             // bool    -- ストップフィルターによって除去されたかどうか
+$token->getPositionIncrement()  // int     -- 前のトークンの位置との差分
+$token->getPositionLength()     // int     -- このトークンがカバーする位置数
+```
+
+---
+
+## フィールド値の型マッピング
+
+PHP の値は自動的に Laurus の `DataValue` 型に変換されます：
+
+| PHP 型 | Laurus 型 | 備考 |
+| :--- | :--- | :--- |
+| `null` | `Null` | |
+| `true` / `false` | `Bool` | |
+| `int` | `Int64` | |
+| `float` | `Float64` | |
+| `string` | `Text` | |
+| `array`（数値） | `Vector` | 要素は `f32` に変換 |
+| `array`（`"lat"`, `"lon"`） | `Geo` | 2 つの `float` 値 |
+| `string`（ISO 8601） | `DateTime` | ISO 8601 形式からパース |

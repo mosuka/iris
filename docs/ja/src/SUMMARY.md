@@ -95,6 +95,14 @@
   - [API リファレンス](laurus-ruby/api_reference.md)
   - [開発](laurus-ruby/development.md)
 
+# laurus-php
+
+- [PHP バインディング概要](laurus-php.md)
+  - [インストール](laurus-php/installation.md)
+  - [クイックスタート](laurus-php/quickstart.md)
+  - [API リファレンス](laurus-php/api_reference.md)
+  - [開発](laurus-php/development.md)
+
 # 開発ガイド
 
 - [ビルドとテスト](development/build_and_test.md)

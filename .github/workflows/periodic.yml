@@ -59,7 +59,7 @@ jobs:
           shared-key: "stable-x86_64-unknown-linux-gnu"
 
       - name: Run clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
+        run: cargo clippy --all-targets --features embeddings-all -- -D warnings
 
   # ============================================================
   # Test laurus (core library)
@@ -101,7 +101,7 @@ jobs:
           if [ "${{ matrix.platform.skip_embedding_features }}" == "true" ]; then
             FEATURES=""
           else
-            FEATURES="--all-features"
+            FEATURES="--features embeddings-all"
           fi
 
           cargo test --package laurus --target "${{ matrix.platform.target }}" $FEATURES
@@ -150,7 +150,7 @@ jobs:
           if [ "${{ matrix.platform.skip_embedding_features }}" == "true" ]; then
             FEATURES=""
           else
-            FEATURES="--all-features"
+            FEATURES="--features embeddings-all"
           fi
 
           cargo test --package laurus-server --target "${{ matrix.platform.target }}" $FEATURES
@@ -199,7 +199,7 @@ jobs:
           if [ "${{ matrix.platform.skip_embedding_features }}" == "true" ]; then
             FEATURES=""
           else
-            FEATURES="--all-features"
+            FEATURES="--features embeddings-all"
           fi
 
           cargo test --package laurus-mcp --target "${{ matrix.platform.target }}" $FEATURES
@@ -248,7 +248,7 @@ jobs:
           if [ "${{ matrix.platform.skip_embedding_features }}" == "true" ]; then
             FEATURES=""
           else
-            FEATURES="--all-features"
+            FEATURES="--features embeddings-all"
           fi
 
           cargo test --package laurus-cli --target "${{ matrix.platform.target }}" $FEATURES
