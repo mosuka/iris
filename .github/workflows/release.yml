@@ -516,7 +516,7 @@ jobs:
             -DestinationPath "laurus-${{ github.ref_name }}-${{ matrix.platform.target }}.zip"
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: laurus-${{ matrix.platform.target }}
           path: laurus-${{ github.ref_name }}-${{ matrix.platform.target }}.${{ matrix.platform.archive }}
@@ -540,7 +540,7 @@ jobs:
           args: --manifest-path laurus-python/Cargo.toml --out dist
 
       - name: Upload sdist
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: wheels-sdist
           path: dist/*.tar.gz
@@ -579,7 +579,7 @@ jobs:
           args: --release --out dist --manifest-path laurus-python/Cargo.toml --features embeddings-all
 
       - name: Upload wheel
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: wheels-${{ matrix.platform.runner }}-${{ matrix.platform.target }}
           path: dist/*.whl
@@ -636,7 +636,7 @@ jobs:
           npx napi build --platform --release -p laurus-nodejs --target ${{ matrix.settings.target }}
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: nodejs-binding-${{ matrix.settings.target }}
           path: laurus-nodejs/*.node
@@ -676,7 +676,7 @@ jobs:
         run: wasm-pack build --target ${{ matrix.wasm-target }} --release
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: wasm-${{ matrix.wasm-target }}
           path: laurus-wasm/pkg/
@@ -732,7 +732,7 @@ jobs:
           bundle exec rake compile
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ruby-native-${{ matrix.platform.target }}
           path: |
@@ -761,7 +761,7 @@ jobs:
       contents: write
     steps:
       - name: Download artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: artifacts
           pattern: "laurus-*"
@@ -829,7 +829,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download wheels and sdist
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: dist
           pattern: "wheels-*"
@@ -862,7 +862,7 @@ jobs:
           registry-url: "https://registry.npmjs.org"
 
       - name: Download all Node.js artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: laurus-nodejs/artifacts
           pattern: "nodejs-binding-*"
@@ -1021,7 +1021,7 @@ jobs:
           toolchain: stable
 
       - name: Download Ruby artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: laurus-ruby/artifacts
           pattern: "ruby-native-*"
