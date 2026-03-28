@@ -1,0 +1,6 @@
+/target
+/vendor
+composer.lock
+*.so
+*.dylib
+*.dll

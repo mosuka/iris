@@ -1,0 +1,799 @@
+//! PHP wrappers for all Laurus query types.
+//!
+//! Each PHP query class stores the data needed to construct the Rust query.
+//! Vector query classes produce [`VectorSearchQuery`] instead.
+
+use std::cell::RefCell;
+
+use ext_php_rs::convert::FromZval;
+use ext_php_rs::prelude::*;
+use ext_php_rs::types::{ZendClassObject, Zval};
+use laurus::lexical::span::{SpanQueryBuilder, SpanQueryWrapper};
+use laurus::lexical::{
+    BooleanQuery, FuzzyQuery, GeoQuery, NumericRangeQuery, PhraseQuery, TermQuery, WildcardQuery,
+};
+use laurus::vector::Vector;
+use laurus::vector::store::request::QueryVector;
+use laurus::{DataValue, LexicalSearchQuery, QueryPayload, VectorSearchQuery};
+
+// ---------------------------------------------------------------------------
+// Helper: extract a lexical query from any PHP query object
+// ---------------------------------------------------------------------------
+
+/// Extract a Laurus lexical query from an arbitrary PHP Zval.
+///
+/// Supports: `TermQuery`, `PhraseQuery`, `FuzzyQuery`, `WildcardQuery`,
+/// `NumericRangeQuery`, `GeoQuery`, `BooleanQuery`, `SpanQuery`.
+///
+/// # Arguments
+///
+/// * `zv` - PHP Zval that should be one of the query types.
+///
+/// # Returns
+///
+/// A boxed `dyn Query` implementing the lexical query.
+pub fn extract_lexical_query(zv: &Zval) -> PhpResult<Box<dyn laurus::lexical::Query>> {
+    if let Some(obj) = <&ZendClassObject<PhpTermQuery>>::from_zval(zv) {
+        let q: &PhpTermQuery = obj;
+        return Ok(Box::new(TermQuery::new(&q.field, &q.term)));
+    }
+    if let Some(obj) = <&ZendClassObject<PhpPhraseQuery>>::from_zval(zv) {
+        let q: &PhpPhraseQuery = obj;
+        return Ok(Box::new(PhraseQuery::new(&q.field, q.terms.clone())));
+    }
+    if let Some(obj) = <&ZendClassObject<PhpFuzzyQuery>>::from_zval(zv) {
+        let q: &PhpFuzzyQuery = obj;
+        return Ok(Box::new(
+            FuzzyQuery::new(&q.field, &q.term).max_edits(q.max_edits),
+        ));
+    }
+    if let Some(obj) = <&ZendClassObject<PhpWildcardQuery>>::from_zval(zv) {
+        let q: &PhpWildcardQuery = obj;
+        return Ok(Box::new(WildcardQuery::new(&q.field, &q.pattern).map_err(
+            |e| ext_php_rs::exception::PhpException::default(e.to_string()),
+        )?));
+    }
+    if let Some(obj) = <&ZendClassObject<PhpNumericRangeQuery>>::from_zval(zv) {
+        let q: &PhpNumericRangeQuery = obj;
+        return Ok(q.build());
+    }
+    if let Some(obj) = <&ZendClassObject<PhpGeoQuery>>::from_zval(zv) {
+        let q: &PhpGeoQuery = obj;
+        return q
+            .build()
+            .map_err(|e| ext_php_rs::exception::PhpException::default(e.to_string()));
+    }
+    if let Some(obj) = <&ZendClassObject<PhpBooleanQuery>>::from_zval(zv) {
+        let q: &PhpBooleanQuery = obj;
+        return q.build_query();
+    }
+    if let Some(obj) = <&ZendClassObject<PhpSpanQuery>>::from_zval(zv) {
+        let q: &PhpSpanQuery = obj;
+        return Ok(Box::new(SpanQueryWrapper::new(q.kind.build(&q.field))));
+    }
+    Err("Expected a lexical query type (TermQuery, BooleanQuery, …)".into())
+}
+
+/// Wrap an arbitrary PHP query Zval as a `LexicalSearchQuery::Obj`.
+///
+/// # Arguments
+///
+/// * `zv` - PHP Zval query object.
+///
+/// # Returns
+///
+/// A `LexicalSearchQuery` wrapping the extracted query.
+pub fn zval_to_lexical_search_query(zv: &Zval) -> PhpResult<LexicalSearchQuery> {
+    Ok(LexicalSearchQuery::Obj(extract_lexical_query(zv)?))
+}
+
+/// Check whether the PHP Zval is a vector query type.
+///
+/// # Arguments
+///
+/// * `zv` - PHP Zval to check.
+///
+/// # Returns
+///
+/// `true` if the value is a `VectorQuery` or `VectorTextQuery`.
+pub fn is_vector_query(zv: &Zval) -> bool {
+    <&ZendClassObject<PhpVectorQuery>>::from_zval(zv).is_some()
+        || <&ZendClassObject<PhpVectorTextQuery>>::from_zval(zv).is_some()
+}
+
+/// Convert a vector query PHP Zval into a [`VectorSearchQuery`].
+///
+/// # Arguments
+///
+/// * `zv` - PHP Zval that should be `VectorQuery` or `VectorTextQuery`.
+///
+/// # Returns
+///
+/// The corresponding `VectorSearchQuery`.
+pub fn zval_to_vector_search_query(zv: &Zval) -> PhpResult<VectorSearchQuery> {
+    if let Some(obj) = <&ZendClassObject<PhpVectorQuery>>::from_zval(zv) {
+        let q: &PhpVectorQuery = obj;
+        return Ok(VectorSearchQuery::Vectors(vec![QueryVector {
+            vector: Vector::new(q.vector.clone()),
+            weight: 1.0,
+            fields: Some(vec![q.field.clone()]),
+        }]));
+    }
+    if let Some(obj) = <&ZendClassObject<PhpVectorTextQuery>>::from_zval(zv) {
+        let q: &PhpVectorTextQuery = obj;
+        return Ok(VectorSearchQuery::Payloads(vec![QueryPayload::new(
+            &q.field,
+            DataValue::Text(q.text.clone()),
+        )]));
+    }
+    Err("Expected VectorQuery or VectorTextQuery".into())
+}
+
+// ---------------------------------------------------------------------------
+// Internal span-query recipe enum (Clone so it can be nested)
+// ---------------------------------------------------------------------------
+
+/// Internal representation of span query structure for deferred building.
+#[derive(Clone)]
+pub enum SpanKind {
+    /// Single term span.
+    Term(String),
+    /// Near proximity span with slop and ordering.
+    Near(Vec<SpanKind>, u32, bool),
+    /// Containing span: big span that contains little span.
+    Containing(Box<SpanKind>, Box<SpanKind>),
+    /// Within span: include span within exclude span at a maximum distance.
+    Within(Box<SpanKind>, Box<SpanKind>, u32),
+}
+
+impl SpanKind {
+    /// Build a concrete `SpanQuery` from this recipe.
+    ///
+    /// # Arguments
+    ///
+    /// * `field` - Field name to search within.
+    pub fn build(&self, field: &str) -> Box<dyn laurus::lexical::span::SpanQuery> {
+        let sb = SpanQueryBuilder::new(field);
+        match self {
+            SpanKind::Term(t) => Box::new(sb.term(t)),
+            SpanKind::Near(clauses, slop, ordered) => {
+                let built: Vec<Box<dyn laurus::lexical::span::SpanQuery>> =
+                    clauses.iter().map(|c| c.build(field)).collect();
+                Box::new(sb.near(built, *slop, *ordered))
+            }
+            SpanKind::Containing(big, little) => {
+                Box::new(sb.containing(big.build(field), little.build(field)))
+            }
+            SpanKind::Within(include, exclude, dist) => {
+                Box::new(sb.within(include.build(field), exclude.build(field), *dist))
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TermQuery
+// ---------------------------------------------------------------------------
+
+/// Exact single-term lexical query (`Laurus\TermQuery`).
+#[php_class]
+#[php(name = "Laurus\\TermQuery")]
+pub struct PhpTermQuery {
+    pub field: String,
+    pub term: String,
+}
+
+#[php_impl]
+impl PhpTermQuery {
+    /// Create a new term query.
+    ///
+    /// # Arguments
+    ///
+    /// * `field` - Field name to search.
+    /// * `term` - Exact term to match.
+    pub fn __construct(field: String, term: String) -> Self {
+        Self { field, term }
+    }
+
+    /// Return a string representation.
+    pub fn __to_string(&self) -> String {
+        format!("TermQuery(field='{}', term='{}')", self.field, self.term)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// PhraseQuery
+// ---------------------------------------------------------------------------
+
+/// Exact phrase (word-sequence) lexical query (`Laurus\PhraseQuery`).
+#[php_class]
+#[php(name = "Laurus\\PhraseQuery")]
+pub struct PhpPhraseQuery {
+    pub field: String,
+    pub terms: Vec<String>,
+}
+
+#[php_impl]
+impl PhpPhraseQuery {
+    /// Create a new phrase query.
+    ///
+    /// # Arguments
+    ///
+    /// * `field` - Field name to search.
+    /// * `terms` - Array of terms forming the phrase.
+    pub fn __construct(field: String, terms: Vec<String>) -> Self {
+        Self { field, terms }
+    }
+
+    /// Return a string representation.
+    pub fn __to_string(&self) -> String {
+        format!(
+            "PhraseQuery(field='{}', terms={:?})",
+            self.field, self.terms
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// FuzzyQuery
+// ---------------------------------------------------------------------------
+
+/// Approximate (typo-tolerant) lexical query (`Laurus\FuzzyQuery`).
+#[php_class]
+#[php(name = "Laurus\\FuzzyQuery")]
+pub struct PhpFuzzyQuery {
+    pub field: String,
+    pub term: String,
+    pub max_edits: u32,
+}
+
+#[php_impl]
+impl PhpFuzzyQuery {
+    /// Create a new fuzzy query.
+    ///
+    /// # Arguments
+    ///
+    /// * `field` - Field name.
+    /// * `term` - Term to match approximately.
+    /// * `max_edits` - Maximum edit distance (default: 2).
+    #[php(defaults(max_edits = 2))]
+    pub fn __construct(field: String, term: String, max_edits: i64) -> Self {
+        Self {
+            field,
+            term,
+            max_edits: max_edits as u32,
+        }
+    }
+
+    /// Return a string representation.
+    pub fn __to_string(&self) -> String {
+        format!(
+            "FuzzyQuery(field='{}', term='{}', max_edits={})",
+            self.field, self.term, self.max_edits
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// WildcardQuery
+// ---------------------------------------------------------------------------
+
+/// Wildcard pattern lexical query (`Laurus\WildcardQuery`).
+///
+/// `*` matches any sequence, `?` matches any single character.
+#[php_class]
+#[php(name = "Laurus\\WildcardQuery")]
+pub struct PhpWildcardQuery {
+    pub field: String,
+    pub pattern: String,
+}
+
+#[php_impl]
+impl PhpWildcardQuery {
+    /// Create a new wildcard query.
+    ///
+    /// # Arguments
+    ///
+    /// * `field` - Field name to search.
+    /// * `pattern` - Wildcard pattern.
+    pub fn __construct(field: String, pattern: String) -> Self {
+        Self { field, pattern }
+    }
+
+    /// Return a string representation.
+    pub fn __to_string(&self) -> String {
+        format!(
+            "WildcardQuery(field='{}', pattern='{}')",
+            self.field, self.pattern
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// NumericRangeQuery
+// ---------------------------------------------------------------------------
+
+/// Internal representation of numeric range kind.
+#[derive(Clone)]
+pub enum NumericKind {
+    /// Integer range with optional min and max.
+    Integer(Option<i64>, Option<i64>),
+    /// Float range with optional min and max.
+    Float(Option<f64>, Option<f64>),
+}
+
+/// Numeric range filter query (`Laurus\NumericRangeQuery`).
+///
+/// Use `numeric_type` parameter to specify "integer" or "float".
+#[php_class]
+#[php(name = "Laurus\\NumericRangeQuery")]
+pub struct PhpNumericRangeQuery {
+    pub field: String,
+    pub kind: NumericKind,
+}
+
+#[php_impl]
+impl PhpNumericRangeQuery {
+    /// Create a new numeric range query.
+    ///
+    /// # Arguments
+    ///
+    /// * `field` - Field name.
+    /// * `min` - Lower bound (optional, pass null for unbounded).
+    /// * `max` - Upper bound (optional, pass null for unbounded).
+    /// * `numeric_type` - "integer" or "float" (default: "integer").
+    pub fn __construct(
+        field: String,
+        min: &Zval,
+        max: &Zval,
+        numeric_type: Option<String>,
+    ) -> Self {
+        let nt = numeric_type.unwrap_or_else(|| "integer".to_string());
+        let kind = if nt == "float" {
+            let min_f = if min.is_null() {
+                None
+            } else {
+                f64::from_zval(min)
+            };
+            let max_f = if max.is_null() {
+                None
+            } else {
+                f64::from_zval(max)
+            };
+            NumericKind::Float(min_f, max_f)
+        } else {
+            let min_i = if min.is_null() {
+                None
+            } else {
+                i64::from_zval(min)
+            };
+            let max_i = if max.is_null() {
+                None
+            } else {
+                i64::from_zval(max)
+            };
+            NumericKind::Integer(min_i, max_i)
+        };
+        Self { field, kind }
+    }
+
+    /// Return a string representation.
+    pub fn __to_string(&self) -> String {
+        match &self.kind {
+            NumericKind::Integer(min, max) => {
+                format!(
+                    "NumericRangeQuery(field='{}', min={:?}, max={:?}, type='integer')",
+                    self.field, min, max
+                )
+            }
+            NumericKind::Float(min, max) => {
+                format!(
+                    "NumericRangeQuery(field='{}', min={:?}, max={:?}, type='float')",
+                    self.field, min, max
+                )
+            }
+        }
+    }
+}
+
+impl PhpNumericRangeQuery {
+    /// Build the underlying Rust `NumericRangeQuery`.
+    pub fn build(&self) -> Box<dyn laurus::lexical::Query> {
+        match &self.kind {
+            NumericKind::Float(min, max) => {
+                Box::new(NumericRangeQuery::f64_range(&self.field, *min, *max))
+            }
+            NumericKind::Integer(min, max) => {
+                Box::new(NumericRangeQuery::i64_range(&self.field, *min, *max))
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// GeoQuery
+// ---------------------------------------------------------------------------
+
+/// Internal representation of geographic query kind.
+#[derive(Clone)]
+pub enum GeoKind {
+    /// Radius-based search.
+    Radius {
+        /// Center latitude.
+        lat: f64,
+        /// Center longitude.
+        lon: f64,
+        /// Search radius in kilometers.
+        distance_km: f64,
+    },
+    /// Bounding box search.
+    BoundingBox {
+        /// Southern boundary.
+        min_lat: f64,
+        /// Western boundary.
+        min_lon: f64,
+        /// Northern boundary.
+        max_lat: f64,
+        /// Eastern boundary.
+        max_lon: f64,
+    },
+}
+
+/// Geographic search query (`Laurus\GeoQuery`).
+#[php_class]
+#[php(name = "Laurus\\GeoQuery")]
+pub struct PhpGeoQuery {
+    pub field: String,
+    pub kind: GeoKind,
+}
+
+#[php_impl]
+impl PhpGeoQuery {
+    /// Create a radius-based geo query.
+    ///
+    /// # Arguments
+    ///
+    /// * `field` - Geo field name.
+    /// * `lat` - Center latitude.
+    /// * `lon` - Center longitude.
+    /// * `distance_km` - Search radius in kilometers.
+    pub fn within_radius(field: String, lat: f64, lon: f64, distance_km: f64) -> Self {
+        Self {
+            field,
+            kind: GeoKind::Radius {
+                lat,
+                lon,
+                distance_km,
+            },
+        }
+    }
+
+    /// Create a bounding-box geo query.
+    ///
+    /// # Arguments
+    ///
+    /// * `field` - Geo field name.
+    /// * `min_lat` - Southern boundary.
+    /// * `min_lon` - Western boundary.
+    /// * `max_lat` - Northern boundary.
+    /// * `max_lon` - Eastern boundary.
+    pub fn within_bounding_box(
+        field: String,
+        min_lat: f64,
+        min_lon: f64,
+        max_lat: f64,
+        max_lon: f64,
+    ) -> Self {
+        Self {
+            field,
+            kind: GeoKind::BoundingBox {
+                min_lat,
+                min_lon,
+                max_lat,
+                max_lon,
+            },
+        }
+    }
+
+    /// Return a string representation.
+    pub fn __to_string(&self) -> String {
+        match &self.kind {
+            GeoKind::Radius {
+                lat,
+                lon,
+                distance_km,
+            } => format!(
+                "GeoQuery.within_radius(field='{}', lat={}, lon={}, distance_km={})",
+                self.field, lat, lon, distance_km
+            ),
+            GeoKind::BoundingBox {
+                min_lat,
+                min_lon,
+                max_lat,
+                max_lon,
+            } => format!(
+                "GeoQuery.within_bounding_box(field='{}', min_lat={}, min_lon={}, max_lat={}, max_lon={})",
+                self.field, min_lat, min_lon, max_lat, max_lon
+            ),
+        }
+    }
+}
+
+impl PhpGeoQuery {
+    /// Build the underlying Rust `GeoQuery`.
+    pub fn build(&self) -> laurus::Result<Box<dyn laurus::lexical::Query>> {
+        match &self.kind {
+            GeoKind::Radius {
+                lat,
+                lon,
+                distance_km,
+            } => Ok(Box::new(GeoQuery::within_radius(
+                &self.field,
+                *lat,
+                *lon,
+                *distance_km,
+            )?)),
+            GeoKind::BoundingBox {
+                min_lat,
+                min_lon,
+                max_lat,
+                max_lon,
+            } => Ok(Box::new(GeoQuery::within_bounding_box(
+                &self.field,
+                *min_lat,
+                *min_lon,
+                *max_lat,
+                *max_lon,
+            )?)),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// BooleanQuery
+// ---------------------------------------------------------------------------
+
+/// Boolean combination query (`Laurus\BooleanQuery`).
+///
+/// Supports AND (must), OR (should), and NOT (must_not) clauses.
+#[php_class]
+#[php(name = "Laurus\\BooleanQuery")]
+pub struct PhpBooleanQuery {
+    pub musts: RefCell<Vec<Box<dyn laurus::lexical::Query>>>,
+    pub shoulds: RefCell<Vec<Box<dyn laurus::lexical::Query>>>,
+    pub must_nots: RefCell<Vec<Box<dyn laurus::lexical::Query>>>,
+}
+
+#[php_impl]
+impl PhpBooleanQuery {
+    /// Create a new empty boolean query.
+    pub fn __construct() -> Self {
+        Self {
+            musts: RefCell::new(Vec::new()),
+            shoulds: RefCell::new(Vec::new()),
+            must_nots: RefCell::new(Vec::new()),
+        }
+    }
+
+    /// Add a MUST (required) clause.
+    ///
+    /// # Arguments
+    ///
+    /// * `query` - A lexical query object.
+    pub fn must(&self, query: &Zval) -> PhpResult<()> {
+        let q = extract_lexical_query(query)?;
+        self.musts.borrow_mut().push(q);
+        Ok(())
+    }
+
+    /// Add a SHOULD (optional, boosts score) clause.
+    ///
+    /// # Arguments
+    ///
+    /// * `query` - A lexical query object.
+    pub fn should(&self, query: &Zval) -> PhpResult<()> {
+        let q = extract_lexical_query(query)?;
+        self.shoulds.borrow_mut().push(q);
+        Ok(())
+    }
+
+    /// Add a MUST_NOT (exclusion) clause.
+    ///
+    /// # Arguments
+    ///
+    /// * `query` - A lexical query object.
+    pub fn must_not(&self, query: &Zval) -> PhpResult<()> {
+        let q = extract_lexical_query(query)?;
+        self.must_nots.borrow_mut().push(q);
+        Ok(())
+    }
+
+    /// Return a string representation.
+    pub fn __to_string(&self) -> String {
+        format!(
+            "BooleanQuery(musts={}, shoulds={}, must_nots={})",
+            self.musts.borrow().len(),
+            self.shoulds.borrow().len(),
+            self.must_nots.borrow().len()
+        )
+    }
+}
+
+impl PhpBooleanQuery {
+    /// Build the underlying Rust [`BooleanQuery`].
+    pub fn build_query(&self) -> PhpResult<Box<dyn laurus::lexical::Query>> {
+        let mut bq = BooleanQuery::new();
+        for q in self.musts.borrow_mut().drain(..) {
+            bq.add_must(q);
+        }
+        for q in self.shoulds.borrow_mut().drain(..) {
+            bq.add_should(q);
+        }
+        for q in self.must_nots.borrow_mut().drain(..) {
+            bq.add_must_not(q);
+        }
+        Ok(Box::new(bq))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SpanQuery
+// ---------------------------------------------------------------------------
+
+/// Positional / proximity span query (`Laurus\SpanQuery`).
+///
+/// Use the static methods to construct span queries, which can be nested to
+/// build complex positional expressions.
+#[php_class]
+#[php(name = "Laurus\\SpanQuery")]
+pub struct PhpSpanQuery {
+    pub field: String,
+    pub kind: SpanKind,
+}
+
+#[php_impl]
+impl PhpSpanQuery {
+    /// Single-term span query.
+    ///
+    /// # Arguments
+    ///
+    /// * `field` - Field to search.
+    /// * `term` - Term to match.
+    pub fn term(field: String, term: String) -> Self {
+        Self {
+            field,
+            kind: SpanKind::Term(term),
+        }
+    }
+
+    /// SpanNear: terms appearing within `slop` positions of each other.
+    ///
+    /// # Arguments
+    ///
+    /// * `field` - Field to search.
+    /// * `terms` - Array of term strings.
+    /// * `slop` - Maximum token distance between terms (default: 0).
+    /// * `ordered` - Whether terms must appear in order (default: true).
+    #[php(defaults(slop = 0, ordered = true))]
+    pub fn near(field: String, terms: Vec<String>, slop: i64, ordered: bool) -> Self {
+        let kinds = terms.into_iter().map(SpanKind::Term).collect();
+        Self {
+            field,
+            kind: SpanKind::Near(kinds, slop as u32, ordered),
+        }
+    }
+
+    /// SpanContaining: a span that contains another span.
+    ///
+    /// # Arguments
+    ///
+    /// * `field` - Field to search.
+    /// * `big` - Outer span query.
+    /// * `little` - Inner span query.
+    pub fn containing(field: String, big: &PhpSpanQuery, little: &PhpSpanQuery) -> Self {
+        Self {
+            field,
+            kind: SpanKind::Containing(Box::new(big.kind.clone()), Box::new(little.kind.clone())),
+        }
+    }
+
+    /// SpanWithin: a span included within another span at a maximum distance.
+    ///
+    /// # Arguments
+    ///
+    /// * `field` - Field to search.
+    /// * `include` - Span to include.
+    /// * `exclude` - Span to exclude.
+    /// * `distance` - Maximum distance.
+    pub fn within(
+        field: String,
+        include: &PhpSpanQuery,
+        exclude: &PhpSpanQuery,
+        distance: i64,
+    ) -> Self {
+        Self {
+            field,
+            kind: SpanKind::Within(
+                Box::new(include.kind.clone()),
+                Box::new(exclude.kind.clone()),
+                distance as u32,
+            ),
+        }
+    }
+
+    /// Return a string representation.
+    pub fn __to_string(&self) -> String {
+        format!("SpanQuery(field='{}')", self.field)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// VectorQuery (pre-computed vector)
+// ---------------------------------------------------------------------------
+
+/// Vector search query using a pre-computed embedding vector (`Laurus\VectorQuery`).
+#[php_class]
+#[php(name = "Laurus\\VectorQuery")]
+pub struct PhpVectorQuery {
+    pub field: String,
+    pub vector: Vec<f32>,
+}
+
+#[php_impl]
+impl PhpVectorQuery {
+    /// Create a new vector query.
+    ///
+    /// # Arguments
+    ///
+    /// * `field` - Vector field name.
+    /// * `vector` - Pre-computed embedding vector as array of floats.
+    pub fn __construct(field: String, vector: Vec<f64>) -> Self {
+        Self {
+            field,
+            vector: vector.into_iter().map(|f| f as f32).collect(),
+        }
+    }
+
+    /// Return a string representation.
+    pub fn __to_string(&self) -> String {
+        format!(
+            "VectorQuery(field='{}', dims={})",
+            self.field,
+            self.vector.len()
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// VectorTextQuery (text → Rust Embedder → vector)
+// ---------------------------------------------------------------------------
+
+/// Vector search query where text is embedded by the Rust-side Embedder
+/// (`Laurus\VectorTextQuery`).
+#[php_class]
+#[php(name = "Laurus\\VectorTextQuery")]
+pub struct PhpVectorTextQuery {
+    pub field: String,
+    pub text: String,
+}
+
+#[php_impl]
+impl PhpVectorTextQuery {
+    /// Create a new vector text query.
+    ///
+    /// # Arguments
+    ///
+    /// * `field` - Vector field name.
+    /// * `text` - Text to be embedded by the Rust-side embedder.
+    pub fn __construct(field: String, text: String) -> Self {
+        Self { field, text }
+    }
+
+    /// Return a string representation.
+    pub fn __to_string(&self) -> String {
+        format!(
+            "VectorTextQuery(field='{}', text='{}')",
+            self.field, self.text
+        )
+    }
+}
