@@ -21,12 +21,12 @@ def main
   # ── Step 1: Create synonym dictionary ─────────────────────────────────
   puts "Step 1: Creating synonym dictionary"
   syn_dict = Laurus::SynonymDictionary.new
-  syn_dict.add_synonym_group(%w[ml machine\ learning])
-  syn_dict.add_synonym_group(%w[ai artificial\ intelligence])
+  syn_dict.add_synonym_group(%w[gem ruby\ library])
+  syn_dict.add_synonym_group(%w[irb interactive\ ruby])
 
   puts "  Added synonyms:"
-  puts "    - 'ml' <-> 'machine learning'"
-  puts "    - 'ai' <-> 'artificial intelligence'\n\n"
+  puts "    - 'gem' <-> 'ruby library'"
+  puts "    - 'irb' <-> 'interactive ruby'\n\n"
 
   tokenizer = Laurus::WhitespaceTokenizer.new
 
@@ -34,7 +34,7 @@ def main
   puts "Step 2: Applying filter WITHOUT boost"
   filt = Laurus::SynonymGraphFilter.new(syn_dict, keep_original: true, boost: 1.0)
 
-  input_text = "ml tutorial"
+  input_text = "gem install"
   puts "  Input: \"#{input_text}\"\n\n"
 
   tokens = tokenizer.tokenize(input_text)
@@ -68,16 +68,16 @@ def main
 
   puts
   puts "  Explanation:"
-  puts "    - Original token 'ml' has boost=1.0"
+  puts "    - Original token 'gem' has boost=1.0"
   puts "    - Synonym tokens have boost < 1.0"
   puts "    - Lower boost means synonyms contribute less to the final score"
   puts "    - This helps prioritize exact matches over synonym matches\n\n"
 
   # ── Step 4: Multi-word synonym expansion ──────────────────────────────
-  puts "Step 4: Multi-word synonym expansion (ai -> artificial intelligence)"
+  puts "Step 4: Multi-word synonym expansion (irb -> interactive ruby)"
   filt2 = Laurus::SynonymGraphFilter.new(syn_dict, keep_original: true, boost: 0.9)
 
-  input_text2 = "ai research"
+  input_text2 = "irb session"
   puts "  Input: \"#{input_text2}\"\n\n"
 
   tokens2 = tokenizer.tokenize(input_text2)
@@ -91,8 +91,8 @@ def main
 
   puts
   puts "  Explanation:"
-  puts "    - 'artificial intelligence' spans positions 0 and 1"
-  puts "    - position_length > 1 on 'artificial' indicates a multi-word synonym"
+  puts "    - 'interactive ruby' spans positions 0 and 1"
+  puts "    - position_length > 1 on 'interactive' indicates a multi-word synonym"
   puts "    - Downstream phrase indexing uses this graph to support phrase queries\n\n"
 
   puts "Use cases for boost:"

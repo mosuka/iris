@@ -30,35 +30,35 @@ def main() -> None:
     index.add_document(
         "doc1",
         {
-            "title": "Introduction to Rust",
-            "body": "Rust is a systems programming language focused on safety and performance.",
+            "title": "Django Web Framework",
+            "body": "Django is a high-level Python web framework with batteries-included architecture.",
         },
     )
     index.add_document(
         "doc2",
         {
-            "title": "Python for Data Science",
-            "body": "Python is a versatile language widely used in data science and machine learning.",
+            "title": "NumPy Scientific Computing",
+            "body": "NumPy provides fast numerical arrays and mathematical operations for Python.",
         },
     )
     index.add_document(
         "doc3",
         {
-            "title": "Web Development with JavaScript",
-            "body": "JavaScript powers the modern web, from frontend frameworks to backend services.",
+            "title": "pytest Testing Framework",
+            "body": "pytest is a powerful testing framework for Python with fixtures and plugins.",
         },
     )
     index.commit()
     print("Indexed 3 documents.\n")
 
     # 4. Search with a TermQuery object
-    print("[Search] TermQuery — 'rust' in body:")
-    results = index.search(laurus.TermQuery("body", "rust"), limit=5)
+    print("[Search] TermQuery — 'django' in body:")
+    results = index.search(laurus.TermQuery("body", "django"), limit=5)
     _print_results(results)
 
     # 5. Search with a DSL string
-    print("\n[Search] DSL — 'language':")
-    results = index.search("language", limit=5)
+    print("\n[Search] DSL — 'python':")
+    results = index.search("python", limit=5)
     _print_results(results)
 
     # 6. put_document replaces an existing document
@@ -66,14 +66,14 @@ def main() -> None:
     index.put_document(
         "doc2",
         {
-            "title": "Python for Everything",
-            "body": "Python is used in web, data science, scripting, and automation.",
+            "title": "NumPy Scientific Computing",
+            "body": "NumPy enables high-performance numerical computing with ndarray and broadcasting.",
         },
     )
     index.commit()
 
-    print("[Search] DSL — 'automation' (should find updated doc2):")
-    results = index.search("automation", limit=5)
+    print("[Search] DSL — 'broadcasting' (should find updated doc2):")
+    results = index.search("broadcasting", limit=5)
     _print_results(results)
 
     print("\nQuickstart complete!")

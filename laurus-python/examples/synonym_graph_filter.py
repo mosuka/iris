@@ -22,12 +22,12 @@ def main() -> None:
     # ── Step 1: Create synonym dictionary ─────────────────────────────────
     print("Step 1: Creating synonym dictionary")
     syn_dict = laurus.SynonymDictionary()
-    syn_dict.add_synonym_group(["ml", "machine learning"])
-    syn_dict.add_synonym_group(["ai", "artificial intelligence"])
+    syn_dict.add_synonym_group(["venv", "virtual environment"])
+    syn_dict.add_synonym_group(["pip", "package installer"])
 
     print("  Added synonyms:")
-    print("    - 'ml' <-> 'machine learning'")
-    print("    - 'ai' <-> 'artificial intelligence'\n")
+    print("    - 'venv' <-> 'virtual environment'")
+    print("    - 'pip' <-> 'package installer'\n")
 
     tokenizer = laurus.WhitespaceTokenizer()
 
@@ -35,7 +35,7 @@ def main() -> None:
     print("Step 2: Applying filter WITHOUT boost")
     filt = laurus.SynonymGraphFilter(syn_dict, keep_original=True, boost=1.0)
 
-    input_text = "ml tutorial"
+    input_text = "venv tutorial"
     print(f'  Input: "{input_text}"\n')
 
     tokens = tokenizer.tokenize(input_text)
@@ -55,6 +55,7 @@ def main() -> None:
     print("  Explanation:")
     print("    - All tokens have boost=1.0 (default)")
     print("    - Synonyms have equal weight to original tokens\n")
+
 
     # ── Step 3: Apply filter WITH boost=0.8 ───────────────────────────────
     print("Step 3: Applying filter WITH boost=0.8")
@@ -77,16 +78,16 @@ def main() -> None:
 
     print()
     print("  Explanation:")
-    print("    - Original token 'ml' has boost=1.0")
+    print("    - Original token 'venv' has boost=1.0")
     print("    - Synonym tokens have boost < 1.0")
     print("    - Lower boost means synonyms contribute less to the final score")
     print("    - This helps prioritize exact matches over synonym matches\n")
 
     # ── Step 4: Multi-word synonym expansion ──────────────────────────────
-    print("Step 4: Multi-word synonym expansion (ai -> artificial intelligence)")
+    print("Step 4: Multi-word synonym expansion (pip -> package installer)")
     filt2 = laurus.SynonymGraphFilter(syn_dict, keep_original=True, boost=0.9)
 
-    input_text2 = "ai research"
+    input_text2 = "pip install"
     print(f'  Input: "{input_text2}"\n')
 
     tokens2 = tokenizer.tokenize(input_text2)
@@ -104,8 +105,8 @@ def main() -> None:
 
     print()
     print("  Explanation:")
-    print("    - 'artificial intelligence' spans positions 0 and 1")
-    print("    - position_length > 1 on 'artificial' indicates a multi-word synonym")
+    print("    - 'package installer' spans positions 0 and 1")
+    print("    - position_length > 1 on 'package' indicates a multi-word synonym")
     print("    - Downstream phrase indexing uses this graph to support phrase queries\n")
 
     print("Use cases for boost:")

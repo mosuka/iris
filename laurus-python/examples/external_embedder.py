@@ -62,15 +62,15 @@ except ImportError:
 # ---------------------------------------------------------------------------
 
 CHUNKS = [
-    ("book_a", "The Rust Programming Language", "Chapter 1: Getting Started", 1, "basics"),
-    ("book_a", "The Rust Programming Language", "Cargo is the Rust build system and package manager. Use cargo new to create a crate.", 2, "basics"),
-    ("book_a", "The Rust Programming Language", "Every value in Rust has an owner. Ownership rules prevent data races at compile time.", 3, "memory"),
-    ("book_a", "The Rust Programming Language", "References and borrowing let you use values without taking ownership of them.", 4, "memory"),
-    ("book_a", "The Rust Programming Language", "Generic types and trait bounds enable polymorphism without runtime overhead.", 5, "type-system"),
-    ("book_a", "The Rust Programming Language", "Async functions and tokio provide concurrent programming with lightweight tasks.", 6, "concurrency"),
-    ("book_b", "Programming in Rust", "Rust's type system catches many bugs at compile time. Trait objects enable dynamic dispatch.", 1, "type-system"),
-    ("book_b", "Programming in Rust", "The borrow checker ensures memory safety without garbage collection. Lifetime annotations help.", 2, "memory"),
-    ("book_b", "Programming in Rust", "Rust async/await provides zero-cost concurrency for building scalable concurrent services.", 3, "concurrency"),
+    ("django_guide", "Django Web Development", "Django follows the model-template-view architecture pattern for clean separation of concerns.", 1, "framework"),
+    ("django_guide", "Django Web Development", "Django ORM maps Python classes to database tables with migrations for schema management.", 2, "framework"),
+    ("django_guide", "Django Web Development", "Django middleware processes requests and responses through a chain of pluggable components.", 3, "framework"),
+    ("flask_guide", "Flask Microservices", "Flask provides lightweight routing and Jinja2 templating for building APIs and web apps.", 1, "framework"),
+    ("flask_guide", "Flask Microservices", "Flask extensions like Flask-SQLAlchemy and Flask-Migrate add database support to Flask projects.", 2, "framework"),
+    ("numpy_docs", "NumPy Fundamentals", "NumPy arrays provide vectorized operations that are much faster than Python loops for numerical computing.", 1, "scientific"),
+    ("numpy_docs", "NumPy Fundamentals", "Broadcasting in NumPy allows arithmetic operations on arrays of different shapes without copying data.", 2, "scientific"),
+    ("pytest_book", "Testing with pytest", "pytest fixtures provide reusable setup and teardown logic for test functions with dependency injection.", 1, "testing"),
+    ("pytest_book", "Testing with pytest", "pytest parametrize decorator runs the same test with different input datasets automatically.", 2, "testing"),
 ]
 
 
@@ -113,21 +113,21 @@ def main() -> None:
     # [A] Basic Vector Search
     # =====================================================================
     print("=" * 60)
-    print("[A] Vector-only: 'memory safety'")
+    print("[A] Vector-only: 'database ORM queries'")
     print("=" * 60)
     _print_results(
-        index.search(laurus.VectorQuery("text_vec", embed("memory safety")), limit=3)
+        index.search(laurus.VectorQuery("text_vec", embed("database ORM queries")), limit=3)
     )
 
     # =====================================================================
     # [B] Filtered Vector Search — category filter
     # =====================================================================
     print("\n" + "=" * 60)
-    print("[B] Filtered vector: 'memory safety' + category='concurrency'")
+    print("[B] Filtered vector: 'database ORM queries' + category='testing'")
     print("=" * 60)
     request = laurus.SearchRequest(
-        vector_query=laurus.VectorQuery("text_vec", embed("memory safety")),
-        filter_query=laurus.TermQuery("category", "concurrency"),
+        vector_query=laurus.VectorQuery("text_vec", embed("database ORM queries")),
+        filter_query=laurus.TermQuery("category", "testing"),
         limit=3,
     )
     _print_results(index.search(request))
@@ -136,11 +136,11 @@ def main() -> None:
     # [C] Hybrid search — RRF Fusion
     # =====================================================================
     print("\n" + "=" * 60)
-    print("[C] Hybrid (RRF k=60): vector='concurrent' + lexical='async'")
+    print("[C] Hybrid (RRF k=60): vector='template rendering' + lexical='jinja2'")
     print("=" * 60)
     request = laurus.SearchRequest(
-        lexical_query=laurus.TermQuery("text", "async"),
-        vector_query=laurus.VectorQuery("text_vec", embed("concurrent")),
+        lexical_query=laurus.TermQuery("text", "jinja2"),
+        vector_query=laurus.VectorQuery("text_vec", embed("template rendering")),
         fusion=laurus.RRF(k=60.0),
         limit=3,
     )
@@ -150,11 +150,11 @@ def main() -> None:
     # [D] Hybrid search — WeightedSum Fusion
     # =====================================================================
     print("\n" + "=" * 60)
-    print("[D] Hybrid (WeightedSum 0.3/0.7): vector='memory safety' + lexical='safety'")
+    print("[D] Hybrid (WeightedSum 0.3/0.7): vector='data analysis' + lexical='arrays'")
     print("=" * 60)
     request = laurus.SearchRequest(
-        lexical_query=laurus.TermQuery("text", "safety"),
-        vector_query=laurus.VectorQuery("text_vec", embed("memory safety")),
+        lexical_query=laurus.TermQuery("text", "arrays"),
+        vector_query=laurus.VectorQuery("text_vec", embed("data analysis")),
         fusion=laurus.WeightedSum(lexical_weight=0.3, vector_weight=0.7),
         limit=3,
     )
@@ -164,12 +164,12 @@ def main() -> None:
     # [E] Hybrid search with filter
     # =====================================================================
     print("\n" + "=" * 60)
-    print("[E] Hybrid + filter: vector='type system' + lexical='trait' + category='type-system'")
+    print("[E] Hybrid + filter: vector='testing automation' + lexical='parametrize' + category='testing'")
     print("=" * 60)
     request = laurus.SearchRequest(
-        lexical_query=laurus.TermQuery("text", "trait"),
-        vector_query=laurus.VectorQuery("text_vec", embed("type system")),
-        filter_query=laurus.TermQuery("category", "type-system"),
+        lexical_query=laurus.TermQuery("text", "parametrize"),
+        vector_query=laurus.VectorQuery("text_vec", embed("testing automation")),
+        filter_query=laurus.TermQuery("category", "testing"),
         fusion=laurus.RRF(k=60.0),
         limit=3,
     )

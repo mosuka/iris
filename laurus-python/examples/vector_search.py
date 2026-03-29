@@ -29,15 +29,15 @@ _DIM = 384  # dimension for all-MiniLM-L6-v2
 # ---------------------------------------------------------------------------
 
 CHUNKS = [
-    ("book_a", "The Rust Programming Language", "Chapter 1: Getting Started", 1, "basics"),
-    ("book_a", "The Rust Programming Language", "Cargo is the Rust build system and package manager. Use cargo new to create a crate.", 2, "basics"),
-    ("book_a", "The Rust Programming Language", "Every value in Rust has an owner. Ownership rules prevent data races at compile time.", 3, "memory"),
-    ("book_a", "The Rust Programming Language", "References and borrowing let you use values without taking ownership of them.", 4, "memory"),
-    ("book_a", "The Rust Programming Language", "Generic types and trait bounds enable polymorphism without runtime overhead.", 5, "type-system"),
-    ("book_a", "The Rust Programming Language", "Async functions and tokio provide concurrent programming with lightweight tasks.", 6, "concurrency"),
-    ("book_b", "Programming in Rust", "Rust's type system catches many bugs at compile time. Trait objects enable dynamic dispatch.", 1, "type-system"),
-    ("book_b", "Programming in Rust", "The borrow checker ensures memory safety without garbage collection. Lifetime annotations help.", 2, "memory"),
-    ("book_b", "Programming in Rust", "Rust async/await provides zero-cost concurrency for building scalable concurrent services.", 3, "concurrency"),
+    ("django_guide", "Django Web Development", "Django follows the model-template-view architecture pattern for clean separation of concerns.", 1, "framework"),
+    ("django_guide", "Django Web Development", "Django ORM maps Python classes to database tables with migrations for schema management.", 2, "framework"),
+    ("django_guide", "Django Web Development", "Django middleware processes requests and responses through a chain of pluggable components.", 3, "framework"),
+    ("flask_guide", "Flask Microservices", "Flask provides lightweight routing and Jinja2 templating for building APIs and web apps.", 1, "framework"),
+    ("flask_guide", "Flask Microservices", "Flask extensions like Flask-SQLAlchemy and Flask-Migrate add database support to Flask projects.", 2, "framework"),
+    ("numpy_docs", "NumPy Fundamentals", "NumPy arrays provide vectorized operations that are much faster than Python loops for numerical computing.", 1, "scientific"),
+    ("numpy_docs", "NumPy Fundamentals", "Broadcasting in NumPy allows arithmetic operations on arrays of different shapes without copying data.", 2, "scientific"),
+    ("pytest_book", "Testing with pytest", "pytest fixtures provide reusable setup and teardown logic for test functions with dependency injection.", 1, "testing"),
+    ("pytest_book", "Testing with pytest", "pytest parametrize decorator runs the same test with different input datasets automatically.", 2, "testing"),
 ]
 
 
@@ -78,34 +78,34 @@ def main() -> None:
     # [A] Basic Vector Search
     # =====================================================================
     print("=" * 60)
-    print("[A] Basic Vector Search: 'memory safety'")
+    print("[A] Basic Vector Search: 'database ORM queries'")
     print("=" * 60)
     _print_results(
-        index.search(laurus.VectorTextQuery("text_vec", "memory safety"), limit=3)
+        index.search(laurus.VectorTextQuery("text_vec", "database ORM queries"), limit=3)
     )
 
     # =====================================================================
     # [B] Filtered Vector Search — category filter
     # =====================================================================
     print("\n" + "=" * 60)
-    print("[B] Filtered Vector Search: 'memory safety' + category='concurrency'")
+    print("[B] Filtered Vector Search: 'database ORM queries' + category='testing'")
     print("=" * 60)
     request = laurus.SearchRequest(
-        vector_query=laurus.VectorTextQuery("text_vec", "memory safety"),
-        filter_query=laurus.TermQuery("category", "concurrency"),
+        vector_query=laurus.VectorTextQuery("text_vec", "database ORM queries"),
+        filter_query=laurus.TermQuery("category", "testing"),
         limit=3,
     )
     _print_results(index.search(request))
 
     # =====================================================================
-    # [C] Filtered Vector Search — numeric range filter (page <= 3)
+    # [C] Filtered Vector Search — numeric range filter (page = 1) + query
     # =====================================================================
     print("\n" + "=" * 60)
-    print("[C] Filtered Vector Search: 'type system' + page <= 3")
+    print("[C] Filtered Vector Search: 'web server HTTP' + page=1")
     print("=" * 60)
     request = laurus.SearchRequest(
-        vector_query=laurus.VectorTextQuery("text_vec", "type system"),
-        filter_query=laurus.NumericRangeQuery("page", min=1, max=3),
+        vector_query=laurus.VectorTextQuery("text_vec", "web server HTTP"),
+        filter_query=laurus.NumericRangeQuery("page", min=1, max=1),
         limit=3,
     )
     _print_results(index.search(request))

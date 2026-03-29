@@ -34,11 +34,12 @@ npm run build:debug
 | :--- | :--- |
 | [quickstart.mjs](quickstart.mjs) | 最小構成の検索: インデックス・検索・統計 |
 | [lexical-search.mjs](lexical-search.mjs) | Lexical クエリタイプ: Term、Phrase、Fuzzy、Wildcard、DSL |
-| [同義語展開の例](../README_ja.md#テキスト解析) | 同義語展開（README 参照） |
+| [synonym-graph-filter.mjs](synonym-graph-filter.mjs) | SynonymDictionary・WhitespaceTokenizer・SynonymGraphFilter による同義語展開 |
 
 ```bash
 node examples/quickstart.mjs
 node examples/lexical-search.mjs
+node examples/synonym-graph-filter.mjs
 ```
 
 ---
@@ -70,6 +71,57 @@ Lexical 検索と Vector 検索を RRF（Reciprocal Rank Fusion）
 
 ```bash
 node examples/hybrid-search.mjs
+```
+
+---
+
+### 外部エンベッダー
+
+laurus の外部で生成した埋め込みベクトル（例: `@xenova/transformers`）
+を使ったベクトル検索・ハイブリッド検索です。
+ライブラリ未インストール時はランダムベクトルにフォールバックします。
+
+| サンプル | 説明 |
+| :--- | :--- |
+| [external-embedder.mjs](external-embedder.mjs) | 外部埋め込みライブラリによる事前計算済みベクトル検索 |
+
+```bash
+npm install @xenova/transformers   # 任意
+node examples/external-embedder.mjs
+```
+
+---
+
+### OpenAI エンベッディング
+
+`openai` npm パッケージを使い、OpenAI API 経由で
+実際の埋め込みベクトルを生成します。API キーが必要です。
+
+| サンプル | 説明 |
+| :--- | :--- |
+| [search-with-openai.mjs](search-with-openai.mjs) | OpenAI エンベッディングによるベクトル・ハイブリッド検索 |
+
+```bash
+npm install openai
+export OPENAI_API_KEY=your-api-key-here
+node examples/search-with-openai.mjs
+```
+
+---
+
+### マルチモーダル検索
+
+`bytes` フィールドに画像の生バイトデータを格納し、
+CLIP 埋め込みと組み合わせてクロスモーダル検索
+（テキスト→画像、画像→テキスト）を行います。
+
+| サンプル | 説明 |
+| :--- | :--- |
+| [multimodal-search.mjs](multimodal-search.mjs) | bytes フィールド + CLIP 埋め込みによるマルチモーダル検索 |
+
+```bash
+npm install @xenova/transformers   # 任意
+node examples/multimodal-search.mjs
 ```
 
 ---
