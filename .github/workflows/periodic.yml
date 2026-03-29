@@ -433,6 +433,9 @@ jobs:
       - name: Build PHP extension
         shell: bash
         run: |
+          if [ "$RUNNER_OS" == "macOS" ]; then
+            export RUSTFLAGS="-C link-args=-Wl,-undefined,dynamic_lookup"
+          fi
           if [ "${{ matrix.platform.skip_embedding_features }}" == "true" ]; then
             cargo build --release -p laurus-php
           else

@@ -144,6 +144,55 @@ sed -i 's/^links = "clang"/# links = "clang"/' patches/ext-php-rs-clang-sys/Carg
 cargo build -p laurus-php -p laurus-ruby
 ```
 
+## macOS linker flag (`-undefined dynamic_lookup`)
+
+PHP extensions are shared libraries (`.so` / `.dylib`) that are loaded by the
+PHP interpreter at runtime. They reference PHP API symbols (`zend_*`,
+`php_*`, etc.) that are defined in the PHP binary itself, not in any library
+the extension links against. On Linux the linker allows undefined symbols in
+shared libraries by default, so this works without extra flags. On macOS the
+linker treats undefined symbols as errors, which causes the build to fail:
+
+```text
+ld: symbol(s) not found for architecture arm64
+```
+
+The fix is to pass `-Wl,-undefined,dynamic_lookup` to the linker, which
+tells it to defer symbol resolution to load time (when PHP `dlopen`s the
+extension).
+
+This flag is **not** set in `.cargo/config.toml` because it would apply to
+every crate in the workspace, including non-PHP crates where undefined
+symbols should remain errors. Instead it is applied only when building
+`laurus-php`:
+
+**Makefile** (local development):
+
+```makefile
+build-laurus-php:
+ifeq ($(shell uname -s),Darwin)
+    RUSTFLAGS="-C link-args=-Wl,-undefined,dynamic_lookup" cargo build -p laurus-php --release
+else
+    cargo build -p laurus-php --release
+endif
+```
+
+**CI** (GitHub Actions):
+
+```yaml
+- name: Build PHP extension
+  shell: bash
+  run: |
+    if [ "$RUNNER_OS" == "macOS" ]; then
+      export RUSTFLAGS="-C link-args=-Wl,-undefined,dynamic_lookup"
+    fi
+    cargo build --release -p laurus-php
+```
+
+When building on macOS, always use `make build-laurus-php` or
+`make test-laurus-php` instead of running `cargo build -p laurus-php`
+directly.
+
 ## Project layout
 
 ```text

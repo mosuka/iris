@@ -63,6 +63,9 @@ format-laurus-wasm: ## Format laurus-wasm
 format-laurus-ruby: ## Format laurus-ruby
 	cargo fmt -p laurus-ruby
 
+format-laurus-php: ## Format laurus-php
+	cargo fmt -p laurus-php
+
 # ── Lint ───────────────────────────────────────────────────────────────────
 
 lint: ## Lint all crates
@@ -92,6 +95,9 @@ lint-laurus-wasm: ## Lint laurus-wasm (wasm32 target)
 lint-laurus-ruby: ## Lint laurus-ruby
 	cargo clippy -p laurus-ruby -- -D warnings
 
+lint-laurus-php: ## Lint laurus-php
+	cargo clippy -p laurus-php -- -D warnings
+
 # ── Test ───────────────────────────────────────────────────────────────────
 
 test: ## Test all crates
@@ -119,6 +125,14 @@ test-laurus-nodejs: ## Test laurus-nodejs
 test-laurus-ruby: ## Test laurus-ruby (Rust unit tests + Ruby minitest)
 	cargo test -p laurus-ruby
 	cd laurus-ruby && bundle install --quiet && bundle exec rake compile && bundle exec ruby -Ilib -Itest -e 'Dir["test/test_*.rb"].each { |f| require_relative f }'
+
+test-laurus-php: ## Test laurus-php (build + PHPUnit)
+ifeq ($(shell uname -s),Darwin)
+	RUSTFLAGS="-C link-args=-Wl,-undefined,dynamic_lookup" cargo build -p laurus-php --release
+else
+	cargo build -p laurus-php --release
+endif
+	cd laurus-php && composer install --quiet && php -d extension=../target/release/liblaurus_php.so vendor/bin/phpunit tests/LaurusTest.php
 
 test-laurus-wasm: ## Build-test laurus-wasm (wasm32 target)
 	cargo build -p laurus-wasm --target wasm32-unknown-unknown
@@ -148,6 +162,13 @@ build-laurus-nodejs: ## Build laurus-nodejs (release)
 
 build-laurus-ruby: ## Build laurus-ruby gem (release)
 	cd laurus-ruby && bundle install --quiet && bundle exec rake compile
+
+build-laurus-php: ## Build laurus-php (release)
+ifeq ($(shell uname -s),Darwin)
+	RUSTFLAGS="-C link-args=-Wl,-undefined,dynamic_lookup" cargo build -p laurus-php --release
+else
+	cargo build -p laurus-php --release
+endif
 
 build-laurus-wasm: ## Build laurus-wasm (wasm-pack, --target web)
 	cd laurus-wasm && wasm-pack build --target web --release

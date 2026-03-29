@@ -137,6 +137,51 @@ sed -i 's/^links = "clang"/# links = "clang"/' patches/ext-php-rs-clang-sys/Carg
 cargo build -p laurus-php -p laurus-ruby
 ```
 
+## macOS リンカーフラグ (`-undefined dynamic_lookup`)
+
+PHP 拡張は共有ライブラリ（`.so` / `.dylib`）であり、実行時に PHP インタプリタに
+ロードされます。PHP API シンボル（`zend_*`, `php_*` 等）は PHP バイナリ本体に
+定義されており、拡張がリンクするライブラリには含まれません。Linux ではリンカーが
+共有ライブラリ内の未定義シンボルをデフォルトで許容するため問題ありませんが、
+macOS ではリンカーが未定義シンボルをエラーとして扱い、ビルドが失敗します:
+
+```text
+ld: symbol(s) not found for architecture arm64
+```
+
+修正方法は `-Wl,-undefined,dynamic_lookup` をリンカーに渡すことです。これにより
+シンボル解決がロード時（PHP が拡張を `dlopen` する時点）まで延期されます。
+
+このフラグは `.cargo/config.toml` には設定**しません**。設定すると workspace 内の
+全クレートに適用され、PHP 以外のクレートでも未定義シンボルがエラーにならなくなる
+ためです。代わりに `laurus-php` のビルド時のみ適用します:
+
+**Makefile**（ローカル開発）:
+
+```makefile
+build-laurus-php:
+ifeq ($(shell uname -s),Darwin)
+    RUSTFLAGS="-C link-args=-Wl,-undefined,dynamic_lookup" cargo build -p laurus-php --release
+else
+    cargo build -p laurus-php --release
+endif
+```
+
+**CI**（GitHub Actions）:
+
+```yaml
+- name: Build PHP extension
+  shell: bash
+  run: |
+    if [ "$RUNNER_OS" == "macOS" ]; then
+      export RUSTFLAGS="-C link-args=-Wl,-undefined,dynamic_lookup"
+    fi
+    cargo build --release -p laurus-php
+```
+
+macOS でビルドする際は、`cargo build -p laurus-php` を直接実行するのではなく、
+`make build-laurus-php` または `make test-laurus-php` を使用してください。
+
 ## プロジェクト構成
 
 ```text
