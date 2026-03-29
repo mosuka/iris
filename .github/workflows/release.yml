@@ -1215,7 +1215,7 @@ jobs:
           GEM_NAME=$(ruby -e "spec = Gem::Specification.load(Dir['*.gemspec'].first); puts spec.name")
           GEM_VERSION=$(ruby -e "spec = Gem::Specification.load(Dir['*.gemspec'].first); puts spec.version")
 
-          if gem list -r "${GEM_NAME}" --exact --versions "${GEM_VERSION}" | grep -q "${GEM_NAME}"; then
+          if gem list -r "${GEM_NAME}" --exact --versions "${GEM_VERSION}" | grep -q "${GEM_NAME} (${GEM_VERSION})"; then
             echo "${GEM_NAME} ${GEM_VERSION} has already been published, skipping"
             exit 0
           fi
