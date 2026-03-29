@@ -60,7 +60,7 @@ jobs:
           shared-key: "stable-x86_64-unknown-linux-gnu"
 
       - name: Run clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
+        run: cargo clippy --all-targets --features embeddings-all -- -D warnings
 
   # ============================================================
   # Test laurus (core library)
@@ -102,7 +102,7 @@ jobs:
           if [ "${{ matrix.platform.skip_embedding_features }}" == "true" ]; then
             FEATURES=""
           else
-            FEATURES="--all-features"
+            FEATURES="--features embeddings-all"
           fi
 
           cargo test --package laurus --target "${{ matrix.platform.target }}" $FEATURES
@@ -151,7 +151,7 @@ jobs:
           if [ "${{ matrix.platform.skip_embedding_features }}" == "true" ]; then
             FEATURES=""
           else
-            FEATURES="--all-features"
+            FEATURES="--features embeddings-all"
           fi
 
           cargo test --package laurus-server --target "${{ matrix.platform.target }}" $FEATURES
@@ -200,7 +200,7 @@ jobs:
           if [ "${{ matrix.platform.skip_embedding_features }}" == "true" ]; then
             FEATURES=""
           else
-            FEATURES="--all-features"
+            FEATURES="--features embeddings-all"
           fi
 
           cargo test --package laurus-mcp --target "${{ matrix.platform.target }}" $FEATURES
@@ -249,7 +249,7 @@ jobs:
           if [ "${{ matrix.platform.skip_embedding_features }}" == "true" ]; then
             FEATURES=""
           else
-            FEATURES="--all-features"
+            FEATURES="--features embeddings-all"
           fi
 
           cargo test --package laurus-cli --target "${{ matrix.platform.target }}" $FEATURES
@@ -397,6 +397,58 @@ jobs:
           bundle exec ruby -Ilib -Itest -e 'Dir["test/test_*.rb"].each { |f| require_relative f }'
 
   # ============================================================
+  # Test laurus-php
+  # ============================================================
+  test-php:
+    name: Test laurus-php
+    needs: [test-laurus]
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - runner: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            skip_embedding_features: true
+        php: ["8.5"]
+    runs-on: ${{ matrix.platform.runner }}
+    steps:
+      - name: Run checkout
+        uses: actions/checkout@v6
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+
+      - name: Install toolchain
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "stable-${{ matrix.platform.target }}"
+
+      - name: Build PHP extension
+        shell: bash
+        run: |
+          if [ "${{ matrix.platform.skip_embedding_features }}" == "true" ]; then
+            cargo build --release -p laurus-php
+          else
+            cargo build --release -p laurus-php --features embeddings-all
+          fi
+
+      - name: Run tests
+        working-directory: laurus-php
+        shell: bash
+        run: |
+          composer install
+          php -d extension=../target/release/liblaurus_php.so vendor/bin/phpunit tests/LaurusTest.php
+
+  # ============================================================
   # Test laurus-wasm
   # ============================================================
   test-wasm:
@@ -440,6 +492,7 @@ jobs:
         test-nodejs,
         test-wasm,
         test-ruby,
+        test-php,
       ]
     runs-on: ubuntu-latest
     steps:
@@ -498,7 +551,7 @@ jobs:
           target: ${{ matrix.platform.target }}
 
       - name: Build binary
-        run: cargo build --release --target ${{ matrix.platform.target }} -p laurus-cli
+        run: cargo build --release --target ${{ matrix.platform.target }} -p laurus-cli --features embeddings-all
 
       - name: Package binary (Unix)
         if: runner.os == 'Linux' || runner.os == 'macOS'
@@ -633,7 +686,7 @@ jobs:
         shell: bash
         run: |
           npm install
-          npx napi build --platform --release -p laurus-nodejs --target ${{ matrix.settings.target }}
+          npx napi build --platform --release -p laurus-nodejs --target ${{ matrix.settings.target }} --features embeddings-all
 
       - name: Upload artifact
         uses: actions/upload-artifact@v7
@@ -727,18 +780,88 @@ jobs:
       - name: Build native extension
         working-directory: laurus-ruby
         shell: bash
+        env:
+          RB_SYS_CARGO_FEATURES: embeddings-all
         run: |
           bundle install
           bundle exec rake compile
+
+      - name: Package artifact
+        shell: bash
+        run: |
+          EXT=$(find laurus-ruby/lib -name "laurus_ruby.*" -type f | head -1)
+          SUFFIX="${EXT##*.}"
+          cp "$EXT" "laurus_ruby.${SUFFIX}"
+          tar -czf "laurus_ruby-${{ github.ref_name }}-${{ matrix.platform.target }}.tar.gz" "laurus_ruby.${SUFFIX}"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v7
         with:
           name: ruby-native-${{ matrix.platform.target }}
-          path: |
-            laurus-ruby/lib/**/*.so
-            laurus-ruby/lib/**/*.dylib
-            laurus-ruby/lib/**/*.bundle
+          path: laurus_ruby-${{ github.ref_name }}-${{ matrix.platform.target }}.tar.gz
+          if-no-files-found: error
+
+  # ============================================================
+  # Build PHP native extensions
+  # ============================================================
+  build-php:
+    name: Build PHP Native
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [test-all]
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - runner: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            ext: so
+          - runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            ext: so
+          - runner: macos-latest
+            target: aarch64-apple-darwin
+            ext: dylib
+          - runner: macos-15-intel
+            target: x86_64-apple-darwin
+            ext: dylib
+        php: ["8.5"]
+    runs-on: ${{ matrix.platform.runner }}
+    steps:
+      - name: Run checkout
+        uses: actions/checkout@v6
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+
+      - name: Install toolchain
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+          target: ${{ matrix.platform.target }}
+
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "stable-${{ matrix.platform.target }}"
+
+      - name: Build PHP extension
+        run: cargo build --release -p laurus-php --features embeddings-all
+
+      - name: Package artifact
+        shell: bash
+        run: |
+          cp target/release/liblaurus_php.${{ matrix.platform.ext }} \
+             laurus_php.${{ matrix.platform.ext }}
+          tar -czf "laurus_php-${{ github.ref_name }}-${{ matrix.platform.target }}.tar.gz" \
+             "laurus_php.${{ matrix.platform.ext }}"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: php-native-${{ matrix.platform.target }}
+          path: laurus_php-${{ github.ref_name }}-${{ matrix.platform.target }}.tar.gz
           if-no-files-found: error
 
   # ============================================================
@@ -755,16 +878,31 @@ jobs:
         build-nodejs,
         build-wasm,
         build-ruby,
+        build-php,
       ]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - name: Download artifacts
+      - name: Download binary artifacts
         uses: actions/download-artifact@v8
         with:
           path: artifacts
           pattern: "laurus-*"
+          merge-multiple: true
+
+      - name: Download Ruby artifacts
+        uses: actions/download-artifact@v8
+        with:
+          path: artifacts
+          pattern: "ruby-native-*"
+          merge-multiple: true
+
+      - name: Download PHP artifacts
+        uses: actions/download-artifact@v8
+        with:
+          path: artifacts
+          pattern: "php-native-*"
           merge-multiple: true
 
       - name: Create GitHub Release

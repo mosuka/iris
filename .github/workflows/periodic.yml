@@ -59,7 +59,7 @@ jobs:
           shared-key: "stable-x86_64-unknown-linux-gnu"
 
       - name: Run clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
+        run: cargo clippy --all-targets --features embeddings-all -- -D warnings
 
   # ============================================================
   # Test laurus (core library)
@@ -101,7 +101,7 @@ jobs:
           if [ "${{ matrix.platform.skip_embedding_features }}" == "true" ]; then
             FEATURES=""
           else
-            FEATURES="--all-features"
+            FEATURES="--features embeddings-all"
           fi
 
           cargo test --package laurus --target "${{ matrix.platform.target }}" $FEATURES
@@ -150,7 +150,7 @@ jobs:
           if [ "${{ matrix.platform.skip_embedding_features }}" == "true" ]; then
             FEATURES=""
           else
-            FEATURES="--all-features"
+            FEATURES="--features embeddings-all"
           fi
 
           cargo test --package laurus-server --target "${{ matrix.platform.target }}" $FEATURES
@@ -199,7 +199,7 @@ jobs:
           if [ "${{ matrix.platform.skip_embedding_features }}" == "true" ]; then
             FEATURES=""
           else
-            FEATURES="--all-features"
+            FEATURES="--features embeddings-all"
           fi
 
           cargo test --package laurus-mcp --target "${{ matrix.platform.target }}" $FEATURES
@@ -248,7 +248,7 @@ jobs:
           if [ "${{ matrix.platform.skip_embedding_features }}" == "true" ]; then
             FEATURES=""
           else
-            FEATURES="--all-features"
+            FEATURES="--features embeddings-all"
           fi
 
           cargo test --package laurus-cli --target "${{ matrix.platform.target }}" $FEATURES
@@ -393,3 +393,55 @@ jobs:
         run: |
           bundle exec rake compile
           bundle exec ruby -Ilib -Itest -e 'Dir["test/test_*.rb"].each { |f| require_relative f }'
+
+  # ============================================================
+  # Test laurus-php
+  # ============================================================
+  test-php:
+    name: Test laurus-php
+    needs: [test-laurus]
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - runner: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            skip_embedding_features: true
+        php: ["8.5"]
+    runs-on: ${{ matrix.platform.runner }}
+    steps:
+      - name: Run checkout
+        uses: actions/checkout@v6
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+
+      - name: Install toolchain
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "stable-${{ matrix.platform.target }}"
+
+      - name: Build PHP extension
+        shell: bash
+        run: |
+          if [ "${{ matrix.platform.skip_embedding_features }}" == "true" ]; then
+            cargo build --release -p laurus-php
+          else
+            cargo build --release -p laurus-php --features embeddings-all
+          fi
+
+      - name: Run tests
+        working-directory: laurus-php
+        shell: bash
+        run: |
+          composer install
+          php -d extension=../target/release/liblaurus_php.so vendor/bin/phpunit tests/LaurusTest.php

@@ -1,0 +1,28 @@
+[package]
+name = "laurus-php"
+version = { workspace = true }
+edition = { workspace = true }
+description = "PHP bindings for the Laurus search library"
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+
+[lib]
+name = "laurus_php"
+crate-type = ["cdylib"]
+
+[features]
+embeddings-candle = ["laurus/embeddings-candle"]
+embeddings-multimodal = ["laurus/embeddings-multimodal"]
+embeddings-openai = ["laurus/embeddings-openai"]
+embeddings-all = [
+    "embeddings-candle",
+    "embeddings-multimodal",
+    "embeddings-openai",
+]
+
+[dependencies]
+laurus = { workspace = true, features = ["native"] }
+ext-php-rs = "0.15.7"
+tokio = { workspace = true }
+chrono = { workspace = true }

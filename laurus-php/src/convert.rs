@@ -1,0 +1,194 @@
+//! Conversions between PHP values and Laurus types.
+
+use chrono::{DateTime, Utc};
+use ext_php_rs::boxed::ZBox;
+use ext_php_rs::convert::FromZval;
+use ext_php_rs::prelude::PhpResult;
+use ext_php_rs::types::array::ArrayKey;
+use ext_php_rs::types::{ZendHashTable, Zval};
+use laurus::{DataValue, Document};
+
+/// Convert a PHP associative array (HashTable) to a [`Document`].
+///
+/// Each key must be a string; values are converted via [`zval_to_data_value`].
+///
+/// # Arguments
+///
+/// * `ht` - PHP HashTable (associative array) mapping field names to values.
+///
+/// # Returns
+///
+/// A `Document` with fields populated from the array.
+pub fn hashtable_to_document(ht: &ZendHashTable) -> PhpResult<Document> {
+    let mut builder = Document::builder();
+    for (key, val) in ht.iter() {
+        let field = match key {
+            ArrayKey::String(s) => s,
+            ArrayKey::Str(s) => s.to_string(),
+            ArrayKey::Long(_) => {
+                return Err("array key must be a string, not an integer".into());
+            }
+        };
+        let dv = zval_to_data_value(val)?;
+        builder = builder.add_field(&field, dv);
+    }
+    Ok(builder.build())
+}
+
+/// Convert a PHP [`Zval`] to a [`DataValue`].
+///
+/// # Type mapping
+///
+/// | PHP type                           | DataValue variant    |
+/// |------------------------------------|----------------------|
+/// | `null`                             | `Null`               |
+/// | `bool`                             | `Bool`               |
+/// | `int`                              | `Int64`              |
+/// | `float`                            | `Float64`            |
+/// | `string`                           | `Text`               |
+/// | `array` of floats (sequential)     | `Vector`             |
+/// | `array` with `"lat"`, `"lon"` keys | `Geo`                |
+/// | ISO 8601 string (fallback)         | `DateTime`           |
+///
+/// # Arguments
+///
+/// * `zv` - PHP Zval to convert.
+///
+/// # Returns
+///
+/// The corresponding `DataValue`, or an error if the type is unsupported.
+pub fn zval_to_data_value(zv: &Zval) -> PhpResult<DataValue> {
+    // null
+    if zv.is_null() {
+        return Ok(DataValue::Null);
+    }
+    // bool
+    if zv.is_bool() {
+        let b = bool::from_zval(zv).ok_or("failed to convert bool")?;
+        return Ok(DataValue::Bool(b));
+    }
+    // int (long)
+    if zv.is_long() {
+        let i = i64::from_zval(zv).ok_or("failed to convert int")?;
+        return Ok(DataValue::Int64(i));
+    }
+    // float (double)
+    if zv.is_double() {
+        let f = f64::from_zval(zv).ok_or("failed to convert float")?;
+        return Ok(DataValue::Float64(f));
+    }
+    // string
+    if zv.is_string() {
+        let s = String::from_zval(zv).ok_or("failed to convert string")?;
+        // Try ISO 8601 datetime parse
+        if let Ok(dt) = s.parse::<DateTime<Utc>>() {
+            return Ok(DataValue::DateTime(dt));
+        }
+        return Ok(DataValue::Text(s));
+    }
+    // array
+    if zv.is_array() {
+        let ht = zv.array().ok_or("failed to get array")?;
+
+        // Check for geo: associative array with "lat" and "lon" keys
+        if let (Some(lat_zv), Some(lon_zv)) = (ht.get("lat"), ht.get("lon")) {
+            let lat = f64::from_zval(lat_zv).ok_or("'lat' must be a float")?;
+            let lon = f64::from_zval(lon_zv).ok_or("'lon' must be a float")?;
+            return Ok(DataValue::Geo(lat, lon));
+        }
+
+        // Otherwise treat as vector (sequential array of floats)
+        let mut vec = Vec::with_capacity(ht.len());
+        for (_, val) in ht.iter() {
+            let f = f64::from_zval(val).ok_or("vector array elements must be numeric")?;
+            vec.push(f as f32);
+        }
+        return Ok(DataValue::Vector(vec));
+    }
+
+    Err(format!(
+        "cannot convert PHP value of type {:?} to DataValue",
+        zv.get_type()
+    )
+    .into())
+}
+
+/// Convert a [`Document`] to a PHP associative array (HashTable).
+///
+/// # Arguments
+///
+/// * `doc` - Document to convert.
+///
+/// # Returns
+///
+/// A `ZendHashTable` mapping field names to PHP values.
+pub fn document_to_hashtable(doc: &Document) -> PhpResult<ZBox<ZendHashTable>> {
+    let mut ht = ZendHashTable::new();
+    for (field, value) in &doc.fields {
+        let zv = data_value_to_zval(value)?;
+        ht.insert(field.as_str(), zv)
+            .map_err(|_| format!("failed to insert field '{field}' into array"))?;
+    }
+    Ok(ht)
+}
+
+/// Convert a [`DataValue`] to a PHP [`Zval`].
+///
+/// # Arguments
+///
+/// * `value` - DataValue to convert.
+///
+/// # Returns
+///
+/// The corresponding PHP Zval.
+pub fn data_value_to_zval(value: &DataValue) -> PhpResult<Zval> {
+    let mut zv = Zval::new();
+    match value {
+        DataValue::Null => {
+            zv.set_null();
+        }
+        DataValue::Bool(b) => {
+            zv.set_bool(*b);
+        }
+        DataValue::Int64(i) => {
+            zv.set_long(*i);
+        }
+        DataValue::Float64(f) => {
+            zv.set_double(*f);
+        }
+        DataValue::Text(s) => {
+            zv.set_string(s, false)
+                .map_err(|_| "failed to set string")?;
+        }
+        DataValue::Bytes(b, _mime) => {
+            zv.set_binary(b.clone());
+        }
+        DataValue::Vector(v) => {
+            let mut arr = ZendHashTable::new();
+            for (i, &f) in v.iter().enumerate() {
+                let mut fzv = Zval::new();
+                fzv.set_double(f as f64);
+                arr.insert_at_index(i as i64, fzv)
+                    .map_err(|_| "failed to insert vector element")?;
+            }
+            zv.set_hashtable(arr);
+        }
+        DataValue::DateTime(dt) => {
+            zv.set_string(&dt.to_rfc3339(), false)
+                .map_err(|_| "failed to set datetime string")?;
+        }
+        DataValue::Geo(lat, lon) => {
+            let mut arr = ZendHashTable::new();
+            let mut lat_zv = Zval::new();
+            lat_zv.set_double(*lat);
+            let mut lon_zv = Zval::new();
+            lon_zv.set_double(*lon);
+            arr.insert("lat", lat_zv)
+                .map_err(|_| "failed to insert lat")?;
+            arr.insert("lon", lon_zv)
+                .map_err(|_| "failed to insert lon")?;
+            zv.set_hashtable(arr);
+        }
+    }
+    Ok(zv)
+}
