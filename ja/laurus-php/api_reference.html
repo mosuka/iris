@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>ファセット - Laurus ドキュメント</title>
+        <title>API リファレンス - Laurus ドキュメント</title>
 
 
         <!-- Custom HTML head -->
@@ -146,7 +146,7 @@
                         <a href="https://github.com/mosuka/laurus" title="Git repository" aria-label="Git repository">
                             <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg></span>
                         </a>
-                        <a href="https://github.com/mosuka/laurus/edit/main/docs/ja/src/laurus/faceting.md" title="Suggest an edit" aria-label="Suggest an edit" rel="edit">
+                        <a href="https://github.com/mosuka/laurus/edit/main/docs/ja/src/laurus-php/api_reference.md" title="Suggest an edit" aria-label="Suggest an edit" rel="edit">
                             <span class=fa-svg id="git-edit-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M421.7 220.3l-11.3 11.3-22.6 22.6-205 205c-6.6 6.6-14.8 11.5-23.8 14.1L30.8 511c-8.4 2.5-17.5 .2-23.7-6.1S-1.5 489.7 1 481.2L38.7 353.1c2.6-9 7.5-17.2 14.1-23.8l205-205 22.6-22.6 11.3-11.3 33.9 33.9 62.1 62.1 33.9 33.9zM96 353.9l-9.3 9.3c-.9 .9-1.6 2.1-2 3.4l-25.3 86 86-25.3c1.3-.4 2.5-1.1 3.4-2l9.3-9.3H112c-8.8 0-16-7.2-16-16V353.9zM453.3 19.3l39.4 39.4c25 25 25 65.5 0 90.5l-14.5 14.5-22.6 22.6-11.3 11.3-33.9-33.9-62.1-62.1L314.3 67.7l11.3-11.3 22.6-22.6 14.5-14.5c25-25 65.5-25 90.5 0z"/></svg></span>
                         </a>
 
@@ -180,96 +180,277 @@
 
                 <div id="mdbook-content" class="content">
                     <main>
-                        <h1 id="ファセット"><a class="header" href="#ファセット">ファセット</a></h1>
-<p>ファセット（Faceting）は、フィールド値によって検索結果をカウント・分類する機能です。検索UIでナビゲーションフィルタを構築するために一般的に使用されます（例: 「エレクトロニクス (42)」「書籍 (18)」）。</p>
-<h2 id="概念"><a class="header" href="#概念">概念</a></h2>
-<h3 id="facetpath"><a class="header" href="#facetpath">FacetPath</a></h3>
-<p><code>FacetPath</code> は階層的なファセット値を表します。例えば、商品カテゴリ「Electronics &gt; Computers &gt; Laptops」は3階層のFacetPathです。</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use laurus::lexical::search::features::facet::FacetPath;
-
-// 単一レベルのファセット
-let facet = FacetPath::from_value("category", "Electronics");
-
-// コンポーネントからの階層的ファセット
-let facet = FacetPath::new("category", vec![
-    "Electronics".to_string(),
-    "Computers".to_string(),
-    "Laptops".to_string(),
-]);
-
-// 区切り文字付き文字列から
-let facet = FacetPath::from_delimited("category", "Electronics/Computers/Laptops", "/");
-<span class="boring">}</span></code></pre>
-<h4 id="facetpathメソッド"><a class="header" href="#facetpathメソッド">FacetPathメソッド</a></h4>
+                        <h1 id="api-リファレンス"><a class="header" href="#api-リファレンス">API リファレンス</a></h1>
+<h2 id="index"><a class="header" href="#index">Index</a></h2>
+<p>Laurus 検索エンジンをラップするメインクラスです。</p>
+<pre><code class="language-php">new \Laurus\Index(?string $path = null, ?Schema $schema = null)
+</code></pre>
+<h3 id="コンストラクタ"><a class="header" href="#コンストラクタ">コンストラクタ</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">パラメータ</th><th style="text-align: left">型</th><th style="text-align: left">デフォルト</th><th style="text-align: left">説明</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>$path</code></td><td style="text-align: left"><code>string|null</code></td><td style="text-align: left"><code>null</code></td><td style="text-align: left">永続ストレージのディレクトリパス。<code>null</code> の場合はインメモリインデックスを作成します。</td></tr>
+<tr><td style="text-align: left"><code>$schema</code></td><td style="text-align: left"><code>Schema|null</code></td><td style="text-align: left"><code>null</code></td><td style="text-align: left">スキーマ定義。省略時は空のスキーマが使用されます。</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="メソッド"><a class="header" href="#メソッド">メソッド</a></h3>
 <div class="table-wrapper">
 <table>
 <thead>
 <tr><th style="text-align: left">メソッド</th><th style="text-align: left">説明</th></tr>
 </thead>
 <tbody>
-<tr><td style="text-align: left"><code>new(field, path)</code></td><td style="text-align: left">フィールド名とパスコンポーネントからFacetPathを作成</td></tr>
-<tr><td style="text-align: left"><code>from_value(field, value)</code></td><td style="text-align: left">単一レベルのファセットを作成</td></tr>
-<tr><td style="text-align: left"><code>from_delimited(field, path_str, delimiter)</code></td><td style="text-align: left">区切り文字付きのパス文字列をパース</td></tr>
-<tr><td style="text-align: left"><code>depth()</code></td><td style="text-align: left">パスの階層数</td></tr>
-<tr><td style="text-align: left"><code>is_parent_of(other)</code></td><td style="text-align: left">このパスが他のパスの親であるか確認</td></tr>
-<tr><td style="text-align: left"><code>parent()</code></td><td style="text-align: left">親パスを取得（1階層上）</td></tr>
-<tr><td style="text-align: left"><code>child(component)</code></td><td style="text-align: left">コンポーネントを追加して子パスを作成</td></tr>
-<tr><td style="text-align: left"><code>to_string_with_delimiter(delimiter)</code></td><td style="text-align: left">区切り文字付き文字列に変換</td></tr>
+<tr><td style="text-align: left"><code>putDocument(string $id, array $doc): void</code></td><td style="text-align: left">ドキュメントをアップサート（upsert）します。同じ ID の既存バージョンをすべて置換します。</td></tr>
+<tr><td style="text-align: left"><code>addDocument(string $id, array $doc): void</code></td><td style="text-align: left">既存バージョンを削除せずにドキュメントチャンクを追記します。</td></tr>
+<tr><td style="text-align: left"><code>getDocuments(string $id): array</code></td><td style="text-align: left">指定 ID の全保存バージョンを返します。</td></tr>
+<tr><td style="text-align: left"><code>deleteDocuments(string $id): void</code></td><td style="text-align: left">指定 ID の全バージョンを削除します。</td></tr>
+<tr><td style="text-align: left"><code>commit(): void</code></td><td style="text-align: left">バッファリングされた書き込みをフラッシュし、すべての保留中の変更を検索可能にします。</td></tr>
+<tr><td style="text-align: left"><code>search(mixed $query, int $limit = 10, int $offset = 0): array</code></td><td style="text-align: left">検索クエリを実行します。<code>SearchResult</code> の配列を返します。</td></tr>
+<tr><td style="text-align: left"><code>stats(): array</code></td><td style="text-align: left">インデックス統計（<code>"document_count"</code>、<code>"vector_fields"</code>）を返します。</td></tr>
 </tbody>
 </table>
 </div>
-<h3 id="facetcount"><a class="header" href="#facetcount">FacetCount</a></h3>
-<p><code>FacetCount</code> はファセット集計の結果を表します。</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>pub struct FacetCount {
-    pub path: FacetPath,
-    pub count: u64,
-    pub children: Vec&lt;FacetCount&gt;,
-}
-<span class="boring">}</span></code></pre>
+<h3 id="search-の-query-引数"><a class="header" href="#search-の-query-引数"><code>search</code> の query 引数</a></h3>
+<p><code>$query</code> パラメータは以下のいずれかを受け付けます：</p>
+<ul>
+<li><strong>DSL 文字列</strong>（例: <code>"title:hello"</code>、<code>"embedding:\"memory safety\""</code>)</li>
+<li><strong>Lexical クエリオブジェクト</strong>（<code>TermQuery</code>、<code>PhraseQuery</code>、<code>BooleanQuery</code> など）</li>
+<li><strong>Vector クエリオブジェクト</strong>（<code>VectorQuery</code>、<code>VectorTextQuery</code>）</li>
+<li><strong><code>SearchRequest</code></strong>（完全な制御が必要な場合）</li>
+</ul>
+<hr>
+<h2 id="schema"><a class="header" href="#schema">Schema</a></h2>
+<p><code>Index</code> のフィールドとインデックスタイプを定義します。</p>
+<pre><code class="language-php">new \Laurus\Schema()
+</code></pre>
+<h3 id="フィールドメソッド"><a class="header" href="#フィールドメソッド">フィールドメソッド</a></h3>
 <div class="table-wrapper">
 <table>
 <thead>
-<tr><th style="text-align: left">フィールド</th><th style="text-align: left">型</th><th style="text-align: left">説明</th></tr>
+<tr><th style="text-align: left">メソッド</th><th style="text-align: left">説明</th></tr>
 </thead>
 <tbody>
-<tr><td style="text-align: left"><code>path</code></td><td style="text-align: left"><code>FacetPath</code></td><td style="text-align: left">ファセット値</td></tr>
-<tr><td style="text-align: left"><code>count</code></td><td style="text-align: left"><code>u64</code></td><td style="text-align: left">マッチするドキュメント数</td></tr>
-<tr><td style="text-align: left"><code>children</code></td><td style="text-align: left"><code>Vec&lt;FacetCount&gt;</code></td><td style="text-align: left">階層的なドリルダウン用の子ファセット</td></tr>
+<tr><td style="text-align: left"><code>addTextField(string $name, bool $stored = true, bool $indexed = true, bool $termVectors = false, ?string $analyzer = null): void</code></td><td style="text-align: left">全文フィールド（転置インデックス、BM25）。</td></tr>
+<tr><td style="text-align: left"><code>addIntegerField(string $name, bool $stored = true, bool $indexed = true): void</code></td><td style="text-align: left">64 ビット整数フィールド。</td></tr>
+<tr><td style="text-align: left"><code>addFloatField(string $name, bool $stored = true, bool $indexed = true): void</code></td><td style="text-align: left">64 ビット浮動小数点フィールド。</td></tr>
+<tr><td style="text-align: left"><code>addBooleanField(string $name, bool $stored = true, bool $indexed = true): void</code></td><td style="text-align: left">ブールフィールド。</td></tr>
+<tr><td style="text-align: left"><code>addBytesField(string $name, bool $stored = true): void</code></td><td style="text-align: left">生バイトフィールド。</td></tr>
+<tr><td style="text-align: left"><code>addGeoField(string $name, bool $stored = true, bool $indexed = true): void</code></td><td style="text-align: left">地理座標フィールド（緯度/経度）。</td></tr>
+<tr><td style="text-align: left"><code>addDatetimeField(string $name, bool $stored = true, bool $indexed = true): void</code></td><td style="text-align: left">UTC 日時フィールド。</td></tr>
+<tr><td style="text-align: left"><code>addHnswField(string $name, int $dimension, ?string $distance = "cosine", int $m = 16, int $efConstruction = 200, ?string $embedder = null): void</code></td><td style="text-align: left">HNSW 近似最近傍ベクトルフィールド。</td></tr>
+<tr><td style="text-align: left"><code>addFlatField(string $name, int $dimension, ?string $distance = "cosine", ?string $embedder = null): void</code></td><td style="text-align: left">Flat（総当たり）ベクトルフィールド。</td></tr>
+<tr><td style="text-align: left"><code>addIvfField(string $name, int $dimension, ?string $distance = "cosine", int $nClusters = 100, int $nProbe = 1, ?string $embedder = null): void</code></td><td style="text-align: left">IVF 近似最近傍ベクトルフィールド。</td></tr>
 </tbody>
 </table>
 </div>
-<h2 id="例-階層的ファセット"><a class="header" href="#例-階層的ファセット">例: 階層的ファセット</a></h2>
-<pre><code class="language-text">Category
-├── Electronics (42)
-│   ├── Computers (18)
-│   │   ├── Laptops (12)
-│   │   └── Desktops (6)
-│   └── Phones (24)
-└── Books (35)
-    ├── Fiction (20)
-    └── Non-Fiction (15)
+<h3 id="その他のメソッド"><a class="header" href="#その他のメソッド">その他のメソッド</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">メソッド</th><th style="text-align: left">説明</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>addEmbedder(string $name, array $config): void</code></td><td style="text-align: left">名前付きエンベダー定義を登録します。<code>$config</code> は <code>"type"</code> キーを持つ連想配列です（下記参照）。</td></tr>
+<tr><td style="text-align: left"><code>setDefaultFields(array $fieldNames): void</code></td><td style="text-align: left">クエリでフィールドが指定されていない場合に使用するデフォルトフィールドを設定します。<code>$fieldNames</code> は文字列の配列です。</td></tr>
+<tr><td style="text-align: left"><code>fieldNames(): array</code></td><td style="text-align: left">このスキーマに定義されたフィールド名のリストを返します。</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="エンベダータイプ"><a class="header" href="#エンベダータイプ">エンベダータイプ</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left"><code>"type"</code></th><th style="text-align: left">必須キー</th><th style="text-align: left">Feature Flag</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>"precomputed"</code></td><td style="text-align: left">–</td><td style="text-align: left">（常に利用可能）</td></tr>
+<tr><td style="text-align: left"><code>"candle_bert"</code></td><td style="text-align: left"><code>"model"</code></td><td style="text-align: left"><code>embeddings-candle</code></td></tr>
+<tr><td style="text-align: left"><code>"candle_clip"</code></td><td style="text-align: left"><code>"model"</code></td><td style="text-align: left"><code>embeddings-multimodal</code></td></tr>
+<tr><td style="text-align: left"><code>"openai"</code></td><td style="text-align: left"><code>"model"</code></td><td style="text-align: left"><code>embeddings-openai</code></td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="距離メトリクス"><a class="header" href="#距離メトリクス">距離メトリクス</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">値</th><th style="text-align: left">説明</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>"cosine"</code></td><td style="text-align: left">コサイン類似度（デフォルト）</td></tr>
+<tr><td style="text-align: left"><code>"euclidean"</code></td><td style="text-align: left">ユークリッド距離</td></tr>
+<tr><td style="text-align: left"><code>"dot_product"</code></td><td style="text-align: left">内積</td></tr>
+<tr><td style="text-align: left"><code>"manhattan"</code></td><td style="text-align: left">マンハッタン距離</td></tr>
+<tr><td style="text-align: left"><code>"angular"</code></td><td style="text-align: left">角度距離</td></tr>
+</tbody>
+</table>
+</div>
+<hr>
+<h2 id="クエリクラス"><a class="header" href="#クエリクラス">クエリクラス</a></h2>
+<h3 id="termquery"><a class="header" href="#termquery">TermQuery</a></h3>
+<pre><code class="language-php">new \Laurus\TermQuery(string $field, string $term)
 </code></pre>
-<p>このツリーの各ノードは、ドリルダウンナビゲーション用に <code>children</code> が設定された <code>FacetCount</code> に対応します。</p>
-<h2 id="ユースケース"><a class="header" href="#ユースケース">ユースケース</a></h2>
-<ul>
-<li><strong>EC（電子商取引）</strong>: カテゴリ、ブランド、価格帯、評価によるフィルタリング</li>
-<li><strong>ドキュメント検索</strong>: 著者、部門、日付範囲、ドキュメントタイプによるフィルタリング</li>
-<li><strong>コンテンツ管理</strong>: タグ、トピック、コンテンツステータスによるフィルタリング</li>
-</ul>
+<p>指定フィールドに完全一致する語句を含むドキュメントを検索します。</p>
+<h3 id="phrasequery"><a class="header" href="#phrasequery">PhraseQuery</a></h3>
+<pre><code class="language-php">new \Laurus\PhraseQuery(string $field, array $terms)
+</code></pre>
+<p>指定した語句が順序どおりに含まれるドキュメントを検索します。<code>$terms</code> は文字列の配列です。</p>
+<h3 id="fuzzyquery"><a class="header" href="#fuzzyquery">FuzzyQuery</a></h3>
+<pre><code class="language-php">new \Laurus\FuzzyQuery(string $field, string $term, int $maxEdits = 2)
+</code></pre>
+<p>編集距離が <code>$maxEdits</code> 以内の近似一致を検索します。</p>
+<h3 id="wildcardquery"><a class="header" href="#wildcardquery">WildcardQuery</a></h3>
+<pre><code class="language-php">new \Laurus\WildcardQuery(string $field, string $pattern)
+</code></pre>
+<p>ワイルドカードパターン検索。<code>*</code> は任意の文字列、<code>?</code> は任意の1文字に一致します。</p>
+<h3 id="numericrangequery"><a class="header" href="#numericrangequery">NumericRangeQuery</a></h3>
+<pre><code class="language-php">new \Laurus\NumericRangeQuery(string $field, mixed $min, mixed $max, ?string $numericType = "integer")
+</code></pre>
+<p><code>[$min, $max]</code> の範囲内の数値を検索します。開いた境界には <code>null</code> を指定します。<code>$numericType</code> には <code>"integer"</code> または <code>"float"</code> を設定します。</p>
+<h3 id="geoquery"><a class="header" href="#geoquery">GeoQuery</a></h3>
+<pre><code class="language-php">// 半径検索
+\Laurus\GeoQuery::withinRadius(string $field, float $lat, float $lon, float $distanceKm): GeoQuery
+
+// バウンディングボックス検索
+\Laurus\GeoQuery::withinBoundingBox(string $field, float $minLat, float $minLon, float $maxLat, float $maxLon): GeoQuery
+</code></pre>
+<p><code>withinRadius</code> は指定した地点から <code>$distanceKm</code> 以内の座標を持つドキュメントを返します。<code>withinBoundingBox</code> は指定したバウンディングボックス内のドキュメントを返します。</p>
+<h3 id="booleanquery"><a class="header" href="#booleanquery">BooleanQuery</a></h3>
+<pre><code class="language-php">$bq = new \Laurus\BooleanQuery();
+$bq-&gt;must($query);
+$bq-&gt;should($query);
+$bq-&gt;mustNot($query);
+</code></pre>
+<p>複合ブールクエリ。<code>must</code> 節はすべて一致する必要があります。<code>should</code> 節は少なくとも1つ一致する必要があります。<code>mustNot</code> 節は一致してはなりません。</p>
+<h3 id="spanquery"><a class="header" href="#spanquery">SpanQuery</a></h3>
+<pre><code class="language-php">// 単一語句
+\Laurus\SpanQuery::term(string $field, string $term): SpanQuery
+
+// Near: slop 位置以内の語句
+\Laurus\SpanQuery::near(string $field, array $terms, int $slop = 0, bool $ordered = true): SpanQuery
+
+// Containing: big スパンが little スパンを含む
+\Laurus\SpanQuery::containing(string $field, SpanQuery $big, SpanQuery $little): SpanQuery
+
+// Within: 最大距離での include スパンと exclude スパン
+\Laurus\SpanQuery::within(string $field, SpanQuery $include, SpanQuery $exclude, int $distance): SpanQuery
+</code></pre>
+<p>位置・近接スパンクエリ。<code>near</code> は語句文字列の配列を受け取ります。</p>
+<h3 id="vectorquery"><a class="header" href="#vectorquery">VectorQuery</a></h3>
+<pre><code class="language-php">new \Laurus\VectorQuery(string $field, array $vector)
+</code></pre>
+<p>事前計算済みエンベディングベクトルを使った近似最近傍検索を行います。<code>$vector</code> は Float の配列です。</p>
+<h3 id="vectortextquery"><a class="header" href="#vectortextquery">VectorTextQuery</a></h3>
+<pre><code class="language-php">new \Laurus\VectorTextQuery(string $field, string $text)
+</code></pre>
+<p>クエリ時に <code>$text</code> をエンベディングに変換してベクトル検索を行います。インデックスにエンベダーの設定が必要です。</p>
+<hr>
+<h2 id="searchrequest"><a class="header" href="#searchrequest">SearchRequest</a></h2>
+<p>高度な制御が必要な場合の完全なリクエストクラスです。</p>
+<pre><code class="language-php">new \Laurus\SearchRequest(
+    mixed $query = null,
+    mixed $lexicalQuery = null,
+    mixed $vectorQuery = null,
+    mixed $filterQuery = null,
+    mixed $fusion = null,
+    int $limit = 10,
+    int $offset = 0,
+)
+</code></pre>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">パラメータ</th><th style="text-align: left">説明</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>$query</code></td><td style="text-align: left">DSL 文字列または単一クエリオブジェクト。<code>$lexicalQuery</code> / <code>$vectorQuery</code> と排他的。</td></tr>
+<tr><td style="text-align: left"><code>$lexicalQuery</code></td><td style="text-align: left">明示的なハイブリッド検索の Lexical コンポーネント。</td></tr>
+<tr><td style="text-align: left"><code>$vectorQuery</code></td><td style="text-align: left">明示的なハイブリッド検索の Vector コンポーネント。</td></tr>
+<tr><td style="text-align: left"><code>$filterQuery</code></td><td style="text-align: left">スコアリング後に適用する Lexical フィルター。</td></tr>
+<tr><td style="text-align: left"><code>$fusion</code></td><td style="text-align: left">フュージョンアルゴリズム（<code>RRF</code> または <code>WeightedSum</code>）。両コンポーネント指定時のデフォルトは <code>RRF(k: 60)</code>。</td></tr>
+<tr><td style="text-align: left"><code>$limit</code></td><td style="text-align: left">最大結果件数（デフォルト 10）。</td></tr>
+<tr><td style="text-align: left"><code>$offset</code></td><td style="text-align: left">ページネーションオフセット（デフォルト 0）。</td></tr>
+</tbody>
+</table>
+</div>
+<hr>
+<h2 id="searchresult"><a class="header" href="#searchresult">SearchResult</a></h2>
+<p><code>Index-&gt;search()</code> が返すクラスです。</p>
+<pre><code class="language-php">$result-&gt;getId()        // string   -- 外部ドキュメント識別子
+$result-&gt;getScore()     // float    -- 関連性スコア
+$result-&gt;getDocument()  // array|null -- 取得されたフィールド値。削除済みの場合は null
+</code></pre>
+<hr>
+<h2 id="フュージョンアルゴリズム"><a class="header" href="#フュージョンアルゴリズム">フュージョンアルゴリズム</a></h2>
+<h3 id="rrf"><a class="header" href="#rrf">RRF</a></h3>
+<pre><code class="language-php">new \Laurus\RRF(float $k = 60.0)
+</code></pre>
+<p>逆順位フュージョン（Reciprocal Rank Fusion）。Lexical と Vector の結果リストを順位位置によってマージします。<code>$k</code> は平滑化定数で、値が大きいほど上位ランクの影響が小さくなります。</p>
+<h3 id="weightedsum"><a class="header" href="#weightedsum">WeightedSum</a></h3>
+<pre><code class="language-php">new \Laurus\WeightedSum(float $lexicalWeight = 0.5, float $vectorWeight = 0.5)
+</code></pre>
+<p>両スコアリストをそれぞれ正規化した後、<code>$lexicalWeight * lexical_score + $vectorWeight * vector_score</code> として結合します。</p>
+<hr>
+<h2 id="テキスト解析"><a class="header" href="#テキスト解析">テキスト解析</a></h2>
+<h3 id="synonymdictionary"><a class="header" href="#synonymdictionary">SynonymDictionary</a></h3>
+<pre><code class="language-php">$dict = new \Laurus\SynonymDictionary();
+$dict-&gt;addSynonymGroup(["fast", "quick", "rapid"]);
+</code></pre>
+<p>同義語グループの辞書です。グループ内のすべての語句は互いの同義語として扱われます。</p>
+<h3 id="whitespacetokenizer"><a class="header" href="#whitespacetokenizer">WhitespaceTokenizer</a></h3>
+<pre><code class="language-php">$tokenizer = new \Laurus\WhitespaceTokenizer();
+$tokens = $tokenizer-&gt;tokenize("hello world");
+</code></pre>
+<p>空白で分割してテキストをトークン化し、<code>Token</code> オブジェクトの配列を返します。</p>
+<h3 id="synonymgraphfilter"><a class="header" href="#synonymgraphfilter">SynonymGraphFilter</a></h3>
+<pre><code class="language-php">$filter = new \Laurus\SynonymGraphFilter($dictionary, true, 1.0);
+$expanded = $filter-&gt;apply($tokens);
+</code></pre>
+<p><code>SynonymDictionary</code> の同義語でトークンを展開するトークンフィルターです。</p>
+<h3 id="token"><a class="header" href="#token">Token</a></h3>
+<pre><code class="language-php">$token-&gt;getText()               // string  -- トークンテキスト
+$token-&gt;getPosition()           // int     -- トークンストリーム内の位置
+$token-&gt;getStartOffset()        // int     -- 元テキスト内の文字開始オフセット
+$token-&gt;getEndOffset()          // int     -- 元テキスト内の文字終了オフセット
+$token-&gt;getBoost()              // float   -- スコアブースト係数（1.0 = 調整なし）
+$token-&gt;isStopped()             // bool    -- ストップフィルターによって除去されたかどうか
+$token-&gt;getPositionIncrement()  // int     -- 前のトークンの位置との差分
+$token-&gt;getPositionLength()     // int     -- このトークンがカバーする位置数
+</code></pre>
+<hr>
+<h2 id="フィールド値の型マッピング"><a class="header" href="#フィールド値の型マッピング">フィールド値の型マッピング</a></h2>
+<p>PHP の値は自動的に Laurus の <code>DataValue</code> 型に変換されます：</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">PHP 型</th><th style="text-align: left">Laurus 型</th><th style="text-align: left">備考</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>null</code></td><td style="text-align: left"><code>Null</code></td><td style="text-align: left"></td></tr>
+<tr><td style="text-align: left"><code>true</code> / <code>false</code></td><td style="text-align: left"><code>Bool</code></td><td style="text-align: left"></td></tr>
+<tr><td style="text-align: left"><code>int</code></td><td style="text-align: left"><code>Int64</code></td><td style="text-align: left"></td></tr>
+<tr><td style="text-align: left"><code>float</code></td><td style="text-align: left"><code>Float64</code></td><td style="text-align: left"></td></tr>
+<tr><td style="text-align: left"><code>string</code></td><td style="text-align: left"><code>Text</code></td><td style="text-align: left"></td></tr>
+<tr><td style="text-align: left"><code>array</code>（数値）</td><td style="text-align: left"><code>Vector</code></td><td style="text-align: left">要素は <code>f32</code> に変換</td></tr>
+<tr><td style="text-align: left"><code>array</code>（<code>"lat"</code>, <code>"lon"</code>）</td><td style="text-align: left"><code>Geo</code></td><td style="text-align: left">2 つの <code>float</code> 値</td></tr>
+<tr><td style="text-align: left"><code>string</code>（ISO 8601）</td><td style="text-align: left"><code>DateTime</code></td><td style="text-align: left">ISO 8601 形式からパース</td></tr>
+</tbody>
+</table>
+</div>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="../laurus/scoring.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../laurus-php/quickstart.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
-                            <a rel="next prefetch" href="../laurus/highlighting.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="../laurus-php/development.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                             </a>
 
@@ -279,11 +460,11 @@ let facet = FacetPath::from_delimited("category", "Electronics/Computers/Laptops
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="../laurus/scoring.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="../laurus-php/quickstart.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 
-                    <a rel="next prefetch" href="../laurus/highlighting.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="../laurus-php/development.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                     </a>
             </nav>

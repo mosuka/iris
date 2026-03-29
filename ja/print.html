@@ -36,10 +36,10 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-238a729d.js";
+            window.path_to_searchindex_js = "searchindex-4e95c647.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-88be6a53.js"></script>
+        <script src="toc-0f2ac19d.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -9874,14 +9874,598 @@ rm -rf vendor/bundle
 └── examples/           # 実行可能な Ruby サンプル
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div>
-<h1 id="ビルドとテスト"><a class="header" href="#ビルドとテスト">ビルドとテスト</a></h1>
+<h1 id="php-バインディング概要"><a class="header" href="#php-バインディング概要">PHP バインディング概要</a></h1>
+<p><code>laurus</code> PHP エクステンションは Laurus 検索エンジンの PHP バインディングです。<a href="https://github.com/davidcole1340/ext-php-rs">ext-php-rs</a> を使ってネイティブ Rust 拡張としてビルドされており、PHP プログラムからネイティブに近いパフォーマンスで Laurus の Lexical 検索、Vector 検索、ハイブリッド検索機能を利用できます。</p>
+<h2 id="機能-7"><a class="header" href="#機能-7">機能</a></h2>
+<ul>
+<li><strong>Lexical 検索</strong> – BM25 スコアリングを備えた転置インデックスによる全文検索</li>
+<li><strong>Vector 検索</strong> – Flat、HNSW、IVF インデックスを使用した近似最近傍（ANN）検索</li>
+<li><strong>ハイブリッド検索</strong> – フュージョンアルゴリズム（RRF、WeightedSum）で Lexical と Vector の結果を統合</li>
+<li><strong>豊富なクエリ DSL</strong> – Term、Phrase、Fuzzy、Wildcard、NumericRange、Geo、Boolean、Span クエリ</li>
+<li><strong>テキスト解析</strong> – トークナイザー、フィルター、ステマー、同義語展開</li>
+<li><strong>柔軟なストレージ</strong> – インメモリ（一時的）またはファイルベース（永続的）インデックス</li>
+<li><strong>PHP らしい API</strong> – <code>Laurus\</code> 名前空間の直感的な PHP クラス</li>
+</ul>
+<h2 id="アーキテクチャ-7"><a class="header" href="#アーキテクチャ-7">アーキテクチャ</a></h2>
+<pre><code class="language-mermaid">graph LR
+    subgraph "laurus-php (extension)"
+        PhpIndex["Index\n(PHP クラス)"]
+        PhpQuery["クエリクラス"]
+        PhpSearch["SearchRequest\n/ SearchResult"]
+    end
+
+    PHP["PHP アプリケーション"] --&gt;|"メソッド呼び出し"| PhpIndex
+    PHP --&gt;|"クエリオブジェクト"| PhpQuery
+    PhpIndex --&gt;|"ext-php-rs FFI"| Engine["laurus::Engine\n(Rust)"]
+    PhpQuery --&gt;|"ext-php-rs FFI"| Engine
+    Engine --&gt; Storage["ストレージ\n(Memory / File)"]
+</code></pre>
+<p>PHP クラスは Rust エンジンの薄いラッパーです。
+各呼び出しは ext-php-rs の FFI 境界を一度だけ越え、その後
+Rust エンジンが操作をネイティブコードで実行します。</p>
+<p>Rust エンジン内部は非同期 I/O を使用していますが、
+PHP 側のメソッドはすべて<strong>同期関数</strong>として公開されています。
+各メソッドは内部で <code>tokio::Runtime::block_on()</code> を呼び出し、
+非同期 Rust を同期 PHP にブリッジしています。</p>
+<h2 id="クイックスタート-10"><a class="header" href="#クイックスタート-10">クイックスタート</a></h2>
+<pre><code class="language-php">&lt;?php
+
+use Laurus\Index;
+
+// インメモリインデックスを作成
+$index = new Index();
+
+// ドキュメントをインデックス
+$index-&gt;putDocument("doc1", ["title" =&gt; "Introduction to Rust", "body" =&gt; "Systems programming language."]);
+$index-&gt;putDocument("doc2", ["title" =&gt; "PHP for Web Development", "body" =&gt; "Web applications with PHP."]);
+$index-&gt;commit();
+
+// 検索
+$results = $index-&gt;search("title:rust", 5);
+foreach ($results as $r) {
+    printf("[%s] score=%.4f  %s\n", $r-&gt;getId(), $r-&gt;getScore(), $r-&gt;getDocument()["title"]);
+}
+</code></pre>
+<h2 id="セクション-6"><a class="header" href="#セクション-6">セクション</a></h2>
+<ul>
+<li><a href="#インストール-6">インストール</a> – エクステンションのインストール方法</li>
+<li><a href="#クイックスタート-11">クイックスタート</a> – サンプルによるハンズオン入門</li>
+<li><a href="#api-リファレンス-4">API リファレンス</a> – クラスとメソッドの完全リファレンス</li>
+<li><a href="#開発環境のセットアップ-2">開発</a> – ソースからのビルドとテスト実行</li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="インストール-6"><a class="header" href="#インストール-6">インストール</a></h1>
+<h2 id="ソースからビルド-3"><a class="header" href="#ソースからビルド-3">ソースからビルド</a></h2>
+<p>ソースからビルドするには Rust ツールチェーン（1.85 以降）と PHP 8.1 以降（開発ヘッダー付き）が必要です。</p>
+<pre><code class="language-bash"># リポジトリをクローン
+git clone https://github.com/mosuka/laurus.git
+cd laurus/laurus-php
+
+# ネイティブ拡張をビルド
+cargo build --release
+
+# 共有ライブラリを PHP エクステンションディレクトリにコピー
+# （正確なパスは OS と PHP バージョンによって異なります）
+cp ../target/release/liblaurus_php.so $(php -r "echo ini_get('extension_dir');")
+</code></pre>
+<p>次に <code>php.ini</code> にエクステンションを追加します：</p>
+<pre><code class="language-ini">extension=laurus_php.so
+</code></pre>
+<p>または、コマンドラインでエクステンションをロードすることもできます：</p>
+<pre><code class="language-bash">php -d extension=liblaurus_php.so your_script.php
+</code></pre>
+<h2 id="動作確認-2"><a class="header" href="#動作確認-2">動作確認</a></h2>
+<pre><code class="language-php">&lt;?php
+
+use Laurus\Index;
+
+$index = new Index();
+echo $index;  // Index()
+</code></pre>
+<h2 id="動作要件-2"><a class="header" href="#動作要件-2">動作要件</a></h2>
+<ul>
+<li>PHP 8.1 以降（開発ヘッダー付き: <code>php-dev</code> / <code>php-devel</code>）</li>
+<li>Rust ツールチェーン 1.85 以降（Cargo 含む）</li>
+<li>コンパイル済みネイティブ拡張以外のランタイム依存関係なし</li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="クイックスタート-11"><a class="header" href="#クイックスタート-11">クイックスタート</a></h1>
+<h2 id="1-インデックスを作成する-2"><a class="header" href="#1-インデックスを作成する-2">1. インデックスを作成する</a></h2>
+<pre><code class="language-php">&lt;?php
+
+use Laurus\Index;
+use Laurus\Schema;
+
+// インメモリインデックス（一時的、プロトタイピングに最適）
+$index = new Index();
+
+// ファイルベースインデックス（永続的）
+$schema = new Schema();
+$schema-&gt;addTextField("title");
+$schema-&gt;addTextField("body");
+$index = new Index("./myindex", $schema);
+</code></pre>
+<h2 id="2-ドキュメントをインデックスする-2"><a class="header" href="#2-ドキュメントをインデックスする-2">2. ドキュメントをインデックスする</a></h2>
+<pre><code class="language-php">$index-&gt;putDocument("doc1", [
+    "title" =&gt; "Introduction to Rust",
+    "body" =&gt; "Rust is a systems programming language focused on safety and performance.",
+]);
+$index-&gt;putDocument("doc2", [
+    "title" =&gt; "PHP for Web Development",
+    "body" =&gt; "PHP is widely used for web applications and rapid prototyping.",
+]);
+$index-&gt;commit();
+</code></pre>
+<h2 id="3-lexical-検索-3"><a class="header" href="#3-lexical-検索-3">3. Lexical 検索</a></h2>
+<pre><code class="language-php">// DSL 文字列
+$results = $index-&gt;search("title:rust", 5);
+
+// クエリオブジェクト
+$results = $index-&gt;search(new \Laurus\TermQuery("body", "php"), 5);
+
+// 結果を表示
+foreach ($results as $r) {
+    printf("[%s] score=%.4f  %s\n", $r-&gt;getId(), $r-&gt;getScore(), $r-&gt;getDocument()["title"]);
+}
+</code></pre>
+<h2 id="4-vector-検索-3"><a class="header" href="#4-vector-検索-3">4. Vector 検索</a></h2>
+<p>Vector 検索にはベクトルフィールドを含むスキーマと事前計算済みエンベディングが必要です。</p>
+<pre><code class="language-php">&lt;?php
+
+use Laurus\Index;
+use Laurus\Schema;
+use Laurus\VectorQuery;
+
+$schema = new Schema();
+$schema-&gt;addTextField("title");
+$schema-&gt;addHnswField("embedding", 4);
+
+$index = new Index(null, $schema);
+$index-&gt;putDocument("doc1", ["title" =&gt; "Rust", "embedding" =&gt; [0.1, 0.2, 0.3, 0.4]]);
+$index-&gt;putDocument("doc2", ["title" =&gt; "PHP", "embedding" =&gt; [0.9, 0.8, 0.7, 0.6]]);
+$index-&gt;commit();
+
+$queryVec = [0.1, 0.2, 0.3, 0.4];
+$results = $index-&gt;search(new VectorQuery("embedding", $queryVec), 3);
+</code></pre>
+<h2 id="5-ハイブリッド検索-3"><a class="header" href="#5-ハイブリッド検索-3">5. ハイブリッド検索</a></h2>
+<pre><code class="language-php">use Laurus\SearchRequest;
+use Laurus\TermQuery;
+use Laurus\VectorQuery;
+use Laurus\RRF;
+
+$request = new SearchRequest(
+    query: null,
+    lexicalQuery: new TermQuery("title", "rust"),
+    vectorQuery: new VectorQuery("embedding", $queryVec),
+    filterQuery: null,
+    fusion: new RRF(60.0),
+    limit: 5,
+);
+$results = $index-&gt;search($request);
+</code></pre>
+<h2 id="6-更新と削除-3"><a class="header" href="#6-更新と削除-3">6. 更新と削除</a></h2>
+<pre><code class="language-php">// 更新: putDocument は同じ ID の全バージョンを置換する
+$index-&gt;putDocument("doc1", ["title" =&gt; "Updated Title", "body" =&gt; "New content."]);
+$index-&gt;commit();
+
+// 既存バージョンを削除せずに新しいバージョンを追記（RAG チャンキングパターン）
+$index-&gt;addDocument("doc1", ["title" =&gt; "Chunk 2", "body" =&gt; "Additional chunk."]);
+$index-&gt;commit();
+
+// 全バージョンを取得
+$docs = $index-&gt;getDocuments("doc1");
+
+// 削除
+$index-&gt;deleteDocuments("doc1");
+$index-&gt;commit();
+</code></pre>
+<h2 id="7-スキーマ管理-3"><a class="header" href="#7-スキーマ管理-3">7. スキーマ管理</a></h2>
+<pre><code class="language-php">$schema = new \Laurus\Schema();
+$schema-&gt;addTextField("title");
+$schema-&gt;addTextField("body");
+$schema-&gt;addIntegerField("year");
+$schema-&gt;addFloatField("score");
+$schema-&gt;addBooleanField("published");
+$schema-&gt;addBytesField("thumbnail");
+$schema-&gt;addGeoField("location");
+$schema-&gt;addDatetimeField("created_at");
+$schema-&gt;addHnswField("embedding", 384);
+$schema-&gt;addFlatField("small_vec", 64);
+$schema-&gt;addIvfField("ivf_vec", 128, null, 100, 1);
+</code></pre>
+<h2 id="8-インデックス統計-3"><a class="header" href="#8-インデックス統計-3">8. インデックス統計</a></h2>
+<pre><code class="language-php">$stats = $index-&gt;stats();
+echo $stats["document_count"];
+echo $stats["vector_fields"];
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="api-リファレンス-4"><a class="header" href="#api-リファレンス-4">API リファレンス</a></h1>
+<h2 id="index-4"><a class="header" href="#index-4">Index</a></h2>
+<p>Laurus 検索エンジンをラップするメインクラスです。</p>
+<pre><code class="language-php">new \Laurus\Index(?string $path = null, ?Schema $schema = null)
+</code></pre>
+<h3 id="コンストラクタ-3"><a class="header" href="#コンストラクタ-3">コンストラクタ</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">パラメータ</th><th style="text-align: left">型</th><th style="text-align: left">デフォルト</th><th style="text-align: left">説明</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>$path</code></td><td style="text-align: left"><code>string|null</code></td><td style="text-align: left"><code>null</code></td><td style="text-align: left">永続ストレージのディレクトリパス。<code>null</code> の場合はインメモリインデックスを作成します。</td></tr>
+<tr><td style="text-align: left"><code>$schema</code></td><td style="text-align: left"><code>Schema|null</code></td><td style="text-align: left"><code>null</code></td><td style="text-align: left">スキーマ定義。省略時は空のスキーマが使用されます。</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="メソッド-5"><a class="header" href="#メソッド-5">メソッド</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">メソッド</th><th style="text-align: left">説明</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>putDocument(string $id, array $doc): void</code></td><td style="text-align: left">ドキュメントをアップサート（upsert）します。同じ ID の既存バージョンをすべて置換します。</td></tr>
+<tr><td style="text-align: left"><code>addDocument(string $id, array $doc): void</code></td><td style="text-align: left">既存バージョンを削除せずにドキュメントチャンクを追記します。</td></tr>
+<tr><td style="text-align: left"><code>getDocuments(string $id): array</code></td><td style="text-align: left">指定 ID の全保存バージョンを返します。</td></tr>
+<tr><td style="text-align: left"><code>deleteDocuments(string $id): void</code></td><td style="text-align: left">指定 ID の全バージョンを削除します。</td></tr>
+<tr><td style="text-align: left"><code>commit(): void</code></td><td style="text-align: left">バッファリングされた書き込みをフラッシュし、すべての保留中の変更を検索可能にします。</td></tr>
+<tr><td style="text-align: left"><code>search(mixed $query, int $limit = 10, int $offset = 0): array</code></td><td style="text-align: left">検索クエリを実行します。<code>SearchResult</code> の配列を返します。</td></tr>
+<tr><td style="text-align: left"><code>stats(): array</code></td><td style="text-align: left">インデックス統計（<code>"document_count"</code>、<code>"vector_fields"</code>）を返します。</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="search-の-query-引数-2"><a class="header" href="#search-の-query-引数-2"><code>search</code> の query 引数</a></h3>
+<p><code>$query</code> パラメータは以下のいずれかを受け付けます：</p>
+<ul>
+<li><strong>DSL 文字列</strong>（例: <code>"title:hello"</code>、<code>"embedding:\"memory safety\""</code>)</li>
+<li><strong>Lexical クエリオブジェクト</strong>（<code>TermQuery</code>、<code>PhraseQuery</code>、<code>BooleanQuery</code> など）</li>
+<li><strong>Vector クエリオブジェクト</strong>（<code>VectorQuery</code>、<code>VectorTextQuery</code>）</li>
+<li><strong><code>SearchRequest</code></strong>（完全な制御が必要な場合）</li>
+</ul>
+<hr>
+<h2 id="schema-6"><a class="header" href="#schema-6">Schema</a></h2>
+<p><code>Index</code> のフィールドとインデックスタイプを定義します。</p>
+<pre><code class="language-php">new \Laurus\Schema()
+</code></pre>
+<h3 id="フィールドメソッド-3"><a class="header" href="#フィールドメソッド-3">フィールドメソッド</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">メソッド</th><th style="text-align: left">説明</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>addTextField(string $name, bool $stored = true, bool $indexed = true, bool $termVectors = false, ?string $analyzer = null): void</code></td><td style="text-align: left">全文フィールド（転置インデックス、BM25）。</td></tr>
+<tr><td style="text-align: left"><code>addIntegerField(string $name, bool $stored = true, bool $indexed = true): void</code></td><td style="text-align: left">64 ビット整数フィールド。</td></tr>
+<tr><td style="text-align: left"><code>addFloatField(string $name, bool $stored = true, bool $indexed = true): void</code></td><td style="text-align: left">64 ビット浮動小数点フィールド。</td></tr>
+<tr><td style="text-align: left"><code>addBooleanField(string $name, bool $stored = true, bool $indexed = true): void</code></td><td style="text-align: left">ブールフィールド。</td></tr>
+<tr><td style="text-align: left"><code>addBytesField(string $name, bool $stored = true): void</code></td><td style="text-align: left">生バイトフィールド。</td></tr>
+<tr><td style="text-align: left"><code>addGeoField(string $name, bool $stored = true, bool $indexed = true): void</code></td><td style="text-align: left">地理座標フィールド（緯度/経度）。</td></tr>
+<tr><td style="text-align: left"><code>addDatetimeField(string $name, bool $stored = true, bool $indexed = true): void</code></td><td style="text-align: left">UTC 日時フィールド。</td></tr>
+<tr><td style="text-align: left"><code>addHnswField(string $name, int $dimension, ?string $distance = "cosine", int $m = 16, int $efConstruction = 200, ?string $embedder = null): void</code></td><td style="text-align: left">HNSW 近似最近傍ベクトルフィールド。</td></tr>
+<tr><td style="text-align: left"><code>addFlatField(string $name, int $dimension, ?string $distance = "cosine", ?string $embedder = null): void</code></td><td style="text-align: left">Flat（総当たり）ベクトルフィールド。</td></tr>
+<tr><td style="text-align: left"><code>addIvfField(string $name, int $dimension, ?string $distance = "cosine", int $nClusters = 100, int $nProbe = 1, ?string $embedder = null): void</code></td><td style="text-align: left">IVF 近似最近傍ベクトルフィールド。</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="その他のメソッド-1"><a class="header" href="#その他のメソッド-1">その他のメソッド</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">メソッド</th><th style="text-align: left">説明</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>addEmbedder(string $name, array $config): void</code></td><td style="text-align: left">名前付きエンベダー定義を登録します。<code>$config</code> は <code>"type"</code> キーを持つ連想配列です（下記参照）。</td></tr>
+<tr><td style="text-align: left"><code>setDefaultFields(array $fieldNames): void</code></td><td style="text-align: left">クエリでフィールドが指定されていない場合に使用するデフォルトフィールドを設定します。<code>$fieldNames</code> は文字列の配列です。</td></tr>
+<tr><td style="text-align: left"><code>fieldNames(): array</code></td><td style="text-align: left">このスキーマに定義されたフィールド名のリストを返します。</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="エンベダータイプ-1"><a class="header" href="#エンベダータイプ-1">エンベダータイプ</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left"><code>"type"</code></th><th style="text-align: left">必須キー</th><th style="text-align: left">Feature Flag</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>"precomputed"</code></td><td style="text-align: left">–</td><td style="text-align: left">（常に利用可能）</td></tr>
+<tr><td style="text-align: left"><code>"candle_bert"</code></td><td style="text-align: left"><code>"model"</code></td><td style="text-align: left"><code>embeddings-candle</code></td></tr>
+<tr><td style="text-align: left"><code>"candle_clip"</code></td><td style="text-align: left"><code>"model"</code></td><td style="text-align: left"><code>embeddings-multimodal</code></td></tr>
+<tr><td style="text-align: left"><code>"openai"</code></td><td style="text-align: left"><code>"model"</code></td><td style="text-align: left"><code>embeddings-openai</code></td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="距離メトリクス-3"><a class="header" href="#距離メトリクス-3">距離メトリクス</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">値</th><th style="text-align: left">説明</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>"cosine"</code></td><td style="text-align: left">コサイン類似度（デフォルト）</td></tr>
+<tr><td style="text-align: left"><code>"euclidean"</code></td><td style="text-align: left">ユークリッド距離</td></tr>
+<tr><td style="text-align: left"><code>"dot_product"</code></td><td style="text-align: left">内積</td></tr>
+<tr><td style="text-align: left"><code>"manhattan"</code></td><td style="text-align: left">マンハッタン距離</td></tr>
+<tr><td style="text-align: left"><code>"angular"</code></td><td style="text-align: left">角度距離</td></tr>
+</tbody>
+</table>
+</div>
+<hr>
+<h2 id="クエリクラス-3"><a class="header" href="#クエリクラス-3">クエリクラス</a></h2>
+<h3 id="termquery-4"><a class="header" href="#termquery-4">TermQuery</a></h3>
+<pre><code class="language-php">new \Laurus\TermQuery(string $field, string $term)
+</code></pre>
+<p>指定フィールドに完全一致する語句を含むドキュメントを検索します。</p>
+<h3 id="phrasequery-4"><a class="header" href="#phrasequery-4">PhraseQuery</a></h3>
+<pre><code class="language-php">new \Laurus\PhraseQuery(string $field, array $terms)
+</code></pre>
+<p>指定した語句が順序どおりに含まれるドキュメントを検索します。<code>$terms</code> は文字列の配列です。</p>
+<h3 id="fuzzyquery-4"><a class="header" href="#fuzzyquery-4">FuzzyQuery</a></h3>
+<pre><code class="language-php">new \Laurus\FuzzyQuery(string $field, string $term, int $maxEdits = 2)
+</code></pre>
+<p>編集距離が <code>$maxEdits</code> 以内の近似一致を検索します。</p>
+<h3 id="wildcardquery-4"><a class="header" href="#wildcardquery-4">WildcardQuery</a></h3>
+<pre><code class="language-php">new \Laurus\WildcardQuery(string $field, string $pattern)
+</code></pre>
+<p>ワイルドカードパターン検索。<code>*</code> は任意の文字列、<code>?</code> は任意の1文字に一致します。</p>
+<h3 id="numericrangequery-4"><a class="header" href="#numericrangequery-4">NumericRangeQuery</a></h3>
+<pre><code class="language-php">new \Laurus\NumericRangeQuery(string $field, mixed $min, mixed $max, ?string $numericType = "integer")
+</code></pre>
+<p><code>[$min, $max]</code> の範囲内の数値を検索します。開いた境界には <code>null</code> を指定します。<code>$numericType</code> には <code>"integer"</code> または <code>"float"</code> を設定します。</p>
+<h3 id="geoquery-4"><a class="header" href="#geoquery-4">GeoQuery</a></h3>
+<pre><code class="language-php">// 半径検索
+\Laurus\GeoQuery::withinRadius(string $field, float $lat, float $lon, float $distanceKm): GeoQuery
+
+// バウンディングボックス検索
+\Laurus\GeoQuery::withinBoundingBox(string $field, float $minLat, float $minLon, float $maxLat, float $maxLon): GeoQuery
+</code></pre>
+<p><code>withinRadius</code> は指定した地点から <code>$distanceKm</code> 以内の座標を持つドキュメントを返します。<code>withinBoundingBox</code> は指定したバウンディングボックス内のドキュメントを返します。</p>
+<h3 id="booleanquery-4"><a class="header" href="#booleanquery-4">BooleanQuery</a></h3>
+<pre><code class="language-php">$bq = new \Laurus\BooleanQuery();
+$bq-&gt;must($query);
+$bq-&gt;should($query);
+$bq-&gt;mustNot($query);
+</code></pre>
+<p>複合ブールクエリ。<code>must</code> 節はすべて一致する必要があります。<code>should</code> 節は少なくとも1つ一致する必要があります。<code>mustNot</code> 節は一致してはなりません。</p>
+<h3 id="spanquery-3"><a class="header" href="#spanquery-3">SpanQuery</a></h3>
+<pre><code class="language-php">// 単一語句
+\Laurus\SpanQuery::term(string $field, string $term): SpanQuery
+
+// Near: slop 位置以内の語句
+\Laurus\SpanQuery::near(string $field, array $terms, int $slop = 0, bool $ordered = true): SpanQuery
+
+// Containing: big スパンが little スパンを含む
+\Laurus\SpanQuery::containing(string $field, SpanQuery $big, SpanQuery $little): SpanQuery
+
+// Within: 最大距離での include スパンと exclude スパン
+\Laurus\SpanQuery::within(string $field, SpanQuery $include, SpanQuery $exclude, int $distance): SpanQuery
+</code></pre>
+<p>位置・近接スパンクエリ。<code>near</code> は語句文字列の配列を受け取ります。</p>
+<h3 id="vectorquery-3"><a class="header" href="#vectorquery-3">VectorQuery</a></h3>
+<pre><code class="language-php">new \Laurus\VectorQuery(string $field, array $vector)
+</code></pre>
+<p>事前計算済みエンベディングベクトルを使った近似最近傍検索を行います。<code>$vector</code> は Float の配列です。</p>
+<h3 id="vectortextquery-3"><a class="header" href="#vectortextquery-3">VectorTextQuery</a></h3>
+<pre><code class="language-php">new \Laurus\VectorTextQuery(string $field, string $text)
+</code></pre>
+<p>クエリ時に <code>$text</code> をエンベディングに変換してベクトル検索を行います。インデックスにエンベダーの設定が必要です。</p>
+<hr>
+<h2 id="searchrequest-4"><a class="header" href="#searchrequest-4">SearchRequest</a></h2>
+<p>高度な制御が必要な場合の完全なリクエストクラスです。</p>
+<pre><code class="language-php">new \Laurus\SearchRequest(
+    mixed $query = null,
+    mixed $lexicalQuery = null,
+    mixed $vectorQuery = null,
+    mixed $filterQuery = null,
+    mixed $fusion = null,
+    int $limit = 10,
+    int $offset = 0,
+)
+</code></pre>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">パラメータ</th><th style="text-align: left">説明</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>$query</code></td><td style="text-align: left">DSL 文字列または単一クエリオブジェクト。<code>$lexicalQuery</code> / <code>$vectorQuery</code> と排他的。</td></tr>
+<tr><td style="text-align: left"><code>$lexicalQuery</code></td><td style="text-align: left">明示的なハイブリッド検索の Lexical コンポーネント。</td></tr>
+<tr><td style="text-align: left"><code>$vectorQuery</code></td><td style="text-align: left">明示的なハイブリッド検索の Vector コンポーネント。</td></tr>
+<tr><td style="text-align: left"><code>$filterQuery</code></td><td style="text-align: left">スコアリング後に適用する Lexical フィルター。</td></tr>
+<tr><td style="text-align: left"><code>$fusion</code></td><td style="text-align: left">フュージョンアルゴリズム（<code>RRF</code> または <code>WeightedSum</code>）。両コンポーネント指定時のデフォルトは <code>RRF(k: 60)</code>。</td></tr>
+<tr><td style="text-align: left"><code>$limit</code></td><td style="text-align: left">最大結果件数（デフォルト 10）。</td></tr>
+<tr><td style="text-align: left"><code>$offset</code></td><td style="text-align: left">ページネーションオフセット（デフォルト 0）。</td></tr>
+</tbody>
+</table>
+</div>
+<hr>
+<h2 id="searchresult-7"><a class="header" href="#searchresult-7">SearchResult</a></h2>
+<p><code>Index-&gt;search()</code> が返すクラスです。</p>
+<pre><code class="language-php">$result-&gt;getId()        // string   -- 外部ドキュメント識別子
+$result-&gt;getScore()     // float    -- 関連性スコア
+$result-&gt;getDocument()  // array|null -- 取得されたフィールド値。削除済みの場合は null
+</code></pre>
+<hr>
+<h2 id="フュージョンアルゴリズム-3"><a class="header" href="#フュージョンアルゴリズム-3">フュージョンアルゴリズム</a></h2>
+<h3 id="rrf-3"><a class="header" href="#rrf-3">RRF</a></h3>
+<pre><code class="language-php">new \Laurus\RRF(float $k = 60.0)
+</code></pre>
+<p>逆順位フュージョン（Reciprocal Rank Fusion）。Lexical と Vector の結果リストを順位位置によってマージします。<code>$k</code> は平滑化定数で、値が大きいほど上位ランクの影響が小さくなります。</p>
+<h3 id="weightedsum-5"><a class="header" href="#weightedsum-5">WeightedSum</a></h3>
+<pre><code class="language-php">new \Laurus\WeightedSum(float $lexicalWeight = 0.5, float $vectorWeight = 0.5)
+</code></pre>
+<p>両スコアリストをそれぞれ正規化した後、<code>$lexicalWeight * lexical_score + $vectorWeight * vector_score</code> として結合します。</p>
+<hr>
+<h2 id="テキスト解析-4"><a class="header" href="#テキスト解析-4">テキスト解析</a></h2>
+<h3 id="synonymdictionary-3"><a class="header" href="#synonymdictionary-3">SynonymDictionary</a></h3>
+<pre><code class="language-php">$dict = new \Laurus\SynonymDictionary();
+$dict-&gt;addSynonymGroup(["fast", "quick", "rapid"]);
+</code></pre>
+<p>同義語グループの辞書です。グループ内のすべての語句は互いの同義語として扱われます。</p>
+<h3 id="whitespacetokenizer-3"><a class="header" href="#whitespacetokenizer-3">WhitespaceTokenizer</a></h3>
+<pre><code class="language-php">$tokenizer = new \Laurus\WhitespaceTokenizer();
+$tokens = $tokenizer-&gt;tokenize("hello world");
+</code></pre>
+<p>空白で分割してテキストをトークン化し、<code>Token</code> オブジェクトの配列を返します。</p>
+<h3 id="synonymgraphfilter-3"><a class="header" href="#synonymgraphfilter-3">SynonymGraphFilter</a></h3>
+<pre><code class="language-php">$filter = new \Laurus\SynonymGraphFilter($dictionary, true, 1.0);
+$expanded = $filter-&gt;apply($tokens);
+</code></pre>
+<p><code>SynonymDictionary</code> の同義語でトークンを展開するトークンフィルターです。</p>
+<h3 id="token-3"><a class="header" href="#token-3">Token</a></h3>
+<pre><code class="language-php">$token-&gt;getText()               // string  -- トークンテキスト
+$token-&gt;getPosition()           // int     -- トークンストリーム内の位置
+$token-&gt;getStartOffset()        // int     -- 元テキスト内の文字開始オフセット
+$token-&gt;getEndOffset()          // int     -- 元テキスト内の文字終了オフセット
+$token-&gt;getBoost()              // float   -- スコアブースト係数（1.0 = 調整なし）
+$token-&gt;isStopped()             // bool    -- ストップフィルターによって除去されたかどうか
+$token-&gt;getPositionIncrement()  // int     -- 前のトークンの位置との差分
+$token-&gt;getPositionLength()     // int     -- このトークンがカバーする位置数
+</code></pre>
+<hr>
+<h2 id="フィールド値の型マッピング-2"><a class="header" href="#フィールド値の型マッピング-2">フィールド値の型マッピング</a></h2>
+<p>PHP の値は自動的に Laurus の <code>DataValue</code> 型に変換されます：</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">PHP 型</th><th style="text-align: left">Laurus 型</th><th style="text-align: left">備考</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>null</code></td><td style="text-align: left"><code>Null</code></td><td style="text-align: left"></td></tr>
+<tr><td style="text-align: left"><code>true</code> / <code>false</code></td><td style="text-align: left"><code>Bool</code></td><td style="text-align: left"></td></tr>
+<tr><td style="text-align: left"><code>int</code></td><td style="text-align: left"><code>Int64</code></td><td style="text-align: left"></td></tr>
+<tr><td style="text-align: left"><code>float</code></td><td style="text-align: left"><code>Float64</code></td><td style="text-align: left"></td></tr>
+<tr><td style="text-align: left"><code>string</code></td><td style="text-align: left"><code>Text</code></td><td style="text-align: left"></td></tr>
+<tr><td style="text-align: left"><code>array</code>（数値）</td><td style="text-align: left"><code>Vector</code></td><td style="text-align: left">要素は <code>f32</code> に変換</td></tr>
+<tr><td style="text-align: left"><code>array</code>（<code>"lat"</code>, <code>"lon"</code>）</td><td style="text-align: left"><code>Geo</code></td><td style="text-align: left">2 つの <code>float</code> 値</td></tr>
+<tr><td style="text-align: left"><code>string</code>（ISO 8601）</td><td style="text-align: left"><code>DateTime</code></td><td style="text-align: left">ISO 8601 形式からパース</td></tr>
+</tbody>
+</table>
+</div>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="開発環境のセットアップ-2"><a class="header" href="#開発環境のセットアップ-2">開発環境のセットアップ</a></h1>
+<p>このページでは <code>laurus-php</code> バインディングのローカル開発環境の構築、ビルド、テストスイートの実行方法について説明します。</p>
 <h2 id="前提条件-7"><a class="header" href="#前提条件-7">前提条件</a></h2>
+<ul>
+<li><strong>Rust</strong> 1.85 以降（Cargo 含む）</li>
+<li><strong>PHP</strong> 8.1 以降（開発ヘッダー付き: <code>php-dev</code> / <code>php-devel</code>）</li>
+<li><strong>Composer</strong>（依存関係管理用）</li>
+<li>リポジトリがローカルにクローンされていること</li>
+</ul>
+<pre><code class="language-bash">git clone https://github.com/mosuka/laurus.git
+cd laurus
+</code></pre>
+<h2 id="ビルド-3"><a class="header" href="#ビルド-3">ビルド</a></h2>
+<h3 id="開発ビルド-2"><a class="header" href="#開発ビルド-2">開発ビルド</a></h3>
+<p>Rust ネイティブ拡張をデバッグモードでコンパイルします。Rust ソースを変更した場合は再実行してください。</p>
+<pre><code class="language-bash">cd laurus-php
+cargo build
+</code></pre>
+<p>ビルド成果物は <code>../target/debug/liblaurus_php.so</code> に生成されます。</p>
+<h3 id="リリースビルド-2"><a class="header" href="#リリースビルド-2">リリースビルド</a></h3>
+<pre><code class="language-bash">cd laurus-php
+cargo build --release
+</code></pre>
+<p>ビルド成果物は <code>../target/release/liblaurus_php.so</code> に生成されます。</p>
+<h3 id="ビルドの確認-2"><a class="header" href="#ビルドの確認-2">ビルドの確認</a></h3>
+<pre><code class="language-bash">php -d extension=../target/release/liblaurus_php.so -r "
+use Laurus\Index;
+\$index = new Index();
+print_r(\$index-&gt;stats());
+"
+# Array ( [document_count] =&gt; 0 [vector_fields] =&gt; Array ( ) )
+</code></pre>
+<h2 id="テスト-3"><a class="header" href="#テスト-3">テスト</a></h2>
+<p>テストは <a href="https://phpunit.de/">PHPUnit</a> を使用しており、<code>tests/</code> ディレクトリにあります。</p>
+<pre><code class="language-bash"># テスト依存関係をインストール
+composer install
+
+# 全テスト実行
+php -d extension=../target/release/liblaurus_php.so vendor/bin/phpunit tests/
+</code></pre>
+<p>特定のテストファイルを実行する場合：</p>
+<pre><code class="language-bash">php -d extension=../target/release/liblaurus_php.so vendor/bin/phpunit tests/LaurusTest.php
+</code></pre>
+<h2 id="lint-とフォーマット-1"><a class="header" href="#lint-とフォーマット-1">Lint とフォーマット</a></h2>
+<pre><code class="language-bash"># Rust lint（Clippy）
+cargo clippy -p laurus-php -- -D warnings
+
+# Rust フォーマットチェック
+cargo fmt -p laurus-php --check
+
+# フォーマット適用
+cargo fmt -p laurus-php
+</code></pre>
+<h2 id="クリーンアップ-2"><a class="header" href="#クリーンアップ-2">クリーンアップ</a></h2>
+<pre><code class="language-bash"># ビルド成果物を削除
+cargo clean
+
+# Composer 依存関係を削除
+rm -rf vendor/
+</code></pre>
+<h2 id="workspace-統合と-clang-sys-パッチ"><a class="header" href="#workspace-統合と-clang-sys-パッチ">Workspace 統合と clang-sys パッチ</a></h2>
+<p><code>laurus-php</code> は <a href="https://github.com/extphprs/ext-php-rs">ext-php-rs</a> を使用しており、
+ext-php-rs は <code>ext-php-rs-clang-sys</code>（<code>clang-sys</code> のフォーク）に依存しています。
+一方、<code>laurus-ruby</code> は <code>magnus</code> → <code>rb-sys</code> → <code>bindgen</code> → <code>clang-sys</code>（オリジナル）に依存しています。
+両方のクレートが <code>links = "clang"</code> を宣言しており、Cargo は同一 workspace 内で同じ <code>links</code> 値を持つ
+パッケージを 2 つ許可しません。</p>
+<p><code>laurus-php</code> と <code>laurus-ruby</code> を workspace メンバーとして共存させるため、ルートの <code>Cargo.toml</code> で
+<code>ext-php-rs-clang-sys</code> を <code>links</code> 宣言を除去したローカルコピーに patch しています：</p>
+<pre><code class="language-toml"># Cargo.toml（workspace ルート）
+[patch.crates-io]
+ext-php-rs-clang-sys = { path = "patches/ext-php-rs-clang-sys" }
+</code></pre>
+<p>パッチは <code>patches/ext-php-rs-clang-sys/</code> にあります。上流クレートからの唯一の変更点は
+<code>Cargo.toml</code> の <code>links = "clang"</code> の除去です。<code>clang-sys</code> と <code>ext-php-rs-clang-sys</code> は
+どちらも <code>libclang</code> をビルド時のみ使用し（<code>bindgen</code> によるヘッダー解析）、最終バイナリにはリンク
+されないため、この変更は安全です。</p>
+<h3 id="パッチが必要な条件"><a class="header" href="#パッチが必要な条件">パッチが必要な条件</a></h3>
+<p>このパッチは <code>laurus-php</code> と <code>laurus-ruby</code> が同一の Cargo workspace のメンバーである場合にのみ
+必要です。<code>laurus-ruby</code> を workspace から除外するか、<code>laurus-php</code> を <code>[workspace] exclude</code> で
+除外すれば、<code>links = "clang"</code> の競合は発生しないため、パッチとルート <code>Cargo.toml</code> の
+<code>[patch.crates-io]</code> セクションを削除できます。</p>
+<h3 id="パッチの更新"><a class="header" href="#パッチの更新">パッチの更新</a></h3>
+<p><code>ext-php-rs</code> をアップグレードして新しいバージョンの <code>ext-php-rs-clang-sys</code> が
+使われるようになった場合、パッチを更新してください：</p>
+<pre><code class="language-bash"># 1. laurus-php/Cargo.toml で ext-php-rs を更新した後：
+cargo update -p ext-php-rs
+
+# 2. 新しい ext-php-rs-clang-sys ソースをコピー
+cp -r ~/.cargo/registry/src/index.crates.io-*/ext-php-rs-clang-sys-&lt;NEW_VERSION&gt;/* \
+      patches/ext-php-rs-clang-sys/
+
+# 3. links 宣言を除去
+sed -i 's/^links = "clang"/# links = "clang"/' patches/ext-php-rs-clang-sys/Cargo.toml
+
+# 4. ビルドを確認
+cargo build -p laurus-php -p laurus-ruby
+</code></pre>
+<h2 id="プロジェクト構成-4"><a class="header" href="#プロジェクト構成-4">プロジェクト構成</a></h2>
+<pre><code class="language-text">laurus-php/
+├── Cargo.toml          # Rust クレートマニフェスト
+├── composer.json       # Composer パッケージ定義
+├── composer.lock       # ロックされた依存関係バージョン
+├── src/                # Rust ソース（ext-php-rs バインディング）
+│   ├── lib.rs          # モジュール登録
+│   ├── index.rs        # Index クラス
+│   ├── schema.rs       # Schema クラス
+│   ├── query.rs        # クエリクラス
+│   ├── search.rs       # SearchRequest / SearchResult / Fusion
+│   ├── analysis.rs     # Tokenizer / Filter / Token
+│   ├── convert.rs      # PHP &lt;-&gt; DataValue 変換
+│   └── errors.rs       # エラーマッピング
+├── tests/              # PHPUnit テスト
+│   └── LaurusTest.php
+└── examples/           # 実行可能な PHP サンプル
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="ビルドとテスト"><a class="header" href="#ビルドとテスト">ビルドとテスト</a></h1>
+<h2 id="前提条件-8"><a class="header" href="#前提条件-8">前提条件</a></h2>
 <ul>
 <li><strong>Rust</strong> 1.85 以降（edition 2024）</li>
 <li><strong>Cargo</strong>（Rust に付属）</li>
 <li><strong>protobuf コンパイラ</strong>（<code>protoc</code>）– <code>laurus-server</code> のビルドに必要</li>
 </ul>
-<h2 id="ビルド-3"><a class="header" href="#ビルド-3">ビルド</a></h2>
+<h2 id="ビルド-4"><a class="header" href="#ビルド-4">ビルド</a></h2>
 <pre><code class="language-bash"># すべてのクレートをビルド
 cargo build
 
@@ -9891,7 +10475,7 @@ cargo build --features embeddings-candle
 # リリースモードでビルド
 cargo build --release
 </code></pre>
-<h2 id="テスト-3"><a class="header" href="#テスト-3">テスト</a></h2>
+<h2 id="テスト-4"><a class="header" href="#テスト-4">テスト</a></h2>
 <pre><code class="language-bash"># すべてのテストを実行
 cargo test
 
@@ -9985,7 +10569,7 @@ laurus = { version = "0.1.0", features = ["embeddings-all"] }
 </div>
 <p>Lexical（キーワード）検索のみが必要な場合は、Feature を有効にせずに Laurus を使用することで、最小のバイナリサイズと最速のコンパイル時間を実現できます。</p>
 <div style="break-before: page; page-break-before: always;"></div>
-<h1 id="プロジェクト構成-4"><a class="header" href="#プロジェクト構成-4">プロジェクト構成</a></h1>
+<h1 id="プロジェクト構成-5"><a class="header" href="#プロジェクト構成-5">プロジェクト構成</a></h1>
 <p>Laurus は 3 つのクレートを持つ Cargo ワークスペースとして構成されています。</p>
 <h2 id="ワークスペースレイアウト"><a class="header" href="#ワークスペースレイアウト">ワークスペースレイアウト</a></h2>
 <pre><code class="language-text">laurus/                          # リポジトリルート
