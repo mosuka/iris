@@ -79,3 +79,34 @@ Then open <http://localhost:8080> in your browser.
 > **Note:** The first run downloads the model weights from Hugging Face Hub
 > (`sentence-transformers/all-MiniLM-L6-v2`, ~90 MB). Subsequent runs use
 > the local cache.
+
+---
+
+### Vector search -- external embedder
+
+Uses pre-computed vectors passed via `VectorQuery`. No embedder is registered
+in the schema -- the caller manages embeddings externally.
+
+Build without extra features (standard release build):
+
+```bash
+cargo build --release
+```
+
+| Example | Description |
+| :--- | :--- |
+| [external_embedder.php](external_embedder.php) | Pre-computed vector search with random fallback embeddings (no external dependencies) |
+| [search_with_openai.php](search_with_openai.php) | Real vector search using the OpenAI Embeddings API via raw curl |
+| [multimodal_search.php](multimodal_search.php) | Multimodal search: store image bytes + vector embeddings, query across text and images |
+
+```bash
+php -d extension=target/release/liblaurus_php.so examples/external_embedder.php
+php -d extension=target/release/liblaurus_php.so examples/multimodal_search.php
+```
+
+The OpenAI example requires an API key:
+
+```bash
+export OPENAI_API_KEY=your-api-key-here
+php -d extension=target/release/liblaurus_php.so examples/search_with_openai.php
+```

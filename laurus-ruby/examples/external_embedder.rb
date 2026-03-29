@@ -1,27 +1,69 @@
 # frozen_string_literal: true
 
-# Hybrid Search Example — combining lexical and vector search.
+# External Embedder Example — vector and hybrid search with a user-managed embedder.
 #
-# Demonstrates:
-# - Lexical-only search (for comparison)
-# - Vector-only search (for comparison)
-# - Hybrid search with RRF fusion
-# - Hybrid search with WeightedSum fusion
-# - Hybrid search with a filter query
+# Demonstrates vector and hybrid search where embeddings are produced outside
+# laurus and passed as pre-computed vectors via VectorQuery.
 #
-# The embedder is registered in the schema and laurus automatically converts
-# text to vectors at index and query time — no external embedding library needed.
+# This approach is useful when you want to:
+# - Use any embedding library (ruby-openai, informers, etc.)
+# - Control the embedding model independently of the index schema
+# - Reuse embeddings across multiple indexes
+#
+# For an alternative that lets laurus handle embeddings automatically, see
+# vector_search.rb and hybrid_search.rb which use the built-in
+# CandleBert embedder via schema.add_embedder().
 #
 # Usage:
+#   gem install informers        # optional but recommended
 #   cd laurus-ruby
-#   bundle exec rake compile  # build with: --features embeddings-candle
-#   ruby -Ilib examples/hybrid_search.rb
+#   bundle exec rake compile
+#   ruby -Ilib examples/external_embedder.rb
 
 require "laurus"
 
-EMBEDDER_NAME = "bert"
-EMBEDDER_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
-DIM = 384 # dimension for all-MiniLM-L6-v2
+# ---------------------------------------------------------------------------
+# Embedding helper
+# ---------------------------------------------------------------------------
+
+begin
+  require "informers"
+
+  _pipeline = Informers.pipeline("feature-extraction", "sentence-transformers/all-MiniLM-L6-v2")
+  DIM = 384
+
+  define_method(:embed) do |text|
+    result = _pipeline.call(text)
+    # Normalize to unit vector
+    norm = Math.sqrt(result.sum { |x| x * x })
+    norm = 1.0 if norm.zero?
+    result.map { |x| x / norm }
+  end
+
+  puts "Using informers (sentence-transformers/all-MiniLM-L6-v2) for embeddings.\n\n"
+rescue LoadError
+  # Fallback: deterministic pseudo-embeddings for demo purposes only.
+  # Real similarity is not meaningful with these vectors.
+  DIM = 64
+
+  define_method(:embed) do |text|
+    seed = text.bytes.reduce(0) { |acc, b| (acc * 31 + b) & 0xFFFFFFFF }
+    rng = Random.new(seed)
+    raw = Array.new(DIM) { rng.rand(-1.0..1.0) }
+    norm = Math.sqrt(raw.sum { |x| x * x })
+    norm = 1.0 if norm.zero?
+    raw.map { |x| x / norm }
+  end
+
+  puts "[NOTE] informers gem not found -- using random fallback vectors."
+  puts "       Results will NOT reflect semantic similarity."
+  puts "       Install with: gem install informers"
+  puts
+end
+
+# ---------------------------------------------------------------------------
+# Dataset
+# ---------------------------------------------------------------------------
 
 CHUNKS = [
   ["rails_guide", "Ruby on Rails Tutorial", "Rails follows the model-view-controller pattern with Active Record for database access.", 1, "framework"],
@@ -48,22 +90,24 @@ def print_results(results)
 end
 
 def main
-  puts "=== Laurus Hybrid Search Example ===\n\n"
-  puts "Embedder: #{EMBEDDER_MODEL} (dim=#{DIM})\n\n"
+  puts "=== Laurus External Embedder Example ===\n\n"
+  puts "Embedding dimension: #{DIM}\n\n"
 
-  # ── Schema ─────────────────────────────────────────────────────────────
+  # -- Schema ---------------------------------------------------------------
+  # No embedder is registered in the schema; vectors are provided by the
+  # caller at index and query time via embed().
   schema = Laurus::Schema.new
-  schema.add_embedder(EMBEDDER_NAME, { "type" => "candle_bert", "model" => EMBEDDER_MODEL })
   schema.add_text_field("title")
   schema.add_text_field("text")
   schema.add_text_field("category")
   schema.add_integer_field("page")
-  schema.add_flat_field("text_vec", DIM, distance: "cosine", embedder: EMBEDDER_NAME)
+  schema.add_flat_field("text_vec", DIM, distance: "cosine")
   schema.set_default_fields(%w[text])
 
   index = Laurus::Index.new(schema: schema)
 
-  # ── Index ──────────────────────────────────────────────────────────────
+  # -- Index ----------------------------------------------------------------
+  # Embeddings are computed here in Ruby and stored as float vectors.
   puts "--- Indexing chunked documents ---\n\n"
   CHUNKS.each do |doc_id, title, text, page, category|
     index.add_document(doc_id, {
@@ -71,80 +115,77 @@ def main
       "text" => text,
       "category" => category,
       "page" => page,
-      "text_vec" => text
+      "text_vec" => embed(text)
     })
   end
   index.commit
   puts "Indexed #{CHUNKS.size} chunks.\n\n"
 
   # =====================================================================
-  # [A] Lexical-only search (baseline)
+  # [A] Basic Vector Search
   # =====================================================================
   puts "=" * 60
-  puts "[A] Lexical-only: term 'migrations' in text"
+  puts "[A] Vector-only: 'database ORM queries'"
   puts "=" * 60
-  print_results(index.search(Laurus::TermQuery.new("text", "migrations"), limit: 3))
+  print_results(index.search(Laurus::VectorQuery.new("text_vec", embed("database ORM queries")), limit: 3))
 
   # =====================================================================
-  # [B] Vector-only search (baseline)
+  # [B] Filtered Vector Search -- category filter
   # =====================================================================
   puts "\n#{"=" * 60}"
-  puts "[B] Vector-only: 'database query builder'"
+  puts "[B] Filtered vector: 'database ORM queries' + category='testing'"
   puts "=" * 60
-  print_results(index.search(Laurus::VectorTextQuery.new("text_vec", "database query builder"), limit: 3))
+  request = Laurus::SearchRequest.new(
+    vector_query: Laurus::VectorQuery.new("text_vec", embed("database ORM queries")),
+    filter_query: Laurus::TermQuery.new("category", "testing"),
+    limit: 3
+  )
+  print_results(index.search(request))
 
   # =====================================================================
-  # [C] Hybrid search — RRF Fusion
+  # [C] Hybrid search -- RRF Fusion
   # =====================================================================
   puts "\n#{"=" * 60}"
   puts "[C] Hybrid (RRF k=60): vector='template rendering' + lexical='action'"
   puts "=" * 60
   request = Laurus::SearchRequest.new(
     lexical_query: Laurus::TermQuery.new("text", "action"),
-    vector_query: Laurus::VectorTextQuery.new("text_vec", "template rendering"),
+    vector_query: Laurus::VectorQuery.new("text_vec", embed("template rendering")),
     fusion: Laurus::RRF.new(k: 60.0),
     limit: 3
   )
   print_results(index.search(request))
 
   # =====================================================================
-  # [D] Hybrid search — WeightedSum Fusion
+  # [D] Hybrid search -- WeightedSum Fusion
   # =====================================================================
   puts "\n#{"=" * 60}"
   puts "[D] Hybrid (WeightedSum 0.3/0.7): vector='testing isolation' + lexical='mocks'"
   puts "=" * 60
   request = Laurus::SearchRequest.new(
     lexical_query: Laurus::TermQuery.new("text", "mocks"),
-    vector_query: Laurus::VectorTextQuery.new("text_vec", "testing isolation"),
+    vector_query: Laurus::VectorQuery.new("text_vec", embed("testing isolation")),
     fusion: Laurus::WeightedSum.new(lexical_weight: 0.3, vector_weight: 0.7),
     limit: 3
   )
   print_results(index.search(request))
 
   # =====================================================================
-  # [E] Hybrid search with filter query
+  # [E] Hybrid search with filter
   # =====================================================================
   puts "\n#{"=" * 60}"
   puts "[E] Hybrid + filter: vector='package distribution' + lexical='gem' + category='tooling'"
   puts "=" * 60
   request = Laurus::SearchRequest.new(
     lexical_query: Laurus::TermQuery.new("text", "gem"),
-    vector_query: Laurus::VectorTextQuery.new("text_vec", "package distribution"),
+    vector_query: Laurus::VectorQuery.new("text_vec", embed("package distribution")),
     filter_query: Laurus::TermQuery.new("category", "tooling"),
     fusion: Laurus::RRF.new(k: 60.0),
     limit: 3
   )
   print_results(index.search(request))
 
-  # =====================================================================
-  # [F] DSL string query
-  # =====================================================================
-  puts "\n#{"=" * 60}"
-  puts "[F] DSL query string: 'text:middleware'"
-  puts "=" * 60
-  print_results(index.search("text:middleware", limit: 3))
-
-  puts "\nHybrid search example completed!"
+  puts "\nExternal embedder example completed!"
 end
 
 main

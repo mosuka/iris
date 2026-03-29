@@ -72,6 +72,47 @@ ruby -Ilib examples/hybrid_search.rb
 
 ---
 
+### Vector search — external embedder
+
+Uses pre-computed embedding vectors via `VectorQuery`. You bring your own
+embedder (e.g. `informers` gem, `ruby-openai` gem, or any HTTP API) and
+pass the resulting float arrays to laurus.
+
+| Example | Description |
+| :--- | :--- |
+| [external_embedder.rb](external_embedder.rb) | Pre-computed vector search using `informers` gem (with random fallback) |
+| [search_with_openai.rb](search_with_openai.rb) | OpenAI embeddings via `ruby-openai` gem — requires `OPENAI_API_KEY` |
+
+```bash
+gem install informers  # optional
+ruby -Ilib examples/external_embedder.rb
+
+gem install ruby-openai
+export OPENAI_API_KEY=your-api-key-here
+ruby -Ilib examples/search_with_openai.rb
+```
+
+---
+
+### Multimodal search
+
+Stores raw bytes (e.g. images) alongside pre-computed vectors for
+cross-modal similarity search.
+
+| Example | Description |
+| :--- | :--- |
+| [multimodal_search.rb](multimodal_search.rb) | Bytes field + pre-computed vectors for text-to-image and image-to-image search |
+
+```bash
+ruby -Ilib examples/multimodal_search.rb
+```
+
+> **Note:** Ruby does not have a widely-available native CLIP library, so
+> this example uses random fallback vectors. For production use, call a
+> CLIP API externally and pass the resulting vectors to `VectorQuery`.
+
+---
+
 ## Release build
 
 For production performance, build with the release profile:

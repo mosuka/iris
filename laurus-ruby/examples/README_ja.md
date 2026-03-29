@@ -72,6 +72,48 @@ ruby -Ilib examples/hybrid_search.rb
 
 ---
 
+### ベクトル検索 — 外部 Embedder
+
+`VectorQuery` を使って事前計算済みのベクトルを渡します。
+Embedder は外部で用意し（`informers` gem、`ruby-openai` gem、HTTP API など）、
+結果の float 配列を laurus に渡します。
+
+| サンプル | 説明 |
+| :--- | :--- |
+| [external_embedder.rb](external_embedder.rb) | `informers` gem による事前計算ベクトル検索（ランダムフォールバック付き） |
+| [search_with_openai.rb](search_with_openai.rb) | `ruby-openai` gem による OpenAI Embeddings — `OPENAI_API_KEY` が必要 |
+
+```bash
+gem install informers  # 任意
+ruby -Ilib examples/external_embedder.rb
+
+gem install ruby-openai
+export OPENAI_API_KEY=your-api-key-here
+ruby -Ilib examples/search_with_openai.rb
+```
+
+---
+
+### マルチモーダル検索
+
+生バイト（画像など）と事前計算済みベクトルを組み合わせた
+クロスモーダル類似度検索を行います。
+
+| サンプル | 説明 |
+| :--- | :--- |
+| [multimodal_search.rb](multimodal_search.rb) | bytes フィールド + 事前計算ベクトルによるテキスト-画像・画像-画像検索 |
+
+```bash
+ruby -Ilib examples/multimodal_search.rb
+```
+
+> **注意:** Ruby にはネイティブの CLIP ライブラリが広く利用できないため、
+> このサンプルではランダムなフォールバックベクトルを使用しています。
+> 本番環境では CLIP API を外部から呼び出し、結果のベクトルを
+> `VectorQuery` に渡してください。
+
+---
+
 ## リリースビルド
 
 本番環境向けのパフォーマンスが必要な場合は、

@@ -215,12 +215,12 @@
     <div class="card">
       <h2>Search — Unified Query DSL</h2>
       <p class="dsl-hint">
-        Lexical: <code>rust</code> <code>title:wasm</code> <code>"memory safety"</code> &nbsp;
-        Vector: <code>embedding:"how to make code faster"</code> <code>embedding:python</code> &nbsp;
-        Hybrid: <code>rust embedding:"systems programming"</code>
+        Lexical: <code>wasm</code> <code>title:wasm-pack</code> <code>"browser API"</code> &nbsp;
+        Vector: <code>embedding:"how to run native code in the browser"</code> &nbsp;
+        Hybrid: <code>wasm embedding:"compile to web"</code>
       </p>
       <div class="search-box">
-        <input type="text" id="query" placeholder='Try: rust, embedding:"systems programming", or both!' disabled>
+        <input type="text" id="query" placeholder='Try: wasm, embedding:"browser performance", or both!' disabled>
         <button id="search-btn" onclick="doSearch()" disabled>Search</button>
       </div>
       <ul class="results" id="results">
@@ -239,12 +239,12 @@
           </div>
           <div class="field">
             <label>Title</label>
-            <input type="text" id="doc-title" placeholder="Introduction to Rust" disabled>
+            <input type="text" id="doc-title" placeholder="Introduction to WebAssembly" disabled>
           </div>
         </div>
         <div>
           <label>Body</label>
-          <textarea id="doc-body" placeholder="Rust is a systems programming language focused on safety and performance." disabled></textarea>
+          <textarea id="doc-body" placeholder="WebAssembly enables near-native performance for web applications in the browser." disabled></textarea>
         </div>
         <div class="row">
           <button id="add-btn" onclick="addDocument()" disabled>Add & Commit</button>
@@ -344,14 +344,14 @@
         } else {
           // Seed with sample documents on first visit
           const samples = [
-            { id: 'rust-intro', title: 'Introduction to Rust', body: 'Rust is a systems programming language focused on safety, speed, and concurrency. It guarantees memory safety without a garbage collector.' },
-            { id: 'wasm-guide', title: 'WebAssembly Guide', body: 'WebAssembly enables near-native performance for web applications running in the browser. It is a compilation target for languages like Rust and C++.' },
-            { id: 'search-101', title: 'Full-Text Search 101', body: 'Full-text search indexes documents and retrieves them based on keyword relevance using algorithms like BM25 and TF-IDF scoring.' },
-            { id: 'vector-search', title: 'Vector Search Explained', body: 'Vector search finds similar items by comparing high-dimensional embeddings using distance metrics like cosine similarity and dot product.' },
-            { id: 'hybrid', title: 'Hybrid Search', body: 'Hybrid search combines lexical keyword matching with vector similarity to deliver more relevant results using fusion algorithms like RRF.' },
-            { id: 'ml-basics', title: 'Machine Learning Basics', body: 'Machine learning is a branch of artificial intelligence that enables systems to learn from data and improve performance on tasks.' },
-            { id: 'embeddings', title: 'Understanding Embeddings', body: 'Embeddings are dense vector representations of data that capture semantic meaning. Words with similar meanings have similar embeddings.' },
-            { id: 'rust-wasm', title: 'Rust and WebAssembly', body: 'Rust compiles to WebAssembly efficiently, making it ideal for performance-critical browser applications like search engines and games.' },
+            { id: 'wasm-core', title: 'WebAssembly Core Specification', body: 'WebAssembly is a binary instruction format for a stack-based virtual machine. It enables deployment on the web for client and server applications with near-native performance.' },
+            { id: 'wasm-pack', title: 'wasm-pack Build Tool', body: 'wasm-pack helps build and publish Rust-generated WebAssembly packages. It integrates with npm and bundlers like webpack and vite for seamless web development.' },
+            { id: 'wasm-bindgen', title: 'wasm-bindgen Interop', body: 'wasm-bindgen facilitates communication between WebAssembly modules and JavaScript. It generates bindings for DOM APIs, closures, and complex data types.' },
+            { id: 'wasi', title: 'WASI System Interface', body: 'WASI provides a standardized system interface for WebAssembly modules running outside the browser. It enables file access, networking, and environment variables.' },
+            { id: 'browser-api', title: 'Browser APIs from WASM', body: 'WebAssembly modules can access browser APIs through JavaScript bindings including fetch, canvas, WebGL, and Web Workers for parallel computation.' },
+            { id: 'component-model', title: 'WASM Component Model', body: 'The WebAssembly Component Model defines how WASM modules compose and communicate through typed interfaces and shared-nothing linking.' },
+            { id: 'opfs', title: 'OPFS Persistent Storage', body: 'The Origin Private File System provides fast persistent storage for WebAssembly applications in the browser with synchronous access from dedicated workers.' },
+            { id: 'simd', title: 'WASM SIMD Instructions', body: 'WebAssembly SIMD extends the instruction set with 128-bit vector operations for accelerating numerical computation, image processing, and machine learning inference.' },
           ];
 
           appendLog('Indexing sample documents (auto-embedding by engine)...');

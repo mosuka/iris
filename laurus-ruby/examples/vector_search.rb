@@ -21,15 +21,15 @@ EMBEDDER_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 DIM = 384 # dimension for all-MiniLM-L6-v2
 
 CHUNKS = [
-  ["book_a", "The Rust Programming Language", "Chapter 1: Getting Started", 1, "basics"],
-  ["book_a", "The Rust Programming Language", "Cargo is the Rust build system and package manager. Use cargo new to create a crate.", 2, "basics"],
-  ["book_a", "The Rust Programming Language", "Every value in Rust has an owner. Ownership rules prevent data races at compile time.", 3, "memory"],
-  ["book_a", "The Rust Programming Language", "References and borrowing let you use values without taking ownership of them.", 4, "memory"],
-  ["book_a", "The Rust Programming Language", "Generic types and trait bounds enable polymorphism without runtime overhead.", 5, "type-system"],
-  ["book_a", "The Rust Programming Language", "Async functions and tokio provide concurrent programming with lightweight tasks.", 6, "concurrency"],
-  ["book_b", "Programming in Rust", "Rust's type system catches many bugs at compile time. Trait objects enable dynamic dispatch.", 1, "type-system"],
-  ["book_b", "Programming in Rust", "The borrow checker ensures memory safety without garbage collection. Lifetime annotations help.", 2, "memory"],
-  ["book_b", "Programming in Rust", "Rust async/await provides zero-cost concurrency for building scalable concurrent services.", 3, "concurrency"]
+  ["rails_guide", "Ruby on Rails Tutorial", "Rails follows the model-view-controller pattern with Active Record for database access.", 1, "framework"],
+  ["rails_guide", "Ruby on Rails Tutorial", "Rails migrations manage database schema changes with version-controlled Ruby files.", 2, "framework"],
+  ["rails_guide", "Ruby on Rails Tutorial", "Action Controller handles HTTP requests and renders responses through configurable routes.", 3, "framework"],
+  ["sinatra_guide", "Sinatra Web Apps", "Sinatra provides lightweight routing with blocks for building REST APIs and small web applications.", 1, "framework"],
+  ["sinatra_guide", "Sinatra Web Apps", "Sinatra middleware and helpers extend request processing with authentication and logging.", 2, "framework"],
+  ["rspec_book", "Testing with RSpec", "RSpec describe and context blocks organize test examples with readable and expressive syntax.", 1, "testing"],
+  ["rspec_book", "Testing with RSpec", "RSpec mocks and stubs simulate external dependencies to isolate the unit under test.", 2, "testing"],
+  ["rubygems_docs", "RubyGems Fundamentals", "RubyGems is the package manager for Ruby distributing libraries as self-contained gems.", 1, "tooling"],
+  ["rubygems_docs", "RubyGems Fundamentals", "Gemspec files define gem metadata, dependencies, and file lists for publishing to rubygems.org.", 2, "tooling"]
 ].freeze
 
 def print_results(results)
@@ -78,32 +78,32 @@ def main
   # [A] Basic Vector Search
   # =====================================================================
   puts "=" * 60
-  puts "[A] Basic Vector Search: 'memory safety'"
+  puts "[A] Basic Vector Search: 'database ORM queries'"
   puts "=" * 60
-  print_results(index.search(Laurus::VectorTextQuery.new("text_vec", "memory safety"), limit: 3))
+  print_results(index.search(Laurus::VectorTextQuery.new("text_vec", "database ORM queries"), limit: 3))
 
   # =====================================================================
   # [B] Filtered Vector Search — category filter
   # =====================================================================
   puts "\n#{"=" * 60}"
-  puts "[B] Filtered Vector Search: 'memory safety' + category='concurrency'"
+  puts "[B] Filtered Vector Search: 'database ORM queries' + category='testing'"
   puts "=" * 60
   request = Laurus::SearchRequest.new(
-    vector_query: Laurus::VectorTextQuery.new("text_vec", "memory safety"),
-    filter_query: Laurus::TermQuery.new("category", "concurrency"),
+    vector_query: Laurus::VectorTextQuery.new("text_vec", "database ORM queries"),
+    filter_query: Laurus::TermQuery.new("category", "testing"),
     limit: 3
   )
   print_results(index.search(request))
 
   # =====================================================================
-  # [C] Filtered Vector Search — numeric range filter (page <= 3)
+  # [C] Filtered Vector Search — numeric range filter (page = 1)
   # =====================================================================
   puts "\n#{"=" * 60}"
-  puts "[C] Filtered Vector Search: 'type system' + page <= 3"
+  puts "[C] Filtered Vector Search: 'HTTP web routing' + page = 1"
   puts "=" * 60
   request = Laurus::SearchRequest.new(
-    vector_query: Laurus::VectorTextQuery.new("text_vec", "type system"),
-    filter_query: Laurus::NumericRangeQuery.new("page", min: 1, max: 3),
+    vector_query: Laurus::VectorTextQuery.new("text_vec", "HTTP web routing"),
+    filter_query: Laurus::NumericRangeQuery.new("page", min: 1, max: 1),
     limit: 3
   )
   print_results(index.search(request))

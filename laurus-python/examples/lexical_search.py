@@ -39,79 +39,79 @@ def main() -> None:
     # ── Index documents ────────────────────────────────────────────────────
     docs = [
         (
-            "book1",
+            "django",
             {
-                "title": "The Rust Programming Language",
-                "body": "Rust is a systems programming language focused on safety, speed, and concurrency",
-                "category": "programming",
-                "filename": "rust_book.pdf",
+                "title": "Django Web Framework",
+                "body": "Django is a high-level Python web framework with batteries-included architecture and ORM",
+                "category": "framework",
+                "filename": "django_guide.pdf",
                 "in_print": True,
-                "price": 49.99,
-                "year": 2019,
+                "price": 4.8,
+                "year": 2005,
+                "location": (52.3676, 4.9041),  # Amsterdam
+            },
+        ),
+        (
+            "flask",
+            {
+                "title": "Flask Micro Framework",
+                "body": "Flask is a lightweight Python micro framework for building web applications and APIs",
+                "category": "framework",
+                "filename": "flask_docs.epub",
+                "in_print": True,
+                "price": 4.5,
+                "year": 2010,
+                "location": (47.3769, 8.5417),  # Zurich
+            },
+        ),
+        (
+            "numpy",
+            {
+                "title": "NumPy Scientific Computing",
+                "body": "NumPy provides fast numerical arrays and mathematical operations for scientific computing",
+                "category": "scientific",
+                "filename": "numpy_manual.pdf",
+                "in_print": True,
+                "price": 4.9,
+                "year": 2006,
                 "location": (37.7749, -122.4194),  # San Francisco
             },
         ),
         (
-            "book2",
+            "pandas",
             {
-                "title": "Python for Data Science",
-                "body": "Python is a versatile programming language widely used in data science and machine learning",
-                "category": "data-science",
-                "filename": "python_data.epub",
+                "title": "Pandas Data Analysis",
+                "body": "Pandas provides data structures and analysis tools for handling tabular data in Python",
+                "category": "scientific",
+                "filename": "pandas_guide.docx",
                 "in_print": True,
-                "price": 39.99,
-                "year": 2021,
-                "location": (40.7128, -74.0060),  # New York
-            },
-        ),
-        (
-            "book3",
-            {
-                "title": "JavaScript Web Development",
-                "body": "JavaScript powers the modern web from frontend frameworks to backend services",
-                "category": "web-development",
-                "filename": "javascript_web.pdf",
-                "in_print": True,
-                "price": 54.99,
-                "year": 2022,
-                "location": (51.5074, -0.1278),  # London
-            },
-        ),
-        (
-            "book4",
-            {
-                "title": "Machine Learning Algorithms",
-                "body": "Understanding algorithms used in machine learning and artificial intelligence applications",
-                "category": "data-science",
-                "filename": "ml_algorithms.docx",
-                "in_print": True,
-                "price": 72.99,
-                "year": 2020,
+                "price": 4.7,
+                "year": 2008,
                 "location": (37.4419, -122.1430),  # Palo Alto
             },
         ),
         (
-            "book5",
+            "pytest",
             {
-                "title": "Database Design Principles",
-                "body": "Learn database design, SQL queries, and data management for modern applications",
-                "category": "database",
-                "filename": "db_design.pdf",
+                "title": "pytest Testing Framework",
+                "body": "pytest is a powerful testing framework for Python with fixtures and plugins",
+                "category": "testing",
+                "filename": "pytest_docs.pdf",
                 "in_print": False,
-                "price": 45.50,
-                "year": 2018,
-                "location": (47.6062, -122.3321),  # Seattle
+                "price": 4.6,
+                "year": 2004,
+                "location": (52.5200, 13.4050),  # Berlin
             },
         ),
         (
-            "book6",
+            "gunicorn",
             {
-                "title": "The quick brown fox",
-                "body": "The quick brown fox jumped over the lazy dog in a sunny meadow",
+                "title": "Gunicorn WSGI Server",
+                "body": "The quick green snake slithered through the virtual environment garden",
                 "category": "fiction",
-                "filename": "fox_story.txt",
+                "filename": "gunicorn_story.txt",
                 "in_print": False,
-                "price": 12.99,
+                "price": 3.5,
                 "year": 2023,
                 "location": (34.0522, -118.2437),  # Los Angeles
             },
@@ -131,17 +131,17 @@ def main() -> None:
     print("PART 1: TermQuery")
     print("=" * 60)
 
-    print("\n[1a] Search for 'rust' in body:")
-    _print_results(index.search(laurus.TermQuery("body", "rust"), limit=5))
+    print("\n[1a] Search for 'django' in body:")
+    _print_results(index.search(laurus.TermQuery("body", "django"), limit=5))
 
-    print("\n[1b] Search for 'programming' in category (exact):")
-    _print_results(index.search(laurus.TermQuery("category", "programming"), limit=5))
+    print("\n[1b] Search for 'framework' in category (exact):")
+    _print_results(index.search(laurus.TermQuery("category", "framework"), limit=5))
 
     print("\n[1c] Search for in_print=true (boolean field):")
     _print_results(index.search(laurus.TermQuery("in_print", "true"), limit=5))
 
-    print("\n[1d] DSL: 'body:rust':")
-    _print_results(index.search("body:rust", limit=5))
+    print("\n[1d] DSL: 'body:django':")
+    _print_results(index.search("body:django", limit=5))
 
     # =====================================================================
     # PART 2: PhraseQuery — exact word sequence
@@ -150,21 +150,21 @@ def main() -> None:
     print("PART 2: PhraseQuery")
     print("=" * 60)
 
-    print("\n[2a] Phrase 'machine learning' in body:")
+    print("\n[2a] Phrase 'scientific computing' in body:")
     _print_results(
-        index.search(laurus.PhraseQuery("body", ["machine", "learning"]), limit=5)
+        index.search(laurus.PhraseQuery("body", ["scientific", "computing"]), limit=5)
     )
 
-    print("\n[2b] Phrase 'systems programming language' in body:")
+    print("\n[2b] Phrase 'web framework' in body:")
     _print_results(
         index.search(
-            laurus.PhraseQuery("body", ["systems", "programming", "language"]),
+            laurus.PhraseQuery("body", ["web", "framework"]),
             limit=5,
         )
     )
 
-    print("\n[2c] DSL: 'body:\"machine learning\"':")
-    _print_results(index.search('body:"machine learning"', limit=5))
+    print("\n[2c] DSL: 'body:\"scientific computing\"':")
+    _print_results(index.search('body:"scientific computing"', limit=5))
 
     # =====================================================================
     # PART 3: FuzzyQuery — approximate matching (typo tolerance)
@@ -173,18 +173,18 @@ def main() -> None:
     print("PART 3: FuzzyQuery")
     print("=" * 60)
 
-    print("\n[3a] Fuzzy 'programing' (missing 'm', max_edits=2):")
+    print("\n[3a] Fuzzy 'framwork' (missing 'e', max_edits=2):")
     _print_results(
-        index.search(laurus.FuzzyQuery("body", "programing", max_edits=2), limit=5)
+        index.search(laurus.FuzzyQuery("body", "framwork", max_edits=2), limit=5)
     )
 
-    print("\n[3b] Fuzzy 'javascritp' (transposed, max_edits=1):")
+    print("\n[3b] Fuzzy 'numppy' (extra 'p', max_edits=1):")
     _print_results(
-        index.search(laurus.FuzzyQuery("body", "javascritp", max_edits=1), limit=5)
+        index.search(laurus.FuzzyQuery("body", "numppy", max_edits=1), limit=5)
     )
 
-    print("\n[3c] DSL: 'programing~2':")
-    _print_results(index.search("programing~2", limit=5))
+    print("\n[3c] DSL: 'framwork~2':")
+    _print_results(index.search("framwork~2", limit=5))
 
     # =====================================================================
     # PART 4: WildcardQuery — pattern matching with * and ?
@@ -196,11 +196,11 @@ def main() -> None:
     print("\n[4a] Wildcard '*.pdf' in filename:")
     _print_results(index.search(laurus.WildcardQuery("filename", "*.pdf"), limit=5))
 
-    print("\n[4b] Wildcard 'pro*' in body:")
-    _print_results(index.search(laurus.WildcardQuery("body", "pro*"), limit=5))
+    print("\n[4b] Wildcard 'py*' in body:")
+    _print_results(index.search(laurus.WildcardQuery("body", "py*"), limit=5))
 
-    print("\n[4c] DSL: 'body:pro*':")
-    _print_results(index.search("body:pro*", limit=5))
+    print("\n[4c] DSL: 'body:py*':")
+    _print_results(index.search("body:py*", limit=5))
 
     # =====================================================================
     # PART 5: NumericRangeQuery — numeric range filtering
@@ -209,20 +209,20 @@ def main() -> None:
     print("PART 5: NumericRangeQuery")
     print("=" * 60)
 
-    print("\n[5a] Books with price $40–$60 (float range):")
+    print("\n[5a] Entries with rating 4.5–4.9 (float range):")
     _print_results(
         index.search(
-            laurus.NumericRangeQuery("price", min=40.0, max=60.0), limit=5
+            laurus.NumericRangeQuery("price", min=4.5, max=4.9), limit=5
         )
     )
 
-    print("\n[5b] Books published from 2021 onwards (integer range):")
+    print("\n[5b] Entries released from 2008 onwards (integer range):")
     _print_results(
-        index.search(laurus.NumericRangeQuery("year", min=2021), limit=5)
+        index.search(laurus.NumericRangeQuery("year", min=2008), limit=5)
     )
 
-    print("\n[5c] DSL: 'price:[40 TO 60]':")
-    _print_results(index.search("price:[40 TO 60]", limit=5))
+    print("\n[5c] DSL: 'price:[4.5 TO 4.9]':")
+    _print_results(index.search("price:[4.5 TO 4.9]", limit=5))
 
     # =====================================================================
     # PART 6: GeoQuery — geographic search
@@ -256,26 +256,26 @@ def main() -> None:
     print("PART 7: BooleanQuery")
     print("=" * 60)
 
-    print("\n[7a] AND: 'programming' in body AND category='data-science':")
+    print("\n[7a] AND: 'python' in body AND category='scientific':")
     bq = laurus.BooleanQuery()
-    bq.must(laurus.TermQuery("body", "programming"))
-    bq.must(laurus.TermQuery("category", "data-science"))
+    bq.must(laurus.TermQuery("body", "python"))
+    bq.must(laurus.TermQuery("category", "scientific"))
     _print_results(index.search(bq, limit=5))
 
-    print("\n[7b] OR: category='programming' OR category='web-development':")
+    print("\n[7b] OR: category='framework' OR category='testing':")
     bq = laurus.BooleanQuery()
-    bq.should(laurus.TermQuery("category", "programming"))
-    bq.should(laurus.TermQuery("category", "web-development"))
+    bq.should(laurus.TermQuery("category", "framework"))
+    bq.should(laurus.TermQuery("category", "testing"))
     _print_results(index.search(bq, limit=5))
 
-    print("\n[7c] NOT: 'programming' in body, NOT 'python':")
+    print("\n[7c] NOT: 'python' in body, NOT 'django':")
     bq = laurus.BooleanQuery()
-    bq.must(laurus.TermQuery("body", "programming"))
-    bq.must_not(laurus.TermQuery("body", "python"))
+    bq.must(laurus.TermQuery("body", "python"))
+    bq.must_not(laurus.TermQuery("body", "django"))
     _print_results(index.search(bq, limit=5))
 
-    print("\n[7d] DSL: '+body:programming -body:python':")
-    _print_results(index.search("+body:programming -body:python", limit=5))
+    print("\n[7d] DSL: '+body:python -body:django':")
+    _print_results(index.search("+body:python -body:django", limit=5))
 
     # =====================================================================
     # PART 8: SpanQuery — positional / proximity search
@@ -284,13 +284,13 @@ def main() -> None:
     print("PART 8: SpanQuery (no DSL equivalent)")
     print("=" * 60)
 
-    print("\n[8a] SpanNear: 'quick' near 'fox' (slop=1, ordered):")
-    span_q = laurus.SpanQuery.near("body", ["quick", "fox"], slop=1, ordered=True)
+    print("\n[8a] SpanNear: 'quick' near 'snake' (slop=1, ordered):")
+    span_q = laurus.SpanQuery.near("body", ["quick", "snake"], slop=1, ordered=True)
     _print_results(index.search(span_q, limit=5))
 
-    print("\n[8b] SpanContaining: 'quick..fox' containing 'brown':")
-    big = laurus.SpanQuery.near("body", ["quick", "fox"], slop=1, ordered=True)
-    little = laurus.SpanQuery.term("body", "brown")
+    print("\n[8b] SpanContaining: 'quick..snake' containing 'green':")
+    big = laurus.SpanQuery.near("body", ["quick", "snake"], slop=1, ordered=True)
+    little = laurus.SpanQuery.term("body", "green")
     containing = laurus.SpanQuery.containing("body", big, little)
     _print_results(index.search(containing, limit=5))
 

@@ -77,3 +77,34 @@ php -d extension=target/release/liblaurus_php.so -S localhost:8080 examples/sear
 
 > **注意:** 初回実行時に Hugging Face Hub からモデルの重みがダウンロードされます
 > (`sentence-transformers/all-MiniLM-L6-v2`, 約 90 MB)。2 回目以降はローカルキャッシュが使用されます。
+
+---
+
+### ベクトル検索 -- 外部エンベッダー
+
+`VectorQuery` 経由で事前計算済みベクトルを使用します。スキーマにエンベッダーを登録せず、
+呼び出し側が外部でエンベディングを管理します。
+
+追加フィーチャーなしでビルドしてください（標準リリースビルド）:
+
+```bash
+cargo build --release
+```
+
+| サンプル | 説明 |
+| :--- | :--- |
+| [external_embedder.php](external_embedder.php) | ランダムフォールバックベクトルによる事前計算済みベクトル検索（外部依存なし） |
+| [search_with_openai.php](search_with_openai.php) | OpenAI Embeddings API（raw curl）を使用したリアルベクトル検索 |
+| [multimodal_search.php](multimodal_search.php) | マルチモーダル検索: 画像バイト + ベクトル埋め込みを保存し、テキストと画像を横断検索 |
+
+```bash
+php -d extension=target/release/liblaurus_php.so examples/external_embedder.php
+php -d extension=target/release/liblaurus_php.so examples/multimodal_search.php
+```
+
+OpenAI サンプルは API キーが必要です:
+
+```bash
+export OPENAI_API_KEY=your-api-key-here
+php -d extension=target/release/liblaurus_php.so examples/search_with_openai.php
+```

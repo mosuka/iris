@@ -50,61 +50,61 @@ def main
 
   # ── Index documents ────────────────────────────────────────────────────
   docs = [
-    ["book1", {
-      "title" => "The Rust Programming Language",
-      "body" => "Rust is a systems programming language focused on safety, speed, and concurrency",
-      "category" => "programming",
-      "filename" => "rust_book.pdf",
+    ["rails", {
+      "title" => "Ruby on Rails",
+      "body" => "Rails is a full-stack web application framework following convention over configuration and the MVC pattern",
+      "category" => "framework",
+      "filename" => "rails_guide.pdf",
       "in_print" => true,
       "price" => 49.99,
-      "year" => 2019,
+      "year" => 2004,
       "location" => { "lat" => 37.7749, "lon" => -122.4194 } # San Francisco
     }],
-    ["book2", {
-      "title" => "Python for Data Science",
-      "body" => "Python is a versatile programming language widely used in data science and machine learning",
-      "category" => "data-science",
-      "filename" => "python_data.epub",
+    ["sinatra", {
+      "title" => "Sinatra DSL",
+      "body" => "Sinatra is a lightweight Ruby DSL for creating web applications with minimal effort and elegant routing",
+      "category" => "framework",
+      "filename" => "sinatra_docs.epub",
       "in_print" => true,
-      "price" => 39.99,
-      "year" => 2021,
-      "location" => { "lat" => 40.7128, "lon" => -74.0060 } # New York
-    }],
-    ["book3", {
-      "title" => "JavaScript Web Development",
-      "body" => "JavaScript powers the modern web from frontend frameworks to backend services",
-      "category" => "web-development",
-      "filename" => "javascript_web.pdf",
-      "in_print" => true,
-      "price" => 54.99,
-      "year" => 2022,
-      "location" => { "lat" => 51.5074, "lon" => -0.1278 } # London
-    }],
-    ["book4", {
-      "title" => "Machine Learning Algorithms",
-      "body" => "Understanding algorithms used in machine learning and artificial intelligence applications",
-      "category" => "data-science",
-      "filename" => "ml_algorithms.docx",
-      "in_print" => true,
-      "price" => 72.99,
-      "year" => 2020,
+      "price" => 29.99,
+      "year" => 2007,
       "location" => { "lat" => 37.4419, "lon" => -122.1430 } # Palo Alto
     }],
-    ["book5", {
-      "title" => "Database Design Principles",
-      "body" => "Learn database design, SQL queries, and data management for modern applications",
-      "category" => "database",
-      "filename" => "db_design.pdf",
+    ["rspec", {
+      "title" => "RSpec Testing Framework",
+      "body" => "RSpec is a behavior-driven development framework for writing readable and expressive Ruby test specifications",
+      "category" => "testing",
+      "filename" => "rspec_manual.pdf",
+      "in_print" => true,
+      "price" => 44.99,
+      "year" => 2005,
+      "location" => { "lat" => 52.5200, "lon" => 13.4050 } # Berlin
+    }],
+    ["rubocop", {
+      "title" => "RuboCop Style Guide",
+      "body" => "RuboCop is a static code analyzer and formatter enforcing community Ruby style guidelines and best practices",
+      "category" => "tooling",
+      "filename" => "rubocop_guide.docx",
+      "in_print" => true,
+      "price" => 35.50,
+      "year" => 2013,
+      "location" => { "lat" => 51.5074, "lon" => -0.1278 } # London
+    }],
+    ["bundler", {
+      "title" => "Bundler Dependency Manager",
+      "body" => "Bundler manages gem dependencies for Ruby projects ensuring consistent environments across machines",
+      "category" => "tooling",
+      "filename" => "bundler_docs.pdf",
       "in_print" => false,
-      "price" => 45.50,
-      "year" => 2018,
+      "price" => 25.00,
+      "year" => 2010,
       "location" => { "lat" => 47.6062, "lon" => -122.3321 } # Seattle
     }],
-    ["book6", {
-      "title" => "The quick brown fox",
-      "body" => "The quick brown fox jumped over the lazy dog in a sunny meadow",
+    ["matz", {
+      "title" => "The elegant red gem",
+      "body" => "The elegant red gem sparkled beneath the cherry blossom tree in a quiet garden",
       "category" => "fiction",
-      "filename" => "fox_story.txt",
+      "filename" => "gem_story.txt",
       "in_print" => false,
       "price" => 12.99,
       "year" => 2023,
@@ -124,17 +124,17 @@ def main
   puts "PART 1: TermQuery"
   puts "=" * 60
 
-  puts "\n[1a] Search for 'rust' in body:"
-  print_results(index.search(Laurus::TermQuery.new("body", "rust"), limit: 5))
+  puts "\n[1a] Search for 'ruby' in body:"
+  print_results(index.search(Laurus::TermQuery.new("body", "ruby"), limit: 5))
 
-  puts "\n[1b] Search for 'programming' in category (exact):"
-  print_results(index.search(Laurus::TermQuery.new("category", "programming"), limit: 5))
+  puts "\n[1b] Search for 'framework' in category (exact):"
+  print_results(index.search(Laurus::TermQuery.new("category", "framework"), limit: 5))
 
   puts "\n[1c] Search for in_print=true (boolean field):"
   print_results(index.search(Laurus::TermQuery.new("in_print", "true"), limit: 5))
 
-  puts "\n[1d] DSL: 'body:rust':"
-  print_results(index.search("body:rust", limit: 5))
+  puts "\n[1d] DSL: 'body:ruby':"
+  print_results(index.search("body:ruby", limit: 5))
 
   # =====================================================================
   # PART 2: PhraseQuery — exact word sequence
@@ -143,14 +143,14 @@ def main
   puts "PART 2: PhraseQuery"
   puts "=" * 60
 
-  puts "\n[2a] Phrase 'machine learning' in body:"
-  print_results(index.search(Laurus::PhraseQuery.new("body", %w[machine learning]), limit: 5))
+  puts "\n[2a] Phrase 'convention over configuration' in body:"
+  print_results(index.search(Laurus::PhraseQuery.new("body", %w[convention over configuration]), limit: 5))
 
-  puts "\n[2b] Phrase 'systems programming language' in body:"
-  print_results(index.search(Laurus::PhraseQuery.new("body", %w[systems programming language]), limit: 5))
+  puts "\n[2b] Phrase 'web application framework' in body:"
+  print_results(index.search(Laurus::PhraseQuery.new("body", %w[web application framework]), limit: 5))
 
-  puts "\n[2c] DSL: 'body:\"machine learning\"':"
-  print_results(index.search('body:"machine learning"', limit: 5))
+  puts "\n[2c] DSL: 'body:\"convention over configuration\"':"
+  print_results(index.search('body:"convention over configuration"', limit: 5))
 
   # =====================================================================
   # PART 3: FuzzyQuery — approximate matching (typo tolerance)
@@ -159,14 +159,14 @@ def main
   puts "PART 3: FuzzyQuery"
   puts "=" * 60
 
-  puts "\n[3a] Fuzzy 'programing' (missing 'm', max_edits=2):"
-  print_results(index.search(Laurus::FuzzyQuery.new("body", "programing", max_edits: 2), limit: 5))
+  puts "\n[3a] Fuzzy 'rubyy' (extra 'y', max_edits=2):"
+  print_results(index.search(Laurus::FuzzyQuery.new("body", "rubyy", max_edits: 2), limit: 5))
 
-  puts "\n[3b] Fuzzy 'javascritp' (transposed, max_edits=1):"
-  print_results(index.search(Laurus::FuzzyQuery.new("body", "javascritp", max_edits: 1), limit: 5))
+  puts "\n[3b] Fuzzy 'sinatraa' (extra 'a', max_edits=1):"
+  print_results(index.search(Laurus::FuzzyQuery.new("body", "sinatraa", max_edits: 1), limit: 5))
 
-  puts "\n[3c] DSL: 'programing~2':"
-  print_results(index.search("programing~2", limit: 5))
+  puts "\n[3c] DSL: 'rubyy~2':"
+  print_results(index.search("rubyy~2", limit: 5))
 
   # =====================================================================
   # PART 4: WildcardQuery — pattern matching with * and ?
@@ -178,11 +178,11 @@ def main
   puts "\n[4a] Wildcard '*.pdf' in filename:"
   print_results(index.search(Laurus::WildcardQuery.new("filename", "*.pdf"), limit: 5))
 
-  puts "\n[4b] Wildcard 'pro*' in body:"
-  print_results(index.search(Laurus::WildcardQuery.new("body", "pro*"), limit: 5))
+  puts "\n[4b] Wildcard 'rub*' in body:"
+  print_results(index.search(Laurus::WildcardQuery.new("body", "rub*"), limit: 5))
 
-  puts "\n[4c] DSL: 'body:pro*':"
-  print_results(index.search("body:pro*", limit: 5))
+  puts "\n[4c] DSL: 'body:rub*':"
+  print_results(index.search("body:rub*", limit: 5))
 
   # =====================================================================
   # PART 5: NumericRangeQuery — numeric range filtering
@@ -191,14 +191,14 @@ def main
   puts "PART 5: NumericRangeQuery"
   puts "=" * 60
 
-  puts "\n[5a] Books with price $40-$60 (float range):"
-  print_results(index.search(Laurus::NumericRangeQuery.new("price", min: 40.0, max: 60.0), limit: 5))
+  puts "\n[5a] Books with price $30-$50 (float range):"
+  print_results(index.search(Laurus::NumericRangeQuery.new("price", min: 30.0, max: 50.0), limit: 5))
 
-  puts "\n[5b] Books published from 2021 onwards (integer range):"
-  print_results(index.search(Laurus::NumericRangeQuery.new("year", min: 2021), limit: 5))
+  puts "\n[5b] Books published from 2010 onwards (integer range):"
+  print_results(index.search(Laurus::NumericRangeQuery.new("year", min: 2010), limit: 5))
 
-  puts "\n[5c] DSL: 'price:[40 TO 60]':"
-  print_results(index.search("price:[40 TO 60]", limit: 5))
+  puts "\n[5c] DSL: 'price:[30 TO 50]':"
+  print_results(index.search("price:[30 TO 50]", limit: 5))
 
   # =====================================================================
   # PART 6: GeoQuery — geographic search
@@ -220,26 +220,26 @@ def main
   puts "PART 7: BooleanQuery"
   puts "=" * 60
 
-  puts "\n[7a] AND: 'programming' in body AND category='data-science':"
+  puts "\n[7a] AND: 'ruby' in body AND category='framework':"
   bq = Laurus::BooleanQuery.new
-  bq.must(Laurus::TermQuery.new("body", "programming"))
-  bq.must(Laurus::TermQuery.new("category", "data-science"))
+  bq.must(Laurus::TermQuery.new("body", "ruby"))
+  bq.must(Laurus::TermQuery.new("category", "framework"))
   print_results(index.search(bq, limit: 5))
 
-  puts "\n[7b] OR: category='programming' OR category='web-development':"
+  puts "\n[7b] OR: category='framework' OR category='testing':"
   bq = Laurus::BooleanQuery.new
-  bq.should(Laurus::TermQuery.new("category", "programming"))
-  bq.should(Laurus::TermQuery.new("category", "web-development"))
+  bq.should(Laurus::TermQuery.new("category", "framework"))
+  bq.should(Laurus::TermQuery.new("category", "testing"))
   print_results(index.search(bq, limit: 5))
 
-  puts "\n[7c] NOT: 'programming' in body, NOT 'python':"
+  puts "\n[7c] NOT: 'ruby' in body, NOT 'sinatra':"
   bq = Laurus::BooleanQuery.new
-  bq.must(Laurus::TermQuery.new("body", "programming"))
-  bq.must_not(Laurus::TermQuery.new("body", "python"))
+  bq.must(Laurus::TermQuery.new("body", "ruby"))
+  bq.must_not(Laurus::TermQuery.new("body", "sinatra"))
   print_results(index.search(bq, limit: 5))
 
-  puts "\n[7d] DSL: '+body:programming -body:python':"
-  print_results(index.search("+body:programming -body:python", limit: 5))
+  puts "\n[7d] DSL: '+body:ruby -body:sinatra':"
+  print_results(index.search("+body:ruby -body:sinatra", limit: 5))
 
   # =====================================================================
   # PART 8: SpanQuery — positional / proximity search
@@ -248,13 +248,13 @@ def main
   puts "PART 8: SpanQuery (no DSL equivalent)"
   puts "=" * 60
 
-  puts "\n[8a] SpanNear: 'quick' near 'fox' (slop=1, ordered):"
-  span_q = Laurus::SpanQuery.near("body", %w[quick fox], slop: 1, ordered: true)
+  puts "\n[8a] SpanNear: 'elegant' near 'gem' (slop=1, ordered):"
+  span_q = Laurus::SpanQuery.near("body", %w[elegant gem], slop: 1, ordered: true)
   print_results(index.search(span_q, limit: 5))
 
-  puts "\n[8b] SpanContaining: 'quick..fox' containing 'brown':"
-  big = Laurus::SpanQuery.near("body", %w[quick fox], slop: 1, ordered: true)
-  little = Laurus::SpanQuery.term("body", "brown")
+  puts "\n[8b] SpanContaining: 'elegant..gem' containing 'red':"
+  big = Laurus::SpanQuery.near("body", %w[elegant gem], slop: 1, ordered: true)
+  little = Laurus::SpanQuery.term("body", "red")
   containing = Laurus::SpanQuery.containing("body", big, little)
   print_results(index.search(containing, limit: 5))
 

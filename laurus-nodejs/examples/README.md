@@ -34,11 +34,12 @@ Build once, then run any of the examples below:
 | :--- | :--- |
 | [quickstart.mjs](quickstart.mjs) | Minimal search: index, search, stats |
 | [lexical-search.mjs](lexical-search.mjs) | Lexical query types: Term, Phrase, Fuzzy, Wildcard, DSL |
-| [synonym-graph-filter example](../README.md#text-analysis) | Synonym expansion (see README) |
+| [synonym-graph-filter.mjs](synonym-graph-filter.mjs) | Synonym expansion with SynonymDictionary, WhitespaceTokenizer, and SynonymGraphFilter |
 
 ```bash
 node examples/quickstart.mjs
 node examples/lexical-search.mjs
+node examples/synonym-graph-filter.mjs
 ```
 
 ---
@@ -69,6 +70,57 @@ Combines lexical and vector search using RRF
 
 ```bash
 node examples/hybrid-search.mjs
+```
+
+---
+
+### External embedder
+
+Vector and hybrid search with embeddings produced outside
+laurus (e.g. `@xenova/transformers`). Falls back to random
+vectors if the library is not installed.
+
+| Example | Description |
+| :--- | :--- |
+| [external-embedder.mjs](external-embedder.mjs) | Pre-computed vector search with external embedding library |
+
+```bash
+npm install @xenova/transformers   # optional
+node examples/external-embedder.mjs
+```
+
+---
+
+### OpenAI embeddings
+
+Uses the `openai` npm package to produce real embeddings
+via the OpenAI API. Requires an API key.
+
+| Example | Description |
+| :--- | :--- |
+| [search-with-openai.mjs](search-with-openai.mjs) | Vector and hybrid search with OpenAI embeddings |
+
+```bash
+npm install openai
+export OPENAI_API_KEY=your-api-key-here
+node examples/search-with-openai.mjs
+```
+
+---
+
+### Multimodal search
+
+Stores raw image bytes in a `bytes` field alongside CLIP
+embeddings for cross-modal (text-to-image, image-to-text)
+search.
+
+| Example | Description |
+| :--- | :--- |
+| [multimodal-search.mjs](multimodal-search.mjs) | Bytes field + CLIP embeddings for multimodal search |
+
+```bash
+npm install @xenova/transformers   # optional
+node examples/multimodal-search.mjs
 ```
 
 ---

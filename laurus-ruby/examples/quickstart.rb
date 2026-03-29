@@ -19,20 +19,20 @@ schema.set_default_fields(%w[title body])
 index = Laurus::Index.new(schema: schema)
 
 # Add documents.
-index.add_document("doc1", { "title" => "Rust Programming", "body" => "Safety and speed." })
-index.add_document("doc2", { "title" => "Python Basics", "body" => "Versatile language." })
+index.add_document("doc1", { "title" => "Rails Web Framework", "body" => "Convention over configuration for rapid web development." })
+index.add_document("doc2", { "title" => "RSpec Testing", "body" => "Behavior-driven development framework for Ruby." })
 index.commit
 
 # Search with a DSL string.
 puts "=== DSL search ==="
-results = index.search("programming", limit: 5)
+results = index.search("ruby OR development", limit: 5)
 results.each do |r|
   puts "  #{r.id} (score: #{r.score}): #{r.document['title']}"
 end
 
 # Search with a TermQuery object.
 puts "\n=== TermQuery search ==="
-results = index.search(Laurus::TermQuery.new("body", "safety"), limit: 5)
+results = index.search(Laurus::TermQuery.new("body", "convention"), limit: 5)
 results.each do |r|
   puts "  #{r.id} (score: #{r.score}): #{r.document['title']}"
 end

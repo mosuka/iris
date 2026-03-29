@@ -1,27 +1,43 @@
 # frozen_string_literal: true
 
-# Hybrid Search Example — combining lexical and vector search.
+# Search with OpenAI Embedder — real vector search using OpenAI's API.
 #
-# Demonstrates:
-# - Lexical-only search (for comparison)
-# - Vector-only search (for comparison)
-# - Hybrid search with RRF fusion
-# - Hybrid search with WeightedSum fusion
-# - Hybrid search with a filter query
+# This example mirrors search_with_openai.rs but produces embeddings on the
+# Ruby side using the ruby-openai gem, then passes the resulting vectors to
+# Laurus as VectorQuery.
 #
-# The embedder is registered in the schema and laurus automatically converts
-# text to vectors at index and query time — no external embedding library needed.
-#
-# Usage:
+# Prerequisites:
+#   gem install ruby-openai
+#   export OPENAI_API_KEY=your-api-key-here
 #   cd laurus-ruby
-#   bundle exec rake compile  # build with: --features embeddings-candle
-#   ruby -Ilib examples/hybrid_search.rb
+#   bundle exec rake compile
+#   ruby -Ilib examples/search_with_openai.rb
 
 require "laurus"
 
-EMBEDDER_NAME = "bert"
-EMBEDDER_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
-DIM = 384 # dimension for all-MiniLM-L6-v2
+# ---------------------------------------------------------------------------
+# OpenAI embedding helper
+# ---------------------------------------------------------------------------
+
+begin
+  require "openai"
+rescue LoadError
+  puts "ERROR: ruby-openai gem not installed."
+  puts "       Install with: gem install ruby-openai"
+  exit 1
+end
+
+MODEL = "text-embedding-3-small"
+DIM = 1536
+
+def embed(client, text)
+  response = client.embeddings(parameters: { model: MODEL, input: text })
+  response.dig("data", 0, "embedding")
+end
+
+# ---------------------------------------------------------------------------
+# Dataset
+# ---------------------------------------------------------------------------
 
 CHUNKS = [
   ["rails_guide", "Ruby on Rails Tutorial", "Rails follows the model-view-controller pattern with Active Record for database access.", 1, "framework"],
@@ -48,103 +64,102 @@ def print_results(results)
 end
 
 def main
-  puts "=== Laurus Hybrid Search Example ===\n\n"
-  puts "Embedder: #{EMBEDDER_MODEL} (dim=#{DIM})\n\n"
+  api_key = ENV["OPENAI_API_KEY"]
+  unless api_key
+    puts "ERROR: OPENAI_API_KEY environment variable not set."
+    puts "       export OPENAI_API_KEY=your-api-key-here"
+    exit 1
+  end
 
-  # ── Schema ─────────────────────────────────────────────────────────────
+  puts "=== Laurus Search with OpenAI Embedder ===\n\n"
+
+  client = OpenAI::Client.new(access_token: api_key)
+  puts "OpenAI embedder ready (model=#{MODEL}, dim=#{DIM})\n\n"
+
+  # -- Schema ---------------------------------------------------------------
   schema = Laurus::Schema.new
-  schema.add_embedder(EMBEDDER_NAME, { "type" => "candle_bert", "model" => EMBEDDER_MODEL })
   schema.add_text_field("title")
   schema.add_text_field("text")
   schema.add_text_field("category")
   schema.add_integer_field("page")
-  schema.add_flat_field("text_vec", DIM, distance: "cosine", embedder: EMBEDDER_NAME)
+  schema.add_flat_field("text_vec", DIM, distance: "cosine")
   schema.set_default_fields(%w[text])
 
   index = Laurus::Index.new(schema: schema)
 
-  # ── Index ──────────────────────────────────────────────────────────────
+  # -- Index ----------------------------------------------------------------
   puts "--- Indexing chunked documents ---\n\n"
   CHUNKS.each do |doc_id, title, text, page, category|
+    vec = embed(client, text)
     index.add_document(doc_id, {
       "title" => title,
       "text" => text,
       "category" => category,
       "page" => page,
-      "text_vec" => text
+      "text_vec" => vec
     })
+    puts "  Indexed #{doc_id} page #{page}: #{text[0, 50].inspect}..."
   end
   index.commit
-  puts "Indexed #{CHUNKS.size} chunks.\n\n"
+  puts "\nIndexed #{CHUNKS.size} chunks.\n\n"
 
   # =====================================================================
-  # [A] Lexical-only search (baseline)
+  # [A] Vector Search
   # =====================================================================
   puts "=" * 60
-  puts "[A] Lexical-only: term 'migrations' in text"
+  puts "[A] Vector Search: 'database ORM queries'"
   puts "=" * 60
-  print_results(index.search(Laurus::TermQuery.new("text", "migrations"), limit: 3))
+  print_results(index.search(Laurus::VectorQuery.new("text_vec", embed(client, "database ORM queries")), limit: 3))
 
   # =====================================================================
-  # [B] Vector-only search (baseline)
+  # [B] Filtered Vector Search -- category filter
   # =====================================================================
   puts "\n#{"=" * 60}"
-  puts "[B] Vector-only: 'database query builder'"
+  puts "[B] Filtered Vector Search: 'database ORM queries' + category='testing'"
   puts "=" * 60
-  print_results(index.search(Laurus::VectorTextQuery.new("text_vec", "database query builder"), limit: 3))
+  request = Laurus::SearchRequest.new(
+    vector_query: Laurus::VectorQuery.new("text_vec", embed(client, "database ORM queries")),
+    filter_query: Laurus::TermQuery.new("category", "testing"),
+    limit: 3
+  )
+  print_results(index.search(request))
 
   # =====================================================================
-  # [C] Hybrid search — RRF Fusion
+  # [C] Filtered Vector Search -- numeric range filter
   # =====================================================================
   puts "\n#{"=" * 60}"
-  puts "[C] Hybrid (RRF k=60): vector='template rendering' + lexical='action'"
+  puts "[C] Filtered Vector Search: 'web server HTTP' + page=1"
+  puts "=" * 60
+  request = Laurus::SearchRequest.new(
+    vector_query: Laurus::VectorQuery.new("text_vec", embed(client, "web server HTTP")),
+    filter_query: Laurus::NumericRangeQuery.new("page", min: 1, max: 1),
+    limit: 3
+  )
+  print_results(index.search(request))
+
+  # =====================================================================
+  # [D] Lexical Search
+  # =====================================================================
+  puts "\n#{"=" * 60}"
+  puts "[D] Lexical Search: 'middleware'"
+  puts "=" * 60
+  print_results(index.search(Laurus::TermQuery.new("text", "middleware"), limit: 3))
+
+  # =====================================================================
+  # [E] Hybrid Search (RRF)
+  # =====================================================================
+  puts "\n#{"=" * 60}"
+  puts "[E] Hybrid Search (RRF): vector='template rendering' + lexical='action'"
   puts "=" * 60
   request = Laurus::SearchRequest.new(
     lexical_query: Laurus::TermQuery.new("text", "action"),
-    vector_query: Laurus::VectorTextQuery.new("text_vec", "template rendering"),
+    vector_query: Laurus::VectorQuery.new("text_vec", embed(client, "template rendering")),
     fusion: Laurus::RRF.new(k: 60.0),
     limit: 3
   )
   print_results(index.search(request))
 
-  # =====================================================================
-  # [D] Hybrid search — WeightedSum Fusion
-  # =====================================================================
-  puts "\n#{"=" * 60}"
-  puts "[D] Hybrid (WeightedSum 0.3/0.7): vector='testing isolation' + lexical='mocks'"
-  puts "=" * 60
-  request = Laurus::SearchRequest.new(
-    lexical_query: Laurus::TermQuery.new("text", "mocks"),
-    vector_query: Laurus::VectorTextQuery.new("text_vec", "testing isolation"),
-    fusion: Laurus::WeightedSum.new(lexical_weight: 0.3, vector_weight: 0.7),
-    limit: 3
-  )
-  print_results(index.search(request))
-
-  # =====================================================================
-  # [E] Hybrid search with filter query
-  # =====================================================================
-  puts "\n#{"=" * 60}"
-  puts "[E] Hybrid + filter: vector='package distribution' + lexical='gem' + category='tooling'"
-  puts "=" * 60
-  request = Laurus::SearchRequest.new(
-    lexical_query: Laurus::TermQuery.new("text", "gem"),
-    vector_query: Laurus::VectorTextQuery.new("text_vec", "package distribution"),
-    filter_query: Laurus::TermQuery.new("category", "tooling"),
-    fusion: Laurus::RRF.new(k: 60.0),
-    limit: 3
-  )
-  print_results(index.search(request))
-
-  # =====================================================================
-  # [F] DSL string query
-  # =====================================================================
-  puts "\n#{"=" * 60}"
-  puts "[F] DSL query string: 'text:middleware'"
-  puts "=" * 60
-  print_results(index.search("text:middleware", limit: 3))
-
-  puts "\nHybrid search example completed!"
+  puts "\nSearch with OpenAI example completed!"
 end
 
 main
