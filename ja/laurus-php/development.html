@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-4e95c647.js";
+            window.path_to_searchindex_js = "../searchindex-4dfb22af.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-0f2ac19d.js"></script>
@@ -277,6 +277,38 @@ sed -i 's/^links = "clang"/# links = "clang"/' patches/ext-php-rs-clang-sys/Carg
 # 4. ビルドを確認
 cargo build -p laurus-php -p laurus-ruby
 </code></pre>
+<h2 id="macos-リンカーフラグ--undefined-dynamic_lookup"><a class="header" href="#macos-リンカーフラグ--undefined-dynamic_lookup">macOS リンカーフラグ (<code>-undefined dynamic_lookup</code>)</a></h2>
+<p>PHP 拡張は共有ライブラリ（<code>.so</code> / <code>.dylib</code>）であり、実行時に PHP インタプリタに
+ロードされます。PHP API シンボル（<code>zend_*</code>, <code>php_*</code> 等）は PHP バイナリ本体に
+定義されており、拡張がリンクするライブラリには含まれません。Linux ではリンカーが
+共有ライブラリ内の未定義シンボルをデフォルトで許容するため問題ありませんが、
+macOS ではリンカーが未定義シンボルをエラーとして扱い、ビルドが失敗します:</p>
+<pre><code class="language-text">ld: symbol(s) not found for architecture arm64
+</code></pre>
+<p>修正方法は <code>-Wl,-undefined,dynamic_lookup</code> をリンカーに渡すことです。これにより
+シンボル解決がロード時（PHP が拡張を <code>dlopen</code> する時点）まで延期されます。</p>
+<p>このフラグは <code>.cargo/config.toml</code> には設定<strong>しません</strong>。設定すると workspace 内の
+全クレートに適用され、PHP 以外のクレートでも未定義シンボルがエラーにならなくなる
+ためです。代わりに <code>laurus-php</code> のビルド時のみ適用します:</p>
+<p><strong>Makefile</strong>（ローカル開発）:</p>
+<pre><code class="language-makefile">build-laurus-php:
+ifeq ($(shell uname -s),Darwin)
+    RUSTFLAGS="-C link-args=-Wl,-undefined,dynamic_lookup" cargo build -p laurus-php --release
+else
+    cargo build -p laurus-php --release
+endif
+</code></pre>
+<p><strong>CI</strong>（GitHub Actions）:</p>
+<pre><code class="language-yaml">- name: Build PHP extension
+  shell: bash
+  run: |
+    if [ "$RUNNER_OS" == "macOS" ]; then
+      export RUSTFLAGS="-C link-args=-Wl,-undefined,dynamic_lookup"
+    fi
+    cargo build --release -p laurus-php
+</code></pre>
+<p>macOS でビルドする際は、<code>cargo build -p laurus-php</code> を直接実行するのではなく、
+<code>make build-laurus-php</code> または <code>make test-laurus-php</code> を使用してください。</p>
 <h2 id="プロジェクト構成"><a class="header" href="#プロジェクト構成">プロジェクト構成</a></h2>
 <pre><code class="language-text">laurus-php/
 ├── Cargo.toml          # Rust クレートマニフェスト
