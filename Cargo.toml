@@ -8,8 +8,8 @@ members = [
     "laurus-nodejs",
     "laurus-wasm",
     "laurus-ruby",
+    "laurus-php",
 ]
-exclude = ["laurus-php"]
 resolver = "2"
 
 [workspace.package]
@@ -51,6 +51,9 @@ tonic-prost = "0.14.5"
 tonic-prost-build = "0.14.5"
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
+
+[patch.crates-io]
+ext-php-rs-clang-sys = { path = "patches/ext-php-rs-clang-sys" }
 
 [profile.release]
 lto = true

@@ -92,6 +92,58 @@ cargo clean
 rm -rf vendor/
 ```
 
+## Workspace integration and the clang-sys patch
+
+`laurus-php` uses [ext-php-rs](https://github.com/extphprs/ext-php-rs), which
+depends on `ext-php-rs-clang-sys` (a fork of `clang-sys`). The `laurus-ruby`
+crate depends on `magnus`, which in turn depends on the original `clang-sys`.
+Both crates declare `links = "clang"`, and Cargo forbids two packages with the
+same `links` value in a single workspace.
+
+To allow `laurus-php` and `laurus-ruby` to coexist as workspace members, the
+root `Cargo.toml` patches `ext-php-rs-clang-sys` with a local copy that has the
+`links` declaration removed:
+
+```toml
+# Cargo.toml (workspace root)
+[patch.crates-io]
+ext-php-rs-clang-sys = { path = "patches/ext-php-rs-clang-sys" }
+```
+
+The patch lives in `patches/ext-php-rs-clang-sys/`. The only change from the
+upstream crate is the removal of `links = "clang"` in its `Cargo.toml`. This is
+safe because both `clang-sys` and `ext-php-rs-clang-sys` use `libclang` only at
+build time (for `bindgen` header parsing) and do not link it into the final
+binary.
+
+### When is the patch needed?
+
+This patch is only required because `laurus-php` and `laurus-ruby` are both
+members of the same Cargo workspace. If `laurus-ruby` were removed from the
+workspace (or if `laurus-php` were excluded via `[workspace] exclude`), the
+`links = "clang"` conflict would not occur and the patch could be removed along
+with the `[patch.crates-io]` section in the root `Cargo.toml`.
+
+### Updating the patch
+
+When `ext-php-rs` is upgraded and pulls in a new version of
+`ext-php-rs-clang-sys`, update the patch:
+
+```bash
+# 1. Update ext-php-rs in laurus-php/Cargo.toml, then:
+cargo update -p ext-php-rs
+
+# 2. Copy the new ext-php-rs-clang-sys source
+cp -r ~/.cargo/registry/src/index.crates.io-*/ext-php-rs-clang-sys-<NEW_VERSION>/* \
+      patches/ext-php-rs-clang-sys/
+
+# 3. Remove the links declaration
+sed -i 's/^links = "clang"/# links = "clang"/' patches/ext-php-rs-clang-sys/Cargo.toml
+
+# 4. Verify the build
+cargo build -p laurus-php -p laurus-ruby
+```
+
 ## Project layout
 
 ```text

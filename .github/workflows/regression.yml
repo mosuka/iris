@@ -611,19 +611,18 @@ jobs:
       - name: Build PHP extension
         shell: bash
         run: |
-          cd laurus-php
           if [ "${{ matrix.platform.skip_embedding_features }}" == "true" ]; then
-            cargo build --release
+            cargo build --release -p laurus-php
           else
-            cargo build --release --features embeddings-all
+            cargo build --release -p laurus-php --features embeddings-all
           fi
 
       - name: Run tests
+        working-directory: laurus-php
         shell: bash
         run: |
-          cd laurus-php
           composer install
-          php -d extension=target/release/liblaurus_php.so vendor/bin/phpunit tests/LaurusTest.php
+          php -d extension=../target/release/liblaurus_php.so vendor/bin/phpunit tests/LaurusTest.php
 
   # ============================================================
   # Gate: ensure all tests pass
